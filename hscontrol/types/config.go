@@ -166,11 +166,11 @@ type Config struct {
 	// the config file is in force; see [Config.SetDNSOverride].
 	dnsOverride *DNSSettings
 	// trafficResolvers are the gateway resolvers the traffic monitor's
-	// DNS log points clients at; see [Config.SetTrafficResolvers].
-	// tailcfgDNSByResolver holds, per resolver address, the DNS
-	// configuration of the clients assigned to it.
+	// DNS log uses; see [Config.SetTrafficResolvers].
+	// tailcfgDNSByExitNode holds, per gateway, the DNS configuration of
+	// the nodes using it as their exit node.
 	trafficResolvers     []TrafficResolver
-	tailcfgDNSByResolver map[netip.Addr]*tailcfg.DNSConfig
+	tailcfgDNSByExitNode map[tailcfg.StableNodeID]*tailcfg.DNSConfig
 	// dnsFileRecords holds the records read from dns.extra_records_path
 	// once the watcher has read the file.
 	dnsFileRecords    []tailcfg.DNSRecord
@@ -2125,11 +2125,11 @@ func (c *Config) RebuildTailcfgDNS() {
 	c.rebuildTailcfgDNSLocked()
 }
 
-// SetTrafficResolvers points the clients' DNS at the traffic monitor's
-// gateway resolvers, each client at one of them; nil stops. They are not
-// part of the effective settings, so an operator saving the DNS page never
-// stores them. [Config.TailcfgDNSConfig] stays the configuration without
-// them.
+// SetTrafficResolvers sets the traffic monitor's gateway resolvers: a node
+// is pointed at one of them only while it uses that gateway as its exit
+// node; nil stops. They are not part of the effective settings, so an
+// operator saving the DNS page never stores them.
+// [Config.TailcfgDNSConfig] stays the configuration without them.
 func (c *Config) SetTrafficResolvers(resolvers []TrafficResolver) {
 	tailcfgDNSMu.Lock()
 	defer tailcfgDNSMu.Unlock()
@@ -2147,20 +2147,25 @@ func (c *Config) TrafficResolvers() []TrafficResolver {
 	return slices.Clone(c.trafficResolvers)
 }
 
-// CloneTailcfgDNSConfigFor is [Config.CloneTailcfgDNSConfig] for the node
-// id holding addrs: while the DNS log is on, the configuration that sends
-// the node's queries to the gateway resolver assigned to it. A gateway
-// running one of the resolvers gets the configuration without them, since
-// its resolver forwards through the gateway's own system resolver, which
-// would ask a gateway resolver again.
-func (c *Config) CloneTailcfgDNSConfigFor(id NodeID, addrs []netip.Addr) *tailcfg.DNSConfig {
+// CloneTailcfgDNSConfigFor is [Config.CloneTailcfgDNSConfig] for node id,
+// which reports exitNode as the exit node it uses: while that exit node
+// is a gateway whose resolver the DNS log uses, the configuration that
+// sends the node's queries to it. Every other node, and a node that uses
+// no exit node, gets the tailnet's configuration unchanged.
+func (c *Config) CloneTailcfgDNSConfigFor(id NodeID, exitNode tailcfg.StableNodeID) *tailcfg.DNSConfig {
 	tailcfgDNSMu.RLock()
 	defer tailcfgDNSMu.RUnlock()
 
 	cfg := c.TailcfgDNSConfig
 
-	if r, ok := AssignTrafficResolver(c.trafficResolvers, id, addrs); ok {
-		cfg = c.tailcfgDNSByResolver[r.Addr]
+	if exitNode != "" {
+		for _, r := range c.trafficResolvers {
+			if r.Stable == exitNode && r.Node != id {
+				cfg = c.tailcfgDNSByExitNode[exitNode]
+
+				break
+			}
+		}
 	}
 
 	if cfg == nil {
@@ -2168,54 +2173,6 @@ func (c *Config) CloneTailcfgDNSConfigFor(id NodeID, addrs []netip.Addr) *tailcf
 	}
 
 	return cfg.Clone()
-}
-
-// AssignTrafficResolver picks the gateway resolver for node id holding
-// addrs by rendezvous hashing: each node goes to the resolver its hash
-// with the node ranks highest, so a resolver joining or leaving moves only
-// the nodes it wins or held, and every server picks the same one. A
-// gateway running a resolver gets none.
-func AssignTrafficResolver(resolvers []TrafficResolver, id NodeID, addrs []netip.Addr) (TrafficResolver, bool) {
-	var (
-		best      TrafficResolver
-		bestScore uint64
-		found     bool
-	)
-
-	for _, r := range resolvers {
-		if r.Node == id || slices.Contains(addrs, r.Addr) {
-			return TrafficResolver{}, false
-		}
-
-		score := rendezvousScore(id, r.Node)
-		if !found || score > bestScore || (score == bestScore && r.Node < best.Node) {
-			best, bestScore, found = r, score, true
-		}
-	}
-
-	return best, found
-}
-
-// rendezvousScore mixes the two IDs into a well spread 64-bit score
-// (splitmix64 finaliser over their combination).
-func rendezvousScore(node, resolver NodeID) uint64 {
-	const (
-		golden = 0x9e3779b97f4a7c15
-		mixA   = 0xbf58476d1ce4e5b9
-		mixB   = 0x94d049bb133111eb
-		shiftA = 30
-		shiftB = 27
-		shiftC = 31
-	)
-
-	x := uint64(node)*golden ^ uint64(resolver)
-	x ^= x >> shiftA
-	x *= mixA
-	x ^= x >> shiftB
-	x *= mixB
-	x ^= x >> shiftC
-
-	return x
 }
 
 func (c *Config) effectiveDNSLocked() DNSConfig {
@@ -2242,42 +2199,38 @@ func (c *Config) rebuildTailcfgDNSLocked() {
 	c.addMagicDNSRoutes(own)
 	c.TailcfgDNSConfig = own
 
-	c.tailcfgDNSByResolver = make(map[netip.Addr]*tailcfg.DNSConfig, len(c.trafficResolvers))
+	c.tailcfgDNSByExitNode = make(map[tailcfg.StableNodeID]*tailcfg.DNSConfig, len(c.trafficResolvers))
 
 	for _, r := range c.trafficResolvers {
-		cfg := dnsToTailcfgDNS(withTrafficResolver(effective, r.Addr))
-		c.addMagicDNSRoutes(cfg)
-		c.tailcfgDNSByResolver[r.Addr] = cfg
+		c.tailcfgDNSByExitNode[r.Stable] = withTrafficResolver(own, r)
 	}
 }
 
-// withTrafficResolver puts a gateway resolver first among the global
-// nameservers and makes every query go to it: without the override a
-// client asks the global nameservers only when its own resolver fails.
-// Every global nameserver is kept while the client uses an exit node:
-// a client with an exit node drops the resolvers without that flag, and
-// with the gateway resolver alone it would lose DNS the moment that
-// gateway went away. The client asks all of them at once, so the gateway
-// still sees every query while it answers.
-func withTrafficResolver(d DNSConfig, resolver netip.Addr) DNSConfig {
-	name := resolver.String()
-	global := []string{name}
+// withTrafficResolver is the DNS of a node using the gateway of r as its
+// exit node. A client with an exit node keeps only the resolvers flagged
+// for use with one, and otherwise asks the exit node itself, so the
+// gateway's resolver goes first, then the gateway's own exit node
+// resolver, which answers as it would without the monitor should the
+// agent stop, then the operator's own resolvers flagged for exit nodes.
+// The client asks them in parallel, so the gateway's resolver sees every
+// question while it answers.
+func withTrafficResolver(own *tailcfg.DNSConfig, r TrafficResolver) *tailcfg.DNSConfig {
+	cfg := own.Clone()
 
-	for _, ns := range d.Nameservers.Global {
-		if ns != name {
-			global = append(global, ns)
+	resolvers := []*dnstype.Resolver{{Addr: r.Addr.String(), UseWithExitNode: true}}
+	if r.DoH != "" {
+		resolvers = append(resolvers, &dnstype.Resolver{Addr: r.DoH, UseWithExitNode: true})
+	}
+
+	for _, res := range own.Resolvers {
+		if res.UseWithExitNode && res.Addr != r.Addr.String() {
+			resolvers = append(resolvers, res)
 		}
 	}
 
-	d.OverrideLocalDNS = true
-	d.Nameservers = Nameservers{
-		Global:               global,
-		Split:                d.Nameservers.Split,
-		UseWithExitNode:      slices.Clone(global),
-		SplitUseWithExitNode: d.Nameservers.SplitUseWithExitNode,
-	}
+	cfg.Resolvers = resolvers
 
-	return d
+	return cfg
 }
 
 // addMagicDNSRoutes maps the IPv4/IPv6 reverse zones of the tailnet's

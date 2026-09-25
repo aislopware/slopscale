@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/traffic"
+	"tailscale.com/tailcfg"
 )
 
 // SettingTraffic is the settings row that holds [TrafficSettings] as JSON;
@@ -80,9 +81,10 @@ type TrafficSettings struct {
 	// SNI has the agents read the server name of TLS and QUIC handshakes
 	// to name each destination.
 	SNI bool `json:"sni"`
-	// DNSLogging has the agents run a resolver and points every client at
-	// the ones that answer, so the monitor sees the names each node looks
-	// up, even for traffic that does not cross a gateway.
+	// DNSLogging has the agents run a resolver and points the nodes using
+	// a gateway as their exit node at its resolver while they do, so the
+	// monitor sees the names they look up then. Every other node's DNS is
+	// left alone and never logged.
 	DNSLogging bool `json:"dnsLogging"`
 	// Retention is how long each resolution is kept.
 	Retention TrafficRetention `json:"retention"`
@@ -100,7 +102,7 @@ type TrafficRetention struct {
 
 // DefaultTrafficSettings is what a tailnet runs with before an operator
 // changes anything: names from handshakes on, the DNS log off, since it
-// changes every client's resolver.
+// changes the resolver of the gateways' exit node users.
 func DefaultTrafficSettings() TrafficSettings {
 	return TrafficSettings{
 		SNI: true,
@@ -165,16 +167,22 @@ type TrafficReporter struct {
 	// Dropped the entries the agent discarded.
 	Unattributed uint64
 	Dropped      uint64
-	// ResolverApprovedAt is when an operator let the tailnet's clients
-	// use the gateway's resolver; zero while it may not.
+	// ResolverApprovedAt is when an operator let the gateway's exit node
+	// users use its resolver; zero while they may not.
 	ResolverApprovedAt time.Time
 }
 
 // TrafficResolver is a gateway resolver the traffic monitor's DNS log
-// points clients at: the gateway and the address it answers on.
+// points a node at while the node uses the gateway as its exit node: the
+// gateway, the address its resolver answers on, and the gateway's own
+// exit node resolver (its peer API DNS-over-HTTP URL), which the node
+// falls back to as it would without the monitor.
 type TrafficResolver struct {
-	Node NodeID
-	Addr netip.Addr
+	Node   NodeID
+	Stable tailcfg.StableNodeID
+	Addr   netip.Addr
+	// DoH is empty when the gateway announced no peer API port.
+	DoH string
 }
 
 // IsPrivateTrafficDestination reports whether dst is an address a gateway

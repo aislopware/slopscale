@@ -125,11 +125,12 @@ type TrafficReporter struct {
 	Stale        bool              `doc:"No report for 90 seconds."           json:"stale"`
 	Collectors   TrafficCollectors `json:"collectors"`
 	DNSListen    []string          `doc:"Where the agent's resolver answers." json:"dnsListen" nullable:"false"`
-	// ResolverActive reports whether clients are pointed at this
-	// gateway's resolver now.
+	// ResolverActive reports whether the nodes using this gateway as
+	// their exit node are pointed at its resolver now.
 	ResolverActive bool `json:"resolverActive"`
-	// ResolverApprovedAt is when an operator let the clients use this
-	// gateway's resolver; unset until then, and the resolver is not used.
+	// ResolverApprovedAt is when an operator let the gateway's exit node
+	// users use its resolver; unset until then, and the resolver is not
+	// used.
 	ResolverApprovedAt *time.Time `json:"resolverApprovedAt,omitempty"`
 	// Refused says why the gateway may not report now, empty while it
 	// may: it must be tagged, approved, not suspended or expired, and
@@ -144,8 +145,8 @@ type TrafficReporter struct {
 
 // TrafficReporterPatch changes a gateway's standing.
 type TrafficReporterPatch struct {
-	// Resolver lets the tailnet's clients use the gateway's resolver
-	// while DNS logging is on, or stops them.
+	// Resolver lets the nodes using the gateway as their exit node use
+	// its resolver while DNS logging is on, or stops them.
 	Resolver bool `json:"resolver"`
 }
 
@@ -159,8 +160,8 @@ type TrafficRetention struct {
 // TrafficSettings are the traffic monitor's settings.
 type TrafficSettings struct {
 	SNI bool `doc:"Agents name destinations from TLS and QUIC handshakes." json:"sni"`
-	// DNSLogging points every client at the gateways' resolvers, so the
-	// monitor sees what each node looks up.
+	// DNSLogging points the nodes using a gateway as their exit node at
+	// its resolver, so the monitor sees what they look up while they do.
 	DNSLogging bool             `json:"dnsLogging"`
 	Retention  TrafficRetention `json:"retention"`
 }
@@ -254,19 +255,16 @@ type (
 	trafficReportersOutput struct {
 		Body struct {
 			Reporters []TrafficReporter `json:"reporters" nullable:"false"`
-			// Resolvers are the gateway resolvers every client is
-			// pointed at now.
+			// Resolvers are the gateway resolvers the DNS log uses now,
+			// each for the nodes using its gateway as their exit node.
 			Resolvers []string `json:"resolvers" nullable:"false"`
 			// ASNRanges is how many address ranges the ASN table in use
 			// holds; 0 until one is downloaded.
 			ASNRanges int `json:"asnRanges"`
-			// SkippedUpstreams are the global nameservers the agents'
-			// resolvers cannot forward to: DNS over TLS and tailnet
-			// addresses.
+			// SkippedUpstreams are the global nameservers kept for exit
+			// node users that the agents' resolvers cannot forward to: DNS
+			// over TLS and tailnet addresses.
 			SkippedUpstreams []string `json:"skippedUpstreams" nullable:"false"`
-			// DNSBlocked says why DNS logging points no client at a
-			// gateway resolver although it is on; empty otherwise.
-			DNSBlocked string `json:"dnsBlocked"`
 		}
 	}
 	trafficReporterOutput struct {
@@ -404,7 +402,7 @@ func registerTrafficReads(api huma.API, b Backend) {
 		Path:        "/api/v1/traffic/reporters",
 		Summary:     "List traffic reporters",
 		Description: "The gateways whose agent has reported, with each collector's state and " +
-			"the resolvers the clients are pointed at.",
+			"the resolvers their exit node users are pointed at.",
 		Tags:     []string{tagTraffic},
 		Security: bearerAuth,
 	}, scope.LogsNetworkRead), func(_ context.Context, _ *struct{}) (*trafficReportersOutput, error) {
@@ -430,10 +428,11 @@ func registerTrafficAdmin(api huma.API, b Backend) {
 		Path:        "/api/v1/traffic/settings",
 		Summary:     "Update traffic settings",
 		Description: "Changes the settings named. The agents take the collector switches with " +
-			"their next report. Turning DNS logging on points each client at one approved gateway " +
-			"resolver, besides the global nameservers, while the gateway reports; turning it off " +
-			"points them back. Changing DNS logging needs the dns scope too, and turning it on " +
-			"needs a global nameserver the agents can forward to.",
+			"their next report. Turning DNS logging on points the nodes using a gateway as their " +
+			"exit node at the gateway's approved resolver while it reports, and logs what they look " +
+			"up while they do; turning it off points them back. Nodes that use no exit node, and " +
+			"clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the " +
+			"dns scope too.",
 		Tags:     []string{tagTraffic},
 		Security: bearerAuth,
 	}, scope.LogsNetwork), "traffic.settings.update", "", ""), func(
@@ -441,7 +440,8 @@ func registerTrafficAdmin(api huma.API, b Backend) {
 	) (*trafficSettingsOutput, error) {
 		if d := in.Body.DNSLogging; d != nil && *d != b.State.TrafficSettings().DNSLogging &&
 			!caller(ctx).Allows(scope.DNS) {
-			return nil, huma.Error403Forbidden("changing DNS logging moves every client's DNS and needs the dns scope")
+			return nil, huma.Error403Forbidden(
+				"changing DNS logging moves the exit node users' DNS and needs the dns scope")
 		}
 
 		saved, c, err := b.State.PatchTrafficSettings(func(s *types.TrafficSettings) {
@@ -465,7 +465,7 @@ func registerTrafficAdmin(api huma.API, b Backend) {
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/traffic/reporters/{nodeId}",
 		Summary:     "Remove traffic reporter",
-		Description: "Forgets a gateway's agent and takes its resolver out of the clients' DNS. " +
+		Description: "Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. " +
 			"What it reported stays until the retention removes it; an agent still running " +
 			"comes back with its next report.",
 		Tags:     []string{tagTraffic},
@@ -493,16 +493,18 @@ func registerTrafficAdmin(api huma.API, b Backend) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v1/traffic/reporters/{nodeId}",
 		Summary:     "Approve a gateway resolver",
-		Description: "Lets the tailnet's clients use a gateway's resolver, or stops them. An approved " +
-			"resolver is used while DNS logging is on, the gateway reports it working and still " +
-			"qualifies. Needs the dns scope too, since it moves the clients' DNS.",
+		Description: "Lets the nodes using a gateway as their exit node use its resolver, or stops " +
+			"them. An approved resolver is used while DNS logging is on, the gateway reports it " +
+			"working and still qualifies, and only by the nodes using the gateway as their exit " +
+			"node right now. Needs the dns scope too, since it moves their DNS.",
 		Tags:     []string{tagTraffic},
 		Security: bearerAuth,
 	}, scope.LogsNetwork), "traffic.reporter.update", "node", "nodeId"), func(
 		ctx context.Context, in *trafficReporterPatchInput,
 	) (*trafficReporterOutput, error) {
 		if !caller(ctx).Allows(scope.DNS) {
-			return nil, huma.Error403Forbidden("approving a resolver moves the clients' DNS and needs the dns scope")
+			return nil, huma.Error403Forbidden(
+				"approving a resolver moves its exit node users' DNS and needs the dns scope")
 		}
 
 		id, err := parseNodeID(in.NodeID)
@@ -718,7 +720,6 @@ func trafficReporters(b Backend) *trafficReportersOutput {
 	out.Body.Resolvers = make([]string, 0, len(resolvers))
 	out.Body.ASNRanges = b.State.ASNRanges()
 	out.Body.SkippedUpstreams = append([]string{}, b.State.TrafficSkippedUpstreams()...)
-	out.Body.DNSBlocked = b.State.TrafficDNSBlocked()
 
 	for _, r := range resolvers {
 		out.Body.Resolvers = append(out.Body.Resolvers, r.Addr.String())

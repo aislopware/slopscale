@@ -141,7 +141,8 @@ func TestTrafficCommands(t *testing.T) {
 				},
 			},
 			wantIn: []string{
-				"exit-1", "reporting, resolving", "conntrack, sni: no nfqueue", "Clients resolve through 100.64.0.1",
+				"exit-1", "reporting, resolving", "conntrack, sni: no nfqueue",
+				"Exit node users resolve through 100.64.0.1",
 			},
 		},
 		{

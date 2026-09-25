@@ -46,7 +46,8 @@ func init() {
 	trafficReportersCmd.AddCommand(deleteTrafficReporterCmd)
 	resolverTrafficReporterCmd.Flags().Uint64P("identifier", "i", 0, "The gateway's node ID")
 	mustMarkRequired(resolverTrafficReporterCmd, "identifier")
-	resolverTrafficReporterCmd.Flags().Bool("approve", true, "Let the clients use the resolver; false stops them")
+	resolverTrafficReporterCmd.Flags().Bool("approve", true,
+		"Let the gateway's exit node users use the resolver; false stops them")
 	trafficReportersCmd.AddCommand(resolverTrafficReporterCmd)
 
 	trafficCmd.AddCommand(trafficSettingsCmd)
@@ -83,7 +84,7 @@ func trafficDNSFlags(cmd *cobra.Command) {
 func trafficSettingsFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("sni", false, "Name destinations from TLS and QUIC handshakes")
 	cmd.Flags().Bool("dns-logging", false,
-		"Point every client at the gateways' resolvers and record the names each node looks up")
+		"Point the nodes using a gateway as their exit node at its resolver and record the names they look up")
 	cmd.Flags().Int64("minute-hours", 0, "Keep per-minute totals this many hours")
 	cmd.Flags().Int64("hour-days", 0, "Keep hourly totals, destinations and names this many days")
 	cmd.Flags().Int64("day-days", 0, "Keep daily ones this many days")
@@ -467,11 +468,7 @@ var listTrafficReportersCmd = &cobra.Command{
 				}
 
 				if len(body.Resolvers) > 0 {
-					fmt.Printf("\nClients resolve through %s\n", strings.Join(body.Resolvers, ", "))
-				}
-
-				if body.DnsBlocked != "" {
-					fmt.Printf("\nDNS logging points no client at a gateway: %s\n", body.DnsBlocked)
+					fmt.Printf("\nExit node users resolve through %s\n", strings.Join(body.Resolvers, ", "))
 				}
 
 				if len(body.SkippedUpstreams) > 0 {
@@ -523,7 +520,7 @@ func collectorsText(c clientv1.TrafficCollectors) string {
 
 var deleteTrafficReporterCmd = &cobra.Command{
 	Use:     cmdDelete,
-	Short:   "Forget a gateway's agent and take its resolver out of the clients' DNS",
+	Short:   "Forget a gateway's agent and take its resolver out of its exit node users' DNS",
 	Aliases: []string{aliasDel},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -546,11 +543,12 @@ var deleteTrafficReporterCmd = &cobra.Command{
 
 var resolverTrafficReporterCmd = &cobra.Command{
 	Use:   "resolver",
-	Short: "Let the clients use a gateway's resolver, or stop them",
+	Short: "Let a gateway's exit node users use its resolver, or stop them",
 	Long: `Approves a gateway's resolver for DNS logging, or withdraws the approval with
 --approve=false. An approved resolver is used while DNS logging is on, the
-gateway reports it working and still qualifies as a gateway. Needs the dns
-scope as well as logs:network.`,
+gateway reports it working and still qualifies as a gateway, and only by the
+nodes using the gateway as their exit node right now. Needs the dns scope as
+well as logs:network.`,
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			identifier, _ := cmd.Flags().GetUint64("identifier")
@@ -605,9 +603,11 @@ var setTrafficSettingsCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Change the traffic monitor's settings",
 	Long: `Changes the given settings; the others keep their value. Turning DNS logging
-on points each client at one approved gateway resolver, besides the global
-nameservers, while its agent reports; turning it off points them back.
-Changing DNS logging needs the dns scope as well as logs:network.`,
+on points the nodes using a gateway as their exit node at the gateway's
+approved resolver while its agent reports, and records what they look up
+while they do; turning it off points them back. Nodes that use no exit node,
+and clients older than Tailscale 1.86, are never logged. Changing DNS logging
+needs the dns scope as well as logs:network.`,
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			body, err := trafficSettingsPatch(cmd)

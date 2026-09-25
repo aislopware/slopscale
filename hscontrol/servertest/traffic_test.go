@@ -202,25 +202,38 @@ func resolvesThrough(nm *netmap.NetworkMap, addr netip.Addr) bool {
 	return first.Addr == addr.String() && first.UseWithExitNode
 }
 
-// keepsGlobalsWithExitNode reports whether the netmap's DNS keeps the
-// tailnet's global nameserver while an exit node is in use, so a client
-// whose gateway resolver died still resolves.
-func keepsGlobalsWithExitNode(nm *netmap.NetworkMap) bool {
-	if nm == nil {
-		return false
-	}
+// resolverAddrs lists the netmap's default resolvers, failing the test
+// on one a client would drop while it uses an exit node.
+func resolverAddrs(t *testing.T, nm *netmap.NetworkMap) []string {
+	t.Helper()
 
-	global := false
+	out := make([]string, 0, len(nm.DNS.Resolvers))
 
 	for _, r := range nm.DNS.Resolvers {
-		if !r.UseWithExitNode {
-			return false
-		}
+		assert.True(t, r.UseWithExitNode, "resolver %s is dropped with an exit node", r.Addr)
 
-		global = global || r.Addr == "1.1.1.1"
+		out = append(out, r.Addr)
 	}
 
-	return global
+	return out
+}
+
+// useExitNode reports gw as the exit node the client uses, the way a
+// Tailscale 1.86 or later client does; an empty gw reports none.
+func useExitNode(t *testing.T, c *servertest.TestClient, gw tailcfg.StableNodeID, opts ...func(*tailcfg.Hostinfo)) {
+	t.Helper()
+
+	hostinfo := &tailcfg.Hostinfo{BackendLogID: "servertest-" + c.Name, Hostname: c.Name, ExitNodeID: gw}
+	for _, o := range opts {
+		o(hostinfo)
+	}
+
+	c.Direct().SetHostinfo(hostinfo)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	require.NoError(t, c.Direct().SendUpdate(ctx))
 }
 
 func nodeIP6(t *testing.T, node *servertest.TestClient) netip.Addr {
@@ -288,8 +301,9 @@ func minuteBucket(at time.Time) int64 {
 // reports flows and DNS questions, and the server attributes them to the
 // sending nodes, rolls them up, names the networks from a downloaded ASN
 // table, folds and prunes them, serves them on API v1 and v2 by role, and
-// points every client's DNS at the gateway's resolver only while it
-// reports. The subtests build on one another, so they run in order.
+// points the DNS of the gateway's exit node users at its resolver only
+// while it reports. The subtests build on one another, so they run in
+// order.
 //
 //nolint:tparallel // later steps depend on the state earlier ones leave behind
 func TestTrafficMonitor(t *testing.T) {
@@ -425,7 +439,8 @@ func TestTrafficMonitor(t *testing.T) {
 		assert.True(t, resp.Config.SNI)
 		assert.False(t, resp.Config.DNS)
 		assert.Equal(t, 60, resp.Config.ReportInterval)
-		assert.Equal(t, []string{"1.1.1.1"}, resp.Config.Upstreams, "a tailnet resolver is never an upstream")
+		assert.Empty(t, resp.Config.Upstreams,
+			"with no nameserver kept for exit node users, the agent forwards to the gateway's own")
 
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary", nil)
 		require.Equal(t, http.StatusOK, status, body)
@@ -825,13 +840,19 @@ func TestTrafficMonitor(t *testing.T) {
 			return list
 		}
 
+		// The laptop uses the gateway as its exit node; the phone uses
+		// none, so its DNS is never touched.
+		useExitNode(t, laptop, types.NodeID(mustID(t, exit)).StableID())
+
+		phoneDNS := phone.Netmap().DNS
+
 		// Off by default: a working resolver is not used.
 		sendReport(t, client, srv.URL, token, report(ownResolver))
 		assert.False(t, mentionsResolver(laptop.Netmap(), exitIP))
 		assert.False(t, opensDNS(exit.Netmap(), exitIP))
 
-		// Moving every client's DNS takes the dns scope on top of the
-		// monitor's.
+		// Moving the exit node users' DNS takes the dns scope on top of
+		// the monitor's.
 		monitorOnly := oauthToken(t, client, srv, ownerKey, "logs:network")
 		status, body := apiCall(t, client, monitorOnly, http.MethodPatch, v1+"/traffic/settings",
 			map[string]any{"dnsLogging": true})
@@ -851,6 +872,7 @@ func TestTrafficMonitor(t *testing.T) {
 		resp := sendReport(t, client, srv.URL, token,
 			report(netip.AddrPortFrom(laptopIP, 53), netip.AddrPortFrom(exitIP, 5353)))
 		assert.True(t, resp.Config.DNS)
+		assert.Empty(t, resp.Config.LogSources, "nobody's DNS points at the gateway")
 		assert.Empty(t, resolvers())
 
 		// A working resolver on the gateway's own address is still not
@@ -872,17 +894,22 @@ func TestTrafficMonitor(t *testing.T) {
 		assert.NotEmpty(t, body["resolverApprovedAt"])
 		assert.Equal(t, true, body["resolverActive"])
 
-		for _, c := range []*servertest.TestClient{laptop, phone} {
-			c.WaitForCondition(t, "DNS through the gateway", trafficWait, func(nm *netmap.NetworkMap) bool {
-				return resolvesThrough(nm, exitIP) && keepsGlobalsWithExitNode(nm)
-			})
-		}
+		laptop.WaitForCondition(t, "DNS through the gateway", trafficWait, func(nm *netmap.NetworkMap) bool {
+			return resolvesThrough(nm, exitIP)
+		})
+		assert.Equal(t, []string{exitIP.String()}, resolverAddrs(t, laptop.Netmap()),
+			"the gateway announced no peer API, so there is no fallback to it")
 
 		exit.WaitForCondition(t, "port 53 open on the gateway", trafficWait, func(nm *netmap.NetworkMap) bool {
 			return opensDNS(nm, exitIP)
 		})
 		assert.False(t, mentionsResolver(exit.Netmap(), exitIP), "the gateway never resolves through itself")
+		assert.Equal(t, phoneDNS, phone.Netmap().DNS, "a node without an exit node keeps its DNS")
 		assert.Equal(t, []any{exitIP.String()}, resolvers())
+
+		resp = sendReport(t, client, srv.URL, token, report(ownResolver))
+		assert.Equal(t, []netip.Addr{laptopIP, nodeIP6(t, laptop)}, resp.Config.LogSources,
+			"the agent records the laptop only")
 
 		// A resolver that stopped working is dropped at once.
 		broken := report(ownResolver)
@@ -915,11 +942,11 @@ func TestTrafficMonitor(t *testing.T) {
 		laptop.WaitForCondition(t, "the resolver back with the gateway", trafficWait,
 			func(nm *netmap.NetworkMap) bool { return resolvesThrough(nm, exitIP) })
 
-		// A gateway that stops reporting leaves the clients' DNS 90
-		// seconds after its last report, at the next tick. Right after a
-		// start, the start counts as the last report. The reports are
-		// backdated through the state; each change is published the way
-		// the report handler and the scheduler publish theirs.
+		// A gateway that stops reporting leaves its users' DNS 90 seconds
+		// after its last report, at the next tick. Right after a start,
+		// the start counts as the last report. The reports are backdated
+		// through the state; each change is published the way the report
+		// handler and the scheduler publish theirs.
 		gateway, ok := srv.State().GetNodeByID(types.NodeID(mustID(t, exit)))
 		require.True(t, ok)
 
@@ -985,34 +1012,19 @@ func TestTrafficMonitor(t *testing.T) {
 			return resolvesThrough(nm, exitIP)
 		})
 
-		// The resolvers follow the tailnet's DNS settings at once, with no
-		// report or tick in between: with no global nameserver the agents
-		// can forward to, and none for the clients to fall back on, the
-		// DNS log points nobody at the gateway.
-		setDNS := func(nameservers ...string) {
-			t.Helper()
+		// The DNS log needs no global nameserver: without one kept for
+		// exit node users, the agent forwards to the gateway's own
+		// resolvers, as the gateway does for them without the monitor.
+		code, reply := apiCall(t, client, ownerKey, http.MethodPut, v1+"/dns",
+			map[string]any{"nameservers": []string{"100.100.100.100"}})
+		require.Equal(t, http.StatusOK, code, reply)
+		assert.Equal(t, []any{exitIP.String()}, resolvers())
 
-			code, reply := apiCall(t, client, ownerKey, http.MethodPut, v1+"/dns",
-				map[string]any{"nameservers": nameservers})
-			require.Equal(t, http.StatusOK, code, reply)
-		}
-
-		setDNS("100.100.100.100")
-		assert.Empty(t, resolvers(), "no usable nameserver, no resolver")
-
-		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
-		require.Equal(t, http.StatusOK, status, body)
-		assert.NotEmpty(t, body["dnsBlocked"])
-		laptop.WaitForCondition(t, "the resolver gone with the nameservers", trafficWait,
-			func(nm *netmap.NetworkMap) bool { return !mentionsResolver(nm, exitIP) })
-		exit.WaitForCondition(t, "port 53 closed with the nameservers gone", trafficWait,
-			func(nm *netmap.NetworkMap) bool { return !opensDNS(nm, exitIP) })
+		resp = sendReport(t, client, srv.URL, token, report(ownResolver))
+		assert.Empty(t, resp.Config.Upstreams)
 
 		status, apiBody = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/dns", nil)
 		require.Equal(t, http.StatusOK, status, apiBody)
-		assert.Equal(t, []any{exitIP.String()}, resolvers(), "back with the file's nameservers")
-		laptop.WaitForCondition(t, "the resolver back with the nameservers", trafficWait,
-			func(nm *netmap.NetworkMap) bool { return resolvesThrough(nm, exitIP) })
 
 		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
 			map[string]any{"dnsLogging": false})
@@ -1024,17 +1036,10 @@ func TestTrafficMonitor(t *testing.T) {
 			return !opensDNS(nm, exitIP)
 		})
 
-		// Turning the log on is refused while there is no nameserver to
-		// fall back on, with the reason.
-		setDNS("100.100.100.100")
+		resp = sendReport(t, client, srv.URL, token, report(ownResolver))
+		assert.Empty(t, resp.Config.LogSources, "the log off records nobody")
 
-		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
-			map[string]any{"dnsLogging": true})
-		assert.Equal(t, http.StatusBadRequest, status, body)
-		assert.Contains(t, fmt.Sprint(body), "nameserver")
-
-		status, apiBody = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/dns", nil)
-		require.Equal(t, http.StatusOK, status, apiBody)
+		useExitNode(t, laptop, "")
 	})
 
 	t.Run("the v2 network log carries the traffic in Tailscale's shape", func(t *testing.T) {
@@ -1490,4 +1495,213 @@ func TestTrafficNamesNetworksReportedBeforeTheTable(t *testing.T) {
 
 	assert.Positive(t, srv.State().ASNRanges())
 	require.NoError(t, srv.State().BackfillTrafficASN(t.Context()), "a second walk with the same table is a no-op")
+}
+
+// TestTrafficDNSLogFollowsTheExitNode proves the DNS log reaches only the
+// nodes that use a gateway as their exit node, and only while they do: a
+// node that picks a gateway gets its resolver, then the gateway's own
+// exit node resolver, then the nameservers kept for exit node users; a
+// node without an exit node, or a client too old to say which one it
+// uses, keeps the tailnet's DNS untouched. Each agent is told exactly
+// which nodes it may record. The subtests move one node from gateway to
+// gateway, so they run in order.
+//
+//nolint:tparallel // each step starts from the exit node the one before left
+func TestTrafficDNSLogFollowsTheExitNode(t *testing.T) {
+	t.Parallel()
+
+	var asnDown atomic.Bool
+
+	srv := servertest.NewServer(t,
+		servertest.WithRealListener(),
+		servertest.WithDNS(types.DNSConfig{
+			MagicDNS:         true,
+			BaseDomain:       "exitdns.test",
+			OverrideLocalDNS: true,
+			Nameservers: types.Nameservers{
+				Global:          []string{"1.1.1.1", "9.9.9.9", "100.100.100.100"},
+				UseWithExitNode: []string{"9.9.9.9", "100.100.100.100"},
+			},
+		}),
+		servertest.WithTraffic(types.TrafficConfig{
+			ASNDatabaseURL: asnTableServer(t, &asnDown),
+			ASNCachePath:   t.TempDir() + "/ip2asn.tsv.gz",
+		}),
+	)
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "exitdns-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	setStatePolicy(t, srv, `{
+		"tagOwners": {"tag:gateway": ["exitdns-owner@"]},
+		"grants": [{"src": ["exitdns-owner@"], "dst": ["autogroup:internet"], "ip": ["*"]}]
+	}`)
+
+	gw1 := servertest.NewClient(t, srv, "gw-1", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
+	gw2 := servertest.NewClient(t, srv, "gw-2", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
+	laptop := servertest.NewClient(t, srv, "laptop", servertest.WithUser(owner))
+	phone := servertest.NewClient(t, srv, "phone", servertest.WithUser(owner))
+	old := servertest.NewClient(t, srv, "old", servertest.WithUser(owner))
+
+	// gw-1 announces its peer API, so its users can fall back to the
+	// gateway's own DNS proxy; gw-2 does not.
+	const peerAPIPort = 40001
+
+	for _, gw := range []*servertest.TestClient{gw1, gw2} {
+		hostinfo := &tailcfg.Hostinfo{
+			BackendLogID: "servertest-" + gw.Name,
+			Hostname:     gw.Name,
+			RoutableIPs:  tsaddr.ExitRoutes(),
+		}
+		if gw == gw1 {
+			hostinfo.Services = []tailcfg.Service{{Proto: tailcfg.PeerAPI4, Port: peerAPIPort}}
+		}
+
+		gw.Direct().SetHostinfo(hostinfo)
+
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		require.NoError(t, gw.Direct().SendUpdate(ctx))
+		cancel()
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			status, body := apiCall(t, client, ownerKey, http.MethodPost,
+				v1+"/node/"+gw.NodeIDString()+"/approve_routes",
+				map[string]any{"routes": []string{"0.0.0.0/0", "::/0"}})
+			assert.Equal(c, http.StatusOK, status, body)
+		}, trafficWait, 100*time.Millisecond)
+	}
+
+	laptop.WaitForCondition(t, "both gateways as peers", trafficWait, func(_ *netmap.NetworkMap) bool {
+		_, ok1 := laptop.PeerByName("gw-1")
+		_, ok2 := laptop.PeerByName("gw-2")
+
+		return ok1 && ok2
+	})
+
+	gw1IP, gw2IP := nodeIP4(t, gw1), nodeIP4(t, gw2)
+	gw1Stable := types.NodeID(mustID(t, gw1)).StableID()
+	gw2Stable := types.NodeID(mustID(t, gw2)).StableID()
+	laptopIPs := []netip.Addr{nodeIP4(t, laptop), nodeIP6(t, laptop)}
+
+	// The old client uses gw-1 too, but predates Hostinfo.ExitNodeID
+	// (capability version 122, Tailscale 1.86), so it never says so.
+	useExitNode(t, old, "", func(h *tailcfg.Hostinfo) { h.IPNVersion = "1.84.0" })
+
+	tailnetDNS := phone.Netmap().DNS
+
+	tailnetResolvers := make([]string, 0, len(tailnetDNS.Resolvers))
+	for _, r := range tailnetDNS.Resolvers {
+		tailnetResolvers = append(tailnetResolvers, r.Addr)
+	}
+
+	require.Equal(t, []string{"1.1.1.1", "9.9.9.9", "100.100.100.100"}, tailnetResolvers)
+
+	tokens := map[*servertest.TestClient]string{
+		gw1: idToken(t, srv, gw1, traffic.Audience),
+		gw2: idToken(t, srv, gw2, traffic.Audience),
+	}
+	seq := uint64(0)
+	report := func(gw *servertest.TestClient) traffic.Config {
+		t.Helper()
+
+		seq++
+
+		return sendReport(t, client, srv.URL, tokens[gw], traffic.Report{
+			Instance: "exitdns-" + gw.Name,
+			Seq:      seq,
+			Status: traffic.Status{
+				Conntrack: traffic.Collector{Enabled: true},
+				DNS:       traffic.Collector{Enabled: true},
+			},
+			DNSListen: []netip.AddrPort{netip.AddrPortFrom(nodeIP4(t, gw), 53)},
+		}).Config
+	}
+
+	status, body := apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
+		map[string]any{"dnsLogging": true})
+	require.Equal(t, http.StatusOK, status, body)
+
+	for _, gw := range []*servertest.TestClient{gw1, gw2} {
+		report(gw)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/reporters/"+gw.NodeIDString(),
+			map[string]any{"resolver": true})
+		require.Equal(t, http.StatusOK, status, body)
+		require.Equal(t, true, body["resolverActive"], body)
+	}
+
+	for _, gw := range []*servertest.TestClient{gw1, gw2} {
+		cfg := report(gw)
+		assert.True(t, cfg.DNS)
+		assert.Empty(t, cfg.LogSources, "%s: nobody uses an exit node yet", gw.Name)
+		assert.Equal(t, []string{"9.9.9.9"}, cfg.Upstreams,
+			"the agents forward where exit node users would, never to a tailnet address")
+	}
+
+	status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Equal(t, []any{"100.100.100.100"}, body["skippedUpstreams"])
+
+	assert.Equal(t, tailnetDNS, laptop.Netmap().DNS, "no exit node, no change")
+
+	resolvesThrough := func(c *servertest.TestClient, want ...string) {
+		t.Helper()
+
+		c.WaitForCondition(t, fmt.Sprintf("DNS through %v", want), trafficWait, func(nm *netmap.NetworkMap) bool {
+			got := make([]string, 0, len(nm.DNS.Resolvers))
+			for _, r := range nm.DNS.Resolvers {
+				got = append(got, r.Addr)
+			}
+
+			return slices.Equal(got, want)
+		})
+	}
+
+	t.Run("a node that picks a gateway resolves through it, and only it is recorded", func(t *testing.T) {
+		useExitNode(t, laptop, gw1Stable)
+
+		gw1DoH := "http://" + netip.AddrPortFrom(gw1IP, peerAPIPort).String() + "/dns-query"
+		resolvesThrough(laptop, gw1IP.String(), gw1DoH, "9.9.9.9", "100.100.100.100")
+		assert.Equal(t, []string{gw1IP.String(), gw1DoH, "9.9.9.9", "100.100.100.100"},
+			resolverAddrs(t, laptop.Netmap()))
+		assert.Equal(t, tailnetDNS.Routes, laptop.Netmap().DNS.Routes, "split DNS stays the tailnet's")
+
+		assert.Equal(t, laptopIPs, report(gw1).LogSources)
+		assert.Empty(t, report(gw2).LogSources)
+
+		for _, c := range []*servertest.TestClient{phone, old, gw1, gw2} {
+			assert.Equal(t, tailnetDNS, c.Netmap().DNS, "%s keeps the tailnet's DNS", c.Name)
+		}
+	})
+
+	t.Run("switching to another gateway moves the node to that resolver", func(t *testing.T) {
+		useExitNode(t, laptop, gw2Stable)
+
+		resolvesThrough(laptop, gw2IP.String(), "9.9.9.9", "100.100.100.100")
+		assert.Empty(t, report(gw1).LogSources)
+		assert.Equal(t, laptopIPs, report(gw2).LogSources)
+	})
+
+	t.Run("switching the exit node off gives the node the tailnet's DNS back", func(t *testing.T) {
+		useExitNode(t, laptop, "")
+
+		resolvesThrough(laptop, tailnetResolvers...)
+		assert.Equal(t, tailnetDNS, laptop.Netmap().DNS)
+		assert.Empty(t, report(gw1).LogSources)
+		assert.Empty(t, report(gw2).LogSources)
+	})
+
+	t.Run("an exit node that is no gateway resolver changes nothing", func(t *testing.T) {
+		useExitNode(t, laptop, "some-other-exit-node")
+
+		assert.Never(t, func() bool {
+			nm := laptop.Netmap()
+
+			return mentionsResolver(nm, gw1IP) || mentionsResolver(nm, gw2IP)
+		}, time.Second, 50*time.Millisecond)
+		assert.Equal(t, tailnetDNS, laptop.Netmap().DNS)
+		assert.Empty(t, report(gw1).LogSources)
+	})
 }

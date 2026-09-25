@@ -175,6 +175,13 @@ type State struct {
 	trafficReporters map[types.NodeID]types.TrafficReporter
 	trafficResolvers []types.TrafficResolver
 	trafficBoot      time.Time
+	// trafficExitNodes are the gateways of trafficResolvers, nil while
+	// there are none, for the map request path to tell in one atomic load
+	// whether an exit node move changes a node's DNS. trafficDNSMoved
+	// holds the nodes whose DNS such a move changed until the map session
+	// takes the change; see [State.TakeTrafficDNSChange].
+	trafficExitNodes atomic.Pointer[[]tailcfg.StableNodeID]
+	trafficDNSMoved  sync.Map
 	// trafficIngest holds a *sync.Mutex per gateway, so one gateway's
 	// reports are applied one at a time.
 	trafficIngest sync.Map
@@ -2770,6 +2777,14 @@ func (s *State) UpdateNodeFromMapRequest(
 		delta.postureChanged = newHostinfo != nil &&
 			!types.HostinfoPostureEqual(currentNode.Hostinfo, newHostinfo)
 
+		if newHostinfo != nil {
+			if currentNode.Hostinfo != nil {
+				delta.oldExitNode = currentNode.Hostinfo.ExitNodeID
+			}
+
+			delta.newExitNode = newHostinfo.ExitNodeID
+		}
+
 		// A change carrying only an updated LastSeen is not worth a
 		// full-row database UPDATE plus the O(n) policy rescan: LastSeen
 		// is best-effort and rides along the next substantive write. DERP
@@ -2877,6 +2892,10 @@ func (s *State) UpdateNodeFromMapRequest(
 
 	if !ok {
 		return change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, id)
+	}
+
+	if delta.oldExitNode != delta.newExitNode {
+		s.noteTrafficExitNodeMove(id, delta.oldExitNode, delta.newExitNode)
 	}
 
 	// The attestation record is a column of its own, so it is written

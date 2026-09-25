@@ -72,6 +72,12 @@ type mapRequestDelta struct {
 	// changed; the node:hardwareAttested attribute is a policy input.
 	attestationMoved bool
 
+	// oldExitNode and newExitNode are the exit node the client used and
+	// uses now, equal when the request says nothing about it. A node using
+	// a gateway as its exit node may get the gateway's resolver from the
+	// traffic monitor's DNS log, so a move changes its own DNS.
+	oldExitNode, newExitNode tailcfg.StableNodeID
+
 	// persistWorthy reports whether the request carries data that should
 	// hit the database. LastSeen-only updates are not persist-worthy.
 	persistWorthy bool
@@ -91,6 +97,8 @@ func (d mapRequestDelta) MarshalZerologObject(e *zerolog.Event) {
 		Bool("disco_key.changed", d.discoKeyChanged).
 		Bool("cap.changed", d.capChanged).
 		Bool("attestation.moved", d.attestationMoved).
+		Str("exit_node.old", string(d.oldExitNode)).
+		Str("exit_node.new", string(d.newExitNode)).
 		Bool("persist", d.persistWorthy)
 }
 

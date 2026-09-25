@@ -41,8 +41,9 @@ func (pm *PolicyManager) SetTrafficResolvers(addrs []netip.Addr) (bool, error) {
 
 // trafficResolverGrants is the grant that lets every node ask the
 // traffic monitor's gateway resolvers, UDP and TCP on port 53: the server
-// points every client at them, and a policy that did not admit the
-// queries would leave the clients without DNS. Nil when there are none.
+// points a gateway's exit node users at its resolver, and a policy that
+// did not admit their queries would leave them without DNS. Nil when
+// there are none.
 func (pol *Policy) trafficResolverGrants() []Grant {
 	if pol == nil || len(pol.trafficResolvers) == 0 {
 		return nil

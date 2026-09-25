@@ -20,6 +20,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/net/tsaddr"
+	"tailscale.com/tailcfg"
 )
 
 // Traffic report errors; the report handler answers them with the status
@@ -36,19 +37,14 @@ var (
 	ErrTrafficReportTooLarge = errors.New("traffic report too large")
 	// ErrTrafficReporterNotFound: the node never reported (404).
 	ErrTrafficReporterNotFound = errors.New("traffic reporter not found")
-	// ErrTrafficDNSLoggingNoNameservers: DNS logging needs a global
-	// nameserver the clients keep when a gateway resolver goes away (400).
-	ErrTrafficDNSLoggingNoNameservers = errors.New(
-		"DNS logging needs at least one global nameserver (an IP address or an https:// resolver outside " +
-			"the tailnet), which the clients keep using when a gateway resolver goes away",
-	)
 )
 
 const (
 	// trafficResolverFreshness is how long after its last report a
-	// gateway's resolver stays in the clients' DNS. Agents report every
-	// minute; the clients also keep the global nameservers, so a gateway
-	// that died costs them nothing but its answers until it is dropped.
+	// gateway's resolver stays in the DNS of its exit node users. Agents
+	// report every minute; the users also keep the gateway's own exit
+	// node resolver, so an agent that died costs them nothing but its
+	// answers until it is dropped.
 	trafficResolverFreshness = 90 * time.Second
 
 	// trafficReportInterval is how often the server asks agents to report.
@@ -98,24 +94,20 @@ func (s *State) TrafficSettings() types.TrafficSettings {
 // PatchTrafficSettings changes the settings through patch, validates,
 // stores and applies them, all under the traffic lock so two changes at
 // once cannot lose each other's fields. Turning the DNS log on or off
-// changes the clients' DNS, so it returns the change to publish.
+// changes the DNS of the gateways' exit node users, so it returns the
+// change to publish.
 func (s *State) PatchTrafficSettings(
 	patch func(*types.TrafficSettings),
 ) (types.TrafficSettings, change.Change, error) {
 	s.trafficMu.Lock()
 	defer s.trafficMu.Unlock()
 
-	current := s.TrafficSettings()
-	settings := current
+	settings := s.TrafficSettings()
 	patch(&settings)
 
 	err := settings.Validate()
 	if err != nil {
 		return types.TrafficSettings{}, change.Change{}, err
-	}
-
-	if settings.DNSLogging && !current.DNSLogging && len(s.trafficUpstreams()) == 0 {
-		return types.TrafficSettings{}, change.Change{}, ErrTrafficDNSLoggingNoNameservers
 	}
 
 	err = s.db.SaveTrafficSettings(settings)
@@ -133,7 +125,7 @@ func (s *State) PatchTrafficSettings(
 // loadTraffic reads the settings, the fold marks and the reporters when
 // the server starts. The resolvers are recomputed from them, with the
 // start as their last report so a restart does not take every resolver
-// out of the clients' DNS until the gateways report again.
+// out of the exit node users' DNS until the gateways report again.
 func (s *State) loadTraffic() error {
 	settings, err := s.db.LoadTrafficSettings()
 	if err != nil {
@@ -185,7 +177,7 @@ func (s *State) TrafficInUse() bool {
 }
 
 // TrafficReporters returns the gateways that have reported, in node ID
-// order, with the resolvers the clients are pointed at now.
+// order, with the resolvers their exit node users are pointed at now.
 func (s *State) TrafficReporters() ([]types.TrafficReporter, []types.TrafficResolver) {
 	s.trafficMu.Lock()
 	defer s.trafficMu.Unlock()
@@ -197,13 +189,14 @@ func (s *State) TrafficReporters() ([]types.TrafficReporter, []types.TrafficReso
 }
 
 // TrafficReporterStale reports whether a gateway has missed enough
-// reports that its resolver is out of the clients' DNS.
+// reports that its resolver is out of its exit node users' DNS.
 func TrafficReporterStale(r types.TrafficReporter, now time.Time) bool {
 	return now.Sub(r.LastReportAt) > trafficResolverFreshness
 }
 
 // DeleteTrafficReporter forgets a gateway, taking its resolver out of the
-// clients' DNS. What it reported stays until the retention removes it.
+// exit node users' DNS. What it reported stays until the retention
+// removes it.
 func (s *State) DeleteTrafficReporter(id types.NodeID) (change.Change, error) {
 	s.trafficMu.Lock()
 	defer s.trafficMu.Unlock()
@@ -222,9 +215,9 @@ func (s *State) DeleteTrafficReporter(id types.NodeID) (change.Change, error) {
 	return s.applyTrafficResolversLocked(time.Now())
 }
 
-// SetTrafficResolverApproval lets the tailnet's clients use a gateway's
-// resolver, or stops them. An approved resolver is used only while the DNS
-// log is on and the gateway reports it working.
+// SetTrafficResolverApproval lets the nodes using a gateway as their exit
+// node use its resolver, or stops them. An approved resolver is used only
+// while the DNS log is on and the gateway reports it working.
 func (s *State) SetTrafficResolverApproval(
 	id types.NodeID,
 	approved bool,
@@ -278,7 +271,7 @@ func (s *State) TrafficTick(now time.Time) (change.Change, error) {
 
 // trafficRecheck recomputes the resolvers after a node changed in a way
 // that can make a gateway ineligible (tags, routes, approval, suspension,
-// expiry), so the clients leave its resolver at once rather than at the
+// expiry), so its users leave its resolver at once rather than at the
 // next tick.
 func (s *State) trafficRecheck() change.Change {
 	c, err := s.TrafficTick(time.Now())
@@ -310,25 +303,14 @@ func (s *State) trafficForgetNode(id types.NodeID) change.Change {
 	return c
 }
 
-// TrafficDNSBlocked says why the DNS log points no client anywhere even
-// though it is on; empty when it is off or working.
-func (s *State) TrafficDNSBlocked() string {
-	if s.TrafficSettings().DNSLogging && len(s.trafficUpstreams()) == 0 {
-		return ErrTrafficDNSLoggingNoNameservers.Error()
-	}
-
-	return ""
-}
-
-// trafficResolversLocked is the resolvers the clients should use: with
-// the DNS log on and a global nameserver to fall back to, one address of
-// every gateway whose resolver an operator approved, that reported it
-// working within the freshness, and that still qualifies as a gateway
-// and is online. Right after the server starts, the start counts as a
-// report and the online check waits, since the gateways have had no time
-// to report or connect.
+// trafficResolversLocked is the resolvers the gateways' exit node users
+// should use: with the DNS log on, one address of every gateway whose
+// resolver an operator approved, that reported it working within the
+// freshness, and that still qualifies as a gateway and is online. Right
+// after the server starts, the start counts as a report and the online
+// check waits, since the gateways have had no time to report or connect.
 func (s *State) trafficResolversLocked(now time.Time) []types.TrafficResolver {
-	if !s.TrafficSettings().DNSLogging || len(s.trafficUpstreams()) == 0 {
+	if !s.TrafficSettings().DNSLogging {
 		return nil
 	}
 
@@ -358,7 +340,12 @@ func (s *State) trafficResolversLocked(now time.Time) []types.TrafficResolver {
 		}
 
 		if addr, ok := trafficResolverAddr(node, r.DNSListen); ok {
-			out = append(out, types.TrafficResolver{Node: r.NodeID, Addr: addr})
+			out = append(out, types.TrafficResolver{
+				Node:   r.NodeID,
+				Stable: r.NodeID.StableID(),
+				Addr:   addr,
+				DoH:    trafficGatewayDoH(node),
+			})
 		}
 	}
 
@@ -391,10 +378,49 @@ func trafficResolverAddr(node types.NodeView, listen []netip.AddrPort) (netip.Ad
 	return v6, v6.IsValid()
 }
 
-// applyTrafficResolversLocked moves the clients' DNS and the grant to the
-// resolvers when the set changed, and returns the change to publish. The
-// grant goes first: when the policy cannot compile it, the clients keep
-// their DNS, which the old grant still admits.
+// trafficGatewayDoH is the gateway's own exit node resolver: the DNS over
+// HTTP endpoint of its peer API, which its exit node users ask without
+// the monitor. Empty when the gateway announced no peer API port.
+func trafficGatewayDoH(node types.NodeView) string {
+	hostinfo := node.Hostinfo()
+	if !hostinfo.Valid() {
+		return ""
+	}
+
+	var port4, port6 uint16
+
+	for _, svc := range hostinfo.Services().All() {
+		switch svc.Proto {
+		case tailcfg.PeerAPI4:
+			port4 = svc.Port
+		case tailcfg.PeerAPI6:
+			port6 = svc.Port
+		case tailcfg.TCP, tailcfg.UDP, tailcfg.PeerAPIDNS:
+		}
+	}
+
+	var v6 netip.AddrPort
+
+	for _, addr := range node.IPs() {
+		switch {
+		case addr.Is4() && port4 != 0:
+			return "http://" + netip.AddrPortFrom(addr, port4).String() + "/dns-query"
+		case addr.Is6() && port6 != 0 && !v6.IsValid():
+			v6 = netip.AddrPortFrom(addr, port6)
+		}
+	}
+
+	if v6.IsValid() {
+		return "http://" + v6.String() + "/dns-query"
+	}
+
+	return ""
+}
+
+// applyTrafficResolversLocked moves the exit node users' DNS and the
+// grant to the resolvers when the set changed, and returns the change to
+// publish. The grant goes first: when the policy cannot compile it, the
+// users keep their DNS, which the old grant still admits.
 func (s *State) applyTrafficResolversLocked(now time.Time) (change.Change, error) {
 	next := s.trafficResolversLocked(now)
 	if slices.Equal(next, s.trafficResolvers) {
@@ -417,13 +443,27 @@ func (s *State) applyTrafficResolversLocked(now time.Time) (change.Change, error
 	s.trafficResolvers = next
 	s.cfg.SetTrafficResolvers(next)
 
+	var gateways *[]tailcfg.StableNodeID
+
+	if len(next) > 0 {
+		stable := make([]tailcfg.StableNodeID, 0, len(next))
+		for _, r := range next {
+			stable = append(stable, r.Stable)
+		}
+
+		gateways = &stable
+	}
+
+	s.trafficExitNodes.Store(gateways)
+
 	s.auditTrafficResolvers(prev, next)
 
 	return change.DNSConfig().Merge(change.PolicyChange()), nil
 }
 
 // auditTrafficResolvers records a change of the resolver set: it moves
-// every client's DNS, so it belongs in the audit log whatever caused it.
+// the DNS of every exit node user of the gateways, so it belongs in the
+// audit log whatever caused it.
 func (s *State) auditTrafficResolvers(prev, next []types.TrafficResolver) {
 	names := func(rs []types.TrafficResolver) []string {
 		out := make([]string, 0, len(rs))
@@ -548,7 +588,7 @@ func (s *State) trafficIngestLock(id types.NodeID) *sync.Mutex {
 
 // IngestTrafficReport attributes the report of an authenticated gateway
 // to nodes, rolls it up and stores it. It returns what the agent should
-// do next and the change to publish when the clients' resolvers moved.
+// do next and the change to publish when the resolvers moved.
 func (s *State) IngestTrafficReport(
 	gateway types.NodeView,
 	report traffic.Report,
@@ -594,7 +634,7 @@ func (s *State) IngestTrafficReport(
 		return traffic.Response{}, change.Change{}, err
 	}
 
-	return traffic.Response{Seq: applied.Seq, Config: s.trafficAgentConfig(settings)}, c, nil
+	return traffic.Response{Seq: applied.Seq, Config: s.trafficAgentConfigLocked(settings, gateway.ID())}, c, nil
 }
 
 // markTrafficDirty moves the fold marks back to the oldest hour and day
@@ -674,38 +714,101 @@ func checkTrafficBucket(bucket, latest int64) error {
 	return nil
 }
 
-// trafficAgentConfig is the configuration handed to every agent.
-func (s *State) trafficAgentConfig(settings types.TrafficSettings) traffic.Config {
+// trafficAgentConfigLocked is the configuration handed to the agent of
+// gateway.
+func (s *State) trafficAgentConfigLocked(settings types.TrafficSettings, gateway types.NodeID) traffic.Config {
+	usable, _ := s.splitTrafficUpstreams()
+
 	return traffic.Config{
 		SNI:            settings.SNI,
 		DNS:            settings.DNSLogging,
-		Upstreams:      s.trafficUpstreams(),
+		Upstreams:      usable,
+		LogSources:     s.trafficLogSourcesLocked(gateway),
 		ReportInterval: trafficReportInterval,
 	}
 }
 
-// trafficUpstreams are the tailnet's global nameservers an agent's
-// resolver can forward to: plain addresses and DoH URLs, never a tailnet
-// address, which could be a gateway resolver and loop.
-func (s *State) trafficUpstreams() []string {
-	usable, _ := s.splitTrafficUpstreams()
+// trafficLogSourcesLocked are the addresses of the nodes whose DNS points
+// at gateway's resolver: those that use gateway as their exit node while
+// the DNS log uses its resolver. The agent records the questions of these
+// nodes only. A client older than capability version 122 (Tailscale 1.86)
+// does not say which exit node it uses, so it is never among them.
+func (s *State) trafficLogSourcesLocked(gateway types.NodeID) []netip.Addr {
+	if !slices.ContainsFunc(s.trafficResolvers, func(r types.TrafficResolver) bool { return r.Node == gateway }) {
+		return nil
+	}
 
-	return usable
+	stable := gateway.StableID()
+
+	var out []netip.Addr
+
+	for _, node := range s.nodeStore.ListNodes().All() {
+		hostinfo := node.Hostinfo()
+		if node.ID() == gateway || !hostinfo.Valid() || hostinfo.ExitNodeID() != stable {
+			continue
+		}
+
+		out = append(out, node.IPs()...)
+	}
+
+	slices.SortFunc(out, netip.Addr.Compare)
+
+	return out
 }
 
-// TrafficSkippedUpstreams are the global nameservers the agents cannot
-// forward to: DNS over TLS, which they do not speak, and tailnet
-// addresses.
+// noteTrafficExitNodeMove remembers that node id's DNS moved when it
+// switched its exit node to or from a gateway whose resolver the DNS log
+// uses, for [State.TakeTrafficDNSChange]. It runs on the map request path
+// whenever a client reports another exit node, so while the DNS log uses
+// no resolver it costs one atomic load.
+func (s *State) noteTrafficExitNodeMove(id types.NodeID, from, to tailcfg.StableNodeID) {
+	gateways := s.trafficExitNodes.Load()
+	if gateways == nil {
+		return
+	}
+
+	if slices.Contains(*gateways, from) || slices.Contains(*gateways, to) {
+		s.trafficDNSMoved.Store(id, struct{}{})
+	}
+}
+
+// TakeTrafficDNSChange returns, once, the change that sends node id its
+// DNS after its map request moved its exit node to or from a gateway
+// resolver; empty otherwise. The map request's own change goes to its
+// peers too, so this one is separate, for the node alone.
+func (s *State) TakeTrafficDNSChange(id types.NodeID) change.Change {
+	if _, moved := s.trafficDNSMoved.LoadAndDelete(id); moved {
+		return change.SelfDNS(id)
+	}
+
+	return change.Change{}
+}
+
+// TrafficSkippedUpstreams are the nameservers for exit node users the
+// agents cannot forward to: DNS over TLS, which they do not speak, and
+// tailnet addresses.
 func (s *State) TrafficSkippedUpstreams() []string {
 	_, skipped := s.splitTrafficUpstreams()
 
 	return skipped
 }
 
+// splitTrafficUpstreams sorts the nameservers an agent's resolver may
+// forward to from those it cannot: the global nameservers the operator
+// kept for exit node users, which such a user asks without the monitor.
+// Without any, the agent forwards to the gateway's own resolvers, as the
+// gateway's peer API does for its exit node users. Plain addresses and
+// DoH URLs qualify, never a tailnet address, which could be a gateway
+// resolver and loop.
 func (s *State) splitTrafficUpstreams() ([]string, []string) {
 	var usable, skipped []string
 
-	for _, ns := range s.cfg.EffectiveDNS().Nameservers.Global {
+	dns := s.cfg.EffectiveDNS()
+	if !dns.OverrideLocalDNS {
+		return nil, nil
+	}
+
+	for _, ns := range dns.Nameservers.UseWithExitNode {
 		u, err := url.Parse(ns)
 		if err == nil && u.Scheme == "https" && u.Host != "" {
 			usable = append(usable, ns)

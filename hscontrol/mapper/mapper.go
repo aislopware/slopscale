@@ -122,7 +122,12 @@ func generateDNSConfig(
 	groupRoutes map[string][]*dnstype.Resolver,
 	serviceRecords []tailcfg.DNSRecord,
 ) *tailcfg.DNSConfig {
-	dnsConfig := cfg.CloneTailcfgDNSConfigFor(node.ID(), node.IPs())
+	var exitNode tailcfg.StableNodeID
+	if hi := node.Hostinfo(); hi.Valid() {
+		exitNode = hi.ExitNodeID()
+	}
+
+	dnsConfig := cfg.CloneTailcfgDNSConfigFor(node.ID(), exitNode)
 	if dnsConfig == nil {
 		return nil
 	}
