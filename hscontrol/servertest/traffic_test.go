@@ -985,6 +985,35 @@ func TestTrafficMonitor(t *testing.T) {
 			return resolvesThrough(nm, exitIP)
 		})
 
+		// The resolvers follow the tailnet's DNS settings at once, with no
+		// report or tick in between: with no global nameserver the agents
+		// can forward to, and none for the clients to fall back on, the
+		// DNS log points nobody at the gateway.
+		setDNS := func(nameservers ...string) {
+			t.Helper()
+
+			code, reply := apiCall(t, client, ownerKey, http.MethodPut, v1+"/dns",
+				map[string]any{"nameservers": nameservers})
+			require.Equal(t, http.StatusOK, code, reply)
+		}
+
+		setDNS("100.100.100.100")
+		assert.Empty(t, resolvers(), "no usable nameserver, no resolver")
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.NotEmpty(t, body["dnsBlocked"])
+		laptop.WaitForCondition(t, "the resolver gone with the nameservers", trafficWait,
+			func(nm *netmap.NetworkMap) bool { return !mentionsResolver(nm, exitIP) })
+		exit.WaitForCondition(t, "port 53 closed with the nameservers gone", trafficWait,
+			func(nm *netmap.NetworkMap) bool { return !opensDNS(nm, exitIP) })
+
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/dns", nil)
+		require.Equal(t, http.StatusOK, status, apiBody)
+		assert.Equal(t, []any{exitIP.String()}, resolvers(), "back with the file's nameservers")
+		laptop.WaitForCondition(t, "the resolver back with the nameservers", trafficWait,
+			func(nm *netmap.NetworkMap) bool { return resolvesThrough(nm, exitIP) })
+
 		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
 			map[string]any{"dnsLogging": false})
 		require.Equal(t, http.StatusOK, status, body)
@@ -994,6 +1023,18 @@ func TestTrafficMonitor(t *testing.T) {
 		exit.WaitForCondition(t, "port 53 closed with the log off", trafficWait, func(nm *netmap.NetworkMap) bool {
 			return !opensDNS(nm, exitIP)
 		})
+
+		// Turning the log on is refused while there is no nameserver to
+		// fall back on, with the reason.
+		setDNS("100.100.100.100")
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
+			map[string]any{"dnsLogging": true})
+		assert.Equal(t, http.StatusBadRequest, status, body)
+		assert.Contains(t, fmt.Sprint(body), "nameserver")
+
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/dns", nil)
+		require.Equal(t, http.StatusOK, status, apiBody)
 	})
 
 	t.Run("the v2 network log carries the traffic in Tailscale's shape", func(t *testing.T) {

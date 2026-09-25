@@ -253,8 +253,9 @@ A gateway's resolver leaves the clients' DNS:
 - at once, when the agent reports an error in it, when the gateway stops
   qualifying (its routes or tags change, it is suspended, expires or loses
   its approval, or it is deleted), when you withdraw the approval or
-  remove the gateway with `slopscale traffic reporters delete`, or when
-  DNS logging is turned off;
+  remove the gateway with `slopscale traffic reporters delete`, when
+  DNS logging is turned off, or when a change on the DNS page leaves no
+  global nameserver the agents can forward to;
 - within 15 seconds of the gateway's last report turning 90 seconds old,
   or of the gateway going offline. A server that has just started counts
   its start as every gateway's last report, and waits those 90 seconds
