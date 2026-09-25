@@ -25,9 +25,10 @@ func LooksLikeTLS(payload []byte) bool {
 
 // TLSStream reassembles the ClientHello from the client's first bytes on a
 // TCP connection. The ClientHello may be split over several segments and,
-// in principle, over several handshake records.
+// in principle, over several handshake records. What follows it (a
+// ChangeCipherSpec, early data) is never read.
 type TLSStream struct {
-	raw       []byte // record bytes not yet consumed
+	record    []byte // the record being read, header included
 	handshake []byte // handshake message bytes collected from records
 }
 
@@ -36,43 +37,64 @@ type TLSStream struct {
 // stream is not a ClientHello; the stream must not be written to after
 // either.
 func (s *TLSStream) Write(p []byte) (Hello, bool, error) {
-	if len(s.raw)+len(p) > MaxHelloSize+recordHeaderLen*4 {
-		return Hello{}, false, ErrTooLarge
-	}
-
-	s.raw = append(s.raw, p...)
-
-	for len(s.raw) >= recordHeaderLen {
-		if s.raw[0] != recordTypeHandshake || s.raw[1] != recordVersionMajor {
-			return Hello{}, false, ErrNotTLS
+	for len(p) > 0 {
+		want := recordHeaderLen
+		if len(s.record) >= recordHeaderLen {
+			want += int(binary.BigEndian.Uint16(s.record[3:recordHeaderLen]))
 		}
 
-		n := int(binary.BigEndian.Uint16(s.raw[3:recordHeaderLen]))
-		if n == 0 || n > maxRecordLen {
-			return Hello{}, false, ErrMalformed
+		n := min(want-len(s.record), len(p))
+		s.record = append(s.record, p[:n]...)
+		p = p[n:]
+
+		if len(s.record) == recordHeaderLen {
+			err := checkRecordHeader(s.record)
+			if err != nil {
+				return Hello{}, false, err
+			}
+
+			continue
 		}
 
-		if len(s.raw) < recordHeaderLen+n {
+		if len(s.record) < want {
 			break
 		}
 
-		s.handshake = append(s.handshake, s.raw[recordHeaderLen:recordHeaderLen+n]...)
-		s.raw = s.raw[recordHeaderLen+n:]
+		s.handshake = append(s.handshake, s.record[recordHeaderLen:]...)
+		s.record = s.record[:0]
+
+		total, ok, err := helloLength(s.handshake)
+		if err != nil {
+			return Hello{}, false, err
+		}
+
+		if ok && len(s.handshake) >= total {
+			hello, err := ParseClientHello(s.handshake[:total])
+			if err != nil {
+				return Hello{}, false, err
+			}
+
+			return hello, true, nil
+		}
 	}
 
-	total, ok, err := helloLength(s.handshake)
-	if err != nil {
-		return Hello{}, false, err
+	return Hello{}, false, nil
+}
+
+// Held is how many bytes the stream buffers.
+func (s *TLSStream) Held() int {
+	return cap(s.record) + cap(s.handshake)
+}
+
+func checkRecordHeader(h []byte) error {
+	if h[0] != recordTypeHandshake || h[1] != recordVersionMajor {
+		return ErrNotTLS
 	}
 
-	if !ok || len(s.handshake) < total {
-		return Hello{}, false, nil
+	n := int(binary.BigEndian.Uint16(h[3:recordHeaderLen]))
+	if n == 0 || n > maxRecordLen {
+		return ErrMalformed
 	}
 
-	hello, err := ParseClientHello(s.handshake[:total])
-	if err != nil {
-		return Hello{}, false, err
-	}
-
-	return hello, true, nil
+	return nil
 }

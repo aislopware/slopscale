@@ -4,12 +4,19 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/aislopware/slopscale/flowd/sni"
 	"golang.org/x/net/bpf"
 )
 
 // snapLen keeps whole packets, including segmentation-offloaded ones up
 // to 64 KiB and more.
 const snapLen = 256 << 10
+
+// helloSnap keeps a TCP packet's headers and a ClientHello of the largest
+// size read. A segment that continues a hello is no longer than this, so
+// a longer one (bulk data the tunnel merged) never leaves the kernel, and
+// a packet that starts a hello is cut to it.
+const helloSnap = sni.MaxHelloSize + 1<<10
 
 // Filter offsets and values, for raw IP packets starting at offset 0 (a
 // tunnel device, or a packet socket of type SOCK_DGRAM on any device).
@@ -48,6 +55,7 @@ var errBadJump = errors.New("bad jump")
 const (
 	next   = "next"
 	accept = "accept"
+	hello  = "hello"
 	reject = "reject"
 )
 
@@ -55,11 +63,17 @@ const (
 // ClientHello or QUIC Initial:
 //
 //   - unfragmented TCP with payload starting a TLS handshake record, or
-//     with PSH set (the last segment of a ClientHello split over two);
-//   - UDP whose payload starts with a QUIC long header.
+//     with PSH set and no longer than a hello (the last segment of a
+//     ClientHello split over two);
+//   - UDP whose payload starts with a QUIC long header;
+//   - IPv6 with extension headers before the transport header, which the
+//     processor walks.
 //
 // Everything else (bulk data, ACKs, other protocols) never leaves the
-// kernel.
+// kernel. A stateless filter cannot tell the middle segments of a hello
+// split over three or more from bulk data, so those hellos are read only
+// when the tunnel merged the segments (tailscaled's receive offload merges
+// a burst), as it does for most.
 func filterProgram() ([]bpf.Instruction, error) {
 	prog := []asmOp{
 		{ins: bpf.LoadAbsolute{Off: offVersion, Size: 1}},
@@ -84,10 +98,10 @@ func filterProgram() ([]bpf.Instruction, error) {
 		{ins: bpf.LoadIndirect{Off: 0, Size: 1}},
 		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: tlsHandshake}, jt: next, jf: "v4psh"},
 		{ins: bpf.LoadIndirect{Off: 1, Size: 1}},
-		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: tlsMajor}, jt: accept, jf: next},
+		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: tlsMajor}, jt: hello, jf: next},
 		{label: "v4psh", ins: bpf.LoadMemShift{Off: offVersion}},
 		{ins: bpf.LoadIndirect{Off: offTCPFlags, Size: 1}},
-		{ins: bpf.JumpIf{Cond: bpf.JumpBitsSet, Val: tcpFlagPSH}, jt: accept, jf: reject},
+		{ins: bpf.JumpIf{Cond: bpf.JumpBitsSet, Val: tcpFlagPSH}, jt: "tail", jf: reject},
 
 		{label: "v4udp", ins: bpf.LoadMemShift{Off: offVersion}},
 		{ins: bpf.LoadIndirect{Off: udpHeader, Size: 1}},
@@ -96,7 +110,10 @@ func filterProgram() ([]bpf.Instruction, error) {
 
 		{label: "v6", ins: bpf.LoadAbsolute{Off: offV6Next, Size: 1}},
 		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: protoTCP}, jt: "v6tcp", jf: next},
-		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: protoUDP}, jt: "v6udp", jf: reject},
+		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: protoUDP}, jt: "v6udp", jf: next},
+		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: ipv6HopByHop}, jt: accept, jf: next},
+		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: ipv6Routing}, jt: accept, jf: next},
+		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: ipv6DestOptions}, jt: accept, jf: reject},
 
 		{label: "v6tcp", ins: bpf.LoadAbsolute{Off: offV6TCPDataOff, Size: 1}},
 		{ins: bpf.ALUOpConstant{Op: bpf.ALUOpShiftRight, Val: dataOffShift}},
@@ -108,15 +125,19 @@ func filterProgram() ([]bpf.Instruction, error) {
 		{ins: bpf.LoadIndirect{Off: 0, Size: 1}},
 		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: tlsHandshake}, jt: next, jf: "v6psh"},
 		{ins: bpf.LoadIndirect{Off: 1, Size: 1}},
-		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: tlsMajor}, jt: accept, jf: next},
+		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: tlsMajor}, jt: hello, jf: next},
 		{label: "v6psh", ins: bpf.LoadAbsolute{Off: offV6TCPFlags, Size: 1}},
-		{ins: bpf.JumpIf{Cond: bpf.JumpBitsSet, Val: tcpFlagPSH}, jt: accept, jf: reject},
+		{ins: bpf.JumpIf{Cond: bpf.JumpBitsSet, Val: tcpFlagPSH}, jt: "tail", jf: reject},
 
 		{label: "v6udp", ins: bpf.LoadAbsolute{Off: offV6UDPFirst, Size: 1}},
 		{ins: bpf.ALUOpConstant{Op: bpf.ALUOpAnd, Val: quicLongFixed}},
 		{ins: bpf.JumpIf{Cond: bpf.JumpEqual, Val: quicLongFixed}, jt: accept, jf: reject},
 
+		{label: "tail", ins: bpf.LoadExtension{Num: bpf.ExtLen}},
+		{ins: bpf.JumpIf{Cond: bpf.JumpGreaterThan, Val: helloSnap}, jt: reject, jf: hello},
+
 		{label: accept, ins: bpf.RetConstant{Val: snapLen}},
+		{label: hello, ins: bpf.RetConstant{Val: helloSnap}},
 		{label: reject, ins: bpf.RetConstant{Val: 0}},
 	}
 

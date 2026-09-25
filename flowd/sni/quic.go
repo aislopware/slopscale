@@ -57,6 +57,7 @@ const (
 	varintValueMask          = 0x3f
 	varintLenShift           = 6
 	maxCryptoOffset          = MaxHelloSize
+	maxCryptoRanges          = 16
 	ackRangeFieldsPerAckPair = 2
 	ecnCounts                = 3
 )
@@ -79,6 +80,9 @@ var (
 	// ErrQUICMalformed is returned for an Initial that does not parse or
 	// does not decrypt.
 	ErrQUICMalformed = errors.New("malformed QUIC Initial packet")
+	// ErrFragmented is returned for CRYPTO frames that leave more gaps
+	// than a client's reordering explains.
+	ErrFragmented = errors.New("CRYPTO stream too fragmented")
 )
 
 // CryptoFrame is a CRYPTO frame's data at its offset in the stream.
@@ -107,8 +111,10 @@ func LooksLikeQUICInitial(payload []byte) bool {
 // datagram are skipped; the datagram must start with an Initial.
 func ParseInitials(datagram []byte) (Initial, error) {
 	var (
-		out  Initial
-		rest = datagram
+		out         Initial
+		rest        = datagram
+		keys        initialKeys
+		keysVersion uint32
 	)
 
 	for len(rest) > 0 && rest[0]&headerFormLong != 0 {
@@ -133,7 +139,17 @@ func ParseInitials(datagram []byte) (Initial, error) {
 			break
 		}
 
-		frames, err := decryptInitial(pkt)
+		// Coalesced Initials share the connection ID, so their keys.
+		if keys.aead == nil || keysVersion != pkt.version {
+			keys, err = deriveKeys(pkt.version, pkt.dcid)
+			if err != nil {
+				return Initial{}, err
+			}
+
+			keysVersion = pkt.version
+		}
+
+		frames, err := decryptInitial(pkt, keys)
 		if err != nil {
 			return Initial{}, err
 		}
@@ -276,6 +292,9 @@ type initialKeys struct {
 	hp   cipher.Block
 }
 
+// deriveKeys is [deriveInitialKeys]; tests count its calls.
+var deriveKeys = deriveInitialKeys
+
 func deriveInitialKeys(version uint32, dcid []byte) (initialKeys, error) {
 	salt, labelPrefix := saltV1, "quic "
 	if version == quicV2 {
@@ -346,12 +365,7 @@ func expandLabel(secret []byte, label string, length uint16) ([]byte, error) {
 	return out, nil
 }
 
-func decryptInitial(pkt longPacket) ([]CryptoFrame, error) {
-	keys, err := deriveInitialKeys(pkt.version, pkt.dcid)
-	if err != nil {
-		return nil, err
-	}
-
+func decryptInitial(pkt longPacket, keys initialKeys) ([]CryptoFrame, error) {
 	b := slices.Clone(pkt.packet)
 	sampleAt := pkt.pnOffset + maxPNLen
 
@@ -510,12 +524,20 @@ func (s *CryptoStream) Add(frames []CryptoFrame) (Hello, bool, error) {
 			return Hello{}, false, ErrTooLarge
 		}
 
+		if start == end {
+			continue
+		}
+
+		err := s.addRange(start, end)
+		if err != nil {
+			return Hello{}, false, err
+		}
+
 		if end > len(s.buf) {
 			s.buf = append(s.buf, make([]byte, end-len(s.buf))...)
 		}
 
 		copy(s.buf[start:end], f.Data)
-		s.addRange(start, end)
 	}
 
 	contiguous := s.contiguous()
@@ -537,27 +559,33 @@ func (s *CryptoStream) Add(frames []CryptoFrame) (Hello, bool, error) {
 	return hello, true, nil
 }
 
-func (s *CryptoStream) addRange(start, end int) {
-	if start == end {
-		return
+// Held is how many bytes the stream buffers.
+func (s *CryptoStream) Held() int {
+	return cap(s.buf)
+}
+
+// addRange records that [start, end) is held, merging it with the ranges
+// it overlaps or touches. A range that would be one more gap than
+// [maxCryptoRanges] allows fails the stream: clients shuffle a handful of
+// frames, not thousands.
+func (s *CryptoStream) addRange(start, end int) error {
+	// i is the first range ending at or after start; it and those after it
+	// that begin at or before end merge with the new one.
+	i, _ := slices.BinarySearchFunc(s.ranges, start, func(r [2]int, at int) int { return cmp.Compare(r[1], at) })
+
+	j := i
+	for j < len(s.ranges) && s.ranges[j][0] <= end {
+		start, end = min(start, s.ranges[j][0]), max(end, s.ranges[j][1])
+		j++
 	}
 
-	s.ranges = append(s.ranges, [2]int{start, end})
-	slices.SortFunc(s.ranges, func(a, b [2]int) int { return cmp.Compare(a[0], b[0]) })
-
-	merged := s.ranges[:1]
-	for _, r := range s.ranges[1:] {
-		last := &merged[len(merged)-1]
-		if r[0] <= last[1] {
-			last[1] = max(last[1], r[1])
-
-			continue
-		}
-
-		merged = append(merged, r)
+	if i == j && len(s.ranges) >= maxCryptoRanges {
+		return ErrFragmented
 	}
 
-	s.ranges = merged
+	s.ranges = slices.Replace(s.ranges, i, j, [2]int{start, end})
+
+	return nil
 }
 
 // contiguous is how many bytes from offset zero are held.

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -125,39 +126,45 @@ func TestFilter(t *testing.T) {
 	fragment := ipv4(node, remote, 6, tcp(1, 443, 0, flagACK, hello))
 	binary.BigEndian.PutUint16(fragment[6:], 0x2000) // MF
 
+	merged := make([]byte, 60_000)
+
 	for _, tc := range []struct {
-		name   string
-		pkt    []byte
-		accept bool
+		name string
+		pkt  []byte
+		snap int // 0 when rejected
 	}{
-		{name: "v4 hello", pkt: ipv4(node, remote, 6, tcp(1, 443, 0, flagACK, hello[:1000])), accept: true},
+		{name: "v4 hello", pkt: ipv4(node, remote, 6, tcp(1, 443, 0, flagACK, hello[:1000])), snap: helloSnap},
 		{
-			name:   "v4 hello tail with PSH",
-			pkt:    ipv4(node, remote, 6, tcp(1, 443, 1000, flagACK|flagPSH, bulk[:300])),
-			accept: true,
+			name: "v4 hello tail with PSH",
+			pkt:  ipv4(node, remote, 6, tcp(1, 443, 1000, flagACK|flagPSH, bulk[:300])),
+			snap: helloSnap,
 		},
+		{
+			name: "v4 hello starting a merged packet",
+			pkt:  ipv4(node, remote, 6, tcp(1, 443, 0, flagACK|flagPSH, append(slices.Clone(hello), merged...))),
+			snap: helloSnap,
+		},
+		{name: "v4 merged bulk data with PSH", pkt: ipv4(node, remote, 6, tcp(1, 443, 5000, flagACK|flagPSH, merged))},
 		{name: "v4 bulk data", pkt: ipv4(node, remote, 6, tcp(1, 443, 5000, flagACK, bulk))},
 		{name: "v4 pure ack", pkt: ipv4(node, remote, 6, tcp(1, 443, 5000, flagACK|flagPSH, nil))},
 		{name: "v4 fragment", pkt: fragment},
-		{name: "v4 quic initial", pkt: ipv4(node, remote, 17, udp(5000, quicVector(t))), accept: true},
+		{name: "v4 quic initial", pkt: ipv4(node, remote, 17, udp(5000, quicVector(t))), snap: snapLen},
 		{name: "v4 quic short header", pkt: ipv4(node, remote, 17, udp(5000, append([]byte{0x40}, bulk...)))},
 		{name: "v4 icmp", pkt: ipv4(node, remote, 1, bulk[:64])},
-		{name: "v6 hello", pkt: ipv6(node6, remote6, 6, tcp(1, 443, 0, flagACK, hello[:1000])), accept: true},
+		{name: "v6 hello", pkt: ipv6(node6, remote6, 6, tcp(1, 443, 0, flagACK, hello[:1000])), snap: helloSnap},
 		{name: "v6 bulk", pkt: ipv6(node6, remote6, 6, tcp(1, 443, 0, flagACK, bulk))},
-		{name: "v6 psh", pkt: ipv6(node6, remote6, 6, tcp(1, 443, 0, flagPSH, bulk[:10])), accept: true},
-		{name: "v6 quic initial", pkt: ipv6(node6, remote6, 17, udp(5000, quicVector(t))), accept: true},
-		{name: "v6 hop-by-hop header", pkt: ipv6(node6, remote6, 0, bulk[:80])},
+		{name: "v6 psh", pkt: ipv6(node6, remote6, 6, tcp(1, 443, 0, flagPSH, bulk[:10])), snap: helloSnap},
+		{name: "v6 merged bulk data with PSH", pkt: ipv6(node6, remote6, 6, tcp(1, 443, 0, flagPSH, merged))},
+		{name: "v6 quic initial", pkt: ipv6(node6, remote6, 17, udp(5000, quicVector(t))), snap: snapLen},
+		{name: "v6 hop-by-hop header", pkt: ipv6(node6, remote6, 0, bulk[:80]), snap: snapLen},
+		{name: "v6 fragment header", pkt: ipv6(node6, remote6, 44, bulk[:80])},
+		{name: "v6 icmp", pkt: ipv6(node6, remote6, 58, bulk[:80])},
 		{name: "garbage", pkt: []byte{0x12, 0x34}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			n, err := vm.Run(tc.pkt)
 			require.NoError(t, err)
-
-			if tc.accept {
-				assert.Positive(t, n)
-			} else {
-				assert.Zero(t, n)
-			}
+			assert.Equal(t, tc.snap, n)
 		})
 	}
 }
