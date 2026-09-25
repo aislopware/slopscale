@@ -10,6 +10,10 @@ Restart=always
 RestartSec=10
 # Shutdown flushes the open buckets to the spool and gives the upload 5s.
 TimeoutStopSec=20
+# SystemCallFilter=~@resources keeps Go from raising its own soft limit,
+# which would stay at systemd's 1024; the resolver holds a socket per
+# query in flight and per TCP client.
+LimitNOFILE=65536
 
 # Root for the tailscaled socket and the conntrack sysctls, but only with
 # the capabilities the collectors need: conntrack netlink (NET_ADMIN), the
@@ -30,7 +34,11 @@ ProtectHostname=true
 ProtectKernelLogs=true
 ProtectKernelModules=true
 # ProtectKernelTunables and ProcSubset=pid stay off: the agent turns on
-# nf_conntrack_acct under /proc/sys at start.
+# nf_conntrack_acct and nf_conntrack_timestamp under /proc/sys at start.
+# They stay on after it stops or is purged, until the next boot (nothing
+# is written to /etc/sysctl.d): they cost a few bytes per tracked
+# connection, and the agent cannot tell whether someone else turned them
+# on first and still relies on them.
 ProtectProc=invisible
 ProtectSystem=strict
 RemoveIPC=true

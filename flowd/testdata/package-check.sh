@@ -37,6 +37,9 @@ systemctl restart slopscale-flowd
 sleep 3
 systemctl is-active slopscale-flowd
 test "$(cat /proc/sys/net/netfilter/nf_conntrack_acct)" = 1
+# Go cannot raise its own soft limit under SystemCallFilter=~@resources.
+pid=$(systemctl show -p MainPID --value slopscale-flowd)
+grep -E '^Max open files +65536 +65536' "/proc/$pid/limits"
 
 addr=$(getent ahostsv4 example.com | awk 'NR==1 { print $1 }')
 ip netns exec client curl -sS -o /dev/null --resolve "example.com:443:$addr" https://example.com/
@@ -56,3 +59,28 @@ jq -se --arg addr "$addr" '
 ' /tmp/reports.json >/dev/null
 
 echo "PASS: the packaged unit counted and named the request"
+
+# The maintainer scripts behave like dh_installsystemd's: removal stops and
+# masks the unit, a reinstall unmasks and starts it, purge leaves nothing.
+# Docker's Debian images forbid maintainer scripts to start or stop
+# services; a real system does not.
+rm -f /usr/sbin/policy-rc.d
+unit=/etc/systemd/system/slopscale-flowd.service
+systemctl start slopscale-flowd
+dpkg -r slopscale-flowd
+test "$(systemctl is-active slopscale-flowd || true)" != active
+test "$(readlink "$unit")" = /dev/null
+
+dpkg -i /opt/slopscale-flowd.deb
+test ! -e "$unit"
+systemctl is-enabled slopscale-flowd
+systemctl is-active slopscale-flowd
+
+dpkg -P slopscale-flowd
+test ! -e "$unit"
+test ! -e /var/lib/slopscale-flowd
+test -z "$(find /var/lib/systemd/deb-systemd-helper-enabled -name '*slopscale-flowd*' 2>/dev/null)"
+# The accounting sysctls stay on until the next boot, by choice.
+test "$(cat /proc/sys/net/netfilter/nf_conntrack_acct)" = 1
+
+echo "PASS: remove, reinstall and purge"

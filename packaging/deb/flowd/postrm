@@ -1,20 +1,32 @@
 #!/bin/sh
-# postrm script for slopscale-flowd.
+# postrm script for slopscale-flowd, following the snippets
+# dh_installsystemd generates.
+#
+# The connection tracking sysctls the agent turned on stay on until the
+# next boot; see the unit file for why.
 
 set -e
+
+SERVICE="slopscale-flowd.service"
 
 case "$1" in
     remove)
       if [ -d /run/systemd/system ]; then
         systemctl --system daemon-reload >/dev/null || true
       fi
+      # Removed but not purged, the unit must not come back enabled by
+      # anything but a reinstall, whose postinst unmasks it.
+      if [ -x /usr/bin/deb-systemd-helper ]; then
+        deb-systemd-helper mask "$SERVICE" >/dev/null || true
+      fi
     ;;
 
     purge)
       # The spool holds reports not yet delivered; purging drops them.
       rm -rf /var/lib/slopscale-flowd
-      if [ -x "/usr/bin/deb-systemd-helper" ]; then
-        deb-systemd-helper purge slopscale-flowd.service >/dev/null || true
+      if [ -x /usr/bin/deb-systemd-helper ]; then
+        deb-systemd-helper purge "$SERVICE" >/dev/null || true
+        deb-systemd-helper unmask "$SERVICE" >/dev/null || true
       fi
     ;;
 
