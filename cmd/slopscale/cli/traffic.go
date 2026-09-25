@@ -44,6 +44,10 @@ func init() {
 	deleteTrafficReporterCmd.Flags().Uint64P("identifier", "i", 0, "The gateway's node ID")
 	mustMarkRequired(deleteTrafficReporterCmd, "identifier")
 	trafficReportersCmd.AddCommand(deleteTrafficReporterCmd)
+	resolverTrafficReporterCmd.Flags().Uint64P("identifier", "i", 0, "The gateway's node ID")
+	mustMarkRequired(resolverTrafficReporterCmd, "identifier")
+	resolverTrafficReporterCmd.Flags().Bool("approve", true, "Let the clients use the resolver; false stops them")
+	trafficReportersCmd.AddCommand(resolverTrafficReporterCmd)
 
 	trafficCmd.AddCommand(trafficSettingsCmd)
 	trafficSettingsCmd.AddCommand(getTrafficSettingsCmd)
@@ -466,6 +470,14 @@ var listTrafficReportersCmd = &cobra.Command{
 					fmt.Printf("\nClients resolve through %s\n", strings.Join(body.Resolvers, ", "))
 				}
 
+				if body.DnsBlocked != "" {
+					fmt.Printf("\nDNS logging points no client at a gateway: %s\n", body.DnsBlocked)
+				}
+
+				if len(body.SkippedUpstreams) > 0 {
+					fmt.Printf("\nThe resolvers cannot forward to %s\n", strings.Join(body.SkippedUpstreams, ", "))
+				}
+
 				return nil
 			})
 		},
@@ -476,8 +488,12 @@ func reporterState(r clientv1.TrafficReporter) string {
 	switch {
 	case r.Stale:
 		return "stale"
+	case r.Refused != "":
+		return "refused: " + r.Refused
 	case r.ResolverActive:
 		return "reporting, resolving"
+	case r.ResolverApprovedAt != nil:
+		return "reporting, resolver approved"
 	}
 
 	return "reporting"
@@ -528,6 +544,38 @@ var deleteTrafficReporterCmd = &cobra.Command{
 	),
 }
 
+var resolverTrafficReporterCmd = &cobra.Command{
+	Use:   "resolver",
+	Short: "Let the clients use a gateway's resolver, or stop them",
+	Long: `Approves a gateway's resolver for DNS logging, or withdraws the approval with
+--approve=false. An approved resolver is used while DNS logging is on, the
+gateway reports it working and still qualifies as a gateway. Needs the dns
+scope as well as logs:network.`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+			approve, _ := cmd.Flags().GetBool("approve")
+
+			resp, err := client.UpdateTrafficReporterWithResponse(ctx, strconv.FormatUint(identifier, util.Base10),
+				clientv1.TrafficReporterPatch{Resolver: approve})
+			if err != nil {
+				return fmt.Errorf("updating traffic reporter: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			msg := "Resolver approval withdrawn"
+			if approve {
+				msg = "Resolver approved"
+			}
+
+			return printOutput(cmd, resp.JSON200, msg)
+		},
+	),
+}
+
 var trafficSettingsCmd = &cobra.Command{
 	Use:   "settings",
 	Short: "Manage the traffic monitor's settings",
@@ -557,8 +605,9 @@ var setTrafficSettingsCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Change the traffic monitor's settings",
 	Long: `Changes the given settings; the others keep their value. Turning DNS logging
-on points every client at the gateways' resolvers while their agents report;
-turning it off points them back.`,
+on points each client at one approved gateway resolver, besides the global
+nameservers, while its agent reports; turning it off points them back.
+Changing DNS logging needs the dns scope as well as logs:network.`,
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			body, err := trafficSettingsPatch(cmd)
