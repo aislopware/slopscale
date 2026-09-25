@@ -3826,6 +3826,469 @@ components:
         - public
         - votes
       type: object
+    TrafficCollector:
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        error:
+          description: Why the collector is not working; empty while it works.
+          type: string
+      required:
+        - enabled
+        - error
+      type: object
+    TrafficCollectors:
+      additionalProperties: false
+      properties:
+        appConnector:
+          $ref: "#/components/schemas/TrafficCollector"
+        conntrack:
+          $ref: "#/components/schemas/TrafficCollector"
+        dns:
+          $ref: "#/components/schemas/TrafficCollector"
+        sni:
+          $ref: "#/components/schemas/TrafficCollector"
+      required:
+        - conntrack
+        - sni
+        - dns
+        - appConnector
+      type: object
+    TrafficCounts:
+      additionalProperties: false
+      properties:
+        conns:
+          description: Connections that started.
+          format: int64
+          minimum: 0
+          type: integer
+        rxBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        rxPackets:
+          format: int64
+          minimum: 0
+          type: integer
+        txBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        txPackets:
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - txBytes
+        - rxBytes
+        - txPackets
+        - rxPackets
+        - conns
+      type: object
+    TrafficDNSOutputBody:
+      additionalProperties: false
+      properties:
+        end:
+          format: date-time
+          type: string
+        names:
+          items:
+            $ref: "#/components/schemas/TrafficName"
+          type: array
+        resolution:
+          description: "Seconds per bucket: 60, 3600 or 86400."
+          format: int64
+          type: integer
+        start:
+          format: date-time
+          type: string
+      required:
+        - names
+        - resolution
+        - start
+        - end
+      type: object
+    TrafficDestination:
+      additionalProperties: false
+      properties:
+        asName:
+          description: The network's name, from the ASN table.
+          type: string
+        asn:
+          description: The network's AS number; 0 when unknown.
+          format: int64
+          type: integer
+        conns:
+          description: Connections that started.
+          format: int64
+          minimum: 0
+          type: integer
+        country:
+          description: ISO 3166 code of the network's registration.
+          type: string
+        dst:
+          description: The address; empty on the folded remainder of the smaller destinations.
+          type: string
+        host:
+          description: The name the traffic was for, from the handshake or a lookup.
+          type: string
+        nodeId:
+          description: Set when grouped by node or reporter.
+          format: uint64
+          type: string
+        nodeName:
+          type: string
+        nodes:
+          description: How many nodes the group covers.
+          format: int64
+          minimum: 0
+          type: integer
+        port:
+          format: int64
+          type: integer
+        private:
+          description: A private address, reached through a subnet route.
+          type: boolean
+        proto:
+          description: "IP protocol number: 6 TCP, 17 UDP."
+          format: int64
+          type: integer
+        rxBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        rxPackets:
+          format: int64
+          minimum: 0
+          type: integer
+        txBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        txPackets:
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - dst
+        - port
+        - proto
+        - host
+        - asn
+        - asName
+        - country
+        - private
+        - nodeId
+        - nodeName
+        - nodes
+        - txBytes
+        - rxBytes
+        - txPackets
+        - rxPackets
+        - conns
+      type: object
+    TrafficDestinationsOutputBody:
+      additionalProperties: false
+      properties:
+        destinations:
+          items:
+            $ref: "#/components/schemas/TrafficDestination"
+          type: array
+        end:
+          format: date-time
+          type: string
+        resolution:
+          description: "Seconds per bucket: 60, 3600 or 86400."
+          format: int64
+          type: integer
+        start:
+          format: date-time
+          type: string
+      required:
+        - destinations
+        - resolution
+        - start
+        - end
+      type: object
+    TrafficName:
+      additionalProperties: false
+      properties:
+        failed:
+          description: Questions answered with an error or not at all.
+          format: int64
+          minimum: 0
+          type: integer
+        name:
+          description: Empty on the folded remainder, or when grouped by node.
+          type: string
+        nodeId:
+          description: Set when grouped by node.
+          format: uint64
+          type: string
+        nodeName:
+          type: string
+        nodes:
+          description: How many nodes asked.
+          format: int64
+          minimum: 0
+          type: integer
+        queries:
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - name
+        - nodeId
+        - nodeName
+        - queries
+        - failed
+        - nodes
+      type: object
+    TrafficNode:
+      additionalProperties: false
+      properties:
+        conns:
+          description: Connections that started.
+          format: int64
+          minimum: 0
+          type: integer
+        nodeId:
+          format: uint64
+          type: string
+        nodeName:
+          description: Empty when the node no longer exists.
+          type: string
+        rxBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        rxPackets:
+          format: int64
+          minimum: 0
+          type: integer
+        txBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        txPackets:
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - nodeId
+        - nodeName
+        - txBytes
+        - rxBytes
+        - txPackets
+        - rxPackets
+        - conns
+      type: object
+    TrafficPoint:
+      additionalProperties: false
+      properties:
+        conns:
+          description: Connections that started.
+          format: int64
+          minimum: 0
+          type: integer
+        rxBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        rxPackets:
+          format: int64
+          minimum: 0
+          type: integer
+        start:
+          format: date-time
+          type: string
+        txBytes:
+          format: int64
+          minimum: 0
+          type: integer
+        txPackets:
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - start
+        - txBytes
+        - rxBytes
+        - txPackets
+        - rxPackets
+        - conns
+      type: object
+    TrafficReporter:
+      additionalProperties: false
+      properties:
+        collectors:
+          $ref: "#/components/schemas/TrafficCollectors"
+        dnsListen:
+          description: Where the agent's resolver answers.
+          items:
+            type: string
+          type: array
+        dropped:
+          format: int64
+          minimum: 0
+          type: integer
+        firstSeenAt:
+          format: date-time
+          type: string
+        instance:
+          description: Changes each time the agent starts.
+          type: string
+        lastReportAt:
+          format: date-time
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        nodeName:
+          type: string
+        online:
+          type: boolean
+        resolverActive:
+          type: boolean
+        stale:
+          description: No report for three minutes.
+          type: boolean
+        unattributed:
+          format: int64
+          minimum: 0
+          type: integer
+        version:
+          description: The agent's version.
+          type: string
+      required:
+        - nodeId
+        - nodeName
+        - online
+        - version
+        - instance
+        - firstSeenAt
+        - lastReportAt
+        - stale
+        - collectors
+        - dnsListen
+        - resolverActive
+        - unattributed
+        - dropped
+      type: object
+    TrafficReportersOutputBody:
+      additionalProperties: false
+      properties:
+        asnRanges:
+          format: int64
+          type: integer
+        reporters:
+          items:
+            $ref: "#/components/schemas/TrafficReporter"
+          type: array
+        resolvers:
+          items:
+            type: string
+          type: array
+      required:
+        - reporters
+        - resolvers
+        - asnRanges
+      type: object
+    TrafficRetention:
+      additionalProperties: false
+      properties:
+        dayDays:
+          description: Daily ones, in days.
+          format: int64
+          type: integer
+        hourDays:
+          description: Hourly totals, destinations and names, in days.
+          format: int64
+          type: integer
+        minuteHours:
+          description: Per-minute totals, in hours.
+          format: int64
+          type: integer
+      required:
+        - minuteHours
+        - hourDays
+        - dayDays
+      type: object
+    TrafficRetentionPatch:
+      additionalProperties: false
+      properties:
+        dayDays:
+          format: int64
+          type: integer
+        hourDays:
+          format: int64
+          type: integer
+        minuteHours:
+          format: int64
+          type: integer
+      type: object
+    TrafficSettings:
+      additionalProperties: false
+      properties:
+        dnsLogging:
+          type: boolean
+        retention:
+          $ref: "#/components/schemas/TrafficRetention"
+        sni:
+          description: Agents name destinations from TLS and QUIC handshakes.
+          type: boolean
+      required:
+        - sni
+        - dnsLogging
+        - retention
+      type: object
+    TrafficSettingsPatch:
+      additionalProperties: false
+      properties:
+        dnsLogging:
+          type: boolean
+        retention:
+          $ref: "#/components/schemas/TrafficRetentionPatch"
+        sni:
+          type: boolean
+      type: object
+    TrafficSummaryOutputBody:
+      additionalProperties: false
+      properties:
+        end:
+          format: date-time
+          type: string
+        nodes:
+          items:
+            $ref: "#/components/schemas/TrafficNode"
+          type: array
+        reporters:
+          items:
+            $ref: "#/components/schemas/TrafficNode"
+          type: array
+        resolution:
+          description: "Seconds per bucket: 60, 3600 or 86400."
+          format: int64
+          type: integer
+        series:
+          items:
+            $ref: "#/components/schemas/TrafficPoint"
+          type: array
+        start:
+          format: date-time
+          type: string
+        total:
+          $ref: "#/components/schemas/TrafficCounts"
+      required:
+        - total
+        - series
+        - nodes
+        - reporters
+        - resolution
+        - start
+        - end
+      type: object
     UpdateNodePreferencesRequestBody:
       additionalProperties: false
       properties:
@@ -8859,6 +9322,403 @@ paths:
         - Settings
       x-audit-action: tailnet_lock.disable
       x-required-scope: feature_settings
+  /api/v1/traffic/destinations:
+    get:
+      description: |-
+        Where the traffic went, largest first, read at hourly or daily resolution. groupBy host merges the addresses of one name; node and reporter rank the nodes and gateways for the filter.
+
+        Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listTrafficDestinations
+      parameters:
+        - description: RFC 3339; defaults to a day before end.
+          explode: false
+          in: query
+          name: start
+          schema:
+            description: RFC 3339; defaults to a day before end.
+            format: date-time
+            type: string
+        - description: RFC 3339; defaults to now.
+          explode: false
+          in: query
+          name: end
+          schema:
+            description: RFC 3339; defaults to now.
+            format: date-time
+            type: string
+        - description: Keep the traffic of one node.
+          explode: false
+          in: query
+          name: nodeId
+          schema:
+            description: Keep the traffic of one node.
+            format: uint64
+            type: string
+        - description: Keep the traffic through one gateway.
+          explode: false
+          in: query
+          name: reporterId
+          schema:
+            description: Keep the traffic through one gateway.
+            format: uint64
+            type: string
+        - explode: false
+          in: query
+          name: groupBy
+          schema:
+            default: destination
+            enum:
+              - destination
+              - host
+              - asn
+              - country
+              - port
+              - node
+              - reporter
+            type: string
+        - description: Keep hosts or addresses containing this.
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Keep hosts or addresses containing this.
+            type: string
+        - description: Keep one network (AS number).
+          explode: false
+          in: query
+          name: asn
+          schema:
+            description: Keep one network (AS number).
+            format: int64
+            maximum: 4294967295
+            minimum: 0
+            type: integer
+        - description: Keep one country (ISO 3166).
+          explode: false
+          in: query
+          name: country
+          schema:
+            description: Keep one country (ISO 3166).
+            maxLength: 2
+            type: string
+        - description: Keep one IP protocol.
+          explode: false
+          in: query
+          name: proto
+          schema:
+            description: Keep one IP protocol.
+            format: int64
+            maximum: 255
+            minimum: 0
+            type: integer
+        - description: Keep one port; needs proto.
+          explode: false
+          in: query
+          name: port
+          schema:
+            description: Keep one port; needs proto.
+            format: int64
+            maximum: 65535
+            minimum: 0
+            type: integer
+        - description: At most 1000; default 100.
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: At most 1000; default 100.
+            format: int64
+            maximum: 1000
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficDestinationsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List traffic destinations
+      tags:
+        - Traffic
+      x-required-scope: logs:network:read
+  /api/v1/traffic/dns:
+    get:
+      description: |-
+        The names the nodes asked the gateways' resolvers about, most asked first, read at hourly or daily resolution. Empty unless DNS logging is on.
+
+        Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listTrafficNames
+      parameters:
+        - description: RFC 3339; defaults to a day before end.
+          explode: false
+          in: query
+          name: start
+          schema:
+            description: RFC 3339; defaults to a day before end.
+            format: date-time
+            type: string
+        - description: RFC 3339; defaults to now.
+          explode: false
+          in: query
+          name: end
+          schema:
+            description: RFC 3339; defaults to now.
+            format: date-time
+            type: string
+        - description: Keep the traffic of one node.
+          explode: false
+          in: query
+          name: nodeId
+          schema:
+            description: Keep the traffic of one node.
+            format: uint64
+            type: string
+        - description: Keep the traffic through one gateway.
+          explode: false
+          in: query
+          name: reporterId
+          schema:
+            description: Keep the traffic through one gateway.
+            format: uint64
+            type: string
+        - explode: false
+          in: query
+          name: groupBy
+          schema:
+            default: name
+            enum:
+              - name
+              - node
+            type: string
+        - description: Keep names containing this.
+          explode: false
+          in: query
+          name: q
+          schema:
+            description: Keep names containing this.
+            type: string
+        - description: At most 1000; default 100.
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: At most 1000; default 100.
+            format: int64
+            maximum: 1000
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficDNSOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List looked-up names
+      tags:
+        - Traffic
+      x-required-scope: logs:network:read
+  /api/v1/traffic/reporters:
+    get:
+      description: |-
+        The gateways whose agent has reported, with each collector's state and the resolvers the clients are pointed at.
+
+        Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listTrafficReporters
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficReportersOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List traffic reporters
+      tags:
+        - Traffic
+      x-required-scope: logs:network:read
+  /api/v1/traffic/reporters/{nodeId}:
+    delete:
+      description: |-
+        Forgets a gateway's agent and takes its resolver out of the clients' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+
+        Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteTrafficReporter
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Remove traffic reporter
+      tags:
+        - Traffic
+      x-audit-action: traffic.reporter.delete
+      x-required-scope: logs:network
+  /api/v1/traffic/settings:
+    get:
+      description: Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getTrafficSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficSettings"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get traffic settings
+      tags:
+        - Traffic
+      x-required-scope: logs:network:read
+    patch:
+      description: |-
+        Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+
+        Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateTrafficSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrafficSettingsPatch"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficSettings"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update traffic settings
+      tags:
+        - Traffic
+      x-audit-action: traffic.settings.update
+      x-required-scope: logs:network
+  /api/v1/traffic/summary:
+    get:
+      description: |-
+        The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+
+        Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getTrafficSummary
+      parameters:
+        - description: RFC 3339; defaults to a day before end.
+          explode: false
+          in: query
+          name: start
+          schema:
+            description: RFC 3339; defaults to a day before end.
+            format: date-time
+            type: string
+        - description: RFC 3339; defaults to now.
+          explode: false
+          in: query
+          name: end
+          schema:
+            description: RFC 3339; defaults to now.
+            format: date-time
+            type: string
+        - description: Keep the traffic of one node.
+          explode: false
+          in: query
+          name: nodeId
+          schema:
+            description: Keep the traffic of one node.
+            format: uint64
+            type: string
+        - description: Keep the traffic through one gateway.
+          explode: false
+          in: query
+          name: reporterId
+          schema:
+            description: Keep the traffic through one gateway.
+            format: uint64
+            type: string
+        - description: How many top nodes, at most 100; default 10.
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: How many top nodes, at most 100; default 10.
+            format: int64
+            maximum: 100
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficSummaryOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get traffic summary
+      tags:
+        - Traffic
+      x-required-scope: logs:network:read
   /api/v1/user:
     get:
       description: "A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing."

@@ -2253,6 +2253,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/traffic/destinations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List traffic destinations
+         * @description Where the traffic went, largest first, read at hourly or daily resolution. groupBy host merges the addresses of one name; node and reporter rank the nodes and gateways for the filter.
+         *
+         *     Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listTrafficDestinations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/traffic/dns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List looked-up names
+         * @description The names the nodes asked the gateways' resolvers about, most asked first, read at hourly or daily resolution. Empty unless DNS logging is on.
+         *
+         *     Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listTrafficNames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/traffic/reporters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List traffic reporters
+         * @description The gateways whose agent has reported, with each collector's state and the resolvers the clients are pointed at.
+         *
+         *     Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listTrafficReporters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/traffic/reporters/{nodeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove traffic reporter
+         * @description Forgets a gateway's agent and takes its resolver out of the clients' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+         *
+         *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteTrafficReporter"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/traffic/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get traffic settings
+         * @description Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getTrafficSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update traffic settings
+         * @description Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+         *
+         *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        patch: operations["updateTrafficSettings"];
+        trace?: never;
+    };
+    "/api/v1/traffic/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get traffic summary
+         * @description The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+         *
+         *     Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getTrafficSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user": {
         parameters: {
             query?: never;
@@ -4204,6 +4340,243 @@ export interface components {
              */
             votes: number;
         };
+        TrafficCollector: {
+            enabled: boolean;
+            /** @description Why the collector is not working; empty while it works. */
+            error: string;
+        };
+        TrafficCollectors: {
+            appConnector: components["schemas"]["TrafficCollector"];
+            conntrack: components["schemas"]["TrafficCollector"];
+            dns: components["schemas"]["TrafficCollector"];
+            sni: components["schemas"]["TrafficCollector"];
+        };
+        TrafficCounts: {
+            /**
+             * Format: int64
+             * @description Connections that started.
+             */
+            conns: number;
+            /** Format: int64 */
+            rxBytes: number;
+            /** Format: int64 */
+            rxPackets: number;
+            /** Format: int64 */
+            txBytes: number;
+            /** Format: int64 */
+            txPackets: number;
+        };
+        TrafficDestination: {
+            /**
+             * Format: int64
+             * @description The network's AS number; 0 when unknown.
+             */
+            asn: number;
+            /** @description The network's name, from the ASN table. */
+            asName: string;
+            /**
+             * Format: int64
+             * @description Connections that started.
+             */
+            conns: number;
+            /** @description ISO 3166 code of the network's registration. */
+            country: string;
+            /** @description The address; empty on the folded remainder of the smaller destinations. */
+            dst: string;
+            /** @description The name the traffic was for, from the handshake or a lookup. */
+            host: string;
+            /**
+             * Format: uint64
+             * @description Set when grouped by node or reporter.
+             */
+            nodeId: string;
+            nodeName: string;
+            /**
+             * Format: int64
+             * @description How many nodes the group covers.
+             */
+            nodes: number;
+            /** Format: int64 */
+            port: number;
+            /** @description A private address, reached through a subnet route. */
+            private: boolean;
+            /**
+             * Format: int64
+             * @description IP protocol number: 6 TCP, 17 UDP.
+             */
+            proto: number;
+            /** Format: int64 */
+            rxBytes: number;
+            /** Format: int64 */
+            rxPackets: number;
+            /** Format: int64 */
+            txBytes: number;
+            /** Format: int64 */
+            txPackets: number;
+        };
+        TrafficDestinationsOutputBody: {
+            destinations: components["schemas"]["TrafficDestination"][];
+            /** Format: date-time */
+            end: string;
+            /**
+             * Format: int64
+             * @description Seconds per bucket: 60, 3600 or 86400.
+             */
+            resolution: number;
+            /** Format: date-time */
+            start: string;
+        };
+        TrafficDNSOutputBody: {
+            /** Format: date-time */
+            end: string;
+            names: components["schemas"]["TrafficName"][];
+            /**
+             * Format: int64
+             * @description Seconds per bucket: 60, 3600 or 86400.
+             */
+            resolution: number;
+            /** Format: date-time */
+            start: string;
+        };
+        TrafficName: {
+            /**
+             * Format: int64
+             * @description Questions answered with an error or not at all.
+             */
+            failed: number;
+            /** @description Empty on the folded remainder, or when grouped by node. */
+            name: string;
+            /**
+             * Format: uint64
+             * @description Set when grouped by node.
+             */
+            nodeId: string;
+            nodeName: string;
+            /**
+             * Format: int64
+             * @description How many nodes asked.
+             */
+            nodes: number;
+            /** Format: int64 */
+            queries: number;
+        };
+        TrafficNode: {
+            /**
+             * Format: int64
+             * @description Connections that started.
+             */
+            conns: number;
+            /** Format: uint64 */
+            nodeId: string;
+            /** @description Empty when the node no longer exists. */
+            nodeName: string;
+            /** Format: int64 */
+            rxBytes: number;
+            /** Format: int64 */
+            rxPackets: number;
+            /** Format: int64 */
+            txBytes: number;
+            /** Format: int64 */
+            txPackets: number;
+        };
+        TrafficPoint: {
+            /**
+             * Format: int64
+             * @description Connections that started.
+             */
+            conns: number;
+            /** Format: int64 */
+            rxBytes: number;
+            /** Format: int64 */
+            rxPackets: number;
+            /** Format: date-time */
+            start: string;
+            /** Format: int64 */
+            txBytes: number;
+            /** Format: int64 */
+            txPackets: number;
+        };
+        TrafficReporter: {
+            collectors: components["schemas"]["TrafficCollectors"];
+            /** @description Where the agent's resolver answers. */
+            dnsListen: string[];
+            /** Format: int64 */
+            dropped: number;
+            /** Format: date-time */
+            firstSeenAt: string;
+            /** @description Changes each time the agent starts. */
+            instance: string;
+            /** Format: date-time */
+            lastReportAt: string;
+            /** Format: uint64 */
+            nodeId: string;
+            nodeName: string;
+            online: boolean;
+            resolverActive: boolean;
+            /** @description No report for three minutes. */
+            stale: boolean;
+            /** Format: int64 */
+            unattributed: number;
+            /** @description The agent's version. */
+            version: string;
+        };
+        TrafficReportersOutputBody: {
+            /** Format: int64 */
+            asnRanges: number;
+            reporters: components["schemas"]["TrafficReporter"][];
+            resolvers: string[];
+        };
+        TrafficRetention: {
+            /**
+             * Format: int64
+             * @description Daily ones, in days.
+             */
+            dayDays: number;
+            /**
+             * Format: int64
+             * @description Hourly totals, destinations and names, in days.
+             */
+            hourDays: number;
+            /**
+             * Format: int64
+             * @description Per-minute totals, in hours.
+             */
+            minuteHours: number;
+        };
+        TrafficRetentionPatch: {
+            /** Format: int64 */
+            dayDays?: number;
+            /** Format: int64 */
+            hourDays?: number;
+            /** Format: int64 */
+            minuteHours?: number;
+        };
+        TrafficSettings: {
+            dnsLogging: boolean;
+            retention: components["schemas"]["TrafficRetention"];
+            /** @description Agents name destinations from TLS and QUIC handshakes. */
+            sni: boolean;
+        };
+        TrafficSettingsPatch: {
+            dnsLogging?: boolean;
+            retention?: components["schemas"]["TrafficRetentionPatch"];
+            sni?: boolean;
+        };
+        TrafficSummaryOutputBody: {
+            /** Format: date-time */
+            end: string;
+            nodes: components["schemas"]["TrafficNode"][];
+            reporters: components["schemas"]["TrafficNode"][];
+            /**
+             * Format: int64
+             * @description Seconds per bucket: 60, 3600 or 86400.
+             */
+            resolution: number;
+            series: components["schemas"]["TrafficPoint"][];
+            /** Format: date-time */
+            start: string;
+            total: components["schemas"]["TrafficCounts"];
+        };
         UpdateNodePreferencesRequestBody: {
             acceptDns?: boolean;
             acceptRoutes?: boolean;
@@ -4532,6 +4905,22 @@ export type StartNodeClientUpdateRequestBody = components['schemas']['StartNodeC
 export type StartNodesClientUpdateRequestBody = components['schemas']['StartNodesClientUpdateRequestBody'];
 export type TailnetLock = components['schemas']['TailnetLock'];
 export type TailnetLockKey = components['schemas']['TailnetLockKey'];
+export type TrafficCollector = components['schemas']['TrafficCollector'];
+export type TrafficCollectors = components['schemas']['TrafficCollectors'];
+export type TrafficCounts = components['schemas']['TrafficCounts'];
+export type TrafficDestination = components['schemas']['TrafficDestination'];
+export type TrafficDestinationsOutputBody = components['schemas']['TrafficDestinationsOutputBody'];
+export type TrafficDnsOutputBody = components['schemas']['TrafficDNSOutputBody'];
+export type TrafficName = components['schemas']['TrafficName'];
+export type TrafficNode = components['schemas']['TrafficNode'];
+export type TrafficPoint = components['schemas']['TrafficPoint'];
+export type TrafficReporter = components['schemas']['TrafficReporter'];
+export type TrafficReportersOutputBody = components['schemas']['TrafficReportersOutputBody'];
+export type TrafficRetention = components['schemas']['TrafficRetention'];
+export type TrafficRetentionPatch = components['schemas']['TrafficRetentionPatch'];
+export type TrafficSettings = components['schemas']['TrafficSettings'];
+export type TrafficSettingsPatch = components['schemas']['TrafficSettingsPatch'];
+export type TrafficSummaryOutputBody = components['schemas']['TrafficSummaryOutputBody'];
 export type UpdateNodePreferencesRequestBody = components['schemas']['UpdateNodePreferencesRequestBody'];
 export type UpdateOAuthClientOutputBody = components['schemas']['UpdateOAuthClientOutputBody'];
 export type UpdateOAuthClientRequestBody = components['schemas']['UpdateOAuthClientRequestBody'];
@@ -9158,6 +9547,262 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TailnetLock"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listTrafficDestinations: {
+        parameters: {
+            query?: {
+                /** @description Keep one network (AS number). */
+                asn?: number;
+                /** @description Keep one country (ISO 3166). */
+                country?: string;
+                /** @description RFC 3339; defaults to now. */
+                end?: string;
+                groupBy?: "destination" | "host" | "asn" | "country" | "port" | "node" | "reporter";
+                /** @description At most 1000; default 100. */
+                limit?: number;
+                /** @description Keep the traffic of one node. */
+                nodeId?: string;
+                /** @description Keep one port; needs proto. */
+                port?: number;
+                /** @description Keep one IP protocol. */
+                proto?: number;
+                /** @description Keep hosts or addresses containing this. */
+                q?: string;
+                /** @description Keep the traffic through one gateway. */
+                reporterId?: string;
+                /** @description RFC 3339; defaults to a day before end. */
+                start?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficDestinationsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listTrafficNames: {
+        parameters: {
+            query?: {
+                /** @description RFC 3339; defaults to now. */
+                end?: string;
+                groupBy?: "name" | "node";
+                /** @description At most 1000; default 100. */
+                limit?: number;
+                /** @description Keep the traffic of one node. */
+                nodeId?: string;
+                /** @description Keep names containing this. */
+                q?: string;
+                /** @description Keep the traffic through one gateway. */
+                reporterId?: string;
+                /** @description RFC 3339; defaults to a day before end. */
+                start?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficDNSOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listTrafficReporters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficReportersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteTrafficReporter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getTrafficSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficSettings"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateTrafficSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrafficSettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficSettings"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getTrafficSummary: {
+        parameters: {
+            query?: {
+                /** @description RFC 3339; defaults to now. */
+                end?: string;
+                /** @description How many top nodes, at most 100; default 10. */
+                limit?: number;
+                /** @description Keep the traffic of one node. */
+                nodeId?: string;
+                /** @description Keep the traffic through one gateway. */
+                reporterId?: string;
+                /** @description RFC 3339; defaults to a day before end. */
+                start?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficSummaryOutputBody"];
                 };
             };
             /** @description Error */
