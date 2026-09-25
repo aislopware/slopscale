@@ -20,7 +20,9 @@ const (
 	sysctlAccounting = "/proc/sys/net/netfilter/nf_conntrack_acct"
 	sysctlTimestamp  = "/proc/sys/net/netfilter/nf_conntrack_timestamp"
 	eventBuffer      = 8 << 20
-	eventQueue       = 4096
+	// eventQueue holds events while a dump is being processed, so a busy
+	// gateway's short connections are not lost to an overrun meanwhile.
+	eventQueue = 1 << 16
 )
 
 // Collector reads the kernel's connection tracking table.
@@ -32,26 +34,28 @@ type Collector struct {
 	Log  *slog.Logger
 }
 
-// EnableAccounting turns on per-connection counters. Only connections
-// created afterwards carry them.
-func EnableAccounting() error {
+// EnableAccounting turns on per-connection counters and creation
+// timestamps, and reports whether the kernel has timestamps. Only
+// connections created afterwards carry either.
+func EnableAccounting() (bool, error) {
 	err := os.WriteFile(sysctlAccounting, []byte("1"), 0o600)
 	if err != nil {
-		return fmt.Errorf("enabling connection tracking accounting (is nf_conntrack loaded?): %w", err)
+		return false, fmt.Errorf("enabling connection tracking accounting (is nf_conntrack loaded?): %w", err)
 	}
 
-	// Timestamps are not needed for the counts; set them for operators
-	// reading the table by hand, and ignore kernels without them.
-	_ = os.WriteFile(sysctlTimestamp, []byte("1"), 0o600)
+	// Timestamps tell a connection that began before the agent from one
+	// whose start event was lost; a kernel without them costs precision
+	// after a restart, not the counts.
+	err = os.WriteFile(sysctlTimestamp, []byte("1"), 0o600)
 
-	return nil
+	return err == nil, nil
 }
 
 // Run follows the table until ctx ends or reading it fails. When ctx ends
 // it dumps the table once more, so traffic on connections still open since
 // the last dump reaches the sink before Run returns.
 func (c *Collector) Run(ctx context.Context) error {
-	err := EnableAccounting()
+	stamped, err := EnableAccounting()
 	if err != nil {
 		return err
 	}
@@ -63,6 +67,12 @@ func (c *Collector) Run(ctx context.Context) error {
 	defer dump.Close()
 
 	tracker := NewTracker(keepFunc())
+
+	// Following starts before the event socket opens: every connection
+	// created from here on has a start event or a stamp after this.
+	if stamped {
+		tracker.UseTimestamps(time.Now())
+	}
 
 	var events eventSource
 
@@ -165,25 +175,46 @@ func (c *Collector) event(tracker *Tracker, ev ct.Event) {
 	}
 }
 
+// dump reads the table one address family at a time, keeping only the
+// connections the tracker follows: the kernel's entries are large, and on
+// a router whose own NAT fills the table most of them are not tailnet
+// traffic. The kernel cannot filter by address prefix, so the whole table
+// still crosses the socket each dump; see the package documentation.
 func (c *Collector) dump(conn *ct.Conn, tracker *Tracker) error {
-	flows, err := conn.Dump(nil)
-	if err != nil {
-		return fmt.Errorf("dumping the conntrack table: %w", err)
-	}
+	var kept []Flow
 
-	converted := make([]Flow, 0, len(flows))
+	for _, family := range []netfilter.ProtoFamily{netfilter.ProtoIPv4, netfilter.ProtoIPv6} {
+		flows, err := conn.DumpFilter(ct.NewFilter().Family(family), nil)
+		if err != nil {
+			// Filtered dumps need Linux 4.20; older kernels read it all.
+			flows, err = conn.Dump(nil)
+			if err != nil {
+				return fmt.Errorf("dumping the conntrack table: %w", err)
+			}
 
-	for i := range flows {
-		if f, ok := fromKernel(&flows[i]); ok {
-			converted = append(converted, f)
+			kept = keepFrom(kept, flows, tracker)
+
+			break
 		}
+
+		kept = keepFrom(kept, flows, tracker)
 	}
 
-	for _, d := range tracker.Dump(converted) {
+	for _, d := range tracker.Dump(kept) {
 		c.Sink(d)
 	}
 
 	return nil
+}
+
+func keepFrom(kept []Flow, flows []ct.Flow, tracker *Tracker) []Flow {
+	for i := range flows {
+		if f, ok := fromKernel(&flows[i]); ok && tracker.keep(f.Conn) {
+			kept = append(kept, f)
+		}
+	}
+
+	return kept
 }
 
 func fromKernel(f *ct.Flow) (Flow, bool) {
@@ -203,6 +234,7 @@ func fromKernel(f *ct.Flow) (Flow, bool) {
 		TxPackets: f.CountersOrig.Packets,
 		RxBytes:   f.CountersReply.Bytes,
 		RxPackets: f.CountersReply.Packets,
+		Start:     f.Timestamp.Start,
 	}
 
 	return out, true
