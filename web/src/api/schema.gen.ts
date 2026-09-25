@@ -2306,7 +2306,7 @@ export interface paths {
         };
         /**
          * List traffic reporters
-         * @description The gateways whose agent has reported, with each collector's state and the resolvers the clients are pointed at.
+         * @description The gateways whose agent has reported, with each collector's state and the resolvers their exit node users are pointed at.
          *
          *     Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -2331,7 +2331,7 @@ export interface paths {
         post?: never;
         /**
          * Remove traffic reporter
-         * @description Forgets a gateway's agent and takes its resolver out of the clients' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+         * @description Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
          *
          *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -2340,7 +2340,7 @@ export interface paths {
         head?: never;
         /**
          * Approve a gateway resolver
-         * @description Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+         * @description Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
          *
          *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -2366,7 +2366,7 @@ export interface paths {
         head?: never;
         /**
          * Update traffic settings
-         * @description Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
+         * @description Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
          *
          *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -4535,7 +4535,6 @@ export interface components {
         TrafficReportersOutputBody: {
             /** Format: int64 */
             asnRanges: number;
-            dnsBlocked: string;
             reporters: components["schemas"]["TrafficReporter"][];
             resolvers: string[];
             skippedUpstreams: string[];

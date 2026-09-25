@@ -4196,8 +4196,6 @@ components:
         asnRanges:
           format: int64
           type: integer
-        dnsBlocked:
-          type: string
         reporters:
           items:
             $ref: "#/components/schemas/TrafficReporter"
@@ -4215,7 +4213,6 @@ components:
         - resolvers
         - asnRanges
         - skippedUpstreams
-        - dnsBlocked
       type: object
     TrafficRetention:
       additionalProperties: false
@@ -9588,7 +9585,7 @@ paths:
   /api/v1/traffic/reporters:
     get:
       description: |-
-        The gateways whose agent has reported, with each collector's state and the resolvers the clients are pointed at.
+        The gateways whose agent has reported, with each collector's state and the resolvers their exit node users are pointed at.
 
         Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: listTrafficReporters
@@ -9614,7 +9611,7 @@ paths:
   /api/v1/traffic/reporters/{nodeId}:
     delete:
       description: |-
-        Forgets a gateway's agent and takes its resolver out of the clients' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+        Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
 
         Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: deleteTrafficReporter
@@ -9647,7 +9644,7 @@ paths:
       x-required-scope: logs:network
     patch:
       description: |-
-        Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+        Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
 
         Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateTrafficReporter
@@ -9709,7 +9706,7 @@ paths:
       x-required-scope: logs:network:read
     patch:
       description: |-
-        Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
+        Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
 
         Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateTrafficSettings
