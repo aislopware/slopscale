@@ -329,6 +329,44 @@ func TestRunRetriesServerErrors(t *testing.T) {
 	assert.Equal(t, []time.Duration{minBackoff, 2 * minBackoff}, sleeps)
 }
 
+// TestRunStopsWhileRetrying stops the agent while the server is failing:
+// Run returns instead of retrying a cancelled request in a tight loop,
+// which once logged millions of lines after a SIGTERM.
+func TestRunStopsWhileRetrying(t *testing.T) {
+	h := newHarness(t)
+	h.enqueue(t, 1)
+
+	for i := range 64 {
+		h.server.statuses = append(h.server.statuses, http.StatusBadGateway+i%2)
+	}
+
+	var attempts atomic.Int32
+
+	h.uploader.sleep = func(ctx context.Context, d time.Duration) {
+		attempts.Add(1)
+		sleepCtx(ctx, d)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		h.uploader.Run(ctx)
+		close(done)
+	}()
+
+	require.Eventually(t, func() bool { return attempts.Load() > 0 }, 5*time.Second, time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run kept going after its context ended")
+	}
+
+	assert.LessOrEqual(t, attempts.Load(), int32(2), "no retries once the context ended")
+}
+
 func TestTokenExpiry(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 

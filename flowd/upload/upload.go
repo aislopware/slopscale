@@ -204,6 +204,9 @@ func (u *Uploader) Run(ctx context.Context) {
 
 	for {
 		wait, err := u.Drain(ctx)
+		if ctx.Err() != nil {
+			return
+		}
 
 		switch {
 		case err == nil:
