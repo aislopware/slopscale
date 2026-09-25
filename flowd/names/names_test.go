@@ -103,3 +103,48 @@ func TestMappedAddressesMatch(t *testing.T) {
 	assert.Equal(t, "v4.example", host)
 	assert.Equal(t, traffic.HostDNS, source)
 }
+
+// TestFullCachesEvictTheStalest fills the caches and keeps adding: new
+// connections keep their names, the ones closest to expiry lose theirs,
+// and the caches stay bounded. Full caches used to refuse every new name.
+func TestFullCachesEvictTheStalest(t *testing.T) {
+	start := time.Unix(1_800_000_000, 0)
+	r := NewResolver()
+	dst := netip.MustParseAddrPort("203.0.113.10:443")
+
+	conn := func(i int) Conn {
+		src := netip.AddrPortFrom(netip.AddrFrom4([4]byte{100, byte(64 + i>>16), byte(i >> 8), byte(i)}), 40000)
+
+		return Conn{Src: src, Dst: dst, Proto: 6}
+	}
+
+	// Nothing expires while the cache fills, one entry per millisecond.
+	for i := range maxSNIEntries + 100 {
+		r.PutSNI(conn(i), "host", false, start.Add(time.Duration(i)*time.Millisecond))
+	}
+
+	now := start.Add(time.Duration(maxSNIEntries+100) * time.Millisecond)
+
+	host, source := r.Lookup(conn(maxSNIEntries+99), now)
+	assert.Equal(t, "host", host, "the newest connection keeps its name")
+	assert.Equal(t, traffic.HostSNI, source)
+
+	host, _ = r.Lookup(conn(0), now)
+	assert.Empty(t, host, "the stalest one made room")
+	assert.LessOrEqual(t, len(r.sni), maxSNIEntries)
+
+	laptop := netip.MustParseAddr("100.64.0.3")
+	addr := func(i int) netip.Addr { return netip.AddrFrom4([4]byte{198, byte(i >> 16), byte(i >> 8), byte(i)}) }
+
+	for i := range maxAnswerEntries + 10 {
+		r.PutDNS(laptop, "name", []netip.Addr{addr(i)}, time.Hour, start.Add(time.Duration(i)*time.Microsecond))
+	}
+
+	assert.LessOrEqual(t, len(r.bySrc), maxAnswerEntries)
+	assert.LessOrEqual(t, len(r.shared), maxAnswerEntries)
+
+	last := Conn{Src: netip.AddrPortFrom(laptop, 1), Dst: netip.AddrPortFrom(addr(maxAnswerEntries+9), 443), Proto: 6}
+	host, source = r.Lookup(last, now)
+	assert.Equal(t, "name", host)
+	assert.Equal(t, traffic.HostDNS, source)
+}

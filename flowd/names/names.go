@@ -6,6 +6,7 @@ package names
 
 import (
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
@@ -74,11 +75,53 @@ func (r *Resolver) PutSNI(c Conn, host string, ech bool, now time.Time) {
 
 	r.sweepLocked(now)
 
-	if _, ok := r.sni[c]; !ok && len(r.sni) >= maxSNIEntries {
-		return
+	if _, ok := r.sni[c]; !ok {
+		makeRoom(r.sni, maxSNIEntries, now)
 	}
 
 	r.sni[c] = sniEntry{host: host, ech: ech, expires: now.Add(sniTTL)}
+}
+
+func (e sniEntry) expiry() time.Time  { return e.expires }
+func (e nameEntry) expiry() time.Time { return e.expires }
+
+// evictFraction is the share of a full map evicted at once, the entries
+// closest to expiry, so the sort it takes is paid once per that many
+// inserts rather than on each.
+const evictFraction = 8
+
+// makeRoom leaves m with room for one more entry: expired entries go
+// first, then, if it is still full, the eighth closest to expiry. A full
+// map evicts rather than refusing, so on a busy gateway new connections
+// keep their names and the stalest ones lose theirs.
+func makeRoom[K comparable, V interface{ expiry() time.Time }](m map[K]V, limit int, now time.Time) {
+	if len(m) < limit {
+		return
+	}
+
+	for k, v := range m {
+		if now.After(v.expiry()) {
+			delete(m, k)
+		}
+	}
+
+	if len(m) < limit {
+		return
+	}
+
+	expiries := make([]time.Time, 0, len(m))
+	for _, v := range m {
+		expiries = append(expiries, v.expiry())
+	}
+
+	slices.SortFunc(expiries, time.Time.Compare)
+	threshold := expiries[len(expiries)/evictFraction]
+
+	for k, v := range m {
+		if !v.expiry().After(threshold) {
+			delete(m, k)
+		}
+	}
 }
 
 // PutDNS records that src resolved name to addrs, valid for ttl.
@@ -94,13 +137,17 @@ func (r *Resolver) PutDNS(src netip.Addr, name string, addrs []netip.Addr, ttl t
 		addr = addr.Unmap()
 
 		key := srcDst{src: src.Unmap(), dst: addr}
-		if _, ok := r.bySrc[key]; ok || len(r.bySrc) < maxAnswerEntries {
-			r.bySrc[key] = entry
+		if _, ok := r.bySrc[key]; !ok {
+			makeRoom(r.bySrc, maxAnswerEntries, now)
 		}
 
-		if _, ok := r.shared[addr]; ok || len(r.shared) < maxAnswerEntries {
-			r.shared[addr] = entry
+		r.bySrc[key] = entry
+
+		if _, ok := r.shared[addr]; !ok {
+			makeRoom(r.shared, maxAnswerEntries, now)
 		}
+
+		r.shared[addr] = entry
 	}
 }
 
