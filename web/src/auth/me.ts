@@ -31,7 +31,9 @@ export type Scope =
   | "logs:configuration"
   | "logs:configuration:read"
   | "services"
-  | "services:read";
+  | "services:read"
+  | "logs:network"
+  | "logs:network:read";
 
 export type Me = MethodResponse<typeof api, "get", "/api/v1/whoami">;
 

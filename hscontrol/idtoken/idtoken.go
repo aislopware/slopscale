@@ -177,6 +177,56 @@ func (s *Signer) Sign(claims Claims) (string, error) {
 	return token, nil
 }
 
+// ErrInvalidToken is returned for a token the signer did not issue for
+// the audience, or one that is not valid now.
+var ErrInvalidToken = errors.New("invalid identity token")
+
+// verifyLeeway allows for the clock of the machine that fetched the token
+// and the server's disagreeing a little.
+const verifyLeeway = time.Minute
+
+// Verify checks that token was signed by this signer for issuer and
+// audience and is valid at now, and returns what it says. The server uses
+// it when a machine presents its own identity token as a credential.
+func (s *Signer) Verify(token, issuer, audience string, now time.Time) (Claims, error) {
+	parsed, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{Algorithm})
+	if err != nil {
+		return Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	var claims Claims
+
+	err = parsed.Claims(&s.key.PublicKey, &claims)
+	if err != nil {
+		return Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	standard := jwt.Claims{
+		Issuer:    claims.Issuer,
+		Subject:   claims.Subject,
+		Audience:  claims.Audience,
+		Expiry:    claims.Expiry,
+		NotBefore: claims.NotBefore,
+		IssuedAt:  claims.IssuedAt,
+		ID:        claims.ID,
+	}
+
+	if claims.Expiry == nil {
+		return Claims{}, fmt.Errorf("%w: no expiry", ErrInvalidToken)
+	}
+
+	err = standard.ValidateWithLeeway(jwt.Expected{
+		Issuer:      issuer,
+		AnyAudience: jwt.Audience{audience},
+		Time:        now,
+	}, verifyLeeway)
+	if err != nil {
+		return Claims{}, fmt.Errorf("%w: %w", ErrInvalidToken, err)
+	}
+
+	return claims, nil
+}
+
 // JWKS is the key set a verifier reads, holding the public key.
 func (s *Signer) JWKS() jose.JSONWebKeySet {
 	return jose.JSONWebKeySet{

@@ -17,6 +17,7 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/traffic/asn"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/prometheus/common/model"
@@ -164,6 +165,12 @@ type Config struct {
 	// dnsOverride is the DNS settings from the settings table, nil when
 	// the config file is in force; see [Config.SetDNSOverride].
 	dnsOverride *DNSSettings
+	// trafficResolvers are the gateway resolvers the traffic monitor's
+	// DNS log points clients at; see [Config.SetTrafficResolvers].
+	// tailcfgDNSOwnResolver is TailcfgDNSConfig without them, for the
+	// nodes that run one.
+	trafficResolvers      []netip.Addr
+	tailcfgDNSOwnResolver *tailcfg.DNSConfig
 	// dnsFileRecords holds the records read from dns.extra_records_path
 	// once the watcher has read the file.
 	dnsFileRecords    []tailcfg.DNSRecord
@@ -205,6 +212,9 @@ type Config struct {
 
 	// Egress bounds where the server's own outbound requests may go.
 	Egress EgressConfig
+
+	// Traffic configures the traffic monitor's destination enrichment.
+	Traffic TrafficConfig
 
 	// Debug turns on endpoints meant for developing slopscale.
 	Debug DebugConfig
@@ -585,6 +595,22 @@ func funnelConfig() (FunnelConfig, error) {
 	return cfg, nil
 }
 
+// TrafficConfig is where the traffic monitor gets the table that names a
+// destination's network and country.
+type TrafficConfig struct {
+	// ASNDatabaseURL is downloaded daily; empty turns the naming off.
+	ASNDatabaseURL string
+	// ASNCachePath keeps the last good copy across restarts.
+	ASNCachePath string
+}
+
+func trafficConfig() TrafficConfig {
+	return TrafficConfig{
+		ASNDatabaseURL: conf.GetString("traffic.asn_database_url"),
+		ASNCachePath:   util.AbsolutePathFromConfigPath(conf.GetString("traffic.asn_cache_path")),
+	}
+}
+
 func sshRecordingConfig() SSHRecordingConfig {
 	return SSHRecordingConfig{
 		Enabled:         conf.GetBool("ssh_recording.enabled"),
@@ -760,6 +786,8 @@ func setNodeServiceDefaults() {
 	conf.SetDefault("funnel.listen_addrs", []string{":443", ":8443", ":10000"})
 	conf.SetDefault("funnel.state_dir", "/var/lib/slopscale/ingress")
 	conf.SetDefault("funnel.ports", []int{443, 8443, 10000})
+	conf.SetDefault("traffic.asn_database_url", asn.DefaultURL)
+	conf.SetDefault("traffic.asn_cache_path", "/var/lib/slopscale/ip2asn-combined.tsv.gz")
 	conf.SetDefault("client_updates.check", true)
 	conf.SetDefault("client_updates.interval", DefaultClientUpdatesInterval)
 	conf.SetDefault("egress.deny_private_targets", false)
@@ -1797,6 +1825,8 @@ func LoadServerConfig() (*Config, error) {
 
 		Egress: egressConfig(),
 
+		Traffic: trafficConfig(),
+
 		Debug: debugConfig(),
 
 		HTTPSCerts: httpsCerts,
@@ -2095,6 +2125,52 @@ func (c *Config) RebuildTailcfgDNS() {
 	c.rebuildTailcfgDNSLocked()
 }
 
+// SetTrafficResolvers points every client's DNS at the traffic monitor's
+// gateway resolvers, ahead of the tailnet's own nameservers; nil stops.
+// They are not part of the effective settings, so an operator saving the
+// DNS page never stores them. It rebuilds [Config.TailcfgDNSConfig].
+func (c *Config) SetTrafficResolvers(addrs []netip.Addr) {
+	tailcfgDNSMu.Lock()
+	defer tailcfgDNSMu.Unlock()
+
+	c.trafficResolvers = slices.Clone(addrs)
+	c.rebuildTailcfgDNSLocked()
+}
+
+// TrafficResolvers returns the resolvers set with
+// [Config.SetTrafficResolvers].
+func (c *Config) TrafficResolvers() []netip.Addr {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	return slices.Clone(c.trafficResolvers)
+}
+
+// CloneTailcfgDNSConfigFor is [Config.CloneTailcfgDNSConfig] for the node
+// holding addrs: a node that runs one of the traffic resolvers gets the
+// DNS without them, since its resolver may forward to the node's own
+// system resolver, which would ask the node's resolver again.
+func (c *Config) CloneTailcfgDNSConfigFor(addrs []netip.Addr) *tailcfg.DNSConfig {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	cfg := c.TailcfgDNSConfig
+
+	for _, addr := range addrs {
+		if slices.Contains(c.trafficResolvers, addr) {
+			cfg = c.tailcfgDNSOwnResolver
+
+			break
+		}
+	}
+
+	if cfg == nil {
+		return nil
+	}
+
+	return cfg.Clone()
+}
+
 func (c *Config) effectiveDNSLocked() DNSConfig {
 	d := c.DNSConfig
 	if c.dnsOverride != nil {
@@ -2113,9 +2189,57 @@ func (c *Config) rebuildTailcfgDNSLocked() {
 		return
 	}
 
-	cfg := dnsToTailcfgDNS(c.effectiveDNSLocked())
-	c.addMagicDNSRoutes(cfg)
+	effective := c.effectiveDNSLocked()
+
+	own := dnsToTailcfgDNS(effective)
+	c.addMagicDNSRoutes(own)
+	c.tailcfgDNSOwnResolver = own
+
+	cfg := own
+	if len(c.trafficResolvers) > 0 {
+		cfg = dnsToTailcfgDNS(withTrafficResolvers(effective, c.trafficResolvers))
+		c.addMagicDNSRoutes(cfg)
+	}
+
 	c.TailcfgDNSConfig = cfg
+}
+
+// withTrafficResolvers puts the traffic resolvers first among the global
+// nameservers, keeps them while a client uses an exit node, and makes
+// every query go to them: without the override a client asks the global
+// nameservers only when its own resolver fails, and without the exit node
+// flag a client using an exit node sends its DNS to the exit node.
+func withTrafficResolvers(d DNSConfig, resolvers []netip.Addr) DNSConfig {
+	names := make([]string, 0, len(resolvers))
+	for _, addr := range resolvers {
+		names = append(names, addr.String())
+	}
+
+	global := slices.Clone(names)
+
+	for _, ns := range d.Nameservers.Global {
+		if !slices.Contains(names, ns) {
+			global = append(global, ns)
+		}
+	}
+
+	withExit := slices.Clone(names)
+
+	for _, ns := range d.Nameservers.UseWithExitNode {
+		if !slices.Contains(names, ns) {
+			withExit = append(withExit, ns)
+		}
+	}
+
+	d.OverrideLocalDNS = true
+	d.Nameservers = Nameservers{
+		Global:               global,
+		Split:                d.Nameservers.Split,
+		UseWithExitNode:      withExit,
+		SplitUseWithExitNode: d.Nameservers.SplitUseWithExitNode,
+	}
+
+	return d
 }
 
 // addMagicDNSRoutes maps the IPv4/IPv6 reverse zones of the tailnet's

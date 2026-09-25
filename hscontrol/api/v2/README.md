@@ -143,13 +143,20 @@ has to be stored anywhere.
   `devices:posture_attributes`.
 - **Log streaming** `GET`/`PUT`/`DELETE /api/v2/tailnet/-/logging/{logType}/stream`
   (`logging.go`). `configuration` maps onto the audit log streams; `network` is
-  a `404` saying network flow logs are not available on slopscale, because the
-  client, not the control server, produces them. `destinationType` must be one
+  a `404` pointing at the network log read below, since slopscale does not
+  stream flow logs. `destinationType` must be one
   of `types.LogStreamDestinations` (http, splunk, elastic, datadog, axiom,
   loki); anything else is a `400` listing the supported ones, as are the S3 and
   GCS fields. The API owns exactly one stream, named
   `tailscale-api:configuration`, so a `PUT` replaces rather than adds. Scopes
   `logs:configuration:read` and `logs:configuration`.
+- **Network flow logs** `GET /api/v2/tailnet/-/logging/network?start&end`
+  (`network_logs.go`) builds Tailscale's `{"logs": [...]}` records from the
+  traffic monitor's hourly destination rows: one record per gateway and hour,
+  `nodeId` the gateway, `src` the sending node's address with port 0,
+  `subnetTraffic` for private destinations and `exitTraffic` for the rest.
+  Folded remainder rows are left out, the range may cover at most a week, and
+  nothing is recorded between two nodes. Scope `logs:network:read`.
 - **`fields=all` on a device** (`devices_fields.go`) adds
   `blocksIncomingConnections`, `isExternal` (always false: slopscale has no
   shared-in devices), `connectedToControl`, `tailnetLockKey`,

@@ -21,7 +21,7 @@ func init() {
 const (
 	// logTypeConfiguration is Tailscale's name for the audit log, the one
 	// slopscale streams. logTypeNetwork is the flow log, which slopscale
-	// does not collect.
+	// serves from the traffic monitor but does not stream.
 	logTypeConfiguration = "configuration"
 	logTypeNetwork       = "network"
 
@@ -60,7 +60,7 @@ type SetLogstreamConfigurationRequest struct {
 type (
 	logstreamInput struct {
 		Tailnet string `path:"tailnet"`
-		LogType string `doc:"\"configuration\"; slopscale collects no network flow logs." path:"logType"`
+		LogType string `doc:"\"configuration\"; network flow logs are read, not streamed." path:"logType"`
 	}
 	setLogstreamInput struct {
 		Tailnet string `path:"tailnet"`
@@ -206,9 +206,9 @@ func handleSetLogstream(ctx context.Context, b Backend, in *setLogstreamInput) (
 	return &logstreamOutput{Body: logstreamFrom(written)}, nil
 }
 
-// requireLogstreamTarget checks the tailnet and the log type. Network flow
-// logs are a client-side feature slopscale does not collect, so that log
-// type is a 404 naming the reason rather than an empty configuration.
+// requireLogstreamTarget checks the tailnet and the log type. Slopscale
+// does not stream network flow logs, so that log type is a 404 naming
+// where to read them rather than an empty configuration.
 func requireLogstreamTarget(tailnet, logType string) error {
 	err := requireDefaultTailnet(tailnet)
 	if err != nil {
@@ -219,7 +219,8 @@ func requireLogstreamTarget(tailnet, logType string) error {
 	case logTypeConfiguration:
 		return nil
 	case logTypeNetwork:
-		return huma.Error404NotFound("network flow logs are not available on slopscale")
+		return huma.Error404NotFound("network flow logs are not streamed; read them from " +
+			"/api/v2/tailnet/{tailnet}/logging/network")
 	}
 
 	return huma.Error404NotFound("unknown log type " + logType)

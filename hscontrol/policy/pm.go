@@ -109,6 +109,10 @@ type PolicyManager interface {
 	// learned routes for.
 	SetAppConnectors(apps []types.AppConnector) (bool, error)
 
+	// SetTrafficResolvers replaces the traffic monitor's gateway
+	// resolvers, which every node may reach on port 53.
+	SetTrafficResolvers(addrs []netip.Addr) (bool, error)
+
 	// NodeNeedsPeerRecompute reports whether peers must recompute their
 	// netmap when the node's online state changes. True for subnet
 	// routers, relay targets (tailscale.com/cap/relay), and via targets;

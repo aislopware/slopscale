@@ -498,3 +498,67 @@ CREATE TABLE posture_integrations(
   updated_at timestamptz
 );
 CREATE UNIQUE INDEX idx_posture_integrations_name ON posture_integrations(name);
+
+CREATE TABLE traffic_reporters(
+  node_id bigint PRIMARY KEY,
+  instance text NOT NULL,
+  last_seq bigint NOT NULL DEFAULT 0,
+  version text,
+  status text,
+  dns_listen text,
+  first_seen_at timestamptz,
+  last_report_at timestamptz,
+  unattributed bigint NOT NULL DEFAULT 0,
+  dropped bigint NOT NULL DEFAULT 0,
+  CONSTRAINT fk_traffic_reporters_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE traffic_totals(
+  resolution bigint NOT NULL,
+  bucket bigint NOT NULL,
+  node_id bigint NOT NULL,
+  reporter_id bigint NOT NULL,
+  tx_bytes bigint NOT NULL DEFAULT 0,
+  rx_bytes bigint NOT NULL DEFAULT 0,
+  tx_packets bigint NOT NULL DEFAULT 0,
+  rx_packets bigint NOT NULL DEFAULT 0,
+  conns bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id),
+  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_traffic_totals_node ON traffic_totals(node_id, resolution, bucket);
+
+CREATE TABLE traffic_destinations(
+  resolution bigint NOT NULL,
+  bucket bigint NOT NULL,
+  node_id bigint NOT NULL,
+  reporter_id bigint NOT NULL,
+  dst text NOT NULL,
+  port bigint NOT NULL,
+  proto bigint NOT NULL,
+  host text NOT NULL,
+  host_source text,
+  asn bigint NOT NULL DEFAULT 0,
+  country text,
+  tx_bytes bigint NOT NULL DEFAULT 0,
+  rx_bytes bigint NOT NULL DEFAULT 0,
+  tx_packets bigint NOT NULL DEFAULT 0,
+  rx_packets bigint NOT NULL DEFAULT 0,
+  conns bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host),
+  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_traffic_destinations_node ON traffic_destinations(node_id, resolution, bucket);
+
+CREATE TABLE traffic_dns(
+  resolution bigint NOT NULL,
+  bucket bigint NOT NULL,
+  node_id bigint NOT NULL,
+  reporter_id bigint NOT NULL,
+  name text NOT NULL,
+  queries bigint NOT NULL DEFAULT 0,
+  failed bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, name),
+  CONSTRAINT fk_traffic_dns_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_traffic_dns_node ON traffic_dns(node_id, resolution, bucket);

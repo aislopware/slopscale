@@ -29,6 +29,8 @@ export const scopeOptions: readonly { readonly scope: Scope; readonly label: str
   { scope: "webhooks:read", label: "Webhooks (read)" },
   { scope: "logs:configuration", label: "Audit log and streaming" },
   { scope: "logs:configuration:read", label: "Audit log (read)" },
+  { scope: "logs:network", label: "Traffic" },
+  { scope: "logs:network:read", label: "Traffic (read)" },
 ];
 
 export function scopeLabel(scope: string): string {

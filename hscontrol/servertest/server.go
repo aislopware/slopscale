@@ -58,6 +58,7 @@ type serverConfig struct {
 	sshRecording     *types.SSHRecordingConfig
 	httpsCerts       *types.HTTPSCertsConfig
 	funnel           *types.FunnelConfig
+	traffic          *types.TrafficConfig
 	embeddedDERP     bool
 	seededRule       bool
 }
@@ -171,6 +172,12 @@ func WithFunnel(cfg types.FunnelConfig) ServerOption {
 	return func(sc *serverConfig) { sc.funnel = &cfg }
 }
 
+// WithTraffic sets where the traffic monitor downloads its ASN table.
+// Without it the table is off, so no test reaches the internet.
+func WithTraffic(cfg types.TrafficConfig) ServerOption {
+	return func(sc *serverConfig) { sc.traffic = &cfg }
+}
+
 // WithSMTP gives the server a mail server, so email webhooks can be
 // created and delivered.
 func WithSMTP(cfg types.SMTPConfig) ServerOption {
@@ -270,6 +277,10 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 
 	if sc.funnel != nil {
 		cfg.Funnel = *sc.funnel
+	}
+
+	if sc.traffic != nil {
+		cfg.Traffic = *sc.traffic
 	}
 
 	if sc.sshRecording != nil {

@@ -72,9 +72,11 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			settings.KeyExpiry = d
 
 			continue
-		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey, types.SettingTailnetLock:
+		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey, types.SettingTailnetLock,
+			types.SettingTraffic:
 			// Hold JSON or key material and are read by LoadDNSSettings,
-			// LoadDERPSettings, LoadIDTokenKey and LoadTailnetLock.
+			// LoadDERPSettings, LoadIDTokenKey, LoadTailnetLock and
+			// LoadTrafficSettings.
 			continue
 		default:
 			continue
@@ -202,6 +204,49 @@ func (hsdb *HSDatabase) DeleteDERPSettings() error {
 		}
 
 		return nil
+	})
+}
+
+// LoadTrafficSettings reads the traffic monitor settings, the defaults
+// when none are stored. A stored row missing a field (one written before
+// the field existed) keeps the default for it.
+func (hsdb *HSDatabase) LoadTrafficSettings() (types.TrafficSettings, error) {
+	var records []settingRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.Settings.AllColumns).
+			FROM(table.Settings).
+			WHERE(table.Settings.Key.EQ(jet.String(string(types.SettingTraffic)))),
+		&records,
+	)
+	if err != nil {
+		return types.TrafficSettings{}, fmt.Errorf("loading traffic settings: %w", err)
+	}
+
+	settings := types.DefaultTrafficSettings()
+
+	if len(records) == 0 {
+		return settings, nil
+	}
+
+	err = json.Unmarshal([]byte(records[0].Setting.Value), &settings)
+	if err != nil {
+		return types.TrafficSettings{}, fmt.Errorf("decoding traffic settings: %w", err)
+	}
+
+	return settings, nil
+}
+
+// SaveTrafficSettings writes the traffic monitor settings as JSON,
+// inserting their row on first use.
+func (hsdb *HSDatabase) SaveTrafficSettings(settings types.TrafficSettings) error {
+	value, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("encoding traffic settings: %w", err)
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return saveSettingValue(tx, types.SettingTraffic, string(value))
 	})
 }
 

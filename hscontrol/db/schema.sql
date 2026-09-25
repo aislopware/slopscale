@@ -662,3 +662,77 @@ CREATE TABLE posture_integrations(
   updated_at datetime
 );
 CREATE UNIQUE INDEX idx_posture_integrations_name ON posture_integrations(name);
+
+-- traffic_reporters are the gateways running slopscale-flowd, as their
+-- last report left them; see docs/ref/traffic.md. instance and last_seq
+-- make a resent report idempotent; status and dns_listen are JSON.
+CREATE TABLE traffic_reporters(
+  node_id integer PRIMARY KEY,
+  instance text NOT NULL,
+  last_seq integer NOT NULL DEFAULT 0,
+  version text,
+  status text,
+  dns_listen text,
+  first_seen_at datetime,
+  last_report_at datetime,
+  unattributed integer NOT NULL DEFAULT 0,
+  dropped integer NOT NULL DEFAULT 0,
+  CONSTRAINT fk_traffic_reporters_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+
+-- traffic_totals, traffic_destinations and traffic_dns are the traffic
+-- the gateways saw, rolled up per resolution (60, 3600 or 86400 seconds)
+-- and bucket (the Unix time the bucket starts). node_id is the node that
+-- sent the traffic or asked; reporter_id the gateway, which has no
+-- foreign key so that deleting any node does not scan these tables for
+-- it: a deleted gateway's rows age out with the retention. An empty dst
+-- or name is the folded remainder of the smaller rows of a bucket.
+CREATE TABLE traffic_totals(
+  resolution integer NOT NULL,
+  bucket integer NOT NULL,
+  node_id integer NOT NULL,
+  reporter_id integer NOT NULL,
+  tx_bytes integer NOT NULL DEFAULT 0,
+  rx_bytes integer NOT NULL DEFAULT 0,
+  tx_packets integer NOT NULL DEFAULT 0,
+  rx_packets integer NOT NULL DEFAULT 0,
+  conns integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id),
+  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_traffic_totals_node ON traffic_totals(node_id, resolution, bucket);
+
+CREATE TABLE traffic_destinations(
+  resolution integer NOT NULL,
+  bucket integer NOT NULL,
+  node_id integer NOT NULL,
+  reporter_id integer NOT NULL,
+  dst text NOT NULL,
+  port integer NOT NULL,
+  proto integer NOT NULL,
+  host text NOT NULL,
+  host_source text,
+  asn integer NOT NULL DEFAULT 0,
+  country text,
+  tx_bytes integer NOT NULL DEFAULT 0,
+  rx_bytes integer NOT NULL DEFAULT 0,
+  tx_packets integer NOT NULL DEFAULT 0,
+  rx_packets integer NOT NULL DEFAULT 0,
+  conns integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host),
+  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_traffic_destinations_node ON traffic_destinations(node_id, resolution, bucket);
+
+CREATE TABLE traffic_dns(
+  resolution integer NOT NULL,
+  bucket integer NOT NULL,
+  node_id integer NOT NULL,
+  reporter_id integer NOT NULL,
+  name text NOT NULL,
+  queries integer NOT NULL DEFAULT 0,
+  failed integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, name),
+  CONSTRAINT fk_traffic_dns_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_traffic_dns_node ON traffic_dns(node_id, resolution, bucket);

@@ -27,6 +27,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/logstream"
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/traffic/asn"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -162,6 +163,18 @@ type State struct {
 	logStreams *logstream.Streamer
 	// logStreamMu orders writes to the log streams against reloads.
 	logStreamMu sync.Mutex
+
+	// trafficSettings holds the traffic monitor settings; see
+	// [State.TrafficSettings].
+	trafficSettings atomic.Pointer[types.TrafficSettings]
+	// trafficMu guards trafficReporters, the gateways as their last
+	// report left them, and trafficResolvers, the gateway resolvers the
+	// clients are pointed at; it orders report writes against them.
+	trafficMu        sync.Mutex
+	trafficReporters map[types.NodeID]types.TrafficReporter
+	trafficResolvers []netip.Addr
+	// asnTable names destinations' networks; nil until one is loaded.
+	asnTable atomic.Pointer[asn.Table]
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]
@@ -336,42 +349,7 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	s.settings.Store(&settings)
 
-	err = s.applySSHRecording()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadDNS()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadDERP()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.loadAccessModel()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.loadVIPServices()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.loadAppConnectors()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadPostureIntegrations()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadTailnetLock()
+	err = s.loadStoredConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -399,6 +377,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	s.logStreams = logstream.New(db, tailnetName(cfg))
 
 	err = s.loadLogStreams()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.loadTraffic()
 	if err != nil {
 		return nil, err
 	}
@@ -4174,4 +4157,51 @@ func dnsLabelReason(err error) string {
 	}
 
 	return msg
+}
+
+// loadStoredConfig puts in force what operators configured through the
+// API and the database keeps: SSH recording, DNS, DERP, the access
+// model, services, app connectors, posture integrations and tailnet lock.
+func (s *State) loadStoredConfig() error {
+	err := s.applySSHRecording()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadDNS()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadDERP()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.loadAccessModel()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.loadVIPServices()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.loadAppConnectors()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadPostureIntegrations()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadTailnetLock()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
