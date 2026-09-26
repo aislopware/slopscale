@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -81,7 +80,6 @@ const (
 	deliveryTimeout = 15 * time.Second
 	maxInFlight     = 16
 	maxQueued       = 1024
-	maxResponseRead = 4 << 10
 )
 
 // New returns a dispatcher with no endpoints; call [Dispatcher.Reload].
@@ -416,8 +414,6 @@ func (d *Dispatcher) deliver(ctx context.Context, endpoint types.Webhook, event 
 		return 0, fmt.Errorf("posting webhook: %w", err)
 	}
 	defer resp.Body.Close()
-
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseRead))
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return resp.StatusCode, fmt.Errorf("%w: %s", ErrDeliveryRejected, resp.Status)
