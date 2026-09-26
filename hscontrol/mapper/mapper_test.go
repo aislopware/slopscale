@@ -273,16 +273,28 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 
 	m := &mapper{state: s, cfg: cfg}
 
-	// n2 (user2) comes online; n1 (user1) must NOT receive its patch.
+	// n2 (user2) comes online; n1 (user1) must NOT receive its patch, and
+	// with nothing else in the change it must receive no frame at all.
 	leakChange := change.NodeOnline(n2.ID, time.Now())
 	resp, err := m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &leakChange)
 	require.NoError(t, err)
-	require.NotNil(t, resp)
+	assert.Nil(t, resp, "a change holding only a patch n1 cannot see must not produce a frame for n1")
 
-	for _, p := range resp.PeersChangedPatch {
-		assert.NotEqual(t, n2.ID.NodeID(), p.NodeID,
-			"n1 must not receive an online patch for n2, which its policy forbids accessing")
-	}
+	// A node's own online patch is not a peer patch for it either.
+	selfChange := change.NodeOnline(n1.ID, time.Now())
+	resp, err = m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &selfChange)
+	require.NoError(t, err)
+	assert.Nil(t, resp, "n1's own online patch must not produce a frame for n1")
+
+	// The hidden patch is dropped but the rest of the change is still sent.
+	mixedChange := leakChange.Merge(change.PeersChanged("test", n1b.ID))
+	resp, err = m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &mixedChange)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.PeersChanged, 1, "the visible changed peer must survive the dropped patch")
+	assert.Equal(t, n1b.ID.NodeID(), resp.PeersChanged[0].ID)
+	assert.Empty(t, resp.PeersChangedPatch,
+		"n1 must not receive an online patch for n2, which its policy forbids accessing")
 
 	// Control: n1b (same user) coming online IS visible to n1.
 	okChange := change.NodeOnline(n1b.ID, time.Now())

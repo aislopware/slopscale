@@ -410,6 +410,20 @@ func (m *mapper) buildFromChange(
 		return m.selfMapResponse(nodeID, capVer)
 	}
 
+	// A node never sees a patch about itself or about a peer it cannot
+	// see, so a change made only of such patches (the node's own online
+	// patch, a hidden peer going offline) has nothing for it. Building
+	// anyway would send a frame holding nothing but ControlTime.
+	patches := m.filterVisiblePeerPatches(nodeID, resp.PeerPatches)
+	if len(patches) == 0 && len(resp.PeerPatches) > 0 {
+		rest := *resp
+		rest.PeerPatches = nil
+
+		if rest.IsEmpty() {
+			return nil, nil //nolint:nilnil // Every patch was filtered out, nothing to send
+		}
+	}
+
 	builder := m.NewMapResponseBuilder(nodeID).
 		WithCapabilityVersion(capVer).
 		WithDebugType(changeResponseDebug)
@@ -449,7 +463,6 @@ func (m *mapper) buildFromChange(
 		}
 	}
 
-	patches := m.filterVisiblePeerPatches(nodeID, resp.PeerPatches)
 	if len(patches) > 0 {
 		builder.WithPeerChangedPatch(patches)
 	}
