@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -11,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/rdata"
 	"github.com/aislopware/slopscale/hscontrol/traffic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,20 +81,25 @@ func TestMain(m *testing.M) {
 func sh(t *testing.T, args ...string) {
 	t.Helper()
 
-	out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+	out, err := exec.CommandContext(t.Context(), args[0], args[1:]...).CombinedOutput()
 	require.NoError(t, err, "%s: %s", strings.Join(args, " "), out)
 }
 
 func setupNetwork(t *testing.T) {
 	t.Helper()
 
+	// t.Context is already cancelled when the cleanups run.
+	ctx := context.WithoutCancel(t.Context())
+
 	cleanup := func() {
 		for _, args := range [][]string{
-			{"ip", "netns", "del", clientNS}, {"ip", "netns", "del", inetNS},
-			{"ip", "link", "del", gwLink}, {"ip", "link", "del", upLink},
+			{"ip", "netns", "del", clientNS},
+			{"ip", "netns", "del", inetNS},
+			{"ip", "link", "del", gwLink},
+			{"ip", "link", "del", upLink},
 			{"nft", "delete", "table", "inet", "flowde2e"},
 		} {
-			_ = exec.Command(args[0], args[1:]...).Run()
+			_ = exec.CommandContext(ctx, args[0], args[1:]...).Run()
 		}
 	}
 	cleanup()
@@ -138,7 +142,8 @@ func setupNetwork(t *testing.T) {
 func startHelper(t *testing.T, ns, role string) *exec.Cmd {
 	t.Helper()
 
-	cmd := exec.Command("ip", "netns", "exec", ns, os.Args[0], "-test.run=^$")
+	cmd := exec.CommandContext(t.Context(), "ip", "netns", "exec", ns, os.Args[0], "-test.run=^$")
+
 	cmd.Env = append(os.Environ(), helperEnv+"="+role)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -218,7 +223,9 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 	// names the client as a node whose DNS the agent records (the list is
 	// never saved), then let the client run its traffic.
 	require.Eventually(t, func() bool {
-		c, err := net.DialTimeout("tcp", net.JoinHostPort(gatewayV4, "53"), 200*time.Millisecond)
+		dialer := net.Dialer{Timeout: 200 * time.Millisecond}
+
+		c, err := dialer.DialContext(t.Context(), "tcp", net.JoinHostPort(gatewayV4, "53"))
 		if err == nil {
 			c.Close()
 		}
@@ -262,7 +269,12 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 		assert.Empty(t, r.Status.DNS.Error)
 
 		for _, f := range r.Flows {
-			assert.Contains(t, []string{clientV4, clientV6}, f.Src.String(), "only the tailnet node's traffic is reported")
+			assert.Contains(
+				t,
+				[]string{clientV4, clientV6},
+				f.Src.String(),
+				"only the tailnet node's traffic is reported",
+			)
 
 			k := key{src: f.Src.String(), host: f.Host, proto: f.Proto, port: f.Port}
 			agg := flows[k]
@@ -281,7 +293,7 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 
 	within := func(name string, got, sent uint64) {
 		t.Helper()
-		assert.GreaterOrEqual(t, got, uint64(sent), "%s: fewer bytes than were sent", name)
+		assert.GreaterOrEqual(t, got, sent, "%s: fewer bytes than were sent", name)
 		assert.LessOrEqual(t, got, uint64(float64(sent)*1.25)+8000, "%s: far more bytes than were sent", name)
 	}
 
@@ -313,6 +325,7 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 	assert.Equal(t, traffic.HostDNS, sources[plainHost])
 
 	asked := map[string]uint32{}
+
 	for _, q := range queries {
 		assert.Equal(t, clientV4, q.Src.String())
 		asked[q.Name] += q.Count
@@ -329,7 +342,11 @@ func runServerHelper() {
 	cert := selfSigned()
 
 	for _, addr := range []string{internetV4 + ":443", "[" + internetV6 + "]:443"} {
-		ln, err := tls.Listen("tcp", addr, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
+		ln, err := tls.Listen(
+			"tcp",
+			addr,
+			&tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12},
+		)
 		if err != nil {
 			fail(err)
 		}
@@ -337,14 +354,16 @@ func runServerHelper() {
 		go serveTransfers(ln)
 	}
 
-	plain, err := net.Listen("tcp", internetV4+":8080")
+	var lc net.ListenConfig
+
+	plain, err := lc.Listen(context.Background(), "tcp", internetV4+":8080")
 	if err != nil {
 		fail(err)
 	}
 
 	go serveTransfers(plain)
 
-	sink, err := net.ListenPacket("udp", internetV4+":443")
+	sink, err := lc.ListenPacket(context.Background(), "udp", internetV4+":443")
 	if err != nil {
 		fail(err)
 	}
@@ -352,13 +371,14 @@ func runServerHelper() {
 	go func() {
 		buf := make([]byte, 65535)
 		for {
-			if _, _, err := sink.ReadFrom(buf); err != nil {
+			_, _, readErr := sink.ReadFrom(buf)
+			if readErr != nil {
 				return
 			}
 		}
 	}()
 
-	resolver, err := net.ListenPacket("udp", internetV4+":53")
+	resolver, err := lc.ListenPacket(context.Background(), "udp", internetV4+":53")
 	if err != nil {
 		fail(err)
 	}
@@ -379,15 +399,19 @@ func serveTransfers(ln net.Listener) {
 			defer conn.Close()
 
 			var hdr [8]byte
-			if _, err := io.ReadFull(conn, hdr[:]); err != nil {
+
+			_, err := io.ReadFull(conn, hdr[:])
+			if err != nil {
 				return
 			}
 
-			if _, err := io.CopyN(io.Discard, conn, int64(binary.BigEndian.Uint64(hdr[:]))); err != nil {
+			_, err = io.CopyN(io.Discard, conn, int64(binary.BigEndian.Uint64(hdr[:])))
+			if err != nil {
 				return
 			}
 
-			if _, err := io.ReadFull(conn, hdr[:]); err != nil {
+			_, err = io.ReadFull(conn, hdr[:])
+			if err != nil {
 				return
 			}
 
@@ -425,8 +449,8 @@ func serveDNS(pc net.PacketConn) {
 		switch strings.TrimSuffix(strings.ToLower(name), ".") {
 		case filesHost, plainHost:
 			m.Answer = []dns.RR{&dns.A{
-				Hdr: dns.Header{Name: name, TTL: 60, Class: dns.ClassINET},
-				A:   rdata.A{Addr: netip.MustParseAddr(internetV4)},
+				Hdr:  dns.Header{Name: name, TTL: 60, Class: dns.ClassINET},
+				Addr: netip.MustParseAddr(internetV4),
 			}}
 		default:
 			m.Rcode = dns.RcodeNameError
@@ -482,8 +506,9 @@ func runClientHelper() {
 		}
 	}
 
-	if _, err := resolver.LookupHost(ctx, "missing.example.test"); err == nil {
-		fail(fmt.Errorf("missing.example.test resolved"))
+	_, err := resolver.LookupHost(ctx, "missing.example.test")
+	if err == nil {
+		fail(errors.New("missing.example.test resolved"))
 	}
 
 	transfer(internetV4+":443", filesHost, filesUp, filesDown, 0)
@@ -502,35 +527,48 @@ func transfer(addr, serverName string, up, down int64, pause time.Duration) {
 	)
 
 	if serverName == "" {
-		conn, err = net.Dial("tcp", addr)
+		var dialer net.Dialer
+
+		conn, err = dialer.DialContext(context.Background(), "tcp", addr)
 	} else {
-		conn, err = tls.Dial("tcp", addr, &tls.Config{ServerName: serverName, InsecureSkipVerify: true, MinVersion: tls.VersionTLS12}) //nolint:gosec // a throwaway certificate
+		dialer := tls.Dialer{
+			Config: &tls.Config{ServerName: serverName, InsecureSkipVerify: true, MinVersion: tls.VersionTLS12},
+		}
+
+		conn, err = dialer.DialContext(context.Background(), "tcp", addr)
 	}
 
 	if err != nil {
 		fail(err)
 	}
+
 	defer conn.Close()
 
 	var hdr [8]byte
 
 	binary.BigEndian.PutUint64(hdr[:], uint64(up))
-	if _, err := conn.Write(hdr[:]); err != nil {
+
+	_, err = conn.Write(hdr[:])
+	if err != nil {
 		fail(err)
 	}
 
-	if _, err := io.CopyN(conn, zeroReader{}, up); err != nil {
+	_, err = io.CopyN(conn, zeroReader{}, up)
+	if err != nil {
 		fail(err)
 	}
 
 	time.Sleep(pause) //nolint:forbidigo // keeps the connection open across dumps
 
 	binary.BigEndian.PutUint64(hdr[:], uint64(down))
-	if _, err := conn.Write(hdr[:]); err != nil {
+
+	_, err = conn.Write(hdr[:])
+	if err != nil {
 		fail(err)
 	}
 
-	if _, err := io.CopyN(io.Discard, conn, down); err != nil {
+	_, err = io.CopyN(io.Discard, conn, down)
+	if err != nil {
 		fail(err)
 	}
 }

@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -42,42 +43,42 @@ func mdTypesetBody(children ...elem.Node) *elem.Element {
 // These functions wrap elem-go elements using CSS classes.
 // Styling is handled by the CSS in [assets.CSS].
 
-// H1 creates a H1 element styled by .md-typeset h1
+// H1 creates a H1 element styled by .md-typeset h1.
 func H1(children ...elem.Node) *elem.Element {
 	return elem.H1(nil, children...)
 }
 
-// H2 creates a H2 element styled by .md-typeset h2
+// H2 creates a H2 element styled by .md-typeset h2.
 func H2(children ...elem.Node) *elem.Element {
 	return elem.H2(nil, children...)
 }
 
-// H3 creates a H3 element styled by .md-typeset h3
+// H3 creates a H3 element styled by .md-typeset h3.
 func H3(children ...elem.Node) *elem.Element {
 	return elem.H3(nil, children...)
 }
 
-// P creates a paragraph element styled by .md-typeset p
+// P creates a paragraph element styled by .md-typeset p.
 func P(children ...elem.Node) *elem.Element {
 	return elem.P(nil, children...)
 }
 
-// Ol creates an ordered list element styled by .md-typeset ol
+// Ol creates an ordered list element styled by .md-typeset ol.
 func Ol(children ...elem.Node) *elem.Element {
 	return elem.Ol(nil, children...)
 }
 
-// Ul creates an unordered list element styled by .md-typeset ul
+// Ul creates an unordered list element styled by .md-typeset ul.
 func Ul(children ...elem.Node) *elem.Element {
 	return elem.Ul(nil, children...)
 }
 
-// A creates a link element styled by .md-typeset a
+// A creates a link element styled by .md-typeset a.
 func A(href string, children ...elem.Node) *elem.Element {
 	return elem.A(attrs.Props{attrs.Href: href}, children...)
 }
 
-// Code creates an inline code element styled by .md-typeset code
+// Code creates an inline code element styled by .md-typeset code.
 func Code(children ...elem.Node) *elem.Element {
 	return elem.Code(nil, children...)
 }
@@ -206,14 +207,19 @@ func pageFooter() *elem.Element {
 // as their og:image.
 const OpenGraphPath = "/opengraph.png"
 
+const (
+	builtInCardWidth  = 1200
+	builtInCardHeight = 630
+)
+
 // builtInCard is the card baked into the binary, named by every page until
 // an operator configures one of their own.
 func builtInCard() types.SocialCard {
 	return types.SocialCard{
 		URL:         OpenGraphPath,
 		ContentType: "image/png",
-		Width:       1200,
-		Height:      630,
+		Width:       builtInCardWidth,
+		Height:      builtInCardHeight,
 		Alt:         "The slopscale mark and name",
 	}
 }
@@ -302,16 +308,19 @@ func page(title string, content ...elem.Node) *elem.Element {
 
 	head := append([]elem.Node{elem.Title(nil, elem.Text(title))}, socialMeta(title)...)
 
-	return HtmlStructure(head, mdTypesetBody(body...))
+	return HTMLStructure(head, mdTypesetBody(body...))
 }
 
-// HtmlStructure creates a complete HTML document structure with proper meta tags
+const googleFontsCSS = "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700" +
+	"&family=Roboto+Mono:wght@400;700&display=swap"
+
+// HTMLStructure creates a complete HTML document structure with proper meta tags
 // and semantic HTML5 structure. The head nodes and the body element are passed as
 // parameters to allow for customization of each page.
 // Styling is provided via a CSS stylesheet (Material for MkDocs design system) with
 // minimal inline styles for layout and positioning.
-func HtmlStructure(head []elem.Node, body *elem.Element) *elem.Element {
-	children := []elem.Node{
+func HTMLStructure(head []elem.Node, body *elem.Element) *elem.Element {
+	children := slices.Concat([]elem.Node{
 		elem.Meta(attrs.Props{
 			attrs.Charset: "UTF-8",
 		}),
@@ -335,12 +344,11 @@ func HtmlStructure(head []elem.Node, body *elem.Element) *elem.Element {
 		}),
 		elem.Link(attrs.Props{
 			attrs.Rel:  "stylesheet",
-			attrs.Href: "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;700&display=swap",
+			attrs.Href: googleFontsCSS,
 		}),
 		// Material for MkDocs CSS styles
 		elem.Style(attrs.Props{attrs.Type: "text/css"}, elem.Raw(assets.CSS)),
-	}
-	children = append(children, head...)
+	}, head)
 
 	return elem.Html(
 		attrs.Props{attrs.Lang: "en"},

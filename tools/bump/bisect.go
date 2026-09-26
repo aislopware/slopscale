@@ -155,7 +155,7 @@ func applyEach(ctx context.Context, r *repo, atoms []atom) ([]string, error) {
 // reasonOf renders a one-line cause for the report.
 func reasonOf(err error) string {
 	if ce, ok := errors.AsType[*cmdError](err); ok {
-		return fmt.Sprintf("%#q failed", strings.Join(ce.Argv, " "))
+		return "`" + strings.Join(ce.Argv, " ") + "` failed"
 	}
 
 	first, _, _ := strings.Cut(err.Error(), "\n")

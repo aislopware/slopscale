@@ -9,6 +9,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"flag"
@@ -17,11 +18,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aislopware/slopscale/hscontrol/db/sqliteconfig"
 	"github.com/go-jet/jet/v2/generator/metadata"
 	sqlitegen "github.com/go-jet/jet/v2/generator/sqlite"
 	"github.com/go-jet/jet/v2/generator/template"
 	"github.com/go-jet/jet/v2/sqlite"
-	"github.com/aislopware/slopscale/hscontrol/db/sqliteconfig"
 )
 
 var errEmptySchema = errors.New("schema file is empty")
@@ -29,15 +30,16 @@ var errEmptySchema = errors.New("schema file is empty")
 func main() {
 	schemaPath := flag.String("schema", "hscontrol/db/schema.sql", "SQLite schema to generate tables from")
 	outDir := flag.String("out", "gen/jet", "directory the table package is written to")
+
 	flag.Parse()
 
-	err := run(*schemaPath, *outDir)
+	err := run(context.Background(), *schemaPath, *outDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(schemaPath, outDir string) error {
+func run(ctx context.Context, schemaPath, outDir string) error {
 	schema, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return fmt.Errorf("reading schema: %w", err)
@@ -61,7 +63,7 @@ func run(schemaPath, outDir string) error {
 
 	defer func() { _ = db.Close() }()
 
-	_, err = db.Exec(string(schema))
+	_, err = db.ExecContext(ctx, string(schema))
 	if err != nil {
 		return fmt.Errorf("loading schema: %w", err)
 	}

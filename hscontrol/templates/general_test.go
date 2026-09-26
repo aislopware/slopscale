@@ -23,6 +23,7 @@ func TestPageSocialCard(t *testing.T) {
 	assert.Contains(t, out, `content="summary_large_image" name="twitter:card"`)
 
 	SetServerURL("")
+
 	bare := page("Sign in - Slopscale").Render()
 
 	assert.NotContains(t, bare, "og:image")

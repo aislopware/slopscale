@@ -25,7 +25,7 @@ const (
 		"the kernel's connection tracking, so none of it can be counted"
 )
 
-// report spools the buckets before before as one or more reports, each
+// report spools the buckets older than before as one or more reports, each
 // under the server's size and entry limits, and asks the uploader to send
 // them. It reports even when there is no traffic: the server learns from
 // it that the gateway and its resolver are alive.

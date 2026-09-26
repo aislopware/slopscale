@@ -40,13 +40,6 @@ type fakeLocal struct {
 	userspace bool
 }
 
-func (f *fakeLocal) failStatus(err error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	f.statusErr = err
-}
-
 func (f *fakeLocal) IDToken(context.Context, string) (*tailcfg.TokenResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -81,6 +74,13 @@ func (f *fakeLocal) GetAppConnectorRouteInfo(context.Context) (appctype.RouteInf
 	defer f.mu.Unlock()
 
 	return f.routeInfo, nil
+}
+
+func (f *fakeLocal) failStatus(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.statusErr = err
 }
 
 // reportServer is the server side of the report endpoint.
@@ -127,7 +127,9 @@ func (s *reportServer) setConfig(c traffic.Config) {
 func upstream(t *testing.T) string {
 	t.Helper()
 
-	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	var lc net.ListenConfig
+
+	pc, err := lc.ListenPacket(t.Context(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { pc.Close() })
 
@@ -164,13 +166,16 @@ func upstream(t *testing.T) string {
 func freePort(t *testing.T) uint16 {
 	t.Helper()
 
-	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	var lc net.ListenConfig
+
+	pc, err := lc.ListenPacket(t.Context(), "udp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	port := pc.LocalAddr().(*net.UDPAddr).Port
+	addr, ok := pc.LocalAddr().(*net.UDPAddr)
+	require.True(t, ok)
 	require.NoError(t, pc.Close())
 
-	return uint16(port)
+	return uint16(addr.Port)
 }
 
 func ask(t *testing.T, server netip.AddrPort, name string) {
@@ -179,7 +184,9 @@ func ask(t *testing.T, server netip.AddrPort, name string) {
 	m := dns.NewMsg(name, dns.TypeA)
 	require.NoError(t, m.Pack())
 
-	conn, err := net.Dial("udp", server.String())
+	var dialer net.Dialer
+
+	conn, err := dialer.DialContext(t.Context(), "udp", server.String())
 	require.NoError(t, err)
 
 	defer conn.Close()
@@ -287,7 +294,10 @@ func TestAgentReportsAndFollowsConfig(t *testing.T) {
 	assert.Equal(t, uint64(50000), second.Flows[0].RxBytes)
 	require.Len(t, second.Queries, 1)
 	assert.Equal(t, traffic.Query{
-		Bucket: second.Queries[0].Bucket, Src: netip.MustParseAddr("127.0.0.1"), Name: "downloads.example.net", Count: 1,
+		Bucket: second.Queries[0].Bucket,
+		Src:    netip.MustParseAddr("127.0.0.1"),
+		Name:   "downloads.example.net",
+		Count:  1,
 	}, second.Queries[0])
 
 	// The server turns DNS off: the resolver stops.
@@ -303,7 +313,9 @@ func TestAgentReportsAndFollowsConfig(t *testing.T) {
 		return len(a.dnsListen) == 0
 	}, 5*time.Second, 20*time.Millisecond)
 
-	conn, err := net.Dial("udp", listen[0].String())
+	var dialer net.Dialer
+
+	conn, err := dialer.DialContext(t.Context(), "udp", listen[0].String())
 	require.NoError(t, err)
 
 	_, _ = conn.Write([]byte{0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0})
@@ -343,7 +355,11 @@ func TestReportSplitsLargeRollups(t *testing.T) {
 	src := netip.MustParseAddr("100.64.0.3")
 	for i := range traffic.MaxFlowsPerReport + 5 {
 		a.table.AddFlow(rollup.FlowKey{
-			Bucket: 60, Src: src, Dst: netip.AddrFrom4([4]byte{198, 51, byte(i >> 8), byte(i)}), Proto: 17, Port: uint16(i),
+			Bucket: 60,
+			Src:    src,
+			Dst:    netip.AddrFrom4([4]byte{198, 51, byte(i >> 8), byte(i)}),
+			Proto:  17,
+			Port:   uint16(i),
 		}, rollup.Counters{TxBytes: 1})
 	}
 
@@ -381,7 +397,10 @@ func TestAppConnectorNames(t *testing.T) {
 	local.prefs.AppConnector.Advertise = true
 	local.routeInfo.Domains = map[string][]netip.Addr{"gitlab.example.com": {netip.MustParseAddr("198.51.100.72")}}
 
-	a, err := newAgent(t.Context(), Options{Local: local, Server: "http://unused", StateDir: t.TempDir(), SpoolBytes: 1 << 20})
+	a, err := newAgent(
+		t.Context(),
+		Options{Local: local, Server: "http://unused", StateDir: t.TempDir(), SpoolBytes: 1 << 20},
+	)
 	require.NoError(t, err)
 
 	a.refreshAppConnector(t.Context())
@@ -394,6 +413,7 @@ func TestAppConnectorNames(t *testing.T) {
 	assert.Equal(t, traffic.Collector{Enabled: true}, a.status.AppConnector)
 
 	local.prefs.AppConnector.Advertise = false
+
 	a.refreshAppConnector(t.Context())
 	assert.Equal(t, traffic.Collector{}, a.status.AppConnector)
 }
@@ -496,10 +516,12 @@ func TestSupervisorRecordsAndRestarts(t *testing.T) {
 
 	a.supervise(ctx, "test", func(err error) {
 		mu.Lock()
+
 		errs = append(errs, err)
 		mu.Unlock()
 	}, func(context.Context) error {
 		starts++
+
 		cancel() // one run, then the agent stops
 
 		return errBoom

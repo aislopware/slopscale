@@ -40,8 +40,13 @@ var specs = map[string]spec{
 
 func main() {
 	api := flag.String("api", "v1", "which API spec to emit: v1 or v2")
-	downgrade := flag.String("downgrade", "", "write the OpenAPI 3.0.3 downgrade to this path instead of the committed 3.1 spec")
+	downgrade := flag.String(
+		"downgrade",
+		"",
+		"write the OpenAPI 3.0.3 downgrade to this path instead of the committed 3.1 spec",
+	)
 	out := flag.String("out", "", "write the OpenAPI 3.1 spec to this path instead of the default")
+
 	flag.Parse()
 
 	s, ok := specs[*api]
