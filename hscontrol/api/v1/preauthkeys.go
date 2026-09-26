@@ -258,15 +258,14 @@ func preAuthKeyToResponse(key *types.PreAuthKey) PreAuthKey {
 	return out
 }
 
-// maskedPreAuthKey masks new keys (those with a stored prefix) so the secret is
-// never returned; legacy plaintext keys are returned in full for backwards
-// compatibility.
+// maskedPreAuthKey renders a pre-auth key by its prefix so the secret is
+// never returned.
 func maskedPreAuthKey(key types.PreAuthKeyView) string {
-	if key.Prefix() != "" {
-		return "hskey-auth-" + key.Prefix() + "-***"
+	if key.Prefix() == "" {
+		return ""
 	}
 
-	return key.Key()
+	return "hskey-auth-" + key.Prefix() + "-***"
 }
 
 // nonNilTags ensures aclTags serializes as [] rather than null, matching

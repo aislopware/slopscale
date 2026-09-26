@@ -16,7 +16,7 @@
     "nursery": "off"
   },
   "env": { "browser": true, "es2024": true },
-  "settings": { "react": { "version": "19.2" } },
+  "settings": { "react": { "version": "19.3" } },
   "ignorePatterns": ["dist", "**/*.gen.ts", "codegen", "lint"],
   "rules": {
     "query/exhaustive-deps": "error",

@@ -2105,54 +2105,6 @@ type ACL struct {
 	SrcPosture []string `json:"srcPosture,omitempty"`
 }
 
-// UnmarshalJSON implements custom unmarshalling for [ACL] that ignores fields starting with '#'.
-// slopscale-admin uses # in some field names to add metadata, so we will ignore
-// those to ensure it doesnt break.
-//
-// https://github.com/GoodiesHQ/slopscale-admin/blob/214a44a9c15c92d2b42383f131b51df10c84017c/src/lib/common/acl.svelte.ts#L38
-//
-//nolint:lll // URL
-func (a *ACL) UnmarshalJSON(b []byte) error {
-	// First unmarshal into a map to filter out comment fields
-	var raw map[string]any
-
-	err := json.Unmarshal(b, &raw, policyJSONOpts...)
-	if err != nil {
-		return fmt.Errorf("unmarshaling raw ACL map: %w", err)
-	}
-
-	// Remove any fields that start with '#'
-	filtered := make(map[string]any)
-
-	for key, value := range raw {
-		if !strings.HasPrefix(key, "#") {
-			filtered[key] = value
-		}
-	}
-
-	// Marshal the filtered map back to JSON
-	filteredBytes, err := json.Marshal(filtered)
-	if err != nil {
-		return fmt.Errorf("marshaling filtered ACL map: %w", err)
-	}
-
-	// Create a type alias to avoid infinite recursion
-	type aclAlias ACL
-
-	var temp aclAlias
-
-	// Unmarshal into the temporary struct using the v2 JSON options
-	err = json.Unmarshal(filteredBytes, &temp, policyJSONOpts...)
-	if err != nil {
-		return fmt.Errorf("unmarshaling filtered ACL: %w", err)
-	}
-
-	// Copy the result back to the original struct
-	*a = ACL(temp)
-
-	return nil
-}
-
 type Grant struct {
 	// TODO(kradalby): Validate grant src/dst according to ts docs
 	Sources      Aliases `json:"src"`
@@ -3647,6 +3599,41 @@ func (u *SSHUser) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// stripMetadataMembers removes every object member whose name starts with '#'
+// from the policy AST. Policy editors such as headscale-admin store their own
+// metadata in such members, and the policy decoder rejects unknown fields, so
+// they are dropped before decoding instead of rejected. Deleting a member can
+// leave a trailing comma behind; [hujson.Value.Standardize] removes it.
+//
+// Grant and nodeAttr "app" values are opaque capability payloads handed to
+// peers verbatim, not policy schema, so they are left untouched.
+func stripMetadataMembers(v *hujson.Value) {
+	switch val := v.Value.(type) {
+	case *hujson.Object:
+		kept := val.Members[:0]
+
+		for i := range val.Members {
+			name, isString := val.Members[i].Name.Value.(hujson.Literal)
+			if isString && strings.HasPrefix(name.String(), "#") {
+				continue
+			}
+
+			if !isString || name.String() != "app" {
+				stripMetadataMembers(&val.Members[i].Value)
+			}
+
+			kept = append(kept, val.Members[i])
+		}
+
+		val.Members = kept
+
+	case *hujson.Array:
+		for i := range val.Elements {
+			stripMetadataMembers(&val.Elements[i])
+		}
+	}
+}
+
 // unmarshalPolicy takes a byte slice and unmarshals it into a [Policy] struct.
 // In addition to unmarshalling, it will also validate the policy.
 // This is the only entrypoint of reading a policy from a file or other source.
@@ -3664,6 +3651,7 @@ func unmarshalPolicy(b []byte) (*Policy, error) {
 		return nil, fmt.Errorf("parsing HuJSON: %w", err)
 	}
 
+	stripMetadataMembers(&ast)
 	ast.Standardize()
 
 	err = json.Unmarshal(ast.Pack(), &policy, policyJSONOpts...)

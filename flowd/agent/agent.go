@@ -59,6 +59,11 @@ var DefaultResolvConf = []string{
 	"/etc/resolv.pre-tailscale-backup.conf",
 }
 
+var (
+	errHostedControl = errors.New("the node does not use a slopscale control server; pass --server")
+	errStopped       = errors.New("stopped unexpectedly")
+)
+
 // LocalAPI is what the agent asks of the gateway's tailscaled;
 // tailscale.com/client/local.Client implements it.
 type LocalAPI interface {
@@ -112,7 +117,7 @@ type Agent struct {
 
 	mu        sync.Mutex
 	config    traffic.Config // without LogSources, which live in logSources
-	changed   chan struct{} // closed and replaced on every config change
+	changed   chan struct{}  // closed and replaced on every config change
 	status    traffic.Status
 	dnsListen []netip.AddrPort
 	userspace bool // tailscaled forwards in userspace, past connection tracking
@@ -192,7 +197,8 @@ func newAgent(ctx context.Context, opts Options) (*Agent, error) {
 	})
 	a.uploader = upload.New(server, opts.HTTPClient, tokens, sp, a.applyConfig, a.log)
 
-	if recovered := sp.Recovered(); recovered != nil {
+	recovered := sp.Recovered()
+	if recovered != nil {
 		a.log.Warn("the spool state was unreadable; reporting as a new instance", "err", recovered)
 	}
 
@@ -214,7 +220,7 @@ func serverURL(ctx context.Context, opts Options) (string, error) {
 	}
 
 	if prefs.ControlURL == "" || strings.Contains(prefs.ControlURL, hostedControlHost) {
-		return "", errors.New("the node does not use a slopscale control server; pass --server")
+		return "", errHostedControl
 	}
 
 	return prefs.ControlURL, nil
@@ -303,7 +309,8 @@ func (a *Agent) logs(src netip.Addr) bool {
 }
 
 func configEqual(x, y traffic.Config) bool {
-	return x.SNI == y.SNI && x.DNS == y.DNS && x.ReportInterval == y.ReportInterval && slices.Equal(x.Upstreams, y.Upstreams)
+	return x.SNI == y.SNI && x.DNS == y.DNS && x.ReportInterval == y.ReportInterval &&
+		slices.Equal(x.Upstreams, y.Upstreams)
 }
 
 // current returns the configuration and a channel closed when it changes.
@@ -344,7 +351,8 @@ func (a *Agent) run(ctx context.Context) error {
 	flush, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownFlushTimeout)
 	defer cancel()
 
-	if _, err := a.uploader.Drain(flush); err != nil {
+	_, err := a.uploader.Drain(flush)
+	if err != nil {
 		a.log.Warn("could not deliver everything before stopping; it stays spooled", "err", err)
 	}
 
@@ -426,7 +434,7 @@ func (a *Agent) supervise(ctx context.Context, name string, fail func(error), jo
 		}
 
 		if err == nil {
-			err = errors.New("stopped unexpectedly")
+			err = errStopped
 		}
 
 		a.log.Error(name+" failed; restarting", "err", err, "retry_in", restartBackoff)

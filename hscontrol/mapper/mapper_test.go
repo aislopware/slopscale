@@ -217,8 +217,8 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 
 // TestBuildFromChangeFiltersPeerPatchesByVisibility proves that incremental
 // peer-change patches (online/offline, endpoint, key-expiry) are restricted to
-// the recipient's ACL-visible peer set, the same way buildTailPeers filters
-// full peer objects via policy.ReduceNodes. Without it, a node receives the
+// the recipient's ACL-visible peer set, the NodeStore peer map buildTailPeers
+// is fed from. Without it, a node receives the
 // existence, presence, and addresses of peers its policy forbids accessing.
 func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 	t.Parallel()
@@ -273,16 +273,28 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 
 	m := &mapper{state: s, cfg: cfg}
 
-	// n2 (user2) comes online; n1 (user1) must NOT receive its patch.
+	// n2 (user2) comes online; n1 (user1) must NOT receive its patch, and
+	// with nothing else in the change it must receive no frame at all.
 	leakChange := change.NodeOnline(n2.ID, time.Now())
 	resp, err := m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &leakChange)
 	require.NoError(t, err)
-	require.NotNil(t, resp)
+	assert.Nil(t, resp, "a change holding only a patch n1 cannot see must not produce a frame for n1")
 
-	for _, p := range resp.PeersChangedPatch {
-		assert.NotEqual(t, n2.ID.NodeID(), p.NodeID,
-			"n1 must not receive an online patch for n2, which its policy forbids accessing")
-	}
+	// A node's own online patch is not a peer patch for it either.
+	selfChange := change.NodeOnline(n1.ID, time.Now())
+	resp, err = m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &selfChange)
+	require.NoError(t, err)
+	assert.Nil(t, resp, "n1's own online patch must not produce a frame for n1")
+
+	// The hidden patch is dropped but the rest of the change is still sent.
+	mixedChange := leakChange.Merge(change.PeersChanged("test", n1b.ID))
+	resp, err = m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &mixedChange)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Len(t, resp.PeersChanged, 1, "the visible changed peer must survive the dropped patch")
+	assert.Equal(t, n1b.ID.NodeID(), resp.PeersChanged[0].ID)
+	assert.Empty(t, resp.PeersChangedPatch,
+		"n1 must not receive an online patch for n2, which its policy forbids accessing")
 
 	// Control: n1b (same user) coming online IS visible to n1.
 	okChange := change.NodeOnline(n1b.ID, time.Now())
@@ -304,8 +316,8 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 
 // TestBuildFromChangeFiltersUserProfilesByVisibility proves the incremental
 // PeersChanged path restricts UserProfiles to the recipient's ACL-visible
-// peers, like the full-map path (whose ListPeers returns the
-// BuildPeerMap-filtered set). Without it, a changed node broadcast to all
+// peers, from the same BuildPeerMap-filtered set the full-map path reads.
+// Without it, a changed node broadcast to all
 // nodes leaks its owner's identity (login name, display name, avatar) to
 // recipients whose policy forbids accessing that node.
 func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
@@ -379,11 +391,10 @@ func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
 // full-map path under every policy shape, and a cross-user UserProfile must not
 // leak. If a future refactor lets one path drift from another, this fails.
 //
-// It pins two behaviours the scattered per-path filters get wrong today and the
-// consolidation onto the snapshot peer map must fix: deny-all (empty matchers)
-// must hide every peer on the incremental path rather than fall open to "no
-// matchers => all visible", and per-node policies (autogroup:self) must agree
-// across paths.
+// It pins two behaviours of the snapshot peer map every path reads: deny-all
+// (empty matchers) must hide every peer on the incremental path rather than
+// fall open to "no matchers => all visible", and per-node policies
+// (autogroup:self) must agree across paths.
 //
 //nolint:tparallel // subtests install different policies on one shared State
 func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
@@ -687,9 +698,8 @@ func TestGenerateDNSConfigNilHostinfoNoPanic(t *testing.T) {
 // policyShapes covers the paths that decide how the mapper filters peers: a
 // global filter with matchers, a per-node (autogroup:self) filter, a policy
 // that leaves every node with zero matchers, and no rules at all. The
-// zero-matcher shape is the interesting one, because
-// [MapResponseBuilder.buildTailPeers] skips [policy.ReduceNodes] there and
-// emits its input as given.
+// zero-matcher shape is the interesting one: it must hide every peer, not
+// fall open to "no matchers => all visible".
 var policyShapes = []struct {
 	name   string
 	policy string

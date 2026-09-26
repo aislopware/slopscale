@@ -58,6 +58,7 @@ func (h *Slopscale) serveFunnelIngress(ctx context.Context) error {
 		Hostname:    types.FunnelIngressHostname,
 		StateDir:    h.cfg.Funnel.StateDir,
 		ListenAddrs: h.cfg.Funnel.ListenAddrs,
+		ListenKey:   "funnel.listen_addrs",
 	}, func(addrs []net.Addr) {
 		bound := make([]string, 0, len(addrs))
 		for _, addr := range addrs {

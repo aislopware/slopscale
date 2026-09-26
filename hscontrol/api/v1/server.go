@@ -21,6 +21,10 @@ func init() {
 // that is not a setting: where it is, how it was built and what the
 // config file gave it.
 type ServerInfo struct {
+	// TailnetID is the tailnet's stable ID: clients see it as
+	// CurrentTailnet.StableID in `tailscale status --json`, and /api/v2
+	// accepts it as the {tailnet} in a path as well as "-".
+	TailnetID string    `json:"tailnetId"`
 	Version   string    `json:"version"`
 	Commit    string    `json:"commit"`
 	BuildTime string    `json:"buildTime"`
@@ -96,9 +100,12 @@ func registerServer(api huma.API, b Backend) {
 		Tags:        []string{tagSettings},
 		Security:    bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*serverInfoOutput, error) {
-		return &serverInfoOutput{Body: serverInfoFrom(
+		info := serverInfoFrom(
 			b.Cfg, b.State.DERP(), len(b.State.FunnelIngressNodes()), b.State.LatestClientVersion(),
-		)}, nil
+		)
+		info.TailnetID = string(b.State.TailnetID())
+
+		return &serverInfoOutput{Body: info}, nil
 	})
 }
 

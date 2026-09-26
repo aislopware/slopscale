@@ -233,7 +233,12 @@ func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
 	// session to release. A deleted node has nothing to release either,
 	// and waiting for it to reconnect would only hold the stream count
 	// up, which is what kept the server from shutting down.
-	if connectGen == 0 || m.nodeGone() {
+	if connectGen == 0 {
+		return
+	}
+
+	node, exists := m.h.state.GetNodeByID(m.node.ID())
+	if !exists {
 		return
 	}
 
@@ -250,7 +255,10 @@ func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
 	// handler ran late is exactly such a session: if it kept its session
 	// acquired on this path, the surviving session's release could never
 	// take the node offline (the relogin flake).
-	if !stillConnected {
+	//
+	// An expired node cannot come back online through a map reconnect, so
+	// its session is released without the reconnect grace.
+	if !stillConnected && !node.IsExpired() {
 		// Wait up to 10 seconds for the node to reconnect.
 		// 10 seconds was arbitrary chosen as a reasonable time to reconnect.
 		ticker := time.NewTicker(time.Second)

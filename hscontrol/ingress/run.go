@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/netip"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
 	"tailscale.com/tsnet"
@@ -25,6 +26,9 @@ type Node struct {
 	StateDir string
 	// ListenAddrs are the public addresses to accept TLS on.
 	ListenAddrs []string
+	// ListenKey is the setting ListenAddrs come from, named when one of
+	// them cannot be bound.
+	ListenKey string
 	// Logf receives the tailnet client's logs; nil discards them.
 	Logf logger.Logf
 }
@@ -67,7 +71,7 @@ func Run(ctx context.Context, node Node, ready func(addrs []net.Addr)) error {
 
 	proxy := New(srv.Dial, NewStatusResolver(lc.Status))
 
-	listeners, err := listenAll(ctx, node.ListenAddrs)
+	listeners, err := listenAll(ctx, node.ListenAddrs, node.ListenKey)
 	if err != nil {
 		return err
 	}
@@ -101,7 +105,7 @@ func Run(ctx context.Context, node Node, ready func(addrs []net.Addr)) error {
 }
 
 // listenAll opens every address, or none.
-func listenAll(ctx context.Context, addrs []string) ([]net.Listener, error) {
+func listenAll(ctx context.Context, addrs []string, key string) ([]net.Listener, error) {
 	var lc net.ListenConfig
 
 	listeners := make([]net.Listener, 0, len(addrs))
@@ -113,7 +117,13 @@ func listenAll(ctx context.Context, addrs []string) ([]net.Listener, error) {
 				_ = open.Close()
 			}
 
-			return nil, fmt.Errorf("listening on %s: %w", addr, err)
+			return nil, &types.ListenerBindError{
+				Listener:  "Funnel ingress",
+				ConfigKey: key,
+				Network:   "tcp",
+				Addr:      addr,
+				Err:       err,
+			}
 		}
 
 		listeners = append(listeners, ln)

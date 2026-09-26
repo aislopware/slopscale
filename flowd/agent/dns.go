@@ -17,6 +17,8 @@ import (
 // should not take it out of every client's DNS.
 const probeFailuresBeforeError = 2
 
+var errNoTailnetAddress = errors.New("the node has no tailnet address yet")
+
 // maxProbeTime bounds one probe, as long as a client's question may take.
 const maxProbeTime = 5 * time.Second
 
@@ -115,6 +117,7 @@ func (r *dnsRunner) round(ctx context.Context, cfg traffic.Config) {
 	case r.server == nil || !slices.Equal(plan.key, r.running):
 		r.stop()
 
+		//nolint:contextcheck // the resolver outlives this round; r.stop closes it
 		server, err := r.agent.startDNS(plan, r.noteAnswer)
 		if err != nil {
 			r.setStatus(err)
@@ -183,7 +186,7 @@ func (a *Agent) dnsPlan(ctx context.Context, cfg traffic.Config) (dnsPlan, error
 	}
 
 	if status.Self == nil || len(status.Self.TailscaleIPs) == 0 {
-		return dnsPlan{}, errors.New("the node has no tailnet address yet")
+		return dnsPlan{}, errNoTailnetAddress
 	}
 
 	plan := dnsPlan{listen: make([]netip.AddrPort, 0, len(status.Self.TailscaleIPs))}

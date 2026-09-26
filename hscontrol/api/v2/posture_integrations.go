@@ -121,7 +121,7 @@ func registerPostureIntegrationReads(api huma.API, b Backend) {
 	}, scope.DevicesPostureAttributesRead), func(
 		_ context.Context, in *tailnetInput,
 	) (*listPostureIntegrationsOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +233,7 @@ func registerPostureIntegrationWrites(api huma.API, b Backend) {
 func handleCreatePostureIntegration(
 	ctx context.Context, b Backend, in *createPostureIntegrationInput,
 ) (*postureIntegrationOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}

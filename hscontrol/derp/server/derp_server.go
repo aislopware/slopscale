@@ -115,7 +115,13 @@ func (d *DERPServer) Apply(s types.DERPServerSettings) error {
 	} else if d.stunConn == nil || d.stunAddr != s.STUNAddr {
 		packetConn, err := new(net.ListenConfig).ListenPacket(context.Background(), "udp", s.STUNAddr)
 		if err != nil {
-			return fmt.Errorf("opening STUN listener on %s: %w", s.STUNAddr, err)
+			return &types.ListenerBindError{
+				Listener:  "embedded DERP STUN",
+				ConfigKey: "derp.server.stun_listen_addr",
+				Network:   "udp",
+				Addr:      s.STUNAddr,
+				Err:       err,
+			}
 		}
 
 		udpConn, ok := packetConn.(*net.UDPConn)

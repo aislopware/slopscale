@@ -38,6 +38,7 @@ func TestPingAllByIP(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -67,15 +68,22 @@ func TestPingAllByIP(t *testing.T) {
 	expectedNodes := make([]types.NodeID, 0, len(allClients))
 	for _, client := range allClients {
 		status := client.MustStatus()
-		nodeID, err := strconv.ParseUint(string(status.Self.ID), 10, 64)
-		require.NoError(t, err, "failed to parse node ID")
+		nodeID, parseErr := strconv.ParseUint(string(status.Self.ID), 10, 64)
+		require.NoError(t, parseErr, "failed to parse node ID")
+
 		expectedNodes = append(expectedNodes, types.NodeID(nodeID))
 	}
-	requireAllClientsOnline(t, hs, expectedNodes, true, "all clients should be online across all systems", integrationutil.ScaledTimeout(30*time.Second))
 
-	// assertClientsState(t, allClients)
+	requireAllClientsOnline(
+		t,
+		hs,
+		expectedNodes,
+		true,
+		"all clients should be online across all systems",
+		integrationutil.ScaledTimeout(30*time.Second),
+	)
 
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -85,7 +93,14 @@ func TestPingAllByIP(t *testing.T) {
 
 	// Test our DebugBatcher functionality
 	t.Logf("Testing DebugBatcher functionality...")
-	requireAllClientsOnline(t, slopscale, expectedNodes, true, "all clients should be connected to the batcher", integrationutil.ScaledTimeout(30*time.Second))
+	requireAllClientsOnline(
+		t,
+		slopscale,
+		expectedNodes,
+		true,
+		"all clients should be connected to the batcher",
+		integrationutil.ScaledTimeout(30*time.Second),
+	)
 
 	assertPingAll(t, allClients, allAddrs)
 }
@@ -99,6 +114,7 @@ func TestPingAllByIPPublicDERP(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -123,9 +139,7 @@ func TestPingAllByIPPublicDERP(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	// assertClientsState(t, allClients)
-
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -155,6 +169,7 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -162,22 +177,27 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 	requireNoErrSlopscaleEnv(t, err)
 
 	for _, userName := range spec.Users {
-		user, err := scenario.CreateUser(userName)
-		if err != nil {
-			t.Fatalf("failed to create user %s: %s", userName, err)
+		user, createUserErr := scenario.CreateUser(userName)
+		if createUserErr != nil {
+			t.Fatalf("failed to create user %s: %s", userName, createUserErr)
 		}
 
-		err = scenario.CreateTailscaleNodesInUser(userName, "all", spec.NodesPerUser, tsic.WithNetwork(scenario.networks[scenario.testDefaultNetwork]))
+		err = scenario.CreateTailscaleNodesInUser(
+			userName,
+			"all",
+			spec.NodesPerUser,
+			tsic.WithNetwork(scenario.networks[scenario.testDefaultNetwork]),
+		)
 		if err != nil {
 			t.Fatalf("failed to create tailscale nodes in user %s: %s", userName, err)
 		}
 
-		key, err := scenario.CreatePreAuthKey(mustParseID(user.Id), true, true)
-		if err != nil {
-			t.Fatalf("failed to create pre-auth key for user %s: %s", userName, err)
+		authKey, createPreAuthKeyErr := scenario.CreatePreAuthKey(mustParseID(user.Id), true, true)
+		if createPreAuthKeyErr != nil {
+			t.Fatalf("failed to create pre-auth key for user %s: %s", userName, createPreAuthKeyErr)
 		}
 
-		err = scenario.RunTailscaleUp(userName, slopscale.GetEndpoint(), key.Key)
+		err = scenario.RunTailscaleUp(userName, slopscale.GetEndpoint(), authKey.Key)
 		if err != nil {
 			t.Fatalf("failed to run tailscale up for user %s: %s", userName, err)
 		}
@@ -192,14 +212,14 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 	allIps, err := scenario.ListTailscaleClientsIPs()
 	requireNoErrListClientIPs(t, err)
 
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
 	assertPingAll(t, allClients, allAddrs)
 
 	for _, client := range allClients {
-		err := client.Logout()
+		err = client.Logout()
 		if err != nil {
 			t.Fatalf("failed to logout client %s: %s", client.Hostname(), err)
 		}
@@ -213,7 +233,7 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		nodes, err := slopscale.ListNodes()
 		assert.NoError(ct, err)
-		assert.Len(ct, nodes, 0, "All ephemeral nodes should be cleaned up after logout")
+		assert.Empty(ct, nodes, "All ephemeral nodes should be cleaned up after logout")
 	}, integrationutil.StatusReadyTimeout, 2*time.Second)
 }
 
@@ -228,6 +248,7 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -240,22 +261,27 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 	requireNoErrSlopscaleEnv(t, err)
 
 	for _, userName := range spec.Users {
-		user, err := scenario.CreateUser(userName)
-		if err != nil {
-			t.Fatalf("failed to create user %s: %s", userName, err)
+		user, createUserErr := scenario.CreateUser(userName)
+		if createUserErr != nil {
+			t.Fatalf("failed to create user %s: %s", userName, createUserErr)
 		}
 
-		err = scenario.CreateTailscaleNodesInUser(userName, "all", spec.NodesPerUser, tsic.WithNetwork(scenario.networks[scenario.testDefaultNetwork]))
+		err = scenario.CreateTailscaleNodesInUser(
+			userName,
+			"all",
+			spec.NodesPerUser,
+			tsic.WithNetwork(scenario.networks[scenario.testDefaultNetwork]),
+		)
 		if err != nil {
 			t.Fatalf("failed to create tailscale nodes in user %s: %s", userName, err)
 		}
 
-		key, err := scenario.CreatePreAuthKey(mustParseID(user.Id), true, true)
-		if err != nil {
-			t.Fatalf("failed to create pre-auth key for user %s: %s", userName, err)
+		authKey, createPreAuthKeyErr := scenario.CreatePreAuthKey(mustParseID(user.Id), true, true)
+		if createPreAuthKeyErr != nil {
+			t.Fatalf("failed to create pre-auth key for user %s: %s", userName, createPreAuthKeyErr)
 		}
 
-		err = scenario.RunTailscaleUp(userName, slopscale.GetEndpoint(), key.Key)
+		err = scenario.RunTailscaleUp(userName, slopscale.GetEndpoint(), authKey.Key)
 		if err != nil {
 			t.Fatalf("failed to run tailscale up for user %s: %s", userName, err)
 		}
@@ -270,7 +296,7 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 	allIps, err := scenario.ListTailscaleClientsIPs()
 	requireNoErrListClientIPs(t, err)
 
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -279,7 +305,7 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 
 	// Take down all clients, this should start an expiry timer for each.
 	for _, client := range allClients {
-		err := client.Down()
+		err = client.Down()
 		if err != nil {
 			t.Fatalf("failed to take down client %s: %s", client.Hostname(), err)
 		}
@@ -289,7 +315,7 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 	// time of the ephemeral nodes.
 	// Nodes should be able to reconnect and work fine.
 	for _, client := range allClients {
-		err := client.Up()
+		err = client.Up()
 		if err != nil {
 			t.Fatalf("failed to take down client %s: %s", client.Hostname(), err)
 		}
@@ -317,7 +343,7 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 		for _, userName := range spec.Users {
 			nodes, err := slopscale.ListNodes(userName)
 			assert.NoError(ct, err)
-			assert.Len(ct, nodes, 0, "Ephemeral nodes should be expired and removed for user %s", userName)
+			assert.Empty(ct, nodes, "Ephemeral nodes should be expired and removed for user %s", userName)
 		}
 	}, integrationutil.ScaledTimeout(4*time.Minute), 10*time.Second)
 
@@ -347,6 +373,7 @@ func TestPingAllByHostname(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -358,8 +385,6 @@ func TestPingAllByHostname(t *testing.T) {
 
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
-
-	// assertClientsState(t, allClients)
 
 	allHostnames, err := scenario.ListTailscaleClientsFQDNs()
 	requireNoErrListFQDN(t, err)
@@ -382,6 +407,7 @@ func TestTaildrop(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -404,14 +430,15 @@ func TestTaildrop(t *testing.T) {
 	user1Key, err := scenario.CreatePreAuthKey(mustParseID(userMap["user1"].Id), true, false)
 	require.NoError(t, err)
 
-	var user1Clients []TailscaleClient
+	user1Clients := make([]TailscaleClient, 0, len(MustTestVersions))
+
 	for i, version := range MustTestVersions {
 		t.Logf("Creating user1 client %d with version %s", i, version)
-		client, err := scenario.CreateTailscaleNode(
+		client, createErr := scenario.CreateTailscaleNode(
 			version,
 			tsic.WithNetwork(network),
 		)
-		require.NoError(t, err)
+		require.NoError(t, createErr)
 
 		err = client.Login(slopscale.GetEndpoint(), user1Key.Key)
 		require.NoError(t, err)
@@ -427,14 +454,15 @@ func TestTaildrop(t *testing.T) {
 	user2Key, err := scenario.CreatePreAuthKey(mustParseID(userMap["user2"].Id), true, false)
 	require.NoError(t, err)
 
-	var user2Clients []TailscaleClient
+	user2Clients := make([]TailscaleClient, 0, len(MustTestVersions))
+
 	for i, version := range MustTestVersions {
 		t.Logf("Creating user2 client %d with version %s", i, version)
-		client, err := scenario.CreateTailscaleNode(
+		client, createErr := scenario.CreateTailscaleNode(
 			version,
 			tsic.WithNetwork(network),
 		)
-		require.NoError(t, err)
+		require.NoError(t, createErr)
 
 		err = client.Login(slopscale.GetEndpoint(), user2Key.Key)
 		require.NoError(t, err)
@@ -448,7 +476,12 @@ func TestTaildrop(t *testing.T) {
 
 	// Create a tagged device (tags-as-identity: tags come from PreAuthKey)
 	// Use "head" version to test latest behavior
-	taggedKey, err := scenario.CreatePreAuthKeyWithTags(mustParseID(userMap["user1"].Id), true, false, []string{"tag:server"})
+	taggedKey, err := scenario.CreatePreAuthKeyWithTags(
+		mustParseID(userMap["user1"].Id),
+		true,
+		false,
+		[]string{"tag:server"},
+	)
 	require.NoError(t, err)
 
 	taggedClient, err := scenario.CreateTailscaleNode(
@@ -486,6 +519,7 @@ func TestTaildrop(t *testing.T) {
 	for _, client := range allClients {
 		if !strings.Contains(client.Hostname(), "head") {
 			command := []string{"apk", "add", "curl"}
+
 			_, _, err := client.Execute(command)
 			if err != nil {
 				t.Fatalf("failed to install curl on %s, err: %s", client.Hostname(), err)
@@ -501,13 +535,16 @@ func TestTaildrop(t *testing.T) {
 			"/var/run/tailscale/tailscaled.sock",
 			"http://local-tailscaled.sock/localapi/v0/file-targets",
 		}
+
 		result, _, err := client.Execute(curlCommand)
 		if err != nil {
 			return nil, err
 		}
 
 		var fts []apitype.FileTarget
-		if err := json.Unmarshal([]byte(result), &fts); err != nil {
+
+		err = json.Unmarshal([]byte(result), &fts)
+		if err != nil {
 			return nil, fmt.Errorf("failed to parse file-targets response: %w (response: %s)", err, result)
 		}
 
@@ -521,6 +558,7 @@ func TestTaildrop(t *testing.T) {
 				return true
 			}
 		}
+
 		return false
 	}
 
@@ -536,19 +574,30 @@ func TestTaildrop(t *testing.T) {
 					if peer.Hostname() == client.Hostname() {
 						continue
 					}
+
 					assert.True(ct, isInFileTargets(fts, peer.Hostname()),
 						"user1 client %s should see user1 peer %s in FileTargets", client.Hostname(), peer.Hostname())
 				}
 
 				// Should NOT see user2 clients
 				for _, peer := range user2Clients {
-					assert.False(ct, isInFileTargets(fts, peer.Hostname()),
-						"user1 client %s should NOT see user2 peer %s in FileTargets", client.Hostname(), peer.Hostname())
+					assert.False(
+						ct,
+						isInFileTargets(fts, peer.Hostname()),
+						"user1 client %s should NOT see user2 peer %s in FileTargets",
+						client.Hostname(),
+						peer.Hostname(),
+					)
 				}
 
 				// Should NOT see tagged client
-				assert.False(ct, isInFileTargets(fts, taggedClient.Hostname()),
-					"user1 client %s should NOT see tagged client %s in FileTargets", client.Hostname(), taggedClient.Hostname())
+				assert.False(
+					ct,
+					isInFileTargets(fts, taggedClient.Hostname()),
+					"user1 client %s should NOT see tagged client %s in FileTargets",
+					client.Hostname(),
+					taggedClient.Hostname(),
+				)
 			}, integrationutil.ScaledTimeout(10*time.Second), 1*time.Second)
 		}
 	})
@@ -565,19 +614,30 @@ func TestTaildrop(t *testing.T) {
 					if peer.Hostname() == client.Hostname() {
 						continue
 					}
+
 					assert.True(ct, isInFileTargets(fts, peer.Hostname()),
 						"user2 client %s should see user2 peer %s in FileTargets", client.Hostname(), peer.Hostname())
 				}
 
 				// Should NOT see user1 clients
 				for _, peer := range user1Clients {
-					assert.False(ct, isInFileTargets(fts, peer.Hostname()),
-						"user2 client %s should NOT see user1 peer %s in FileTargets", client.Hostname(), peer.Hostname())
+					assert.False(
+						ct,
+						isInFileTargets(fts, peer.Hostname()),
+						"user2 client %s should NOT see user1 peer %s in FileTargets",
+						client.Hostname(),
+						peer.Hostname(),
+					)
 				}
 
 				// Should NOT see tagged client
-				assert.False(ct, isInFileTargets(fts, taggedClient.Hostname()),
-					"user2 client %s should NOT see tagged client %s in FileTargets", client.Hostname(), taggedClient.Hostname())
+				assert.False(
+					ct,
+					isInFileTargets(fts, taggedClient.Hostname()),
+					"user2 client %s should NOT see tagged client %s in FileTargets",
+					client.Hostname(),
+					taggedClient.Hostname(),
+				)
 			}, integrationutil.ScaledTimeout(10*time.Second), 1*time.Second)
 		}
 	})
@@ -595,8 +655,8 @@ func TestTaildrop(t *testing.T) {
 	t.Run("SameUserTransfer", func(t *testing.T) {
 		for _, sender := range user1Clients {
 			// Create file on sender
-			filename := fmt.Sprintf("file_from_%s", sender.Hostname())
-			command := []string{"touch", fmt.Sprintf("/tmp/%s", filename)}
+			filename := "file_from_" + sender.Hostname()
+			command := []string{"touch", "/tmp/" + filename}
 			_, _, err := sender.Execute(command)
 			require.NoError(t, err, "failed to create taildrop file on %s", sender.Hostname())
 
@@ -610,8 +670,8 @@ func TestTaildrop(t *testing.T) {
 				t.Run(fmt.Sprintf("%s->%s", sender.Hostname(), receiver.Hostname()), func(t *testing.T) {
 					sendCommand := []string{
 						"tailscale", "file", "cp",
-						fmt.Sprintf("/tmp/%s", filename),
-						fmt.Sprintf("%s:", receiverFQDN),
+						"/tmp/" + filename,
+						receiverFQDN + ":",
 					}
 
 					assert.EventuallyWithT(t, func(ct *assert.CollectT) {
@@ -635,12 +695,15 @@ func TestTaildrop(t *testing.T) {
 					continue
 				}
 
-				t.Run(fmt.Sprintf("verify-%s-received-from-%s", client.Hostname(), peer.Hostname()), func(t *testing.T) {
-					lsCommand := []string{"ls", fmt.Sprintf("/tmp/file_from_%s", peer.Hostname())}
-					result, _, err := client.Execute(lsCommand)
-					require.NoErrorf(t, err, "failed to ls taildrop file from %s", peer.Hostname())
-					assert.Equal(t, fmt.Sprintf("/tmp/file_from_%s\n", peer.Hostname()), result)
-				})
+				t.Run(
+					fmt.Sprintf("verify-%s-received-from-%s", client.Hostname(), peer.Hostname()),
+					func(t *testing.T) {
+						lsCommand := []string{"ls", "/tmp/file_from_" + peer.Hostname()}
+						result, _, err := client.Execute(lsCommand)
+						require.NoErrorf(t, err, "failed to ls taildrop file from %s", peer.Hostname())
+						assert.Equal(t, fmt.Sprintf("/tmp/file_from_%s\n", peer.Hostname()), result)
+					},
+				)
 			}
 		}
 	})
@@ -651,8 +714,8 @@ func TestTaildrop(t *testing.T) {
 		receiver := user2Clients[0]
 
 		// Create file on sender
-		filename := fmt.Sprintf("cross_user_file_from_%s", sender.Hostname())
-		command := []string{"touch", fmt.Sprintf("/tmp/%s", filename)}
+		filename := "cross_user_file_from_" + sender.Hostname()
+		command := []string{"touch", "/tmp/" + filename}
 		_, _, err := sender.Execute(command)
 		require.NoError(t, err, "failed to create taildrop file on %s", sender.Hostname())
 
@@ -660,8 +723,8 @@ func TestTaildrop(t *testing.T) {
 		receiverFQDN, _ := receiver.FQDN()
 		sendCommand := []string{
 			"tailscale", "file", "cp",
-			fmt.Sprintf("/tmp/%s", filename),
-			fmt.Sprintf("%s:", receiverFQDN),
+			"/tmp/" + filename,
+			receiverFQDN + ":",
 		}
 
 		t.Logf("Attempting cross-user file send from %s to %s (should fail)", sender.Hostname(), receiver.Hostname())
@@ -669,16 +732,17 @@ func TestTaildrop(t *testing.T) {
 
 		// The file transfer should fail because user2 is not in user1's FileTargets
 		// Either the command errors, or it silently fails (check stderr for error message)
-		if err != nil {
+		switch {
+		case err != nil:
 			t.Logf("Cross-user transfer correctly failed with error: %v", err)
-		} else if strings.Contains(stderr, "not a valid peer") || strings.Contains(stderr, "unknown target") {
+		case strings.Contains(stderr, "not a valid peer"), strings.Contains(stderr, "unknown target"):
 			t.Logf("Cross-user transfer correctly rejected: %s", stderr)
-		} else {
+		default:
 			// Even if command succeeded, verify the file was NOT received
 			getCommand := []string{"tailscale", "file", "get", "/tmp/"}
-			receiver.Execute(getCommand)
+			_, _, _ = receiver.Execute(getCommand) // a failed get receives nothing, which the ls below checks
 
-			lsCommand := []string{"ls", fmt.Sprintf("/tmp/%s", filename)}
+			lsCommand := []string{"ls", "/tmp/" + filename}
 			_, _, lsErr := receiver.Execute(lsCommand)
 			assert.Error(t, lsErr, "Cross-user file should NOT have been received")
 		}
@@ -687,8 +751,8 @@ func TestTaildrop(t *testing.T) {
 	// Test 6: Tagged device cannot send files
 	t.Run("TaggedCannotSend", func(t *testing.T) {
 		// Create file on tagged client
-		filename := fmt.Sprintf("file_from_tagged_%s", taggedClient.Hostname())
-		command := []string{"touch", fmt.Sprintf("/tmp/%s", filename)}
+		filename := "file_from_tagged_" + taggedClient.Hostname()
+		command := []string{"touch", "/tmp/" + filename}
 		_, _, err := taggedClient.Execute(command)
 		require.NoError(t, err, "failed to create taildrop file on tagged client")
 
@@ -697,23 +761,30 @@ func TestTaildrop(t *testing.T) {
 		receiverFQDN, _ := receiver.FQDN()
 		sendCommand := []string{
 			"tailscale", "file", "cp",
-			fmt.Sprintf("/tmp/%s", filename),
-			fmt.Sprintf("%s:", receiverFQDN),
+			"/tmp/" + filename,
+			receiverFQDN + ":",
 		}
 
-		t.Logf("Attempting tagged->user file send from %s to %s (should fail)", taggedClient.Hostname(), receiver.Hostname())
-		_, stderr, err := taggedClient.Execute(sendCommand)
+		t.Logf(
+			"Attempting tagged->user file send from %s to %s (should fail)",
+			taggedClient.Hostname(),
+			receiver.Hostname(),
+		)
 
-		if err != nil {
+		_, stderr, err := taggedClient.Execute(sendCommand)
+		switch {
+		case err != nil:
 			t.Logf("Tagged client send correctly failed with error: %v", err)
-		} else if strings.Contains(stderr, "not a valid peer") || strings.Contains(stderr, "unknown target") || strings.Contains(stderr, "no matches for") {
+		case strings.Contains(stderr, "not a valid peer"),
+			strings.Contains(stderr, "unknown target"),
+			strings.Contains(stderr, "no matches for"):
 			t.Logf("Tagged client send correctly rejected: %s", stderr)
-		} else {
+		default:
 			// Verify file was NOT received
 			getCommand := []string{"tailscale", "file", "get", "/tmp/"}
-			receiver.Execute(getCommand)
+			_, _, _ = receiver.Execute(getCommand) // a failed get receives nothing, which the ls below checks
 
-			lsCommand := []string{"ls", fmt.Sprintf("/tmp/%s", filename)}
+			lsCommand := []string{"ls", "/tmp/" + filename}
 			_, _, lsErr := receiver.Execute(lsCommand)
 			assert.Error(t, lsErr, "Tagged client's file should NOT have been received")
 		}
@@ -724,8 +795,8 @@ func TestTaildrop(t *testing.T) {
 		sender := user1Clients[0]
 
 		// Create file on sender
-		filename := fmt.Sprintf("file_to_tagged_from_%s", sender.Hostname())
-		command := []string{"touch", fmt.Sprintf("/tmp/%s", filename)}
+		filename := "file_to_tagged_from_" + sender.Hostname()
+		command := []string{"touch", "/tmp/" + filename}
 		_, _, err := sender.Execute(command)
 		require.NoError(t, err, "failed to create taildrop file on %s", sender.Hostname())
 
@@ -733,23 +804,30 @@ func TestTaildrop(t *testing.T) {
 		taggedFQDN, _ := taggedClient.FQDN()
 		sendCommand := []string{
 			"tailscale", "file", "cp",
-			fmt.Sprintf("/tmp/%s", filename),
-			fmt.Sprintf("%s:", taggedFQDN),
+			"/tmp/" + filename,
+			taggedFQDN + ":",
 		}
 
-		t.Logf("Attempting user->tagged file send from %s to %s (should fail)", sender.Hostname(), taggedClient.Hostname())
-		_, stderr, err := sender.Execute(sendCommand)
+		t.Logf(
+			"Attempting user->tagged file send from %s to %s (should fail)",
+			sender.Hostname(),
+			taggedClient.Hostname(),
+		)
 
-		if err != nil {
+		_, stderr, err := sender.Execute(sendCommand)
+		switch {
+		case err != nil:
 			t.Logf("Send to tagged client correctly failed with error: %v", err)
-		} else if strings.Contains(stderr, "not a valid peer") || strings.Contains(stderr, "unknown target") || strings.Contains(stderr, "no matches for") {
+		case strings.Contains(stderr, "not a valid peer"),
+			strings.Contains(stderr, "unknown target"),
+			strings.Contains(stderr, "no matches for"):
 			t.Logf("Send to tagged client correctly rejected: %s", stderr)
-		} else {
+		default:
 			// Verify file was NOT received by tagged client
 			getCommand := []string{"tailscale", "file", "get", "/tmp/"}
-			taggedClient.Execute(getCommand)
+			_, _, _ = taggedClient.Execute(getCommand) // a failed get receives nothing, which the ls below checks
 
-			lsCommand := []string{"ls", fmt.Sprintf("/tmp/%s", filename)}
+			lsCommand := []string{"ls", "/tmp/" + filename}
 			_, _, lsErr := taggedClient.Execute(lsCommand)
 			assert.Error(t, lsErr, "File to tagged client should NOT have been received")
 		}
@@ -780,6 +858,7 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoErrorf(t, err, "failed to create scenario")
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -814,8 +893,9 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	// Wait for nodestore batch processing to complete
 	// [state.NodeStore] batching timeout is 500ms, so we wait up to 1 second
 	var nodes []*clientv1.Node
+
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		err := executeAndUnmarshal(
+		listErr := executeAndUnmarshal(
 			slopscale,
 			[]string{
 				"slopscale",
@@ -826,7 +906,7 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 			},
 			&nodes,
 		)
-		assert.NoError(ct, err)
+		assert.NoError(ct, listErr)
 		assert.Len(ct, nodes, 3, "Should have 3 nodes after hostname updates")
 
 		for _, node := range nodes {
@@ -841,7 +921,7 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 
 	// Rename givenName in nodes
 	for _, node := range nodes {
-		givenName := fmt.Sprintf("%s-givenname", node.Id)
+		givenName := node.Id + "-givenname"
 		_, err = slopscale.Execute(
 			[]string{
 				"slopscale",
@@ -858,15 +938,16 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		// Build a map of expected DNSNames by node ID
 		expectedDNSNames := make(map[string]string)
+
 		for _, node := range nodes {
 			nodeID := node.Id
-			expectedDNSNames[nodeID] = fmt.Sprintf("%s-givenname.slopscale.net.", node.Id)
+			expectedDNSNames[nodeID] = node.Id + "-givenname.slopscale.net."
 		}
 
 		// Verify from each client's perspective
 		for _, client := range allClients {
-			status, err := client.Status()
-			assert.NoError(ct, err)
+			status, statusErr := client.Status()
+			assert.NoError(ct, statusErr)
 
 			// Check self node
 			selfID := string(status.Self.ID)
@@ -888,8 +969,14 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 
 					// HostName should remain as the original client-reported hostname
 					originalHostname := hostnames[peerID]
-					assert.Equal(ct, originalHostname, peer.HostName,
-						"Peer HostName should remain unchanged for peer ID %s as seen by client %s", peerID, client.Hostname())
+					assert.Equal(
+						ct,
+						originalHostname,
+						peer.HostName,
+						"Peer HostName should remain unchanged for peer ID %s as seen by client %s",
+						peerID,
+						client.Hostname(),
+					)
 				}
 			}
 		}
@@ -931,11 +1018,13 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 
 		for _, node := range nodes {
 			hostname := hostnames[node.Id]
-			givenName := fmt.Sprintf("%s-givenname", node.Id)
+
+			givenName := node.Id + "-givenname"
 			if node.Name != hostname+"NEW" || node.GivenName != givenName {
 				return false
 			}
 		}
+
 		return true
 	}, time.Second, 50*time.Millisecond, "hostname updates should be reflected in node list with new suffix")
 }
@@ -949,6 +1038,7 @@ func TestExpireNode(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -964,9 +1054,7 @@ func TestExpireNode(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	// assertClientsState(t, allClients)
-
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -974,106 +1062,182 @@ func TestExpireNode(t *testing.T) {
 
 	for _, client := range allClients {
 		assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-			status, err := client.Status()
-			assert.NoError(ct, err)
+			status, statusErr := client.Status()
+			assert.NoError(ct, statusErr)
 
 			// Assert that we have the original count - self
-			assert.Len(ct, status.Peers(), spec.NodesPerUser-1, "Client %s should see correct number of peers", client.Hostname())
+			assert.Len(
+				ct,
+				status.Peers(),
+				spec.NodesPerUser-1,
+				"Client %s should see correct number of peers",
+				client.Hostname(),
+			)
 		}, integrationutil.StatusReadyTimeout, 1*time.Second)
 	}
 
 	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
-	// TODO(kradalby): This is Slopscale specific and would not play nicely
-	// with other implementations of the [ControlServer] interface
-	result, err := slopscale.Execute([]string{
-		"slopscale", "nodes", "expire", "--identifier", "1", "--output", "json",
-	})
-	require.NoError(t, err)
+	// Exercise expiry and recovery on every supported test client version.
+	for _, target := range allClients {
+		t.Run(target.Hostname(), func(t *testing.T) {
+			var (
+				selfID  string
+				selfKey key.NodePublic
+			)
 
-	var node clientv1.Node
-	err = json.Unmarshal([]byte(result), &node)
-	require.NoError(t, err)
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				status, statusErr := target.Status()
+				if !assert.NoError(c, statusErr) {
+					return
+				}
 
-	var expiredNodeKey key.NodePublic
-	err = expiredNodeKey.UnmarshalText([]byte(node.NodeKey))
-	require.NoError(t, err)
+				selfID, selfKey = string(status.Self.ID), status.Self.PublicKey
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"client must report its own status before expiry")
 
-	t.Logf("Node %s with node_key %s has been expired", node.Name, expiredNodeKey.String())
+			result, err := slopscale.Execute([]string{
+				"slopscale", "nodes", "expire", "--identifier", selfID, "--output", "json",
+			})
+			require.NoError(t, err)
 
-	// Verify that the expired node has been marked in all peers list.
-	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		for _, client := range allClients {
-			status, err := client.Status()
-			assert.NoError(ct, err)
+			var node clientv1.Node
+			require.NoError(t, json.Unmarshal([]byte(result), &node))
 
-			if client.Hostname() != node.Name {
-				// Check if the expired node appears as expired in this client's peer list
-				for key, peer := range status.Peer {
-					if key == expiredNodeKey {
-						assert.True(ct, peer.Expired, "Node should be marked as expired for client %s", client.Hostname())
-						break
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				status, statusErr := target.Status()
+				if !assert.NoError(c, statusErr) {
+					return
+				}
+
+				assert.Equal(c, "NeedsLogin", status.BackendState)
+				assert.Equal(c, selfKey, status.Self.PublicKey)
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"expired client must require authentication")
+
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				nodes, listErr := slopscale.ListNodes()
+				if !assert.NoError(c, listErr) {
+					return
+				}
+
+				for _, current := range nodes {
+					if current.Id == node.Id {
+						assert.False(c, current.Online, "expired node must be offline in the admin API")
+						return
 					}
 				}
-			}
-		}
-	}, integrationutil.ScaledTimeout(3*time.Minute), 10*time.Second)
 
-	now := time.Now()
+				c.Errorf("expired node %s disappeared", node.Id)
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"Slopscale must report the expired node offline")
 
-	// Verify that the expired node has been marked in all peers list.
-	for _, client := range allClients {
-		if client.Hostname() == node.Name {
-			continue
-		}
-
-		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			status, err := client.Status()
-			assert.NoError(c, err)
-
-			// Ensures that the node is present, and that it is expired.
-			peerStatus, ok := status.Peer[expiredNodeKey]
-			assert.True(c, ok, "expired node key should be present in peer list")
-
-			if ok {
-				assert.NotNil(c, peerStatus.Expired)
-				assert.NotNil(c, peerStatus.KeyExpiry)
-
-				if peerStatus.KeyExpiry != nil {
-					assert.Truef(
-						c,
-						peerStatus.KeyExpiry.Before(now),
-						"node %q should have a key expire before %s, was %s",
-						peerStatus.HostName,
-						now.String(),
-						peerStatus.KeyExpiry,
-					)
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				info, debugErr := slopscale.DebugBatcher()
+				if !assert.NoError(c, debugErr) {
+					return
 				}
 
-				assert.Truef(
-					c,
-					peerStatus.Expired,
-					"node %q should be expired, expired is %v",
-					peerStatus.HostName,
-					peerStatus.Expired,
-				)
-
-				_, stderr, _ := client.Execute([]string{"tailscale", "ping", node.Name})
-				if !strings.Contains(stderr, "node key has expired") {
-					c.Errorf(
-						"expected to be unable to ping expired host %q from %q",
-						node.Name,
-						client.Hostname(),
-					)
+				connection, found := info.ConnectedNodes[node.Id]
+				if assert.True(c, found) {
+					assert.True(c, connection.Connected)
+					assert.Positive(c, connection.ActiveConnections)
 				}
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"expired client must retain its control connection")
+
+			for _, peer := range allClients {
+				if peer.Hostname() == target.Hostname() {
+					continue
+				}
+
+				require.EventuallyWithT(t, func(c *assert.CollectT) {
+					status, statusErr := peer.Status()
+					if !assert.NoError(c, statusErr) {
+						return
+					}
+
+					expired, found := status.Peer[selfKey]
+					if !assert.True(c, found, "expired node must remain visible") {
+						return
+					}
+
+					assert.True(c, expired.Expired)
+					assert.False(c, expired.Online)
+
+					if assert.NotNil(c, expired.KeyExpiry) {
+						assert.True(c, expired.KeyExpiry.Before(time.Now()))
+					}
+				}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+					"peer must see the expired node offline")
+
+				require.EventuallyWithT(t, func(c *assert.CollectT) {
+					_, stderr, _ := peer.Execute([]string{"tailscale", "ping", node.Name})
+					assert.Contains(c, stderr, "node key has expired")
+				}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll, "expired node must not be reachable")
 			}
-		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for expired node status to propagate")
+
+			// No tailscale up/login: restoring expiry must recover the client
+			// using its existing node key and control connection.
+			_, err = slopscale.Execute([]string{
+				"slopscale", "nodes", "expire", "--identifier", node.Id, "--disable",
+			})
+			require.NoError(t, err)
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				status, statusErr := target.Status()
+				if !assert.NoError(c, statusErr) {
+					return
+				}
+
+				assert.Equal(c, "Running", status.BackendState)
+				assert.Equal(c, selfKey, status.Self.PublicKey)
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"restored key must recover the client without login")
+
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				nodes, listErr := slopscale.ListNodes()
+				if !assert.NoError(c, listErr) {
+					return
+				}
+
+				for _, current := range nodes {
+					if current.Id == node.Id {
+						assert.True(c, current.Online)
+						return
+					}
+				}
+
+				c.Errorf("restored node %s disappeared", node.Id)
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"restored node must be online in the admin API")
+
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				for _, peer := range allClients {
+					if peer.Hostname() == target.Hostname() {
+						continue
+					}
+
+					status, statusErr := peer.Status()
+					if !assert.NoError(c, statusErr) {
+						continue
+					}
+
+					restored, found := status.Peer[selfKey]
+					if assert.True(c, found) {
+						assert.False(c, restored.Expired)
+						assert.True(c, restored.Online)
+					}
+				}
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll, "peers must see the restored node online")
+		})
 	}
+
+	assertPingAll(t, allClients, allAddrs)
 }
 
 // TestSetNodeExpiryInFuture tests setting arbitrary expiration date
-// New expiration date should be stored in the db and propagated to all peers
+// New expiration date should be stored in the db and propagated to all peers.
 func TestSetNodeExpiryInFuture(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -1083,6 +1247,7 @@ func TestSetNodeExpiryInFuture(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1111,6 +1276,7 @@ func TestSetNodeExpiryInFuture(t *testing.T) {
 	require.NoError(t, err)
 
 	var node clientv1.Node
+
 	err = json.Unmarshal([]byte(result), &node)
 	require.NoError(t, err)
 
@@ -1118,6 +1284,7 @@ func TestSetNodeExpiryInFuture(t *testing.T) {
 	require.WithinDuration(t, targetExpiry, *node.Expiry, 2*time.Second)
 
 	var nodeKey key.NodePublic
+
 	err = nodeKey.UnmarshalText([]byte(node.NodeKey))
 	require.NoError(t, err)
 
@@ -1181,6 +1348,7 @@ func TestDisableNodeExpiry(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1208,6 +1376,7 @@ func TestDisableNodeExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	var node clientv1.Node
+
 	err = json.Unmarshal([]byte(result), &node)
 	require.NoError(t, err)
 	require.NotNil(t, node.Expiry, "node should have an expiry set")
@@ -1224,6 +1393,7 @@ func TestDisableNodeExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	var nodeDisabled clientv1.Node
+
 	err = json.Unmarshal([]byte(result), &nodeDisabled)
 	require.NoError(t, err)
 
@@ -1234,6 +1404,7 @@ func TestDisableNodeExpiry(t *testing.T) {
 	}
 
 	var nodeKey key.NodePublic
+
 	err = nodeKey.UnmarshalText([]byte(nodeDisabled.NodeKey))
 	require.NoError(t, err)
 
@@ -1276,6 +1447,7 @@ func TestNodeOnlineStatus(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1291,9 +1463,7 @@ func TestNodeOnlineStatus(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	// assertClientsState(t, allClients)
-
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -1301,8 +1471,8 @@ func TestNodeOnlineStatus(t *testing.T) {
 
 	for _, client := range allClients {
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			status, err := client.Status()
-			assert.NoError(c, err)
+			status, statusErr := client.Status()
+			assert.NoError(c, statusErr)
 
 			// Assert that we have the original count - self
 			assert.Len(c, status.Peers(), len(MustTestVersions)-1)
@@ -1335,6 +1505,7 @@ func TestNodeOnlineStatus(t *testing.T) {
 		}
 
 		var nodes []*clientv1.Node
+
 		assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 			result, err := slopscale.Execute([]string{
 				"slopscale", "nodes", "list", "--output", "json",
@@ -1362,6 +1533,7 @@ func TestNodeOnlineStatus(t *testing.T) {
 			assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 				status, err := client.Status()
 				assert.NoError(ct, err)
+
 				if status == nil {
 					assert.Fail(ct, "status is nil")
 					return
@@ -1407,6 +1579,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1425,9 +1598,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	// assertClientsState(t, allClients)
-
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -1440,11 +1611,20 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 	expectedNodes := make([]types.NodeID, 0, len(allClients))
 	for _, client := range allClients {
 		status := client.MustStatus()
-		nodeID, err := strconv.ParseUint(string(status.Self.ID), 10, 64)
-		require.NoError(t, err)
+		nodeID, parseErr := strconv.ParseUint(string(status.Self.ID), 10, 64)
+		require.NoError(t, parseErr)
+
 		expectedNodes = append(expectedNodes, types.NodeID(nodeID))
 	}
-	requireAllClientsOnline(t, slopscale, expectedNodes, true, "all clients should be connected to batcher", integrationutil.ScaledTimeout(30*time.Second))
+
+	requireAllClientsOnline(
+		t,
+		slopscale,
+		expectedNodes,
+		true,
+		"all clients should be connected to batcher",
+		integrationutil.ScaledTimeout(30*time.Second),
+	)
 
 	assertPingAll(t, allClients, allAddrs)
 
@@ -1457,43 +1637,70 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 
 		for _, client := range allClients {
 			c := client
+
 			wg.Go(func() error {
 				t.Logf("taking down %q", c.Hostname())
 				return c.Down()
 			})
 		}
 
-		if err := wg.Wait(); err != nil {
+		err = wg.Wait()
+		if err != nil {
 			t.Fatalf("failed to take down all nodes: %s", err)
 		}
+
 		t.Logf("All nodes taken down at %s", time.Now().Format(TimestampFormat))
 
 		// After taking down all nodes, verify all systems show nodes offline
-		requireAllClientsOnline(t, slopscale, expectedNodes, false, fmt.Sprintf("Run %d: all nodes should be offline after Down()", run+1), integrationutil.ScaledTimeout(120*time.Second))
+		requireAllClientsOnline(
+			t,
+			slopscale,
+			expectedNodes,
+			false,
+			fmt.Sprintf("Run %d: all nodes should be offline after Down()", run+1),
+			integrationutil.ScaledTimeout(120*time.Second),
+		)
 
 		for _, client := range allClients {
 			c := client
+
 			wg.Go(func() error {
 				t.Logf("bringing up %q", c.Hostname())
 				return c.Up()
 			})
 		}
 
-		if err := wg.Wait(); err != nil {
+		err = wg.Wait()
+		if err != nil {
 			t.Fatalf("failed to bring up all nodes: %s", err)
 		}
+
 		t.Logf("All nodes brought up at %s", time.Now().Format(TimestampFormat))
 
 		// After bringing up all nodes, verify batcher shows all reconnected
-		requireAllClientsOnline(t, slopscale, expectedNodes, true, fmt.Sprintf("Run %d: all nodes should be reconnected after Up()", run+1), integrationutil.ScaledTimeout(120*time.Second))
+		requireAllClientsOnline(
+			t,
+			slopscale,
+			expectedNodes,
+			true,
+			fmt.Sprintf("Run %d: all nodes should be reconnected after Up()", run+1),
+			integrationutil.ScaledTimeout(120*time.Second),
+		)
 
 		// Wait for sync and successful pings after nodes come back up
 		err = scenario.WaitForTailscaleSync()
-		assert.NoError(t, err)
+		requireNoErrSync(t, err)
 
 		t.Logf("All nodes synced up %s", time.Now().Format(TimestampFormat))
 
-		requireAllClientsOnline(t, slopscale, expectedNodes, true, fmt.Sprintf("Run %d: all systems should show nodes online after reconnection", run+1), integrationutil.ScaledTimeout(60*time.Second))
+		requireAllClientsOnline(
+			t,
+			slopscale,
+			expectedNodes,
+			true,
+			fmt.Sprintf("Run %d: all systems should show nodes online after reconnection", run+1),
+			integrationutil.ScaledTimeout(60*time.Second),
+		)
 
 		assertPingAll(t, allClients, allAddrs)
 
@@ -1546,29 +1753,27 @@ func mapResponseCountsByType(slopscale ControlServer) (map[string]float64, error
 			continue
 		}
 
-		_, after, ok := strings.Cut(line, labelPrefix)
+		_, rest, ok := strings.Cut(line, labelPrefix)
 		if !ok {
 			continue
 		}
 
-		rest := after
-
-		before0, _, ok0 := strings.Cut(rest, `"`)
-		if !ok0 {
+		label, _, ok := strings.Cut(rest, `"`)
+		if !ok {
 			continue
 		}
 
-		valueStart := strings.LastIndex(line, " ")
-		if valueStart < 0 {
+		_, raw, ok := strings.CutLast(line, " ")
+		if !ok {
 			continue
 		}
 
-		value, err := strconv.ParseFloat(strings.TrimSpace(line[valueStart+1:]), 64)
-		if err != nil {
-			return nil, fmt.Errorf("parsing metric line %q: %w", line, err)
+		value, parseErr := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parsing metric line %q: %w", line, parseErr)
 		}
 
-		counts[before0] = value
+		counts[label] = value
 	}
 
 	return counts, nil
@@ -1592,7 +1797,7 @@ func quiescedMapResponseCounts(
 		current, err := mapResponseCountsByType(slopscale)
 		assert.NoError(ct, err)
 		assert.NotEmpty(ct, current, "metrics should carry the map response counter")
-		assert.Equal(ct, previous, current[peersMapResponseType],
+		assert.InDelta(ct, previous, current[peersMapResponseType], 0,
 			"whole-peer fan-out is still moving")
 
 		previous = current[peersMapResponseType]
@@ -1621,6 +1826,7 @@ func TestHostinfoChangeReachesPeersOnlyWhenPeerVisible(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoErrorf(t, err, "failed to create scenario")
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1658,8 +1864,8 @@ func TestHostinfoChangeReachesPeersOnlyWhenPeerVisible(t *testing.T) {
 	// the NodeStore is the sync point that proves the map request landed
 	// whatever the server chose to broadcast.
 	require.EventuallyWithT(t, func(ct *assert.CollectT) {
-		store, err := slopscale.DebugNodeStore()
-		assert.NoError(ct, err)
+		store, storeErr := slopscale.DebugNodeStore()
+		assert.NoError(ct, storeErr)
 
 		node, ok := store[types.NodeID(subjectNodeID)]
 		if !assert.True(ct, ok, "node %d should be in the NodeStore", subjectNodeID) {
@@ -1682,9 +1888,10 @@ func TestHostinfoChangeReachesPeersOnlyWhenPeerVisible(t *testing.T) {
 
 	// assert, not require: the peer-visible half below is the other side of
 	// the same contract and its evidence is worth having in the same run.
-	assert.Equal(t,
+	assert.InDelta(t,
 		baseline[peersMapResponseType],
 		afterShields[peersMapResponseType],
+		0,
 		"shields-up touches no Hostinfo field a peer reads, so no peer should be handed the whole node again")
 
 	// Hostname is rendered by every peer, so this one has to travel.
@@ -1742,6 +1949,7 @@ func TestNodeDeletionEndsLongPoll(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1784,7 +1992,8 @@ func TestNodeDeletionEndsLongPoll(t *testing.T) {
 		}
 
 		nodeIDsByName = ids
-	}, integrationutil.StatusReadyTimeout, integrationutil.SlowPoll, "node list should name every client before deletion")
+	}, integrationutil.StatusReadyTimeout, integrationutil.SlowPoll,
+		"node list should name every client before deletion")
 	require.Len(t, nodeIDsByName, len(allClients))
 
 	for i, deleted := range allClients {
@@ -1818,6 +2027,7 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 	}
 
 	scenario, err := NewScenario(spec)
+
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
@@ -1836,7 +2046,7 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	allAddrs := lo.Map(allIps, func(x netip.Addr, index int) string {
+	allAddrs := lo.Map(allIps, func(x netip.Addr, _ int) string {
 		return x.String()
 	})
 
@@ -1847,6 +2057,7 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 
 	// Test list all nodes after added otherUser
 	var nodeList []clientv1.Node
+
 	err = executeAndUnmarshal(
 		slopscale,
 		[]string{
@@ -1881,6 +2092,7 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 
 	// Ensure that the node has been deleted, this did not occur due to a panic.
 	var nodeListAfter []clientv1.Node
+
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		err = executeAndUnmarshal(
 			slopscale,

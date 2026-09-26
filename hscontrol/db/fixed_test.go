@@ -92,12 +92,6 @@ func fixedCases(t *testing.T) []fixedCase {
 			jet:   selectAPIKey(table.APIKeys.Prefix.EQ(jet.String("abc"))),
 		},
 		{
-			name:  "pre-auth key by key",
-			fixed: preAuthKeyByKey,
-			args:  []any{"k", limitOne},
-			jet:   selectPreAuthKeys().WHERE(table.PreAuthKeys.Key.EQ(jet.String("k"))).LIMIT(1),
-		},
-		{
 			name:  "pre-auth key by prefix",
 			fixed: preAuthKeyByPrefix,
 			args:  []any{"p", limitOne},

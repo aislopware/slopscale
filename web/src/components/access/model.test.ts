@@ -204,13 +204,14 @@ describe(portsError, () => {
   });
 });
 
+function pickerValues(role: GroupPickerRole): string[] {
+  return groupItems(groups, role).map((item) => item.value);
+}
+
 describe(groupItems, () => {
   it("offers Own machines only as a destination and no builtin group for membership", () => {
-    const values = (role: GroupPickerRole): string[] =>
-      groupItems(groups, role).map((item) => item.value);
-
-    expect(values("destination")).toStrictEqual(["1", "5", "2", "3", "4"]);
-    expect(values("members")).toStrictEqual(["1", "2", "3", "4"]);
-    expect(values("membership")).toStrictEqual(["2", "3", "4"]);
+    expect(pickerValues("destination")).toStrictEqual(["1", "5", "2", "3", "4"]);
+    expect(pickerValues("members")).toStrictEqual(["1", "2", "3", "4"]);
+    expect(pickerValues("membership")).toStrictEqual(["2", "3", "4"]);
   });
 });

@@ -58,6 +58,7 @@ func TestAuthenticationFlows(t *testing.T) {
 		machineKey  func() key.MachinePublic
 		wantAuth    bool
 		wantError   bool
+		wantErrMsg  string
 		wantAuthURL bool
 		wantExpired bool
 		validate    func(*testing.T, *tailcfg.RegisterResponse, *Slopscale)
@@ -1164,6 +1165,143 @@ func TestAuthenticationFlows(t *testing.T) {
 			},
 			machineKey: machineKey1.Public,
 			wantError:  true,
+			wantErrMsg: "[tag:extra] are not permitted",
+		},
+
+		// TEST: Existing tagged node re-registering with foreign RequestTags is rejected
+		// WHAT: Same machine and node key re-run `tailscale up --authkey` with a tag
+		// the key does not carry, hitting the skip-validation re-registration path
+		// INPUT: Node registered with tagged PreAuthKey ([tag:authorized]), then the
+		// same key with RequestTags [tag:client-wants-this]
+		// EXPECTED: Re-registration fails
+		// WHY: New and existing nodes are held to the same advertise-tags rule
+		{
+			name: "existing_tagged_node_reregister_rejects_foreign_request_tags",
+			setupFunc: func(t *testing.T, app *Slopscale) (string, error) {
+				t.Helper()
+
+				user := app.state.CreateUserForTest("tagged-pak-rereg-user")
+
+				pak, err := app.state.CreatePreAuthKey(user.TypedID(), true, false, nil, []string{"tag:authorized"})
+				if err != nil {
+					return "", err
+				}
+
+				_, err = app.handleRegisterWithAuthKey(tailcfg.RegisterRequest{
+					Auth:     &tailcfg.RegisterResponseAuth{AuthKey: pak.Key},
+					NodeKey:  nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{Hostname: "tagged-pak-rereg-node"},
+					Expiry:   time.Now().Add(24 * time.Hour),
+				}, machineKey1.Public())
+				if err != nil {
+					return "", err
+				}
+
+				require.EventuallyWithT(t, func(c *assert.CollectT) {
+					_, found := app.state.GetNodeByNodeKey(nodeKey1.Public())
+					assert.True(c, found)
+				}, 1*time.Second, 50*time.Millisecond)
+
+				return pak.Key, nil
+			},
+			request: func(authKey string) tailcfg.RegisterRequest {
+				return tailcfg.RegisterRequest{
+					Auth: &tailcfg.RegisterResponseAuth{
+						AuthKey: authKey,
+					},
+					NodeKey: nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{
+						Hostname:    "tagged-pak-rereg-node",
+						RequestTags: []string{"tag:client-wants-this"},
+					},
+					Expiry: time.Now().Add(24 * time.Hour),
+				}
+			},
+			machineKey: machineKey1.Public,
+			wantError:  true,
+			wantErrMsg: "[tag:client-wants-this] are not permitted",
+		},
+
+		// TEST: Existing tagged node re-registers with a spent single-use key advertising a subset
+		// WHAT: Container restart re-running `tailscale up --authkey` with the key's
+		// own tag after an admin retagged the node
+		// INPUT: Single-use PreAuthKey ([tag:authorized, tag:other]) registers, admin
+		// sets tags [tag:admin], same key and node key re-register with RequestTags [tag:authorized]
+		// EXPECTED: Re-registration succeeds; admin's tags preserved
+		// WHY: The subset check must not break the same-key restart path, and the
+		// same key must not undo an admin override
+		{
+			name: "existing_tagged_node_reregister_spent_key_subset_tags_keeps_admin_tags",
+			setupFunc: func(t *testing.T, app *Slopscale) (string, error) {
+				t.Helper()
+
+				_, err := app.state.SetPolicy(
+					[]byte(`{"tagOwners":{"tag:admin":[],"tag:authorized":[],"tag:other":[]}}`),
+				)
+				require.NoError(t, err)
+
+				user := app.state.CreateUserForTest("tagged-pak-spent-user")
+
+				pak, err := app.state.CreatePreAuthKey(
+					user.TypedID(), false, false, nil, []string{"tag:authorized", "tag:other"},
+				)
+				if err != nil {
+					return "", err
+				}
+
+				_, err = app.handleRegisterWithAuthKey(tailcfg.RegisterRequest{
+					Auth:    &tailcfg.RegisterResponseAuth{AuthKey: pak.Key},
+					NodeKey: nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{
+						Hostname:    "tagged-pak-spent-node",
+						RequestTags: []string{"tag:authorized"},
+					},
+					Expiry: time.Now().Add(24 * time.Hour),
+				}, machineKey1.Public())
+				if err != nil {
+					return "", err
+				}
+
+				var node types.NodeView
+
+				require.EventuallyWithT(t, func(c *assert.CollectT) {
+					var found bool
+
+					node, found = app.state.GetNodeByNodeKey(nodeKey1.Public())
+					assert.True(c, found)
+				}, 1*time.Second, 50*time.Millisecond)
+
+				_, _, err = app.state.SetNodeTags(node.ID(), []string{"tag:admin"})
+				require.NoError(t, err)
+
+				spent, err := app.state.GetPreAuthKey(pak.Key)
+				require.NoError(t, err)
+				require.True(t, spent.Used, "precondition: single-use key must be spent")
+
+				return pak.Key, nil
+			},
+			request: func(authKey string) tailcfg.RegisterRequest {
+				return tailcfg.RegisterRequest{
+					Auth: &tailcfg.RegisterResponseAuth{
+						AuthKey: authKey,
+					},
+					NodeKey: nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{
+						Hostname:    "tagged-pak-spent-node",
+						RequestTags: []string{"tag:authorized"},
+					},
+					Expiry: time.Now().Add(24 * time.Hour),
+				}
+			},
+			machineKey: machineKey1.Public,
+			wantAuth:   true,
+			validate: func(t *testing.T, _ *tailcfg.RegisterResponse, app *Slopscale) {
+				t.Helper()
+
+				node, found := app.state.GetNodeByNodeKey(nodeKey1.Public())
+				require.True(t, found)
+				assert.Equal(t, []string{"tag:admin"}, node.Tags().AsSlice())
+			},
 		},
 
 		// === RE-AUTHENTICATION SCENARIOS ===
@@ -2700,7 +2838,12 @@ func TestAuthenticationFlows(t *testing.T) {
 
 			// Validate error expectations
 			if tt.wantError {
-				assert.Error(t, err, "expected error but got none")
+				require.Error(t, err, "expected error but got none")
+
+				if tt.wantErrMsg != "" {
+					require.ErrorContains(t, err, tt.wantErrMsg)
+				}
+
 				return
 			}
 
@@ -2741,6 +2884,7 @@ func runInteractiveWorkflowTest(t *testing.T, tt struct {
 	machineKey                func() key.MachinePublic
 	wantAuth                  bool
 	wantError                 bool
+	wantErrMsg                string
 	wantAuthURL               bool
 	wantExpired               bool
 	validate                  func(*testing.T, *tailcfg.RegisterResponse, *Slopscale)

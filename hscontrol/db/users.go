@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -227,7 +228,15 @@ func DestroyUser(q Querier, uid types.UserID) error {
 	}
 
 	if len(nodes) > 0 {
-		return ErrUserStillHasNodes
+		blocking := make([]string, len(nodes))
+		for i, node := range nodes {
+			blocking[i] = fmt.Sprintf("%d (%s)", node.ID.Uint64(), node.Hostname)
+		}
+
+		return fmt.Errorf(
+			"%w: %d node(s) must be deleted first: %s",
+			ErrUserStillHasNodes, len(nodes), strings.Join(blocking, ", "),
+		)
 	}
 
 	keys, err := ListPreAuthKeysByUser(q, uid)

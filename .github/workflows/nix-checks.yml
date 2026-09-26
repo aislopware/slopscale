@@ -33,6 +33,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  # hestia lists the cache entries to skip packs GitHub has evicted.
+  actions: read
   contents: read
 
 jobs:

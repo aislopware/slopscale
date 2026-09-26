@@ -63,7 +63,7 @@ func registerKeyUpdate(api huma.API, b Backend) {
 }
 
 func handleSetKey(ctx context.Context, b Backend, in *setKeyByIDInput) (*keyOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}

@@ -53,7 +53,7 @@ type (
 		UserID string `doc:"User id (the decimal user id)." path:"id"`
 	}
 	listUsersInput struct {
-		Tailnet string `doc:"Tailnet; must be \"-\" (the single Slopscale tailnet)."                  path:"tailnet"`
+		Tailnet string `doc:"Tailnet: \"-\" or the tailnet ID."                                       path:"tailnet"`
 		Type    string `doc:"Filter by user type; Slopscale users are all \"member\"."                query:"type"`
 		Role    string `doc:"Filter by role: owner, admin, network-admin, it-admin, auditor, member." query:"role"`
 	}
@@ -95,7 +95,7 @@ func registerUsers(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.UsersRead), func(_ context.Context, in *listUsersInput) (*listUsersOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

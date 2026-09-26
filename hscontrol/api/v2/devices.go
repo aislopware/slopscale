@@ -101,7 +101,7 @@ type (
 		Fields   string `doc:"Set to \"all\" for route fields." query:"fields"`
 	}
 	listDevicesInput struct {
-		Tailnet string `doc:"Tailnet; must be \"-\"." path:"tailnet"`
+		Tailnet string `doc:"Tailnet: \"-\" or the tailnet ID." path:"tailnet"`
 		Fields  string `query:"fields"`
 	}
 	setAuthorizedInput struct {
@@ -275,7 +275,7 @@ func handleGetDevice(b Backend, in *deviceByIDInput) (*deviceOutput, error) {
 }
 
 func handleListDevices(b Backend, in *listDevicesInput) (*listDevicesOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}

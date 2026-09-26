@@ -4143,6 +4143,7 @@ export interface components {
             serverUrl: string;
             /** Format: date-time */
             startedAt: string;
+            tailnetId: string;
             tls: string;
             version: string;
         };

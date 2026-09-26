@@ -284,7 +284,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
-      - gen
+      - ^gen/
     rules:
       # Size, duplication and magic-number limits are for production code.
       # Table tests and integration scenarios are long, repetitive and
@@ -333,4 +333,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
-      - gen
+      - ^gen/

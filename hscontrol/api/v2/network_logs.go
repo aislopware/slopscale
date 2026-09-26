@@ -82,7 +82,7 @@ func registerNetworkLogs(api huma.API, b Backend) {
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.LogsNetworkRead), func(_ context.Context, in *networkLogsInput) (*networkLogsOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

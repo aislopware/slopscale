@@ -729,7 +729,7 @@ func onlineAdvertisers(nodes map[types.NodeID]types.Node) map[netip.Prefix][]typ
 	var advertisers map[netip.Prefix][]types.NodeID
 
 	for id, n := range nodes {
-		if n.IsOnline == nil || !*n.IsOnline {
+		if !n.Online() {
 			continue
 		}
 
@@ -1021,6 +1021,44 @@ func (s *NodeStore) ListPeers(id types.NodeID) views.Slice[types.NodeView] {
 	defer nodeStoreListPeersMetrics.observe(time.Now())
 
 	return views.SliceOf(s.data.Load().peersOf(id))
+}
+
+// ListPeersAmong returns the peers of id that are in ids, in peer map
+// order.
+func (s *NodeStore) ListPeersAmong(id types.NodeID, ids []types.NodeID) views.Slice[types.NodeView] {
+	defer nodeStoreListPeersMetrics.observe(time.Now())
+
+	return views.SliceOf(s.data.Load().peersAmong(id, ids))
+}
+
+// peersAmong is [Snapshot.peersOf] narrowed to ids, resolving only the
+// peers it keeps. The wanted positions are searched sorted rather than
+// through a map: a patch fan-out asks this for every node with one or two
+// ids, and a map lookup per peer cost more than the rest of the call.
+func (snap *Snapshot) peersAmong(id types.NodeID, ids []types.NodeID) []types.NodeView {
+	pos, ok := snap.posByID[id]
+	if !ok || int(pos) >= len(snap.peerPositions) {
+		return nil
+	}
+
+	wanted := make([]int32, 0, len(ids))
+	for _, want := range ids {
+		if p, ok := snap.posByID[want]; ok {
+			wanted = append(wanted, p)
+		}
+	}
+
+	slices.Sort(wanted)
+
+	var out []types.NodeView
+
+	for _, p := range snap.peerPositions[pos] {
+		if _, found := slices.BinarySearch(wanted, p); found {
+			out = append(out, snap.allNodes[p])
+		}
+	}
+
+	return out
 }
 
 // peersOf resolves a node's peers through allNodes, so they point at the

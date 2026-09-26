@@ -1,0 +1,137 @@
+name: slopscale-up
+description: >-
+  Build slopscale with nix, start it over self-signed TLS with embedded DERP,
+  and join one regular node via a pre-auth key (so the tailnet has a node
+  already in the network and a ping target). Outputs the URL and bootstrap
+  credentials.
+
+# TLS is not optional: the embedded DERP server requires it, and DERP is what
+# gives the nodes a data plane to ping over. The self-signed cert is trusted on
+# the runner so the tailscale client and OAuth exchange accept it.
+
+outputs:
+  url:
+    description: slopscale server URL (https)
+    value: ${{ steps.bootstrap.outputs.url }}
+  preauth:
+    description: reusable pre-auth key for user 'ci'
+    value: ${{ steps.bootstrap.outputs.preauth }}
+  pre_ip:
+    description: tailnet IPv4 of the pre-joined regular node
+    value: ${{ steps.prenode.outputs.pre_ip }}
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup
+
+    - name: Build slopscale
+      shell: bash
+      run: nix build --fallback
+
+    - name: Start slopscale (TLS + embedded DERP)
+      id: bootstrap
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p /tmp/ss
+        echo "127.0.0.1 slopscale" | sudo tee -a /etc/hosts
+
+        # Self-signed cert for the control server, trusted system-wide so the
+        # tailscale client and the OAuth token exchange accept it.
+        openssl req -x509 -newkey rsa:4096 -sha256 -days 1 -nodes \
+          -keyout /tmp/ss/tls.key -out /tmp/ss/tls.crt \
+          -subj '/CN=slopscale' -addext 'subjectAltName=DNS:slopscale'
+        sudo cp /tmp/ss/tls.crt /usr/local/share/ca-certificates/slopscale.crt
+        sudo update-ca-certificates
+
+        URL="https://slopscale:8443"
+
+        cat > config.yaml <<EOF
+        server_url: ${URL}
+        listen_addr: 0.0.0.0:8443
+        metrics_listen_addr: 127.0.0.1:9090
+        unix_socket: /tmp/ss/slopscale.sock
+        unix_socket_permission: "0770"
+        noise:
+          private_key_path: /tmp/ss/noise.key
+        prefixes:
+          v4: 100.64.0.0/10
+          v6: fd7a:115c:a1e0::/48
+          allocation: sequential
+        derp:
+          server:
+            enabled: true
+            region_id: 999
+            region_code: slopscale
+            region_name: Slopscale Embedded DERP
+            stun_listen_addr: 0.0.0.0:3478
+            private_key_path: /tmp/ss/derp.key
+            automatically_add_embedded_derp_region: true
+          urls: []
+          auto_update_enabled: false
+          update_frequency: 1m
+        database:
+          type: sqlite
+          sqlite:
+            path: /tmp/ss/db.sqlite
+        dns:
+          base_domain: slopscale.net
+          magic_dns: true
+          nameservers:
+            global:
+              - 1.1.1.1
+        tls_cert_path: /tmp/ss/tls.crt
+        tls_key_path: /tmp/ss/tls.key
+        policy:
+          mode: file
+          path: /tmp/ss/policy.hujson
+        EOF
+
+        cat > /tmp/ss/policy.hujson <<'EOF'
+        {
+          "tagOwners": { "tag:ci": [] },
+          "acls": [ { "action": "accept", "src": ["*"], "dst": ["*:*"] } ]
+        }
+        EOF
+
+        ./result/bin/slopscale serve > /tmp/ss/serve.log 2>&1 &
+
+        # Wait for readiness via curl's own retry (no fixed sleeps).
+        curl -fsS --retry 60 --retry-delay 1 --retry-all-errors --cacert /tmp/ss/tls.crt \
+          "${URL}/health" || { cat /tmp/ss/serve.log; exit 1; }
+
+        # Not UID: that is a readonly bash builtin.
+        USERID=$(./result/bin/slopscale users create ci -o json | jq -r .id)
+        PREAUTH=$(./result/bin/slopscale preauthkeys create --user "$USERID" --reusable)
+
+        echo "::add-mask::$PREAUTH"
+        {
+          echo "url=${URL}"
+          echo "preauth=${PREAUTH}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Join a regular node (already in the network)
+      id: prenode
+      shell: bash
+      env:
+        URL: ${{ steps.bootstrap.outputs.url }}
+        PREAUTH: ${{ steps.bootstrap.outputs.preauth }}
+      run: |
+        set -euo pipefail
+        # Pinned via flake.lock and kept off PATH, so the action's own tailscale
+        # stays the one `tailscale` resolves to in later steps.
+        nix build --inputs-from . nixpkgs#tailscale -o /tmp/pre-ts
+
+        # Userspace networking: no tun/root needed. Distinct port so it does not
+        # collide with the action's own tailscaled later in the join jobs.
+        /tmp/pre-ts/bin/tailscaled --tun=userspace-networking --socket=/tmp/pre.sock \
+          --state=/tmp/pre.state --port=41642 > /tmp/pre-tailscaled.log 2>&1 &
+
+        timeout 30 bash -c 'until [ -S /tmp/pre.sock ]; do sleep 0.2; done'
+        timeout 120 /tmp/pre-ts/bin/tailscale --socket=/tmp/pre.sock up \
+          --authkey="$PREAUTH" --login-server="$URL" --hostname=pre-node
+
+        PRE_IP=$(/tmp/pre-ts/bin/tailscale --socket=/tmp/pre.sock ip -4)
+        echo "pre-joined node IP: $PRE_IP"
+        echo "pre_ip=${PRE_IP}" >> "$GITHUB_OUTPUT"

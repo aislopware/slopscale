@@ -118,17 +118,18 @@ describe(clientUpdatePlanSummary, () => {
   });
 });
 
+function matching(query: string): string[] {
+  return everything
+    .filter((candidate) => nodeName(candidate).includes(query))
+    .map((candidate) => candidate.id);
+}
+
 /**
  * The search box narrows the table without narrowing the collection behind it, so what a bulk
  * action reaches has to come from the rows the table would show. These replay that: the ids are the
  * table's filtered model, and the selection is what the page holds between renders.
  */
 describe("a selection under a search", () => {
-  const matching = (query: string): string[] =>
-    everything
-      .filter((candidate) => nodeName(candidate).includes(query))
-      .map((candidate) => candidate.id);
-
   it("selects every match and nothing behind the search", () => {
     const ids = matching("machine-1");
     const chosen = new Set(ids);

@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -10,7 +12,6 @@ import (
 	"github.com/aislopware/slopscale/gen/jet/table"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"golang.org/x/crypto/bcrypt"
 	"tailscale.com/util/rands"
 	"tailscale.com/util/set"
 )
@@ -99,16 +100,11 @@ func queryPreAuthKey(q Querier, where jet.BoolExpression) (*types.PreAuthKey, er
 	return record.preAuthKey()
 }
 
-// Pre-auth key lookups on the registration path, rendered once; see
-// [fixedSQL].
-var (
-	preAuthKeyByKey = newFixedSQL(func() statement {
-		return selectPreAuthKeys().WHERE(table.PreAuthKeys.Key.EQ(jet.String(""))).LIMIT(1)
-	})
-	preAuthKeyByPrefix = newFixedSQL(func() statement {
-		return selectPreAuthKeys().WHERE(table.PreAuthKeys.Prefix.EQ(jet.String(""))).LIMIT(1)
-	})
-)
+// preAuthKeyByPrefix is the pre-auth key lookup on the registration path,
+// rendered once; see [fixedSQL].
+var preAuthKeyByPrefix = newFixedSQL(func() statement {
+	return selectPreAuthKeys().WHERE(table.PreAuthKeys.Prefix.EQ(jet.String(""))).LIMIT(1)
+})
 
 func fixedPreAuthKey(q Querier, stmt *fixedSQL, args ...any) (*types.PreAuthKey, error) {
 	var record preAuthKeyRecord
@@ -153,6 +149,8 @@ func insertPreAuthKey(q Querier, key *types.PreAuthKey) error {
 func updatePreAuthKeyColumn(q Querier, where jet.BoolExpression, column jet.Column, value any) (int64, error) {
 	return q.executor().exec(table.PreAuthKeys.UPDATE(column).SET(value).WHERE(where))
 }
+
+var preAuthKeyHash = hashColumn{table.PreAuthKeys, table.PreAuthKeys.ID, table.PreAuthKeys.Hash}
 
 const (
 	authKeyPrefix       = "hskey-auth-"
@@ -221,11 +219,6 @@ func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreA
 
 	keyStr := authKeyPrefix + prefix + "-" + toBeHashed
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), bcryptCost)
-	if err != nil {
-		return nil, fmt.Errorf("hashing pre-auth key: %w", err)
-	}
-
 	key := types.PreAuthKey{
 		UserID:        userID, // nil for system-created keys, or "created by" for tagged keys
 		User:          user,   // nil for system-created keys
@@ -236,8 +229,8 @@ func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreA
 		Expiration:    expiration,
 		Tags:          aclTags, // empty for user-owned keys
 		Groups:        spec.Groups,
-		Prefix:        prefix, // Store prefix
-		Hash:          hash,   // Store hash
+		Prefix:        prefix,
+		Hash:          hashSecret(toBeHashed),
 	}
 
 	err = insertPreAuthKey(q, &key)
@@ -297,42 +290,46 @@ func findAuthKey(q Querier, keyStr string) (*types.PreAuthKey, error) {
 		return nil, ErrPreAuthKeyFailedToParse
 	}
 
+	// Unprefixed: a key from before headscale 0.28, hashed by
+	// 202609261000-hash-legacy-pre-auth-keys under a prefix derived from it.
+	prefix, secret := legacyAuthKeyIdentifier(keyStr), keyStr
+
 	_, prefixAndHash, found := strings.Cut(keyStr, authKeyPrefix)
+	if found {
+		// New format: hskey-auth-{12-char-prefix}-{64-char-hash}
+		var err error
 
-	if !found {
-		// Legacy format (plaintext) - backwards compatibility
-		pak, err := fixedPreAuthKey(q, preAuthKeyByKey, keyStr, limitOne)
+		prefix, secret, err = parsePrefixedKey(
+			prefixAndHash,
+			authKeyPrefixLength,
+			authKeyLength,
+			ErrPreAuthKeyFailedToParse,
+		)
 		if err != nil {
-			return nil, ErrPreAuthKeyNotFound
+			return nil, err
 		}
-
-		return pak, nil
 	}
 
-	// New format: hskey-auth-{12-char-prefix}-{64-char-hash}
-	prefix, hash, err := parsePrefixedKey(
-		prefixAndHash,
-		authKeyPrefixLength,
-		authKeyLength,
-		ErrPreAuthKeyFailedToParse,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Look up key by prefix
 	pak, err := fixedPreAuthKey(q, preAuthKeyByPrefix, prefix, limitOne)
 	if err != nil {
 		return nil, ErrPreAuthKeyNotFound
 	}
 
-	// Verify hash matches
-	err = bcrypt.CompareHashAndPassword(pak.Hash, []byte(hash))
+	err = verifyCredential(q, preAuthKeyHash, pak.ID, pak.Hash, secret)
 	if err != nil {
 		return nil, fmt.Errorf("invalid auth key: %w", err)
 	}
 
 	return pak, nil
+}
+
+// legacyAuthKeyIdentifier derives the lookup prefix of a pre-0.28 plaintext
+// pre-auth key, which embeds none; the whole key is its secret. The "legacy-"
+// marker keeps it disjoint from the hex prefixes of current keys.
+func legacyAuthKeyIdentifier(key string) string {
+	sum := sha256.Sum256([]byte(key))
+
+	return "legacy-" + hex.EncodeToString(sum[:])[:authKeyPrefixLength]
 }
 
 // parsePrefixedKey splits the prefix-and-secret portion of a new-format key
@@ -493,17 +490,23 @@ func RevokePreAuthKey(q Querier, id uint64) error {
 
 // DestroyRevokedPreAuthKeysBefore hard-deletes every key revoked before cutoff,
 // returning how many were removed. The background collector calls this to reap
-// soft-revoked keys after the retention window.
+// soft-revoked keys after the retention window. Keys still referenced by a node
+// are kept until the node is deleted: the node's ephemerality lives on its key,
+// and revoking a key must not change nodes already registered with it.
 func (hsdb *HSDatabase) DestroyRevokedPreAuthKeysBefore(cutoff time.Time) (int, error) {
 	var count int
 
 	err := hsdb.Write(func(tx *Tx) error {
 		var ids []idRow
 
+		backingANode := jet.SELECT(table.Nodes.AuthKeyID).FROM(table.Nodes).
+			WHERE(table.Nodes.AuthKeyID.IS_NOT_NULL())
+
 		err := tx.ex.query(
 			jet.SELECT(table.PreAuthKeys.ID.AS("id_row.id")).FROM(table.PreAuthKeys).
 				WHERE(table.PreAuthKeys.Revoked.IS_NOT_NULL().
-					AND(table.PreAuthKeys.Revoked.LT(jet.TimestampExp(timeArg(cutoff))))),
+					AND(table.PreAuthKeys.Revoked.LT(jet.TimestampExp(timeArg(cutoff)))).
+					AND(table.PreAuthKeys.ID.NOT_IN(backingANode))),
 			&ids,
 		)
 		if err != nil {

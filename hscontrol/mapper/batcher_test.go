@@ -329,28 +329,67 @@ func (ut *updateTracker) getAllStats() map[types.NodeID]UpdateStats {
 	return result
 }
 
+// receiveMapResponse returns the next response on ch, failing the test if
+// none arrives within updateTimeout. Delivery to one node is ordered, so a
+// test that knows every change it queued can assert on each frame in turn
+// instead of draining for a fixed window and hoping the stragglers are gone.
+func receiveMapResponse(t *testing.T, ch <-chan *tailcfg.MapResponse, what string) *tailcfg.MapResponse {
+	t.Helper()
+
+	select {
+	case resp := <-ch:
+		require.NotNil(t, resp, what)
+
+		return resp
+	case <-time.After(updateTimeout):
+		t.Fatalf("timed out waiting for %s", what)
+
+		return nil
+	}
+}
+
+// receiveMatchingMapResponse skips responses on ch until one satisfies match
+// and returns it, failing the test if none does within updateTimeout. It is
+// for channels that may still hold earlier frames the test does not assert on.
+func receiveMatchingMapResponse(
+	t *testing.T,
+	ch <-chan *tailcfg.MapResponse,
+	what string,
+	match func(*tailcfg.MapResponse) bool,
+) *tailcfg.MapResponse {
+	t.Helper()
+
+	deadline := time.After(updateTimeout)
+
+	for {
+		select {
+		case resp := <-ch:
+			if resp != nil && match(resp) {
+				return resp
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for %s", what)
+
+			return nil
+		}
+	}
+}
+
 func assertDERPMapResponse(t *testing.T, resp *tailcfg.MapResponse) {
 	t.Helper()
 
-	assert.NotNil(t, resp.DERPMap, "DERPMap should not be nil in response")
+	require.NotNil(t, resp.DERPMap, "DERPMap should not be nil in response")
 	assert.Len(t, resp.DERPMap.Regions, 1, "Expected exactly one DERP region in response")
 	assert.Equal(t, tailcfg.DERPRegionID(999), resp.DERPMap.Regions[999].RegionID, "Expected DERP region ID to be 999")
 }
 
-func assertOnlineMapResponse(t *testing.T, resp *tailcfg.MapResponse, expected bool) {
+func assertOnlineMapResponse(t *testing.T, resp *tailcfg.MapResponse, peer types.NodeID, expected bool) {
 	t.Helper()
 
-	// Check for peer changes patch (new online/offline notifications use patches)
-	if len(resp.PeersChangedPatch) > 0 {
-		require.Len(t, resp.PeersChangedPatch, 1)
-		assert.Equal(t, expected, *resp.PeersChangedPatch[0].Online)
-
-		return
-	}
-
-	// Fallback to old format for backwards compatibility
-	require.Len(t, resp.Peers, 1)
-	assert.Equal(t, expected, resp.Peers[0].Online)
+	require.Len(t, resp.PeersChangedPatch, 1, "expected one online patch, got %+v", resp)
+	assert.Equal(t, peer.NodeID(), resp.PeersChangedPatch[0].NodeID)
+	require.NotNil(t, resp.PeersChangedPatch[0].Online)
+	assert.Equal(t, expected, *resp.PeersChangedPatch[0].Online)
 }
 
 // UpdateInfo contains parsed information about an update.
@@ -816,84 +855,38 @@ func TestBatcherBasicOperations(t *testing.T) {
 			tn := &testData.Nodes[0]
 			tn2 := &testData.Nodes[1]
 
-			// Test AddNode with real node ID
-			_ = batcher.AddNode(tn.n.ID, tn.ch, 100, nil)
+			// Every frame the first node gets is asserted in order: its
+			// own online patch must produce none, so any extra frame
+			// shows up as the wrong content at the next read.
+			require.NoError(t, batcher.AddNode(tn.n.ID, tn.ch, 100, nil))
+			assert.True(t, batcher.IsConnected(tn.n.ID), "node should be connected after AddNode")
 
-			if !batcher.IsConnected(tn.n.ID) {
-				t.Error("Node should be connected after AddNode")
-			}
+			initial := receiveMapResponse(t, tn.ch, "first node's initial map")
+			assert.NotNil(t, initial.Node, "the initial map must carry the self node")
 
-			// Test work processing with DERP change
 			batcher.AddWork(change.DERPMap())
 
-			// Wait for update and validate content
-			select {
-			case data := <-tn.ch:
-				assertDERPMapResponse(t, data)
-			case <-time.After(200 * time.Millisecond):
-				t.Error("Did not receive expected DERP update")
-			}
+			derpResp := receiveMapResponse(t, tn.ch, "DERP map update")
+			assertDERPMapResponse(t, derpResp)
+			assert.Nil(t, derpResp.Node, "the DERP update must not be a full map")
 
-			// Drain any initial messages from first node
-			drainChannelTimeout(tn.ch, 100*time.Millisecond)
-
-			// Add the second node and verify update message
-			_ = batcher.AddNode(tn2.n.ID, tn2.ch, 100, nil)
+			require.NoError(t, batcher.AddNode(tn2.n.ID, tn2.ch, 100, nil))
 			assert.True(t, batcher.IsConnected(tn2.n.ID))
 
-			// First node should get an update that second node has connected.
-			select {
-			case data := <-tn.ch:
-				assertOnlineMapResponse(t, data, true)
-			case <-time.After(500 * time.Millisecond):
-				t.Error("Did not receive expected Online response update")
-			}
+			online := receiveMapResponse(t, tn.ch, "online patch for the second node")
+			assertOnlineMapResponse(t, online, tn2.n.ID, true)
 
-			// Second node should receive its initial full map
-			select {
-			case data := <-tn2.ch:
-				// Verify it's a full map response
-				assert.NotNil(t, data)
-				assert.True(
-					t,
-					len(data.Peers) >= 1 || data.Node != nil,
-					"Should receive initial full map",
-				)
-			case <-time.After(500 * time.Millisecond):
-				t.Error("Second node should receive its initial full map")
-			}
+			initial2 := receiveMapResponse(t, tn2.ch, "second node's initial map")
+			assert.NotNil(t, initial2.Node, "the initial map must carry the self node")
+			assert.Len(t, initial2.Peers, 1, "the initial map must list the first node")
 
-			// Disconnect the second node
 			batcher.RemoveNode(tn2.n.ID, tn2.ch)
-			// Note: IsConnected may return true during grace period for DNS resolution
 
-			// First node should get update that second has disconnected.
-			select {
-			case data := <-tn.ch:
-				assertOnlineMapResponse(t, data, false)
-			case <-time.After(500 * time.Millisecond):
-				t.Error("Did not receive expected Online response update")
-			}
+			offline := receiveMapResponse(t, tn.ch, "offline patch for the second node")
+			assertOnlineMapResponse(t, offline, tn2.n.ID, false)
 
-			// Test RemoveNode
 			batcher.RemoveNode(tn.n.ID, tn.ch)
-			// Note: IsConnected may return true during grace period for DNS resolution
-			// The node is actually removed from active connections but grace period allows DNS lookups
 		})
-	}
-}
-
-func drainChannelTimeout(ch <-chan *tailcfg.MapResponse, timeout time.Duration) {
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-ch:
-			// Drain message
-		case <-timer.C:
-			return
-		}
 	}
 }
 
@@ -999,14 +992,11 @@ func drainChannelTimeout(ch <-chan *tailcfg.MapResponse, timeout time.Duration) 
 // 	}
 // }
 
-// TestBatcherWorkQueueBatching tests that multiple changes get batched
-// together and sent as a single update to reduce network overhead.
-//
-// Enhanced with real database test data, this test creates registered nodes
-// and rapidly submits multiple types of changes including DERP updates and
-// node changes. Due to the batching mechanism with BatchChangeDelay, these
-// should be combined into fewer updates. This validates that the batching
-// system works correctly with real node data and mixed change types.
+// TestBatcherWorkQueueBatching submits mixed changes in quick succession and
+// checks that the node receives one frame per change, in submission order,
+// and nothing else: the batch tick bundles them into one work item but must
+// neither reorder nor drop them, and the node's own online patch yields no
+// frame.
 func TestBatcherWorkQueueBatching(t *testing.T) {
 	t.Parallel()
 
@@ -1022,12 +1012,10 @@ func TestBatcherWorkQueueBatching(t *testing.T) {
 			testNodes := testData.Nodes
 
 			ch := make(chan *tailcfg.MapResponse, 10)
-			_ = batcher.AddNode(testNodes[0].n.ID, ch, tailcfg.CapabilityVersion(100), nil)
+			require.NoError(t, batcher.AddNode(testNodes[0].n.ID, ch, tailcfg.CapabilityVersion(100), nil))
 
-			// Track update content for validation
-			var receivedUpdates []*tailcfg.MapResponse
+			peer := testNodes[1].n.ID.NodeID()
 
-			// Add multiple changes rapidly to test batching
 			batcher.AddWork(change.DERPMap())
 			// Use a valid expiry time for testing since test nodes don't have expiry set
 			testExpiry := time.Now().Add(24 * time.Hour)
@@ -1036,60 +1024,36 @@ func TestBatcherWorkQueueBatching(t *testing.T) {
 			batcher.AddWork(change.NodeAdded(testNodes[1].n.ID))
 			batcher.AddWork(change.DERPMap())
 
-			// Collect updates with timeout
-			updateCount := 0
-			timeout := time.After(200 * time.Millisecond)
-
-			for {
-				select {
-				case data := <-ch:
-					updateCount++
-
-					receivedUpdates = append(receivedUpdates, data)
-
-					// Validate update content
-					if data != nil {
-						if valid, reason := validateUpdateContent(data); valid {
-							t.Logf("Update %d: valid", updateCount)
-						} else {
-							t.Logf("Update %d: invalid: %s", updateCount, reason)
-						}
-					} else {
-						t.Logf("Update %d: nil update", updateCount)
-					}
-				case <-timeout:
-					// Expected: 5 explicit changes + 1 initial from AddNode + 1 NodeOnline from wrapper = 7 updates
-					expectedUpdates := 7
-					t.Logf("Received %d updates from %d changes (expected %d)",
-						updateCount, 5, expectedUpdates)
-
-					if updateCount != expectedUpdates {
-						t.Errorf(
-							"Expected %d updates but received %d",
-							expectedUpdates,
-							updateCount,
-						)
-					}
-
-					// Validate that all updates have valid content
-					validUpdates := 0
-
-					for _, data := range receivedUpdates {
-						if data != nil {
-							if valid, _ := validateUpdateContent(data); valid {
-								validUpdates++
-							}
-						}
-					}
-
-					if validUpdates != updateCount {
-						t.Errorf("Expected all %d updates to be valid, but only %d were valid",
-							updateCount, validUpdates)
-					}
-
-					return
-				}
+			isDERP := func(r *tailcfg.MapResponse) bool {
+				return r.DERPMap != nil && r.Node == nil && len(r.Peers) == 0
 			}
+
+			// The frames arrive in exactly this order, so a stray frame
+			// (such as an empty one for the node's own online patch)
+			// fails the check at its position instead of being counted.
+			expected := []struct {
+				what  string
+				match func(*tailcfg.MapResponse) bool
+			}{
+				{"initial map", func(r *tailcfg.MapResponse) bool { return r.Node != nil && len(r.Peers) == 1 }},
+				{"DERP map", isDERP},
+				{"key expiry patch", func(r *tailcfg.MapResponse) bool {
+					return len(r.PeersChangedPatch) == 1 && r.PeersChangedPatch[0].NodeID == peer &&
+						r.PeersChangedPatch[0].KeyExpiry != nil
+				}},
+				{"DERP map", isDERP},
+				{"changed peer", func(r *tailcfg.MapResponse) bool {
+					return len(r.PeersChanged) == 1 && r.PeersChanged[0].ID == peer
+				}},
+				{"DERP map", isDERP},
+			}
+
+			for i, want := range expected {
+				resp := receiveMapResponse(t, ch, want.what)
+				assert.Truef(t, want.match(resp), "frame %d: want %s, got %+v", i, want.what, resp)
+			}
+
+			assert.Empty(t, ch, "no frame may follow the last queued change")
 		})
 	}
 }
@@ -1599,137 +1563,24 @@ func TestBatcherFullPeerUpdates(t *testing.T) {
 
 			t.Logf("Created %d nodes in database", len(allNodes))
 
-			// Connect nodes one at a time and wait for each to be connected
+			// Take each node's initial map as it connects, so the only full
+			// peer lists left to read are the ones the FullUpdate produces.
 			for i := range allNodes {
 				node := &allNodes[i]
-				_ = batcher.AddNode(node.n.ID, node.ch, tailcfg.CapabilityVersion(100), nil)
-				t.Logf("Connected node %d (ID: %d)", i, node.n.ID)
+				require.NoError(t, batcher.AddNode(node.n.ID, node.ch, tailcfg.CapabilityVersion(100), nil))
 
-				// Wait for node to be connected
-				assert.EventuallyWithT(t, func(c *assert.CollectT) {
-					assert.True(c, batcher.IsConnected(node.n.ID), "node should be connected")
-				}, time.Second, 10*time.Millisecond, "waiting for node connection")
+				initial := receiveMapResponse(t, node.ch, fmt.Sprintf("initial map of node %d", node.n.ID))
+				require.NotNil(t, initial.Node, "the initial map must carry the self node")
 			}
 
-			// Wait for all NodeCameOnline events to be processed
-			t.Logf("Waiting for NodeCameOnline events to settle...")
-			assert.EventuallyWithT(t, func(c *assert.CollectT) {
-				for i := range allNodes {
-					assert.True(c, batcher.IsConnected(allNodes[i].n.ID), "all nodes should be connected")
-				}
-			}, 5*time.Second, 50*time.Millisecond, "waiting for all nodes to connect")
-
-			// Check how many peers each node should see
-			for i := range allNodes {
-				node := &allNodes[i]
-				peers := testData.State.ListPeers(node.n.ID)
-				t.Logf("Node %d should see %d peers from state", i, peers.Len())
-			}
-
-			// Send a full update - this should generate full peer lists
-			t.Logf("Sending FullSet update...")
 			batcher.AddWork(change.FullUpdate())
 
-			// Wait for FullSet work items to be processed
-			t.Logf("Waiting for FullSet to be processed...")
-			assert.EventuallyWithT(t, func(c *assert.CollectT) {
-				// Check that some data is available in at least one channel
-				found := false
-
-				for i := range allNodes {
-					if len(allNodes[i].ch) > 0 {
-						found = true
-						break
-					}
-				}
-
-				assert.True(c, found, "no updates received yet")
-			}, 5*time.Second, 50*time.Millisecond, "waiting for FullSet updates")
-
-			// Check what each node receives - read multiple updates
-			totalUpdates := 0
-			foundFullUpdate := false
-
-			// Read all available updates for each node
 			for i := range allNodes {
-				nodeUpdates := 0
-
-				t.Logf("Reading updates for node %d:", i)
-
-				// Read up to 10 updates per node or until timeout/no more data
-				for updateNum := range 10 {
-					select {
-					case data := <-allNodes[i].ch:
-						nodeUpdates++
-						totalUpdates++
-
-						// Parse and examine the update - data is already a MapResponse
-						if data == nil {
-							t.Errorf("Node %d update %d: nil MapResponse", i, updateNum)
-							continue
-						}
-
-						updateType := "unknown"
-
-						switch {
-						case len(data.Peers) > 0:
-							updateType = "FULL"
-							foundFullUpdate = true
-						case len(data.PeersChangedPatch) > 0:
-							updateType = "PATCH"
-						case data.DERPMap != nil:
-							updateType = "DERP"
-						}
-
-						t.Logf(
-							"  Update %d: %s - Peers=%d, PeersChangedPatch=%d, DERPMap=%v",
-							updateNum,
-							updateType,
-							len(data.Peers),
-							len(data.PeersChangedPatch),
-							data.DERPMap != nil,
-						)
-
-						if len(data.Peers) > 0 {
-							t.Logf("    Full peer list with %d peers", len(data.Peers))
-
-							for j, peer := range data.Peers[:min(3, len(data.Peers))] {
-								t.Logf(
-									"      Peer %d: NodeID=%d, Online=%v",
-									j,
-									peer.ID,
-									peer.Online,
-								)
-							}
-						}
-
-						if len(data.PeersChangedPatch) > 0 {
-							t.Logf("    Patch update with %d changes", len(data.PeersChangedPatch))
-
-							for j, patch := range data.PeersChangedPatch[:min(3, len(data.PeersChangedPatch))] {
-								t.Logf(
-									"      Patch %d: NodeID=%d, Online=%v",
-									j,
-									patch.NodeID,
-									patch.Online,
-								)
-							}
-						}
-
-					case <-time.After(500 * time.Millisecond):
-					}
-				}
-
-				t.Logf("Node %d received %d updates", i, nodeUpdates)
-			}
-
-			t.Logf("Total updates received across all nodes: %d", totalUpdates)
-
-			if !foundFullUpdate {
-				t.Errorf("CRITICAL: No FULL updates received despite sending change.FullUpdateResponse()!")
-				t.Errorf(
-					"This confirms the bug - FullSet updates are not generating full peer responses",
-				)
+				node := &allNodes[i]
+				full := receiveMatchingMapResponse(t, node.ch, fmt.Sprintf("full update for node %d", node.n.ID),
+					func(r *tailcfg.MapResponse) bool { return len(r.Peers) > 0 })
+				assert.Len(t, full.Peers, len(allNodes)-1, "node %d must get every other node as a peer", node.n.ID)
+				assert.NotNil(t, full.Node, "a full update carries the self node")
 			}
 		})
 	}
@@ -1840,31 +1691,14 @@ func TestBatcherRapidReconnection(t *testing.T) {
 			// Test if "disconnected" nodes can actually receive updates.
 			t.Logf("Testing if nodes can receive updates despite debug status...")
 
-			// Send a change that should reach all nodes
+			// Send a change that should reach all nodes. The new channels
+			// already hold initial maps, which carry a DERP map too, so wait
+			// for the DERP-only frame this change produces.
 			batcher.AddWork(change.DERPMap())
 
-			receivedCount := 0
-			timeout := time.After(500 * time.Millisecond)
-
 			for i := range allNodes {
-				select {
-				case update := <-newChannels[i]:
-					if update != nil {
-						receivedCount++
-
-						t.Logf("Node %d received update successfully", i)
-					}
-				case <-timeout:
-					t.Logf("Node %d timed out waiting for update", i)
-					goto done
-				}
-			}
-
-		done:
-			t.Logf("Update delivery test: %d/%d nodes received updates", receivedCount, len(allNodes))
-
-			if receivedCount < len(allNodes) {
-				t.Logf("Some nodes failed to receive updates - confirming the issue")
+				receiveMatchingMapResponse(t, newChannels[i], fmt.Sprintf("DERP update on node %d's new channel", i),
+					func(r *tailcfg.MapResponse) bool { return r.DERPMap != nil && r.Node == nil })
 			}
 		})
 	}
@@ -1960,68 +1794,19 @@ func TestBatcherMultiConnection(t *testing.T) {
 			// Send update and verify ALL connections receive it.
 			t.Logf("Testing update distribution to all connections...")
 
-			// Clear any existing updates from all channels
-			clearChannel := func(ch chan *tailcfg.MapResponse) {
-				for {
-					select {
-					case <-ch:
-						// drain
-					default:
-						return
-					}
-				}
+			// A connection may still hold frames from the connects above
+			// (node2's online patch), so each one is read until the frame
+			// carrying this change arrives; any frame would do otherwise.
+			isNode2Changed := func(r *tailcfg.MapResponse) bool {
+				return len(r.PeersChanged) == 1 && r.PeersChanged[0].ID == node2.n.ID.NodeID()
 			}
-
-			clearChannel(node1.ch)
-			clearChannel(secondChannel)
-			clearChannel(thirdChannel)
-			clearChannel(node2.ch)
 
 			// Send a change notification from node2 (so node1 should receive it on all connections)
-			testChangeSet := change.NodeAdded(node2.n.ID)
+			batcher.AddWork(change.NodeAdded(node2.n.ID))
 
-			batcher.AddWork(testChangeSet)
-
-			// Wait for updates to propagate to at least one channel
-			assert.EventuallyWithT(t, func(c *assert.CollectT) {
-				assert.Positive(c, len(node1.ch)+len(secondChannel)+len(thirdChannel), "should have received updates")
-			}, 5*time.Second, 50*time.Millisecond, "waiting for updates to propagate")
-
-			// Verify all three connections for node1 receive the update
-			connection1Received := false
-			connection2Received := false
-			connection3Received := false
-
-			select {
-			case mapResp := <-node1.ch:
-				connection1Received = (mapResp != nil)
-				t.Logf("Node1 connection 1 received update: %t", connection1Received)
-			case <-time.After(500 * time.Millisecond):
-				t.Errorf("Node1 connection 1 did not receive update")
-			}
-
-			select {
-			case mapResp := <-secondChannel:
-				connection2Received = (mapResp != nil)
-				t.Logf("Node1 connection 2 received update: %t", connection2Received)
-			case <-time.After(500 * time.Millisecond):
-				t.Errorf("Node1 connection 2 did not receive update")
-			}
-
-			select {
-			case mapResp := <-thirdChannel:
-				connection3Received = (mapResp != nil)
-				t.Logf("Node1 connection 3 received update: %t", connection3Received)
-			case <-time.After(500 * time.Millisecond):
-				t.Errorf("Node1 connection 3 did not receive update")
-			}
-
-			if connection1Received && connection2Received && connection3Received {
-				t.Logf("SUCCESS: All three connections for node1 received the update")
-			} else {
-				t.Errorf("FAILURE: Multi-connection broadcast failed - conn1: %t, conn2: %t, conn3: %t",
-					connection1Received, connection2Received, connection3Received)
-			}
+			receiveMatchingMapResponse(t, node1.ch, "node2 change on node1 connection 1", isNode2Changed)
+			receiveMatchingMapResponse(t, secondChannel, "node2 change on node1 connection 2", isNode2Changed)
+			receiveMatchingMapResponse(t, thirdChannel, "node2 change on node1 connection 3", isNode2Changed)
 
 			// Test connection removal and verify remaining connections still work.
 			t.Logf("Testing connection removal...")
@@ -2046,46 +1831,15 @@ func TestBatcherMultiConnection(t *testing.T) {
 			}
 
 			// Send another update and verify remaining connections still work
-			clearChannel(node1.ch)
-			clearChannel(thirdChannel)
+			batcher.AddWork(change.NodeAdded(node2.n.ID))
 
-			testChangeSet2 := change.NodeAdded(node2.n.ID)
-
-			batcher.AddWork(testChangeSet2)
-
-			// Wait for updates to propagate to remaining channels
-			assert.EventuallyWithT(t, func(c *assert.CollectT) {
-				assert.Positive(c, len(node1.ch)+len(thirdChannel), "should have received updates")
-			}, 5*time.Second, 50*time.Millisecond, "waiting for updates to propagate")
-
-			// Verify remaining connections still receive updates
-			remaining1Received := false
-			remaining3Received := false
-
-			select {
-			case mapResp := <-node1.ch:
-				remaining1Received = (mapResp != nil)
-			case <-time.After(500 * time.Millisecond):
-				t.Errorf("Node1 connection 1 did not receive update after removal")
-			}
-
-			select {
-			case mapResp := <-thirdChannel:
-				remaining3Received = (mapResp != nil)
-			case <-time.After(500 * time.Millisecond):
-				t.Errorf("Node1 connection 3 did not receive update after removal")
-			}
-
-			if remaining1Received && remaining3Received {
-				t.Logf("SUCCESS: Remaining connections still receive updates after removal")
-			} else {
-				t.Errorf("FAILURE: Remaining connections failed to receive updates - conn1: %t, conn3: %t",
-					remaining1Received, remaining3Received)
-			}
+			receiveMatchingMapResponse(t, node1.ch, "node2 change on remaining connection 1", isNode2Changed)
+			receiveMatchingMapResponse(t, thirdChannel, "node2 change on remaining connection 3", isNode2Changed)
 
 			// Drain secondChannel of any messages received before removal
-			// (the test wrapper sends NodeOffline before removal, which may have reached this channel)
-			clearChannel(secondChannel)
+			for len(secondChannel) > 0 {
+				<-secondChannel
+			}
 
 			// Verify second channel no longer receives new updates after being removed
 			select {

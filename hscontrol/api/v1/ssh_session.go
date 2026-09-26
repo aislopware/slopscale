@@ -12,7 +12,6 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/scope"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"tailscale.com/types/views"
 	"tailscale.com/util/dnsname"
 )
 
@@ -152,10 +151,8 @@ func (b Backend) canOpenSSHSession(p principal.Principal, target types.NodeView)
 		return true
 	}
 
-	candidate := views.SliceOf([]types.NodeView{target})
-
 	for _, own := range b.State.ListNodesByUser(p.UserID).All() {
-		if own.ID() != target.ID() && own.IsAdmitted() && b.State.VisiblePeers(own, candidate).Len() > 0 {
+		if b.State.ListPeers(own.ID(), target.ID()).Len() > 0 {
 			return true
 		}
 	}

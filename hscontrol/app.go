@@ -1,6 +1,7 @@
 package hscontrol
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json/jsontext"
@@ -465,10 +466,12 @@ func (h *Slopscale) Serve() error {
 	// Set up REMOTE listeners
 	//
 
-	tlsConfig, err := h.getTLSSettings()
+	tlsSettings, err := h.getTLSSettings(ctx)
 	if err != nil {
 		return fmt.Errorf("configuring TLS settings: %w", err)
 	}
+
+	errorGroup.Go(tlsSettings.serveACME)
 
 	//
 	//
@@ -490,15 +493,21 @@ func (h *Slopscale) Serve() error {
 
 	var httpListener net.Listener
 
-	if tlsConfig != nil {
-		httpServer.TLSConfig = tlsConfig
-		httpListener, err = tls.Listen("tcp", h.cfg.Addr, tlsConfig)
+	if tlsSettings.config != nil {
+		httpServer.TLSConfig = tlsSettings.config
+		httpListener, err = tls.Listen("tcp", h.cfg.Addr, tlsSettings.config)
 	} else {
 		httpListener, err = new(net.ListenConfig).Listen(context.Background(), "tcp", h.cfg.Addr)
 	}
 
 	if err != nil {
-		return fmt.Errorf("binding to TCP address: %w", err)
+		return &types.ListenerBindError{
+			Listener:  "main HTTP",
+			ConfigKey: "listen_addr",
+			Network:   "tcp",
+			Addr:      h.cfg.Addr,
+			Err:       err,
+		}
 	}
 
 	errorGroup.Go(func() error { return httpServer.Serve(httpListener) })
@@ -514,7 +523,13 @@ func (h *Slopscale) Serve() error {
 	if h.cfg.MetricsAddr != "" {
 		debugHTTPListener, err = (&net.ListenConfig{}).Listen(ctx, "tcp", h.cfg.MetricsAddr)
 		if err != nil {
-			return fmt.Errorf("binding to TCP address: %w", err)
+			return &types.ListenerBindError{
+				Listener:  "metrics",
+				ConfigKey: "metrics_listen_addr",
+				Network:   "tcp",
+				Addr:      h.cfg.MetricsAddr,
+				Err:       err,
+			}
 		}
 
 		debugHTTPServer = h.debugHTTPServer()
@@ -628,6 +643,8 @@ func (h *Slopscale) Serve() error {
 				if httpErr != nil {
 					log.Error().Err(httpErr).Msg("failed to shutdown http")
 				}
+
+				tlsSettings.shutdownACME(shutdownCtx)
 
 				info("closing batcher")
 				h.mapBatcher.Close()
@@ -1447,7 +1464,47 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	return r
 }
 
-func (h *Slopscale) getTLSSettings() (*tls.Config, error) {
+// tlsBundle is the TLS configuration of the main listener, nil without
+// TLS, and with the HTTP-01 challenge the server that answers it on a
+// listener already bound, so a bind failure stops the start like any
+// other listener's.
+type tlsBundle struct {
+	config       *tls.Config
+	acmeServer   *http.Server
+	acmeListener net.Listener
+}
+
+// serveACME answers the HTTP-01 challenge until [tlsBundle.shutdownACME];
+// without the challenge it returns at once.
+func (s *tlsBundle) serveACME() error {
+	if s.acmeServer == nil {
+		return nil
+	}
+
+	log.Info().Msgf("listening and serving ACME HTTP-01 challenge on: %s", s.acmeListener.Addr())
+
+	err := s.acmeServer.Serve(s.acmeListener)
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("serving ACME HTTP-01 challenge: %w", err)
+	}
+
+	return nil
+}
+
+func (s *tlsBundle) shutdownACME(ctx context.Context) {
+	if s.acmeServer == nil {
+		return
+	}
+
+	log.Info().Msg("shutting down ACME HTTP-01 challenge server")
+
+	err := s.acmeServer.Shutdown(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to shutdown ACME HTTP-01 challenge server")
+	}
+}
+
+func (h *Slopscale) getTLSSettings(ctx context.Context) (*tlsBundle, error) {
 	tlsEnabled := h.cfg.TLS.LetsEncrypt.Hostname != "" || h.cfg.TLS.CertPath != ""
 	if tlsEnabled && !strings.HasPrefix(h.cfg.ServerURL, "https://") {
 		log.Warn().Msg("listening with TLS but ServerURL does not start with https://")
@@ -1476,7 +1533,7 @@ func (h *Slopscale) getTLSSettings() (*tls.Config, error) {
 			// Configuration via autocert with TLS-ALPN-01 (https://tools.ietf.org/html/rfc8737)
 			// The RFC requires that the validation is done on port 443; in other words, slopscale
 			// must be reachable on port 443.
-			return certManager.TLSConfig(), nil
+			return &tlsBundle{config: certManager.TLSConfig()}, nil
 
 		case types.HTTP01ChallengeType:
 			// Configuration via autocert with HTTP-01. This requires listening on
@@ -1488,15 +1545,22 @@ func (h *Slopscale) getTLSSettings() (*tls.Config, error) {
 				ReadTimeout: types.HTTPTimeout,
 			}
 
-			go func() {
-				err := server.ListenAndServe()
-				log.Fatal().
-					Caller().
-					Err(err).
-					Msg("failed to set up a HTTP server")
-			}()
+			listener, err := new(net.ListenConfig).Listen(ctx, "tcp", server.Addr)
+			if err != nil {
+				return nil, &types.ListenerBindError{
+					Listener:  "ACME HTTP-01 challenge",
+					ConfigKey: "tls_letsencrypt_listen",
+					Network:   "tcp",
+					Addr:      server.Addr,
+					Err:       err,
+				}
+			}
 
-			return certManager.TLSConfig(), nil
+			return &tlsBundle{
+				config:       certManager.TLSConfig(),
+				acmeServer:   server,
+				acmeListener: listener,
+			}, nil
 
 		default:
 			return nil, errUnsupportedLetsEncryptChallengeType
@@ -1504,23 +1568,26 @@ func (h *Slopscale) getTLSSettings() (*tls.Config, error) {
 	}
 
 	if h.cfg.TLS.CertPath == "" {
-		return nil, nil //nolint:nilnil // intentional: no TLS config when neither LetsEncrypt nor a cert path is set
-	}
-
-	tlsConfig := &tls.Config{
-		NextProtos:   []string{"http/1.1"},
-		Certificates: make([]tls.Certificate, 1),
-		MinVersion:   tls.VersionTLS12,
+		return &tlsBundle{}, nil
 	}
 
 	cert, err := tls.LoadX509KeyPair(h.cfg.TLS.CertPath, h.cfg.TLS.KeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("loading TLS key pair: %w", err)
+		return nil, fmt.Errorf(
+			"loading TLS key pair (tls_cert_path=%q, tls_key_path=%q): %w",
+			h.cfg.TLS.CertPath,
+			h.cfg.TLS.KeyPath,
+			err,
+		)
 	}
 
-	tlsConfig.Certificates[0] = cert
-
-	return tlsConfig, nil
+	return &tlsBundle{
+		config: &tls.Config{
+			NextProtos:   []string{"http/1.1"},
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
+		},
+	}, nil
 }
 
 // Provide some middleware that can inspect the ACME/autocert https calls
@@ -1539,14 +1606,18 @@ func (l *acmeLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
-		defer resp.Body.Close()
-
 		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
 		log.Error().
 			Int("status_code", resp.StatusCode).
 			Str("url", req.URL.String()).
 			Bytes("body", body).
 			Msg("acme request returned error")
+
+		// The ACME client parses this body to classify errors such as badNonce,
+		// so give it back a readable copy.
+		resp.Body = io.NopCloser(bytes.NewReader(body))
 	}
 
 	return resp, nil
@@ -1575,7 +1646,7 @@ type zerologLogEntry struct {
 }
 
 func (e *zerologLogEntry) Write(
-	status, bytes int,
+	status, size int,
 	_ http.Header,
 	elapsed time.Duration,
 	_ any,
@@ -1586,7 +1657,7 @@ func (e *zerologLogEntry) Write(
 		Str("proto", e.proto).
 		Str("remote", e.remote).
 		Int("status", status).
-		Int("bytes", bytes).
+		Int("bytes", size).
 		Dur("elapsed", elapsed).
 		Msg("http request")
 }

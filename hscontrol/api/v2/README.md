@@ -18,8 +18,9 @@ slopscale's own conventions. The slopscale-native admin API stays at `/api/v1`
 ## Conventions
 
 - Operations derived from Tailscale carry the `Tailscale compat` tag.
-- The `{tailnet}` path segment must be `-` (the single Slopscale tailnet);
-  anything else is `404`. See `requireDefaultTailnet`.
+- The `{tailnet}` path segment must be `-` or the tailnet ID
+  (`State.TailnetID`, the single Slopscale tailnet); anything else is `404`.
+  See `requireTailnet`.
 - Errors use **Tailscale's** body (`{"message","data","status"}`), installed as
   a per-API transform (`tailscaleErrorTransformer` in `errors.go`). A future
   slopscale-native v2 operation would keep Huma's RFC 9457 problem+json.
@@ -78,9 +79,11 @@ operator is OAuth-only. Supporting OAuth lets all of them drive Slopscale.
   owned-by them via the policy `tagOwners` (`State.TagOwnedByTags` →
   `policy/v2`), so e.g. an operator token tagged `tag:k8s-operator` may mint
   `tag:k8s` keys.
-- Credentials/tokens are stored like API keys: a public id/prefix plus an
-  **Argon2id** hash of the secret (no JWT, no signing keys). `OAuthClient` and
-  `OAuthAccessToken` live in `types/oauth.go` and `db/oauth.go`.
+- Credentials/tokens are stored like API keys: a public id/prefix plus a
+  **SHA-256** hash of the 256-bit secret (no JWT, no signing keys); rows
+  hashed with Argon2id before are rewritten on their next successful use
+  (`db/secret.go`). `OAuthClient` and `OAuthAccessToken` live in
+  `types/oauth.go` and `db/oauth.go`.
 - **Updating a client** is `PUT /api/v2/tailnet/-/keys/{keyId}` with
   `{"keyType":"client","scopes":[…],"tags":[…],"description":"…"}`
   (`keys_update.go`), which the provider's `tailscale_oauth_client` resource
@@ -109,6 +112,18 @@ has to be stored anywhere.
 - Discovery documents are cached per issuer for an hour, bounded to 32 issuers,
   and fetched through `egress.Transport()` because the issuer is operator
   input. Every exchange, refused or not, is audited as `oauth.token.exchange`.
+
+## OAuth with the tailscale client and GitHub Action
+
+The stock `tailscale` client (`feature/oauthkey`) accepts an OAuth client secret
+as an auth key: it exchanges it at `/api/v2/oauth/token`, mints a tagged key via
+`CreateKey`, then registers re-advertising those tags. Server-side this relies on
+two things: `db.AuthenticateOAuthClient` accepting the `tskey-client-` prefix
+alias (the client only runs the exchange for it), and pre-auth key registration
+tolerating `RequestTags` that are a subset of the key's tags.
+`TestAPIv2OAuthTailscaleClientAuthKey` in `servertest/` drives the real client
+code through this; `.github/workflows/tailscale-action-integration.yml` covers
+the GitHub Action. User-facing setup is in `docs/content/ref/api.mdx`.
 
 ## Endpoints beyond the core
 
@@ -208,7 +223,8 @@ go test ./hscontrol/servertest/ -run TestAPIv2` is green._
 7. **Update the CLI** only if the v2 operation fully replaces a v1 one. Tailscale
    has no separate key-expire verb (its `DELETE` _is_ the revoke), so v2 maps
    `DELETE` to a soft revoke: the key stays retrievable with `invalid: true`
-   until the collector reaps it (`preauth_keys.revoked_retention`), the
+   until the collector reaps it (`preauth_keys.revoked_retention`; keys still
+   backing a node are kept), the
    equivalent of v1 `preauthkeys expire`. `slopscale preauthkeys` still stays on
    v1 for now (it is the cross-user admin surface), but the verb gap that
    previously blocked migration is closed.

@@ -667,8 +667,8 @@ func (pm *PolicyManager) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 // For autogroup:self policies (empty global filter), it builds per-node
 // peer maps using each node's specific filter rules.
 //
-// Compared to [policy.ReduceNodes], which builds the list per node, we end
-// up with doing the full work for every node O(n^2), while this will reduce
+// Compared to building the list per node, which ends up doing the full
+// work for every node O(n^2), this will reduce
 // the list as we see relationships while building the map, making it
 // O(n^2/2) in the end, but with less work per node.
 func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[types.NodeID][]types.NodeView {
@@ -765,55 +765,6 @@ func perNodePeers(a, b types.NodeView, ma, mb []matcher.Match, ra, rb nodeRoutes
 		(hasB && b.CanAccessWithRoutes(mb, a, rb.subnet, ra.subnet, ra.isExit)) ||
 		(hasA && b.CanAccessWithRoutes(ma, a, rb.subnet, ra.subnet, ra.isExit)) ||
 		(hasB && a.CanAccessWithRoutes(mb, b, ra.subnet, rb.subnet, rb.isExit))
-}
-
-// VisiblePeers narrows candidates to the ones node may see: the decision
-// [PolicyManager.BuildPeerMap] makes for every pair of the tailnet, made
-// for one node against a candidate list. The incremental map paths use
-// it so a node added or changed reaches only the netmaps the full map
-// would show it in. Without a policy every candidate is visible; with a
-// policy that leaves node's own filter empty (autogroup:shared before
-// anything is shared) the candidates' filters still decide, and a
-// candidate nobody's filter admits stays hidden.
-func (pm *PolicyManager) VisiblePeers(
-	node types.NodeView,
-	candidates views.Slice[types.NodeView],
-) views.Slice[types.NodeView] {
-	if pm == nil {
-		return candidates
-	}
-
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-
-	rn := routesOf(node)
-	out := make([]types.NodeView, 0, candidates.Len())
-
-	var nodeMatchers []matcher.Match
-	if pm.needsPerNodeFilter {
-		nodeMatchers = pm.matchersForNodeLocked(node)
-	}
-
-	for _, peer := range candidates.All() {
-		if peer.ID() == node.ID() {
-			continue
-		}
-
-		rp := routesOf(peer)
-
-		var visible bool
-		if pm.needsPerNodeFilter {
-			visible = perNodePeers(node, peer, nodeMatchers, pm.matchersForNodeLocked(peer), rn, rp)
-		} else {
-			visible = pm.globalPeersLocked(node, peer, rn, rp)
-		}
-
-		if visible {
-			out = append(out, peer)
-		}
-	}
-
-	return views.SliceOf(out)
 }
 
 // FilterForNode returns the filter rules for a specific node, already reduced

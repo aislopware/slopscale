@@ -86,7 +86,7 @@ func registerLogging(api huma.API, b Backend) {
 		Security: security,
 		Errors:   []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.LogsConfigurationRead), func(_ context.Context, in *logstreamInput) (*logstreamOutput, error) {
-		err := requireLogstreamTarget(in.Tailnet, in.LogType)
+		err := b.requireLogstreamTarget(in.Tailnet, in.LogType)
 		if err != nil {
 			return nil, err
 		}
@@ -133,7 +133,7 @@ func registerLogging(api huma.API, b Backend) {
 	}, scope.LogsConfiguration), "logstream.delete", "logstream", ""), func(
 		ctx context.Context, in *logstreamInput,
 	) (*emptyOutput, error) {
-		err := requireLogstreamTarget(in.Tailnet, in.LogType)
+		err := b.requireLogstreamTarget(in.Tailnet, in.LogType)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +155,7 @@ func registerLogging(api huma.API, b Backend) {
 }
 
 func handleSetLogstream(ctx context.Context, b Backend, in *setLogstreamInput) (*logstreamOutput, error) {
-	err := requireLogstreamTarget(in.Tailnet, in.LogType)
+	err := b.requireLogstreamTarget(in.Tailnet, in.LogType)
 	if err != nil {
 		return nil, err
 	}
@@ -209,8 +209,8 @@ func handleSetLogstream(ctx context.Context, b Backend, in *setLogstreamInput) (
 // requireLogstreamTarget checks the tailnet and the log type. Slopscale
 // does not stream network flow logs, so that log type is a 404 naming
 // where to read them rather than an empty configuration.
-func requireLogstreamTarget(tailnet, logType string) error {
-	err := requireDefaultTailnet(tailnet)
+func (b Backend) requireLogstreamTarget(tailnet, logType string) error {
+	err := b.requireTailnet(tailnet)
 	if err != nil {
 		return err
 	}

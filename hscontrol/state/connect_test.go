@@ -3,6 +3,7 @@ package state
 import (
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
@@ -307,4 +308,59 @@ func TestDisconnectOutOfOrderSessionsCannotStrandNodeOnline(t *testing.T) {
 	online, known = nv.IsOnline().GetOk()
 	require.True(t, known)
 	assert.False(t, online, "node must be offline after its last session is released")
+}
+
+func TestExpiredNodeSessionAccounting(t *testing.T) {
+	t.Parallel()
+
+	for name, expiry := range map[string]*time.Time{
+		"never":  nil,
+		"zero":   new(time.Time{}),
+		"future": new(time.Now().Add(time.Hour)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			_, s, id := persistTestSetup(t)
+			t.Cleanup(func() { _ = s.Close() })
+
+			_, first := s.Connect(id)
+			past := time.Now()
+			node, _, err := s.SetNodeExpiry(id, &past)
+			require.NoError(t, err)
+			require.False(t, node.IsOnline().Get())
+			require.Equal(t, 1, node.ActiveSessions())
+
+			changes, second := s.Connect(id)
+			require.Greater(t, second, first)
+
+			for _, c := range changes {
+				for _, patch := range c.PeerPatches {
+					if patch.Online != nil {
+						require.False(t, *patch.Online)
+					}
+				}
+			}
+
+			node, ok := s.GetNodeByID(id)
+			require.True(t, ok)
+			require.False(t, node.IsOnline().Get())
+			require.Equal(t, 2, node.ActiveSessions())
+
+			_, err = s.Disconnect(id, second)
+			require.NoError(t, err)
+
+			node, _, err = s.SetNodeExpiry(id, expiry)
+			require.NoError(t, err)
+			require.True(t, node.IsOnline().Get(), "restoring a key with a live session restores online state")
+			require.Equal(t, 1, node.ActiveSessions())
+
+			_, err = s.Disconnect(id, first)
+			require.NoError(t, err)
+			node, _, err = s.SetNodeExpiry(id, expiry)
+			require.NoError(t, err)
+			require.False(t, node.IsOnline().Get(), "restoring expiry cannot connect a disconnected node")
+			require.Zero(t, node.ActiveSessions())
+		})
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"slices"
+	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	"github.com/aislopware/slopscale/hscontrol/types"
@@ -17,7 +18,8 @@ import (
 // on an old database gives the same result years later.
 //
 // Migrations start from v0.25.0. If upgrading from v0.24.x or earlier, you
-// must first upgrade to v0.25.1 before upgrading to this version.
+// must first upgrade to v0.25.1 before upgrading to this version;
+// runMigrations refuses a database that has not.
 //
 // Raw SQL uses $1..$n placeholders, which both drivers accept. Statements
 // that only make sense on one dialect check tx.ex.dialect.
@@ -702,7 +704,91 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609251000-traffic",
 			run: migrateTraffic,
 		},
+		{
+			// Pre-auth keys from before headscale 0.28 were stored in
+			// plaintext and looked up by it. Each is now stored like a
+			// current key, under a prefix derived from it with the whole
+			// key hashed, so it keeps working; the plaintext and its index
+			// are gone.
+			id:  "202609261000-hash-legacy-pre-auth-keys",
+			run: migrateHashLegacyPreAuthKeys,
+		},
 	}
+}
+
+// migrateHashLegacyPreAuthKeys (202609261000) moves every plaintext pre-auth
+// key to a [legacyAuthKeyIdentifier] prefix and a [hashSecret] hash and
+// clears the key column. SQLite has no SHA-256 function, so it hashes in Go.
+func migrateHashLegacyPreAuthKeys(tx *Tx) error {
+	keys, err := legacyPreAuthKeys(tx)
+	if err != nil {
+		return err
+	}
+
+	claimed := make(map[string]bool, len(keys))
+
+	for _, k := range keys {
+		prefix := legacyAuthKeyIdentifier(k.key)
+
+		// The lookup returned the lowest id of rows sharing a key, so a
+		// later copy never authenticated; revoke it rather than break the
+		// unique prefix index.
+		if claimed[prefix] {
+			_, err = tx.ex.execRaw(
+				`UPDATE pre_auth_keys SET key = '', revoked = COALESCE(revoked, $1) WHERE id = $2`,
+				time.Now().UTC(), k.id,
+			)
+		} else {
+			claimed[prefix] = true
+			_, err = tx.ex.execRaw(
+				`UPDATE pre_auth_keys SET key = '', prefix = $1, hash = $2 WHERE id = $3`,
+				prefix, hashSecret(k.key), k.id,
+			)
+		}
+
+		if err != nil {
+			return fmt.Errorf("hashing legacy pre-auth key %d: %w", k.id, err)
+		}
+	}
+
+	return tx.ex.dropIndexIfExists("idx_pre_auth_keys_key")
+}
+
+type legacyPreAuthKey struct {
+	id  uint64
+	key string
+}
+
+// legacyPreAuthKeys reads the plaintext pre-auth keys in id order. The rows
+// are read to the end before any update, which pgx needs on one connection.
+func legacyPreAuthKeys(tx *Tx) ([]legacyPreAuthKey, error) {
+	rows, err := tx.ex.queryRaw(`SELECT id, key FROM pre_auth_keys
+WHERE (prefix IS NULL OR prefix = '') AND key IS NOT NULL AND key != '' ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("reading legacy pre-auth keys: %w", err)
+	}
+
+	defer func() { _ = rows.Close() }()
+
+	var keys []legacyPreAuthKey
+
+	for rows.Next() {
+		var k legacyPreAuthKey
+
+		err = rows.Scan(&k.id, &k.key)
+		if err != nil {
+			return nil, fmt.Errorf("scanning legacy pre-auth key: %w", err)
+		}
+
+		keys = append(keys, k)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("reading legacy pre-auth keys: %w", err)
+	}
+
+	return keys, nil
 }
 
 // migrateAccessRequestRevoke (202609211000) adds the revocation record to
@@ -932,8 +1018,9 @@ func migrateUserInvites(tx *Tx) error {
 	})
 }
 
-// lookupIndexes are the indexes 202609151200-lookup-indexes adds; they are
-// the same statements schema.sql and schema_postgres.sql carry.
+// lookupIndexes are the indexes 202609151200-lookup-indexes adds; schema.sql
+// and schema_postgres.sql carry the same statements, less
+// idx_pre_auth_keys_key, which 202609261000-hash-legacy-pre-auth-keys drops.
 var lookupIndexes = []string{
 	`CREATE INDEX idx_nodes_node_key ON nodes(node_key)`,
 	`CREATE INDEX idx_nodes_machine_key ON nodes(machine_key)`,

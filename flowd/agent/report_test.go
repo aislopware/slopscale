@@ -94,7 +94,13 @@ func TestLargeRollupReachesTheServer(t *testing.T) {
 	flows, queries := bigRollup()
 	for _, f := range flows {
 		a.table.AddFlow(rollup.FlowKey{
-			Bucket: f.Bucket, Src: f.Src, Dst: f.Dst, Proto: f.Proto, Port: f.Port, Host: f.Host, HostSource: f.HostSource,
+			Bucket:     f.Bucket,
+			Src:        f.Src,
+			Dst:        f.Dst,
+			Proto:      f.Proto,
+			Port:       f.Port,
+			Host:       f.Host,
+			HostSource: f.HostSource,
 		}, rollup.Counters{TxBytes: f.TxBytes, RxBytes: f.RxBytes, TxPackets: f.TxPackets, RxPackets: f.RxPackets})
 	}
 

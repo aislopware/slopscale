@@ -216,7 +216,6 @@ func TestEphemeralNodeLogoutRaceCondition(t *testing.T) {
 	ephemeralNode := createTestNode(4, 1, "test-user", "ephemeral-node")
 	ephemeralNode.AuthKey = &types.PreAuthKey{
 		ID:        1,
-		Key:       "test-key",
 		Ephemeral: true,
 	}
 
@@ -298,7 +297,6 @@ func TestUpdateNodeFromMapRequestEphemeralLogoutSequence(t *testing.T) {
 	ephemeralNode := createTestNode(5, 1, "test-user", "ephemeral-node-5")
 	ephemeralNode.AuthKey = &types.PreAuthKey{
 		ID:        2,
-		Key:       "test-key-2",
 		Ephemeral: true,
 	}
 
@@ -436,7 +434,6 @@ func TestPersistNodeToDBChecksNodeStoreBeforePersist(t *testing.T) {
 	ephemeralNode := createTestNode(7, 1, "test-user", "ephemeral-node-7")
 	ephemeralNode.AuthKey = &types.PreAuthKey{
 		ID:        3,
-		Key:       "test-key-3",
 		Ephemeral: true,
 	}
 

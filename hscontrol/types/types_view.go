@@ -369,6 +369,8 @@ func (v NodeView) DeletedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.DeletedAt)
 }
 
+// IsOnline caches [Node.ShouldBeOnline]; read it through [Node.Online].
+// Every writer must derive it, so online means the same thing everywhere.
 func (v NodeView) IsOnline() views.ValuePointer[bool] { return views.ValuePointerOf(v.ж.IsOnline) }
 
 // Unhealthy excludes the node from primary route election while
@@ -377,10 +379,10 @@ func (v NodeView) Unhealthy() bool { return v.ж.Unhealthy }
 
 // ActiveSessions counts live poll sessions for this node.
 // [State.Connect] increments it and every session release
-// ([State.Disconnect]) decrements it, so the node goes offline
-// exactly when its last session ends, regardless of the order in
-// which overlapping sessions' cleanups run. Never persisted, like
-// SessionEpoch.
+// ([State.Disconnect]) decrements it, regardless of the order in
+// which overlapping sessions' cleanups run. Releasing the last
+// session takes the node offline; expiry can take it offline while
+// sessions remain. Never persisted, like SessionEpoch.
 func (v NodeView) ActiveSessions() int { return v.ж.ActiveSessions }
 
 // SessionEpoch identifies a poll session generation; Connect bumps
@@ -524,13 +526,11 @@ func (v *PreAuthKeyView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 func (v PreAuthKeyView) ID() uint64 { return v.ж.ID }
 
-// Legacy plaintext key (for backwards compatibility)
-func (v PreAuthKeyView) Key() string { return v.ж.Key }
-
-// New bcrypt-based authentication
-func (v PreAuthKeyView) Prefix() string { return v.ж.Prefix }
-
-// bcrypt
+// Prefix is the public lookup id. Hash is the SHA-256 digest of the
+// secret, or a bcrypt hash until the key is next used. A key from
+// before headscale 0.28 has a "legacy-" prefix derived from the whole
+// key, which is also its secret.
+func (v PreAuthKeyView) Prefix() string                { return v.ж.Prefix }
 func (v PreAuthKeyView) Hash() views.ByteSlice[[]byte] { return views.ByteSliceOf(v.ж.Hash) }
 
 // For tagged keys: [PreAuthKey.UserID] tracks who created the key (informational)
@@ -578,7 +578,6 @@ func (v PreAuthKeyView) Revoked() views.ValuePointer[time.Time] {
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _PreAuthKeyViewNeedsRegeneration = PreAuthKey(struct {
 	ID            uint64
-	Key           string
 	Prefix        string
 	Hash          []byte
 	UserID        *uint

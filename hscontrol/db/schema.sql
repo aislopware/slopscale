@@ -45,6 +45,9 @@ CREATE UNIQUE INDEX idx_name_no_provider_identifier ON users(name) WHERE provide
 
 CREATE TABLE pre_auth_keys(
   id integer PRIMARY KEY AUTOINCREMENT,
+  -- key held keys from before headscale 0.28 in plaintext; nothing reads
+  -- it since 202609261000-hash-legacy-pre-auth-keys moved them to prefix
+  -- and hash and emptied it.
   key text,
   prefix text,
   hash blob,
@@ -68,7 +71,6 @@ CREATE TABLE pre_auth_keys(
   CONSTRAINT fk_pre_auth_keys_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
-CREATE INDEX idx_pre_auth_keys_key ON pre_auth_keys(key);
 
 -- scopes is a JSON array of scope names narrowing the key below its
 -- owner's role, empty for the whole role; description names the key.
@@ -87,7 +89,7 @@ CREATE TABLE api_keys(
 CREATE UNIQUE INDEX idx_api_keys_prefix ON api_keys(prefix);
 
 -- OAuth 2.0 client-credentials clients for the v2 API. client_id is public and
--- embedded in the secret (hskey-client-<client_id>-<secret>); only the bcrypt
+-- embedded in the secret (hskey-client-<client_id>-<secret>); only the SHA-256
 -- hash of the secret is stored. Mirrors the api_keys security model.
 -- key_type tells a client from a federated identity, which holds no secret and
 -- authenticates with a JWT its issuer signed; the issuer/audience/subject and
@@ -110,7 +112,7 @@ CREATE TABLE oauth_clients(
 );
 CREATE UNIQUE INDEX idx_oauth_clients_client_id ON oauth_clients(client_id);
 
--- Short-lived bearer access tokens minted by an oauth_client. Stored as a bcrypt
+-- Short-lived bearer access tokens minted by an oauth_client. Stored as a SHA-256
 -- hash of the secret, looked up by prefix.
 CREATE TABLE oauth_access_tokens(
   id integer PRIMARY KEY AUTOINCREMENT,

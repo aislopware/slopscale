@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -113,13 +114,11 @@ func TestDNSHealthMeansAnswering(t *testing.T) {
 	// and stays healthy.
 	local.failStatus(errors.New("tailscaled is restarting"))
 
-	for range 5 {
-		time.Sleep(200 * time.Millisecond)
-
+	require.Never(t, func() bool {
 		st, l := dnsStatus(a)
-		require.Empty(t, st.Error)
-		require.Equal(t, listen, l)
-	}
+
+		return st.Error != "" || !slices.Equal(listen, l)
+	}, time.Second, 200*time.Millisecond)
 
 	local.failStatus(nil)
 

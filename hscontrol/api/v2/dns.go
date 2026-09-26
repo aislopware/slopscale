@@ -130,7 +130,7 @@ func registerDNSNameservers(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNSRead), func(_ context.Context, in *tailnetInput) (*nameserversOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +151,7 @@ func registerDNSNameservers(api huma.API, b Backend) {
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNS), "dns.set", "", ""), func(ctx context.Context, in *setNameserversInput) (*nameserversOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -183,7 +183,7 @@ func registerDNSPreferences(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNSRead), func(_ context.Context, in *tailnetInput) (*preferencesOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +202,7 @@ func registerDNSPreferences(api huma.API, b Backend) {
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNS), "dns.set", "", ""), func(_ context.Context, in *setPreferencesInput) (*preferencesOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +225,7 @@ func registerDNSSearchPaths(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNSRead), func(_ context.Context, in *tailnetInput) (*searchPathsOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -245,7 +245,7 @@ func registerDNSSearchPaths(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNS), "dns.set", "", ""), func(ctx context.Context, in *setSearchPathsInput) (*searchPathsOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +274,7 @@ func registerDNSSplit(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNSRead), func(_ context.Context, in *tailnetInput) (*splitOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -293,7 +293,7 @@ func registerDNSSplit(api huma.API, b Backend) {
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNS), "dns.set", "", ""), func(ctx context.Context, in *setSplitInput) (*splitOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -334,7 +334,7 @@ func registerDNSSplit(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNS), "dns.set", "", ""), func(ctx context.Context, in *setSplitInput) (*splitOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

@@ -49,6 +49,9 @@ const (
 	// ([TailnetLockSettings]); the authority's log is the tka_aums
 	// table. See [State.TailnetLock].
 	SettingTailnetLock SettingKey = "tailnet_lock"
+	// SettingTailnetID holds the tailnet's stable ID; it is made on the
+	// first start and never changes. See [State.TailnetID].
+	SettingTailnetID SettingKey = "tailnet_id"
 )
 
 // Key expiry bounds: a cap shorter than an hour would log nodes out

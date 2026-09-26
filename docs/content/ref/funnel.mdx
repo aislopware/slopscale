@@ -66,7 +66,8 @@ funnel:
 It joins the tailnet as `slopscale-ingress` with the tag
 `tag:slopscale-ingress`, approved and shown among the machines. If the
 server itself listens on port 443, give the ingress another address or
-put it on another machine.
+put it on another machine; the server refuses to start with an address
+another of its listeners already uses.
 
 An ingress on another machine, such as a small VPS in front of a server
 behind NAT, runs with the same binary and a tagged pre-auth key:

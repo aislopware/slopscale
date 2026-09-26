@@ -25,7 +25,15 @@ make build / test / fmt / lint
 make generate                # regenerate gen/; never edit it by hand
 go run ./cmd/hi doctor
 go run ./cmd/hi run "TestName" [--postgres]
+go run ./tools/bump plan     # which pins are stale; changes nothing
+go run ./tools/bump verify   # do the interlocked pins still agree
 ```
+
+Version bumps go through `tools/bump` (the Version bump workflow opens the
+pull request); its package doc lists the interlocks a bump by hand must
+keep too: gvisor and wireguard-windows at the versions tailscale.com pins,
+`go run ./cmd/vendorhash update` after go.sum moves, a `go` directive no
+newer than nixpkgs' Go, and bun pinned by hand in flake.nix.
 
 Needs go, golangci-lint and bun on PATH; `nix develop` pins the CI
 versions but isn't required. Markup and config files outside `docs/` and
@@ -135,10 +143,12 @@ policy change never carries.
 
 Approval is a node property (`nodes.approved_at`; users have their own) and
 is enforced in exactly two places: the NodeStore's peer function drops
-unapproved nodes before the policy builds the peer map, and
-`State.ListPeers`'s explicit-ID branch, `FilterForNode` and `SSHPolicy`
-apply the same rule for the incremental paths. Nothing in the mapper or the
-policy engine knows about approval. `persistNodeToDB` never writes
+unapproved nodes before the policy builds the peer map, which every peer
+list and incremental update reads (`State.ListPeers` included), and
+`FilterForNode` and `SSHPolicy` apply the same rule to the node's own
+view. Nothing in the mapper or the policy engine knows about approval. The
+mapper takes visibility from the peer map alone, so every write that changes
+what the policy admits must rebuild it before its change goes out. `persistNodeToDB` never writes
 `approved_at` (like expiry); `NodeSetApproval` does. An approval change is a
 `PolicyChange` with `IncludeSelf`, not `OriginNode`: one change can carry a
 single origin, but switching a setting off admits many nodes at once and

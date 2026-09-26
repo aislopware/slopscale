@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -157,6 +158,37 @@ func TestNewDERPServer(t *testing.T) {
 	assert.NotNil(t, srv.tailscaleDERP)
 	assert.False(t, srv.Enabled(), "a new relay is off until settings turn it on")
 	assert.Empty(t, srv.STUNAddr())
+}
+
+// TestDERPServerApplySTUNBindFailure proves a STUN address another socket
+// holds fails with the listener and its key named, the errno reachable,
+// and the relay left on the address it had.
+func TestDERPServerApplySTUNBindFailure(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestDERPServer(t, testServerSettings())
+	before := srv.STUNAddr()
+
+	taken, err := new(net.ListenConfig).ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = taken.Close() })
+
+	settings := testServerSettings()
+	settings.STUNAddr = taken.LocalAddr().String()
+
+	err = srv.Apply(settings)
+	require.Error(t, err)
+	require.ErrorIs(t, err, syscall.EADDRINUSE)
+
+	bindErr, ok := errors.AsType[*types.ListenerBindError](err)
+	require.True(t, ok, "want a ListenerBindError, got %T", err)
+	assert.Equal(t, "embedded DERP STUN", bindErr.Listener)
+	assert.Equal(t, "derp.server.stun_listen_addr", bindErr.ConfigKey)
+	assert.Equal(t, "udp", bindErr.Network)
+	assert.Equal(t, settings.STUNAddr, bindErr.Addr)
+
+	assert.Equal(t, before, srv.STUNAddr(), "a failed rebind keeps the old socket")
 }
 
 func TestDERPServerApply(t *testing.T) {

@@ -188,13 +188,19 @@ func principalTags(ctx context.Context) ([]string, bool) {
 	return tagguard.PrincipalTags(ctx)
 }
 
-// requireDefaultTailnet rejects any tailnet other than "-". Slopscale is
-// single-tailnet; the Tailscale SDK sends "-" (its default tailnet). A non-"-"
-// value is "no such tailnet", a 404, which lets the SDK's IsNotFound behave.
-func requireDefaultTailnet(tailnet string) error {
-	if tailnet != "-" {
-		return huma.Error404NotFound("tailnet not found")
+// requireTailnet rejects any tailnet other than "-" or this tailnet's
+// stable ID. Slopscale is single-tailnet; the Tailscale SDK sends "-" (its
+// default tailnet), and tooling that read the ID from the console or from
+// `tailscale status --json` sends that. Anything else is "no such
+// tailnet", a 404, which lets the SDK's IsNotFound behave.
+func (b Backend) requireTailnet(tailnet string) error {
+	if tailnet == "-" {
+		return nil
 	}
 
-	return nil
+	if id := b.State.TailnetID(); !id.IsZero() && tailnet == string(id) {
+		return nil
+	}
+
+	return huma.Error404NotFound("tailnet not found")
 }

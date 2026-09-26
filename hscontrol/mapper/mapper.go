@@ -410,6 +410,20 @@ func (m *mapper) buildFromChange(
 		return m.selfMapResponse(nodeID, capVer)
 	}
 
+	// A node never sees a patch about itself or about a peer it cannot
+	// see, so a change made only of such patches (the node's own online
+	// patch, a hidden peer going offline) has nothing for it. Building
+	// anyway would send a frame holding nothing but ControlTime.
+	patches := m.filterVisiblePeerPatches(nodeID, resp.PeerPatches)
+	if len(patches) == 0 && len(resp.PeerPatches) > 0 {
+		rest := *resp
+		rest.PeerPatches = nil
+
+		if rest.IsEmpty() {
+			return nil, nil //nolint:nilnil // Every patch was filtered out, nothing to send
+		}
+	}
+
 	builder := m.NewMapResponseBuilder(nodeID).
 		WithCapabilityVersion(capVer).
 		WithDebugType(changeResponseDebug)
@@ -449,7 +463,6 @@ func (m *mapper) buildFromChange(
 		}
 	}
 
-	patches := m.filterVisiblePeerPatches(nodeID, resp.PeerPatches)
 	if len(patches) > 0 {
 		builder.WithPeerChangedPatch(patches)
 	}
@@ -461,12 +474,12 @@ func (m *mapper) buildFromChange(
 	return builder.Build()
 }
 
-// filterVisiblePeerPatches drops peer-change patches whose target peer the
-// recipient cannot see under the ACL policy. Without it, online/offline,
-// endpoint, and key-expiry patches disclose the existence, presence, and
-// addresses of peers the recipient's policy forbids it from accessing.
-// A batch usually carries one or two patches, so each is looked up in the
-// visible peer slice rather than through a set built for the call.
+// filterVisiblePeerPatches drops peer-change patches whose target is not
+// in the recipient's peer map, the set the full map is built from.
+// Without it, online/offline, endpoint, and key-expiry patches disclose
+// the existence, presence, and addresses of peers the recipient's policy
+// forbids it from accessing. A recipient that is unknown, waiting for
+// approval or suspended has no peers, so it gets no patches.
 func (m *mapper) filterVisiblePeerPatches(
 	nodeID types.NodeID,
 	patches []*tailcfg.PeerChange,
@@ -475,13 +488,13 @@ func (m *mapper) filterVisiblePeerPatches(
 		return patches
 	}
 
-	node, ok := m.state.GetNodeByID(nodeID)
-	if !ok {
-		// Fail closed: if visibility cannot be resolved, send no patches.
-		return nil
+	ids := make([]types.NodeID, 0, len(patches))
+	for _, p := range patches {
+		//nolint:gosec // tailcfg.NodeID values are never negative
+		ids = append(ids, types.NodeID(p.NodeID))
 	}
 
-	visible := m.state.VisiblePeers(node, m.state.ListPeers(nodeID))
+	visible := m.state.ListPeers(nodeID, ids...)
 
 	var filtered []*tailcfg.PeerChange
 

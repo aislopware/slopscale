@@ -21,7 +21,7 @@ var generateCmd = &cobra.Command{
 var generatePrivateKeyCmd = &cobra.Command{
 	Use:   "private-key",
 	Short: "Generate a private key for the slopscale server",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		machineKey := key.NewMachine()
 
 		machineKeyStr, err := machineKey.MarshalText()

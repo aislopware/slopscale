@@ -119,8 +119,13 @@ plane works against Slopscale unchanged: the
 
 - API endpoint: `/api/v2`, e.g. `https://slopscale.example.com/api/v2`
 - Documentation: `/api/v2/docs`
-- The tailnet in every path is `-`; Slopscale serves one tailnet, and any other
-  name is a `404`.
+- The tailnet in every path is `-` or the tailnet ID; Slopscale serves one
+  tailnet, and any other name is a `404`. The tailnet ID is made on the
+  server's first start and never changes. It has the shape of a Tailscale
+  tailnet ID, such as `T4bXk29QaZmCNTRL`. It is shown on the console's
+  _Settings › Tailnet_ page and as `tailnetId` in `GET /api/v1/server`. A
+  machine whose client knows the field (capability version 148 and later)
+  reports it as `CurrentTailnet.StableID` in `tailscale status --json`.
 - Authenticate with an [API key](#rest-api), which is all-access, or with
   [OAuth 2.0 client credentials](#oauth-clients), which are limited to the
   scopes and tags they were created with. Point the Terraform provider at
@@ -146,6 +151,90 @@ which machines it may create: an auth key minted with the token may only carry
 tags the token holds, or tags those own through the policy's `tagOwners`. A
 token cannot mint API keys, and it can never be given more than the caller that
 created the client could delegate.
+
+### Join nodes with an OAuth client
+
+The Tailscale client can use an OAuth client secret in place of an auth key: it
+exchanges the secret for an access token, mints a single-use tagged auth key and
+registers with it. This works anywhere the client takes an auth key:
+`tailscale up`, the container image, `tsnet` and the
+[`tailscale/github-action`](https://github.com/tailscale/github-action). One
+long-lived secret joins any number of nodes.
+
+Create an OAuth client with the `auth_keys` scope and the tags its nodes get.
+The secret is shown once:
+
+```shell
+slopscale oauth-clients create --scope auth_keys --tag tag:ci
+```
+
+Build the auth key from the secret:
+
+1. Swap the prefix: `hskey-client-…` becomes `tskey-client-…`. The client only
+   runs the exchange for `tskey-client-`; Slopscale accepts both.
+1. Append `?baseURL=<your Slopscale URL>`.
+1. Set `--advertise-tags`. Each tag must exist in the policy's `tagOwners` and be
+   one of the OAuth client's tags, or owned by one of them.
+
+```text
+tskey-client-<id>-<secret>?baseURL=https://slopscale.example.com
+```
+
+:::warning[Always set baseURL]
+
+Without `baseURL` the client sends the secret to `https://api.tailscale.com`.
+:::
+
+These are all the attributes the client understands; any other is an error.
+Order does not matter and an empty value means the default.
+
+| Attribute       | Default                     | Effect                                                                                                                         |
+| --------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `baseURL`       | `https://api.tailscale.com` | Where the exchange and key creation go. Your Slopscale URL, no trailing slash.                                                  |
+| `ephemeral`     | `true`                      | The node is removed after it goes offline (`node.ephemeral.inactivity_timeout`). `false` keeps it.                              |
+| `preauthorized` | `false`                     | While [device approval](/ref/approval) is on, a node joined with `false` waits for approval and one joined with `true` does not. |
+
+Booleans take any Go `strconv.ParseBool` value (`true`, `false`, `1`, `0`, …).
+
+`tailscale up`, either as the auth key or through `--client-secret` (which also
+takes `file:/path/to/secret`):
+
+```shell
+tailscale up --login-server https://slopscale.example.com --advertise-tags tag:ci \
+  --auth-key 'tskey-client-<id>-<secret>?baseURL=https://slopscale.example.com&ephemeral=false'
+```
+
+The container image:
+
+```shell
+docker run -d --name tailscale \
+  -e TS_AUTHKEY='tskey-client-<id>-<secret>?baseURL=https://slopscale.example.com' \
+  -e TS_EXTRA_ARGS='--login-server=https://slopscale.example.com --advertise-tags=tag:ci' \
+  tailscale/tailscale
+```
+
+`tsnet` (`TS_CLIENT_SECRET` works too), with `tailscale.com/feature/oauthkey`
+imported:
+
+```go
+srv := &tsnet.Server{
+    ControlURL:    "https://slopscale.example.com",
+    AuthKey:       "tskey-client-<id>-<secret>?baseURL=https://slopscale.example.com",
+    AdvertiseTags: []string{"tag:ci"},
+}
+```
+
+The GitHub Action, with the whole string stored as a repository secret:
+
+```yaml
+- uses: tailscale/github-action@v4
+  with:
+    authkey: ${{ secrets.SLOPSCALE_AUTHKEY }}
+    args: --login-server=https://slopscale.example.com --advertise-tags=tag:ci
+```
+
+Use `authkey` even though the action marks it deprecated: `oauth-secret`
+appends its own `?…` to the secret, which corrupts `baseURL`.
 
 ### Terraform provider support
 

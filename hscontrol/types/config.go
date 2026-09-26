@@ -106,7 +106,8 @@ type AuditConfig struct {
 type PreAuthKeysConfig struct {
 	// RevokedRetention is how long a soft-revoked pre-auth key (revoked via the
 	// v2 API's DELETE) is kept retrievable before the background collector
-	// hard-deletes it. A zero or negative duration disables the collector.
+	// hard-deletes it. Keys still backing a node are kept until the node is
+	// deleted. A zero or negative duration disables the collector.
 	RevokedRetention time.Duration
 }
 
@@ -951,13 +952,39 @@ func resolveNodeExpiry() time.Duration {
 	return time.Duration(expiry)
 }
 
-func validateServerConfig() error {
-	depr := deprecator{
-		warns:  make(set.Set[string]),
-		fatals: make(set.Set[string]),
-	}
+// docsURL is the documentation site configuration errors point at.
+const docsURL = "https://aislopware.github.io/slopscale/"
 
-	// Deprecated keys are checked after the file is read.
+// validateServerConfig runs every rule on the raw settings and returns the
+// violations joined. [LoadServerConfig] shares one validator with the
+// section readers instead, so a start reports every problem at once.
+func validateServerConfig() error {
+	v := &configValidator{}
+	validateServerConfigInto(v)
+
+	return v.Err()
+}
+
+// validateServerConfigInto records every rule the raw settings break.
+func validateServerConfigInto(v *configValidator) {
+	validateOIDCSettings(v)
+	validateServerSettings(v)
+	validateTLSSettings(v)
+	validateListenerCollisions(v)
+	validateNodeSettings(v)
+	validateDNSSettings(v)
+	validateMagicDNSConfig(v)
+	validateTuningSettings(v)
+	validateDERPConfig(v)
+	validateDatabaseConfig(v)
+	validateDeprecatedKeys(v)
+}
+
+// validateDeprecatedKeys reports the removed keys the file still sets and
+// warns about the deprecated ones.
+func validateDeprecatedKeys(v *configValidator) {
+	depr := deprecator{seen: make(set.Set[string])}
+
 	// Alias the old ACL Policy path with the new configuration option.
 	depr.fatalIfNewKeyIsNotUsed("policy.path", "acl_policy_path")
 
@@ -992,39 +1019,69 @@ func validateServerConfig() error {
 	// Removed: oidc.expiry -> node.expiry
 	depr.fatalIfSet("oidc.expiry", "node.expiry")
 
-	// OIDC is activated by setting oidc.issuer (see app.go), not by a
-	// dedicated oidc.enabled key. Gate validation on the real activation
-	// condition so a misconfiguration fails at startup.
-	if conf.GetString("oidc.issuer") != "" {
-		err := validateOIDCConfig()
-		if err != nil {
-			return err
-		}
+	depr.apply(v)
+}
+
+// validateOIDCSettings checks the identity provider settings. OIDC is
+// activated by setting oidc.issuer (see app.go), not by a dedicated
+// oidc.enabled key, so the rules apply only then.
+func validateOIDCSettings(v *configValidator) {
+	if conf.GetString("oidc.issuer") == "" {
+		return
 	}
 
-	depr.Log()
-
-	if conf.IsSet("dns.extra_records") && conf.IsSet("dns.extra_records_path") {
-		log.Fatal().
-			Msg("fatal config error: dns.extra_records and dns.extra_records_path are mutually exclusive. " +
-				"Remove one of them from the config file")
+	err := validateOIDCConfig()
+	if err != nil {
+		v.Add(&ConfigError{
+			Reason: "OIDC configuration is invalid",
+			Detail: err.Error(),
+			Hint:   "check oidc.issuer, oidc.client_id, oidc.client_secret and oidc.pkce.method",
+			See:    docsURL + "ref/oidc",
+			Cause:  err,
+		})
 	}
+}
 
-	// Collect any validation errors and return them all at once
-	var errorText string
-	if (conf.GetString("tls_letsencrypt_hostname") != "") &&
-		((conf.GetString("tls_cert_path") != "") || (conf.GetString("tls_key_path") != "")) {
-		errorText += "Fatal config error: set either tls_letsencrypt_hostname or tls_cert_path/tls_key_path, not both\n"
-	}
-
+// validateServerSettings checks the keys every server needs.
+func validateServerSettings(v *configValidator) {
 	if conf.GetString("noise.private_key_path") == "" {
-		errorText += "Fatal config error: slopscale now requires a new `noise.private_key_path` field in the config " +
-			"file for the Tailscale v2 protocol\n"
+		v.Add(&ConfigError{
+			Reason: "noise.private_key_path is required",
+			Hint:   "set noise.private_key_path: /var/lib/slopscale/noise_private.key (or any writable path)",
+		})
 	}
 
-	if (conf.GetString("tls_letsencrypt_hostname") != "") &&
-		(conf.GetString("tls_letsencrypt_challenge_type") == TLSALPN01ChallengeType) &&
-		(!strings.HasSuffix(conf.GetString("listen_addr"), ":443")) {
+	serverURL := conf.GetString("server_url")
+	if !strings.HasPrefix(serverURL, "http://") && !strings.HasPrefix(serverURL, "https://") {
+		v.Add(&ConfigError{
+			Reason:  "server_url is missing a scheme",
+			Current: []KV{{"server_url", serverURL}},
+			Hint:    "prefix the URL with https:// (recommended) or http://",
+		})
+	}
+}
+
+// validateTLSSettings checks that one TLS strategy is chosen and that the
+// ACME challenge is one the server can answer.
+func validateTLSSettings(v *configValidator) {
+	hostname := conf.GetString("tls_letsencrypt_hostname")
+	certPath := conf.GetString("tls_cert_path")
+	keyPath := conf.GetString("tls_key_path")
+
+	if hostname != "" && (certPath != "" || keyPath != "") {
+		v.Add(&ConfigError{
+			Reason:        "tls_letsencrypt_hostname and tls_cert_path/tls_key_path are mutually exclusive",
+			Current:       []KV{{"tls_letsencrypt_hostname", hostname}},
+			ConflictsWith: []KV{{"tls_cert_path", certPath}, {"tls_key_path", keyPath}},
+			Hint:          "choose one TLS strategy and unset the other (Let's Encrypt or a static key pair)",
+			See:           docsURL + "ref/tls",
+		})
+	}
+
+	challenge := conf.GetString("tls_letsencrypt_challenge_type")
+
+	if hostname != "" && challenge == TLSALPN01ChallengeType &&
+		!strings.HasSuffix(conf.GetString("listen_addr"), ":443") {
 		// this is only a warning because there could be something sitting in front of
 		// slopscale that redirects the traffic (e.g. an iptables rule)
 		log.Warn().
@@ -1032,95 +1089,210 @@ func validateServerConfig() error {
 				"slopscale must be reachable on port 443, i.e. listen_addr should probably end in :443")
 	}
 
-	if (conf.GetString("tls_letsencrypt_challenge_type") != HTTP01ChallengeType) &&
-		(conf.GetString("tls_letsencrypt_challenge_type") != TLSALPN01ChallengeType) {
-		errorText += "Fatal config error: the only supported values for tls_letsencrypt_challenge_type are " +
-			"HTTP-01 and TLS-ALPN-01\n"
+	if challenge != HTTP01ChallengeType && challenge != TLSALPN01ChallengeType {
+		v.Add(&ConfigError{
+			Reason:  "tls_letsencrypt_challenge_type has an unsupported value",
+			Current: []KV{{"tls_letsencrypt_challenge_type", challenge}},
+			Allowed: []string{HTTP01ChallengeType, TLSALPN01ChallengeType},
+			Hint:    "pick one of the allowed values; HTTP-01 is the default",
+		})
 	}
+}
 
-	if !strings.HasPrefix(conf.GetString("server_url"), "http://") &&
-		!strings.HasPrefix(conf.GetString("server_url"), "https://") {
-		errorText += "Fatal config error: server_url must start with https:// or http://\n"
-	}
-
+// validateNodeSettings checks the ephemeral timeout and the HA probe
+// timings.
+func validateNodeSettings(v *configValidator) {
 	// Minimum inactivity time out is keepalive timeout (60s) plus a few seconds
 	// to avoid races
 	const minInactivityTimeout = 65 * time.Second
 
 	ephemeralTimeout := resolveEphemeralInactivityTimeout()
 	if ephemeralTimeout <= minInactivityTimeout {
-		errorText += fmt.Sprintf(
-			"Fatal config error: node.ephemeral.inactivity_timeout (%s) is set too low, must be more than %s",
-			ephemeralTimeout,
-			minInactivityTimeout,
-		)
+		v.Add(&ConfigError{
+			Reason:  "node.ephemeral.inactivity_timeout is below the minimum",
+			Current: []KV{{"node.ephemeral.inactivity_timeout", ephemeralTimeout.String()}},
+			Minimum: minInactivityTimeout.String(),
+			Hint:    "raise the value above the keepalive interval (60s) plus a safety margin",
+		})
 	}
 
-	if conf.GetBool("dns.override_local_dns") {
-		if global := conf.GetStringSlice("dns.nameservers.global"); len(global) == 0 {
-			errorText += "Fatal config error: dns.nameservers.global must be set when dns.override_local_dns is true\n"
-		}
+	haInterval := conf.GetDuration("node.routes.ha.probe_interval")
+	if haInterval <= 0 {
+		return
 	}
 
-	errorText += useWithExitNodeConfigErrors()
+	const (
+		minHAInterval = 2 * time.Second
+		minHATimeout  = time.Second
+	)
 
-	// Validate HA health probing parameters
-	if haInterval := conf.GetDuration(
-		"node.routes.ha.probe_interval",
-	); haInterval > 0 {
-		if haInterval < 2*time.Second {
-			errorText += fmt.Sprintf(
-				"Fatal config error: node.routes.ha.probe_interval (%s) must be >= 2s\n",
-				haInterval,
-			)
-		}
-
-		haTimeout := conf.GetDuration("node.routes.ha.probe_timeout")
-		if haTimeout < 1*time.Second {
-			errorText += fmt.Sprintf(
-				"Fatal config error: node.routes.ha.probe_timeout (%s) must be >= 1s\n",
-				haTimeout,
-			)
-		}
-
-		if haTimeout >= haInterval {
-			errorText += fmt.Sprintf(
-				"Fatal config error: node.routes.ha.probe_timeout (%s) must be less than "+
-					"node.routes.ha.probe_interval (%s)\n",
-				haTimeout,
-				haInterval,
-			)
-		}
+	if haInterval < minHAInterval {
+		v.Add(&ConfigError{
+			Reason:  "node.routes.ha.probe_interval is below the minimum",
+			Current: []KV{{"node.routes.ha.probe_interval", haInterval.String()}},
+			Minimum: minHAInterval.String(),
+			Hint:    "raise the value to at least the minimum",
+		})
 	}
 
-	// Validate tuning parameters
+	haTimeout := conf.GetDuration("node.routes.ha.probe_timeout")
+	if haTimeout < minHATimeout {
+		v.Add(&ConfigError{
+			Reason:  "node.routes.ha.probe_timeout is below the minimum",
+			Current: []KV{{"node.routes.ha.probe_timeout", haTimeout.String()}},
+			Minimum: minHATimeout.String(),
+			Hint:    "raise the value to at least the minimum",
+		})
+	}
+
+	if haTimeout >= haInterval {
+		v.Add(&ConfigError{
+			Reason: "node.routes.ha.probe_timeout must be less than node.routes.ha.probe_interval",
+			Current: []KV{
+				{"node.routes.ha.probe_timeout", haTimeout.String()},
+				{"node.routes.ha.probe_interval", haInterval.String()},
+			},
+			Hint: "lower probe_timeout below probe_interval (a probe must finish before the next one starts)",
+		})
+	}
+}
+
+// validateDNSSettings checks the DNS keys against each other.
+func validateDNSSettings(v *configValidator) {
+	if conf.IsSet("dns.extra_records") && conf.IsSet("dns.extra_records_path") {
+		v.Add(&ConfigError{
+			Reason: "dns.extra_records and dns.extra_records_path are mutually exclusive",
+			Current: []KV{
+				{"dns.extra_records_path", conf.GetString("dns.extra_records_path")},
+				{"dns.extra_records", "<inline records>"},
+			},
+			Hint: "keep one (a path is recommended for production); remove the other",
+		})
+	}
+
+	if conf.GetBool("dns.override_local_dns") && len(conf.GetStringSlice("dns.nameservers.global")) == 0 {
+		v.Add(&ConfigError{
+			Reason: "dns.nameservers.global is required when dns.override_local_dns is true",
+			Current: []KV{
+				{"dns.override_local_dns", true},
+				{"dns.nameservers.global", "[]"},
+			},
+			Hint: "list at least one upstream nameserver, or set dns.override_local_dns: false",
+			See:  docsURL + "ref/dns",
+		})
+	}
+
+	settings := DNSSettings{
+		Nameservers:          conf.GetStringSlice("dns.nameservers.global"),
+		OverrideLocalDNS:     conf.GetBool("dns.override_local_dns"),
+		SplitNameservers:     conf.GetStringMapStringSlice("dns.nameservers.split"),
+		UseWithExitNode:      conf.GetStringSlice("dns.nameservers.use_with_exit_node.global"),
+		SplitUseWithExitNode: conf.GetStringMapStringSlice("dns.nameservers.use_with_exit_node.split"),
+	}
+
+	// The same rule [DNSSettings.Validate] applies to the runtime settings.
+	err := settings.validateUseWithExitNode()
+	if err != nil {
+		v.Add(&ConfigError{
+			Reason: err.Error(),
+			Hint:   "list only nameservers from dns.nameservers, with dns.override_local_dns: true",
+			See:    docsURL + "ref/dns",
+			Cause:  err,
+		})
+	}
+}
+
+// validateMagicDNSConfig checks that MagicDNS has a domain to name the
+// nodes under.
+func validateMagicDNSConfig(v *configValidator) {
+	if !conf.GetBool("dns.magic_dns") || conf.GetString("dns.base_domain") != "" {
+		return
+	}
+
+	v.Add(&ConfigError{
+		Reason:  "dns.base_domain is required when dns.magic_dns is true",
+		Current: []KV{{"dns.magic_dns", true}, {"dns.base_domain", ""}},
+		Hint:    `set dns.base_domain to a domain you control (e.g. "ts.example.net"), or set dns.magic_dns: false`,
+		See:     docsURL + "ref/dns",
+	})
+}
+
+// validateTuningSettings checks the NodeStore batching.
+func validateTuningSettings(v *configValidator) {
 	if size := conf.GetInt("tuning.node_store_batch_size"); size <= 0 {
-		errorText += fmt.Sprintf(
-			"Fatal config error: tuning.node_store_batch_size must be positive, got %d\n",
-			size,
-		)
+		v.Add(&ConfigError{
+			Reason:  "tuning.node_store_batch_size must be positive",
+			Current: []KV{{"tuning.node_store_batch_size", size}},
+			Hint:    fmt.Sprintf("set to a positive integer (default: %d)", defaultNodeStoreBatchSize),
+		})
 	}
 
 	if timeout := conf.GetDuration("tuning.node_store_batch_timeout"); timeout <= 0 {
-		errorText += fmt.Sprintf(
-			"Fatal config error: tuning.node_store_batch_timeout must be positive, got %s\n",
-			timeout,
-		)
+		v.Add(&ConfigError{
+			Reason:  "tuning.node_store_batch_timeout must be positive",
+			Current: []KV{{"tuning.node_store_batch_timeout", timeout.String()}},
+			Hint:    "set to a positive duration (default: 500ms)",
+		})
+	}
+}
+
+// validateDERPConfig checks that the embedded relay, when on, has the
+// STUN address and the map it needs.
+func validateDERPConfig(v *configValidator) {
+	if !conf.GetBool("derp.server.enabled") {
+		return
 	}
 
-	if errorText != "" {
-		//nolint:err113 // aggregated validation text, not a sentinel
-		return errors.New(strings.TrimSuffix(errorText, "\n"))
+	if conf.GetBool("derp.server.stun_enabled") && conf.GetString("derp.server.stun_listen_addr") == "" {
+		v.Add(&ConfigError{
+			Reason: "derp.server.stun_listen_addr is required when the embedded relay runs STUN",
+			Current: []KV{
+				{"derp.server.enabled", true},
+				{"derp.server.stun_enabled", true},
+				{"derp.server.stun_listen_addr", ""},
+			},
+			Hint: `set derp.server.stun_listen_addr (e.g. "0.0.0.0:3478"), or set derp.server.stun_enabled: false`,
+			See:  docsURL + "ref/derp",
+		})
 	}
 
-	return nil
+	if !conf.GetBool("derp.server.automatically_add_embedded_derp_region") &&
+		len(conf.GetStringSlice("derp.paths")) == 0 {
+		v.Add(&ConfigError{
+			Reason: "derp.paths is required when derp.server.automatically_add_embedded_derp_region is false",
+			Current: []KV{
+				{"derp.server.automatically_add_embedded_derp_region", false},
+				{"derp.paths", "[]"},
+			},
+			Hint: "list the DERP map file that describes the embedded relay in derp.paths, " +
+				"or set derp.server.automatically_add_embedded_derp_region: true",
+			See: docsURL + "ref/derp",
+		})
+	}
+}
+
+// validateDatabaseConfig checks that database.type names a supported
+// backend.
+func validateDatabaseConfig(v *configValidator) {
+	dbType := conf.GetString("database.type")
+	switch dbType {
+	case DatabaseSqlite, DatabasePostgres, "sqlite":
+		return
+	}
+
+	v.Add(&ConfigError{
+		Reason:  "database.type has an unsupported value",
+		Current: []KV{{"database.type", dbType}},
+		Allowed: []string{"sqlite", DatabaseSqlite, DatabasePostgres},
+		Hint:    "pick one of the allowed values; sqlite suits a single host",
+	})
 }
 
 func tlsConfig() TLSConfig {
 	return TLSConfig{
 		LetsEncrypt: LetsEncryptConfig{
 			Hostname: conf.GetString("tls_letsencrypt_hostname"),
-			Listen:   conf.GetString("tls_letsencrypt_listen"),
+			Listen:   ACMEListenAddr(),
 			CacheDir: util.AbsolutePathFromConfigPath(
 				conf.GetString("tls_letsencrypt_cache_dir"),
 			),
@@ -1160,11 +1332,6 @@ func derpConfig() DERPConfig {
 		"derp.server.automatically_add_embedded_derp_region",
 	)
 
-	if serverEnabled && stunEnabled && stunAddr == "" {
-		log.Fatal().
-			Msg("derp.server.stun_listen_addr must be set if derp.server.enabled and derp.server.stun_enabled are true")
-	}
-
 	urlStrs := conf.GetStringSlice("derp.urls")
 
 	urls := make([]url.URL, 0, len(urlStrs))
@@ -1184,12 +1351,6 @@ func derpConfig() DERPConfig {
 	}
 
 	paths := conf.GetStringSlice("derp.paths")
-
-	if serverEnabled && !automaticallyAddEmbeddedDerpRegion && len(paths) == 0 {
-		log.Fatal().
-			Msg("Disabling derp.server.automatically_add_embedded_derp_region requires to configure " +
-				"the derp server in derp.paths")
-	}
 
 	autoUpdate := conf.GetBool("derp.auto_update_enabled")
 	updateFrequency := conf.GetDuration("derp.update_frequency")
@@ -1299,14 +1460,9 @@ func databaseConfig() DatabaseConfig {
 
 	queryLog := queryLogConfig(debug)
 
-	switch dbType {
-	case DatabaseSqlite, DatabasePostgres:
-		break
-	case "sqlite":
-		dbType = "sqlite3"
-	default:
-		log.Fatal().
-			Msgf("invalid database type %q, must be sqlite, sqlite3 or postgres", dbType)
+	// validateDatabaseConfig has refused every other value.
+	if dbType == "sqlite" {
+		dbType = DatabaseSqlite
 	}
 
 	return DatabaseConfig{
@@ -1418,32 +1574,8 @@ func (d *DNSConfig) splitResolvers() map[string][]*dnstype.Resolver {
 	return routes
 }
 
-// useWithExitNodeConfigErrors checks dns.nameservers.use_with_exit_node
-// against the nameservers it refers to, the way [DNSSettings.Validate]
-// does for the runtime settings.
-func useWithExitNodeConfigErrors() string {
-	settings := DNSSettings{
-		Nameservers:          conf.GetStringSlice("dns.nameservers.global"),
-		OverrideLocalDNS:     conf.GetBool("dns.override_local_dns"),
-		SplitNameservers:     conf.GetStringMapStringSlice("dns.nameservers.split"),
-		UseWithExitNode:      conf.GetStringSlice("dns.nameservers.use_with_exit_node.global"),
-		SplitUseWithExitNode: conf.GetStringMapStringSlice("dns.nameservers.use_with_exit_node.split"),
-	}
-
-	err := settings.validateUseWithExitNode()
-	if err != nil {
-		return "Fatal config error: " + err.Error() + "\n"
-	}
-
-	return ""
-}
-
 func dnsToTailcfgDNS(dns DNSConfig) *tailcfg.DNSConfig {
 	cfg := tailcfg.DNSConfig{}
-
-	if dns.BaseDomain == "" && dns.MagicDNS {
-		log.Fatal().Msg("dns.base_domain must be set when using MagicDNS (dns.magic_dns)")
-	}
 
 	cfg.Proxied = dns.MagicDNS
 
@@ -1561,20 +1693,33 @@ func LoadCLIConfig() (*Config, error) {
 
 // oidcConfig reads the identity provider settings; the client secret
 // comes from the file at oidc.client_secret_path when one is set.
-func oidcConfig() (OIDCConfig, error) {
+func oidcConfig(v *configValidator) OIDCConfig {
 	clientSecret := conf.GetString("oidc.client_secret")
-
 	clientSecretPath := conf.GetString("oidc.client_secret_path")
-	if clientSecretPath != "" && clientSecret != "" {
-		return OIDCConfig{}, errOidcMutuallyExclusive
-	}
 
-	if clientSecretPath != "" {
-		secretPath := os.ExpandEnv(clientSecretPath)
+	switch {
+	case clientSecretPath != "" && clientSecret != "":
+		v.Add(&ConfigError{
+			Reason: "oidc.client_secret and oidc.client_secret_path are mutually exclusive",
+			Current: []KV{
+				{"oidc.client_secret", "<redacted>"},
+				{"oidc.client_secret_path", clientSecretPath},
+			},
+			Hint:  "keep one source for the secret; the path keeps it out of the config file",
+			See:   docsURL + "ref/oidc",
+			Cause: errOidcMutuallyExclusive,
+		})
 
-		secretBytes, err := os.ReadFile(secretPath)
+	case clientSecretPath != "":
+		secretBytes, err := os.ReadFile(os.ExpandEnv(clientSecretPath))
 		if err != nil {
-			return OIDCConfig{}, fmt.Errorf("reading OIDC client secret from %q: %w", secretPath, err)
+			v.Add(&ConfigError{
+				Reason:  "oidc.client_secret_path cannot be read",
+				Current: []KV{{"oidc.client_secret_path", clientSecretPath}},
+				Detail:  err.Error(),
+				Hint:    "make sure the file exists and the slopscale user can read it",
+				Cause:   err,
+			})
 		}
 
 		clientSecret = strings.TrimSpace(string(secretBytes))
@@ -1604,26 +1749,42 @@ func oidcConfig() (OIDCConfig, error) {
 			Enabled: conf.GetBool("oidc.pkce.enabled"),
 			Method:  conf.GetString("oidc.pkce.method"),
 		},
-	}, nil
+	}
 }
 
 // prefixesConfig reads the prefixes section: the two ranges nodes are given
 // addresses from and how one is picked. It warns, rather than refuses, on a
 // range outside CGNAT or the Tailscale ULA: the client is not designed for
 // one, but an existing deployment on such a range must still start.
-func prefixesConfig() (*netip.Prefix, *netip.Prefix, IPAllocationStrategy, error) {
-	prefix4, v4NonStandard, err := parsePrefixConfig("prefixes.v4", tsaddr.CGNATRange(), "IPv4")
-	if err != nil {
-		return nil, nil, "", err
+func prefixesConfig(v *configValidator) (*netip.Prefix, *netip.Prefix, IPAllocationStrategy) {
+	prefix4, v4NonStandard, err4 := parsePrefixConfig("prefixes.v4", tsaddr.CGNATRange(), "IPv4")
+	if err4 != nil {
+		v.Add(&ConfigError{
+			Reason:  "prefixes.v4 is not a valid CIDR",
+			Current: []KV{{"prefixes.v4", conf.GetString("prefixes.v4")}},
+			Detail:  err4.Error(),
+			Hint:    `use CIDR form, e.g. "100.64.0.0/10" (CGNAT, the default)`,
+			Cause:   err4,
+		})
 	}
 
-	prefix6, v6NonStandard, err := parsePrefixConfig("prefixes.v6", tsaddr.TailscaleULARange(), "IPv6")
-	if err != nil {
-		return nil, nil, "", err
+	prefix6, v6NonStandard, err6 := parsePrefixConfig("prefixes.v6", tsaddr.TailscaleULARange(), "IPv6")
+	if err6 != nil {
+		v.Add(&ConfigError{
+			Reason:  "prefixes.v6 is not a valid CIDR",
+			Current: []KV{{"prefixes.v6", conf.GetString("prefixes.v6")}},
+			Detail:  err6.Error(),
+			Hint:    `use CIDR form, e.g. "fd7a:115c:a1e0::/48" (Tailscale ULA, the default)`,
+			Cause:   err6,
+		})
 	}
 
-	if prefix4 == nil && prefix6 == nil {
-		return nil, nil, "", ErrNoPrefixConfigured
+	if err4 == nil && err6 == nil && prefix4 == nil && prefix6 == nil {
+		v.Add(&ConfigError{
+			Reason: "no IP prefix configured for the tailnet",
+			Hint:   `set at least one of prefixes.v4 ("100.64.0.0/10") or prefixes.v6 ("fd7a:115c:a1e0::/48")`,
+			Cause:  ErrNoPrefixConfigured,
+		})
 	}
 
 	if v4NonStandard || v6NonStandard {
@@ -1647,91 +1808,70 @@ func prefixesConfig() (*netip.Prefix, *netip.Prefix, IPAllocationStrategy, error
 		})
 	}
 
-	allocStr := conf.GetString("prefixes.allocation")
+	alloc := IPAllocationStrategy(conf.GetString("prefixes.allocation"))
 
-	switch allocStr {
-	case string(IPAllocationStrategySequential):
-		return prefix4, prefix6, IPAllocationStrategySequential, nil
-	case string(IPAllocationStrategyRandom):
-		return prefix4, prefix6, IPAllocationStrategyRandom, nil
+	switch alloc {
+	case IPAllocationStrategySequential, IPAllocationStrategyRandom:
 	default:
-		return nil, nil, "", fmt.Errorf(
-			"%w: %q, allowed options: %s, %s",
-			ErrInvalidAllocationStrategy,
-			allocStr,
-			IPAllocationStrategySequential,
-			IPAllocationStrategyRandom,
-		)
+		v.Add(&ConfigError{
+			Reason:  "prefixes.allocation has an unsupported value",
+			Current: []KV{{"prefixes.allocation", string(alloc)}},
+			Allowed: []string{string(IPAllocationStrategySequential), string(IPAllocationStrategyRandom)},
+			Hint:    "pick one of the allowed values; sequential is the default",
+			Cause:   ErrInvalidAllocationStrategy,
+		})
 	}
+
+	return prefix4, prefix6, alloc
 }
 
-// LoadServerConfig returns the full Slopscale configuration to
-// host a Slopscale server. This is called as part of `slopscale serve`.
-//
-//nolint:funlen // legacy: one linear read of every config key; splitting it would only scatter the key list
-func LoadServerConfig() (*Config, error) {
-	err := validateServerConfig()
+// serverSections are the sections whose readers can refuse a value.
+type serverSections struct {
+	prefix4, prefix6 *netip.Prefix
+	alloc            IPAllocationStrategy
+	trusted          []netip.Prefix
+	dns              DNSConfig
+	oidc             OIDCConfig
+	smtp             SMTPConfig
+	branding         Branding
+	httpsCerts       HTTPSCertsConfig
+	funnel           FunnelConfig
+	clientUpdates    ClientUpdatesConfig
+	dialPlan         []netip.Addr
+}
+
+// readServerSections reads every section that can refuse a value and
+// records each refusal on v, so one start reports all of them.
+func readServerSections(v *configValidator) serverSections {
+	var (
+		s   serverSections
+		err error
+	)
+
+	s.prefix4, s.prefix6, s.alloc = prefixesConfig(v)
+	s.oidc = oidcConfig(v)
+
+	s.trusted, err = trustedProxies()
 	if err != nil {
-		return nil, err
+		v.Add(&ConfigError{
+			Reason:  "trusted_proxies contains an invalid CIDR",
+			Current: []KV{{"trusted_proxies", conf.GetStringSlice("trusted_proxies")}},
+			Detail:  err.Error(),
+			Hint:    "use specific proxy CIDRs; catch-all ranges are not allowed",
+			Cause:   err,
+		})
 	}
 
-	logConfig := logConfig()
-	zerolog.SetGlobalLevel(logConfig.Level)
-
-	prefix4, prefix6, alloc, err := prefixesConfig()
+	s.dns, err = dns()
 	if err != nil {
-		return nil, err
+		v.Add(&ConfigError{
+			Reason:  "dns.extra_records cannot be parsed",
+			Current: []KV{{"dns.extra_records", "<inline records>"}},
+			Detail:  err.Error(),
+			Hint:    "check the YAML syntax; see config-example.yaml for the expected shape",
+			Cause:   err,
+		})
 	}
-
-	trusted, err := trustedProxies()
-	if err != nil {
-		return nil, err
-	}
-
-	dnsConfig, err := dns()
-	if err != nil {
-		return nil, err
-	}
-
-	derpConfig := derpConfig()
-	logTailConfig := logtailConfig()
-
-	smtp, err := smtpConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	branding, err := brandingConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	oidcCfg, err := oidcConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	httpsCerts, err := httpsCertsConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	funnel, err := funnelConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	clientUpdates, err := clientUpdatesConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	dialPlan, err := controlDialPlanConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL := conf.GetString("server_url")
 
 	// BaseDomain cannot be the same as the server URL.
 	// This is because Tailscale takes over the domain in BaseDomain,
@@ -1740,30 +1880,112 @@ func LoadServerConfig() (*Config, error) {
 	// - DERP run on their own domains
 	// - Control plane runs on login.tailscale.com/controlplane.tailscale.com
 	// - MagicDNS (BaseDomain) for users is on a *.ts.net domain per tailnet (e.g. tail-scale.ts.net)
-	if dnsConfig.BaseDomain != "" {
-		err := isSafeServerURL(serverURL, dnsConfig.BaseDomain)
+	if s.dns.BaseDomain != "" {
+		serverURL := conf.GetString("server_url")
+
+		err = isSafeServerURL(serverURL, s.dns.BaseDomain)
 		if err != nil {
-			return nil, err
+			addServerURLConfigError(v, serverURL, s.dns.BaseDomain, err)
 		}
 	}
 
+	s.smtp, err = smtpConfig()
+	addReaderError(v, err)
+
+	s.branding, err = brandingConfig()
+	addReaderError(v, err)
+
+	s.httpsCerts, err = httpsCertsConfig()
+	addReaderError(v, err)
+
+	s.funnel, err = funnelConfig()
+	addReaderError(v, err)
+
+	s.clientUpdates, err = clientUpdatesConfig()
+	addReaderError(v, err)
+
+	s.dialPlan, err = controlDialPlanConfig()
+	addReaderError(v, err)
+
+	return s
+}
+
+// addReaderError records the error of a section reader whose message
+// already names the key it refuses.
+func addReaderError(v *configValidator, err error) {
+	if err != nil {
+		v.Add(&ConfigError{Reason: err.Error(), Cause: err})
+	}
+}
+
+// addServerURLConfigError records why server_url cannot be served next to
+// dns.base_domain.
+func addServerURLConfigError(v *configValidator, serverURL, baseDomain string, err error) {
+	current := []KV{{"server_url", serverURL}, {"dns.base_domain", baseDomain}}
+
+	switch {
+	case errors.Is(err, errServerURLSame):
+		v.Add(&ConfigError{
+			Reason:  "server_url and dns.base_domain refer to the same hostname",
+			Current: current,
+			Hint:    "give server_url a host outside dns.base_domain (MagicDNS takes over base_domain on the clients)",
+			See:     docsURL + "ref/dns",
+			Cause:   err,
+		})
+	case errors.Is(err, errServerURLSuffix):
+		v.Add(&ConfigError{
+			Reason:  "server_url is a subdomain of dns.base_domain",
+			Current: current,
+			Hint:    "host slopscale outside dns.base_domain (MagicDNS takes over base_domain on the clients)",
+			See:     docsURL + "ref/dns",
+			Cause:   err,
+		})
+	default:
+		v.Add(&ConfigError{
+			Reason:  "server_url cannot be parsed",
+			Current: []KV{{"server_url", serverURL}},
+			Detail:  err.Error(),
+			Hint:    "set server_url to an absolute URL, e.g. https://slopscale.example.com",
+			Cause:   err,
+		})
+	}
+}
+
+// LoadServerConfig returns the full Slopscale configuration to
+// host a Slopscale server. This is called as part of `slopscale serve`.
+// It reports every rule the settings break in one error; see
+// [ConfigErrors].
+func LoadServerConfig() (*Config, error) {
+	v := &configValidator{}
+	validateServerConfigInto(v)
+
+	logConfig := logConfig()
+	zerolog.SetGlobalLevel(logConfig.Level)
+
+	s := readServerSections(v)
+
+	err := v.Err()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		ServerURL:          serverURL,
+		ServerURL:          conf.GetString("server_url"),
 		Addr:               conf.GetString("listen_addr"),
 		MetricsAddr:        conf.GetString("metrics_listen_addr"),
-		TrustedProxies:     trusted,
+		TrustedProxies:     s.trusted,
 		DisableUpdateCheck: false,
 
-		PrefixV4:     prefix4,
-		PrefixV6:     prefix6,
-		IPAllocation: alloc,
+		PrefixV4:     s.prefix4,
+		PrefixV6:     s.prefix6,
+		IPAllocation: s.alloc,
 
 		NoisePrivateKeyPath: util.AbsolutePathFromConfigPath(
 			conf.GetString("noise.private_key_path"),
 		),
-		BaseDomain: dnsConfig.BaseDomain,
+		BaseDomain: s.dns.BaseDomain,
 
-		DERP: derpConfig,
+		DERP: derpConfig(),
 
 		Node: NodeConfig{
 			Expiry: resolveNodeExpiry(),
@@ -1790,8 +2012,8 @@ func LoadServerConfig() (*Config, error) {
 
 		TLS: tlsConfig(),
 
-		DNSConfig:        dnsConfig,
-		TailcfgDNSConfig: dnsToTailcfgDNS(dnsConfig),
+		DNSConfig:        s.dns,
+		TailcfgDNSConfig: dnsToTailcfgDNS(s.dns),
 
 		ACMEEmail: conf.GetString("acme_email"),
 		ACMEURL:   conf.GetString("acme_url"),
@@ -1799,9 +2021,9 @@ func LoadServerConfig() (*Config, error) {
 		UnixSocket:           conf.GetString("unix_socket"),
 		UnixSocketPermission: util.GetFileMode("unix_socket_permission"),
 
-		OIDC: oidcCfg,
+		OIDC: s.oidc,
 
-		LogTail: logTailConfig,
+		LogTail: logtailConfig(),
 		Taildrop: TaildropConfig{
 			Enabled: conf.GetBool("taildrop.enabled"),
 		},
@@ -1811,17 +2033,17 @@ func LoadServerConfig() (*Config, error) {
 
 		Policy: policyConfig(),
 
-		SMTP: smtp,
+		SMTP: s.smtp,
 
-		Branding: branding,
+		Branding: s.branding,
 
 		SSHRecording: sshRecordingConfig(),
 
-		Funnel: funnel,
+		Funnel: s.funnel,
 
-		ClientUpdates: clientUpdates,
+		ClientUpdates: s.clientUpdates,
 
-		ControlDialPlan: dialPlan,
+		ControlDialPlan: s.dialPlan,
 
 		Egress: egressConfig(),
 
@@ -1829,7 +2051,7 @@ func LoadServerConfig() (*Config, error) {
 
 		Debug: debugConfig(),
 
-		HTTPSCerts: httpsCerts,
+		HTTPSCerts: s.httpsCerts,
 
 		CLI: CLIConfig{
 			Address:  conf.GetString("cli.address"),
@@ -1885,112 +2107,110 @@ func isSafeServerURL(serverURL, baseDomain string) error {
 	return nil
 }
 
+// deprecation is a configuration key that is no longer supported. NewKey
+// is its replacement, empty when it was removed without one.
+type deprecation struct {
+	OldKey string
+	NewKey string
+	Hint   string
+}
+
+// deprecator collects the deprecated keys the settings use. Warnings are
+// logged; removed keys become [ConfigError]s on the validator, next to
+// every other problem, instead of ending the process on their own.
 type deprecator struct {
-	warns  set.Set[string]
-	fatals set.Set[string]
+	seen   set.Set[string]
+	warns  []deprecation
+	fatals []deprecation
 }
 
-func (d *deprecator) String() string {
-	var b strings.Builder
-
-	for _, w := range d.warns.Slice() {
-		fmt.Fprintf(&b, "WARN: %s\n", w)
+func (d *deprecator) addWarn(dep deprecation) {
+	if d.seen.Contains(dep.OldKey) {
+		return
 	}
 
-	for _, f := range d.fatals.Slice() {
-		fmt.Fprintf(&b, "FATAL: %s\n", f)
-	}
-
-	return b.String()
+	d.seen.Add(dep.OldKey)
+	d.warns = append(d.warns, dep)
 }
 
-func (d *deprecator) Log() {
-	if len(d.fatals) > 0 {
-		log.Fatal().Msg("\n" + d.String())
-	} else if len(d.warns) > 0 {
-		log.Warn().Msg("\n" + d.String())
+func (d *deprecator) addFatal(dep deprecation) {
+	if d.seen.Contains(dep.OldKey) {
+		return
 	}
+
+	d.seen.Add(dep.OldKey)
+	d.fatals = append(d.fatals, dep)
 }
 
-// fatal deprecates and adds an entry to the fatal list of options if the oldKey is set.
+// fatal records a removed key that has no replacement.
 func (d *deprecator) fatal(oldKey string) {
 	if conf.IsSet(oldKey) {
-		d.fatals.Add(
-			fmt.Sprintf(
-				"The %q configuration key has been removed. See the changelog for details.",
-				oldKey,
-			),
-		)
+		d.addFatal(deprecation{OldKey: oldKey})
 	}
 }
 
-// fatalWithHint behaves like fatal but appends a remediation pointer to
-// the message so operators see exactly what to do without leaving the
-// terminal. Use it when the removed key has a clean replacement on the
+// fatalWithHint behaves like fatal but tells the operator what to do
+// instead. Use it when the removed key has a clean replacement on the
 // policy side.
 func (d *deprecator) fatalWithHint(oldKey, hint string) {
 	if conf.IsSet(oldKey) {
-		d.fatals.Add(
-			fmt.Sprintf(
-				"The %q configuration key has been removed. %s",
-				oldKey,
-				hint,
-			),
-		)
+		d.addFatal(deprecation{OldKey: oldKey, Hint: hint})
 	}
 }
 
-// fatalIfNewKeyIsNotUsed deprecates and adds an entry to the fatal list of options if the oldKey
-// is set and the new key is _not_ set.
-// If the new key is set, a warning is emitted instead.
+// fatalIfNewKeyIsNotUsed records an error when oldKey is set without
+// newKey, and a warning when both are set, since newKey wins then.
 func (d *deprecator) fatalIfNewKeyIsNotUsed(newKey, oldKey string) {
-	if conf.IsSet(oldKey) && !conf.IsSet(newKey) {
-		d.fatals.Add(
-			fmt.Sprintf(
-				"The %q configuration key is deprecated. Use %q instead. %q has been removed.",
-				oldKey,
-				newKey,
-				oldKey,
-			),
-		)
-	} else if conf.IsSet(oldKey) {
-		d.warns.Add(
-			fmt.Sprintf(
-				"The %q configuration key is deprecated. Use %q instead. %q has been removed.",
-				oldKey,
-				newKey,
-				oldKey,
-			),
-		)
+	if !conf.IsSet(oldKey) {
+		return
 	}
+
+	if !conf.IsSet(newKey) {
+		d.addFatal(deprecation{OldKey: oldKey, NewKey: newKey})
+
+		return
+	}
+
+	d.addWarn(deprecation{OldKey: oldKey, NewKey: newKey})
 }
 
-// fatalIfSet fatals if the oldKey is set at all, regardless of whether
-// the newKey is set. Use this when the old key has been fully removed
-// and any use of it should be a hard error.
+// fatalIfSet records an error whenever oldKey is set, naming newKey as the
+// replacement. Use it when the old key has been fully removed.
 func (d *deprecator) fatalIfSet(oldKey, newKey string) {
 	if conf.IsSet(oldKey) {
-		d.fatals.Add(
-			fmt.Sprintf(
-				"The %q configuration key has been removed. Use %q instead.",
-				oldKey,
-				newKey,
-			),
-		)
+		d.addFatal(deprecation{OldKey: oldKey, NewKey: newKey})
 	}
 }
 
-// warnNoAlias deprecates and adds an option to log a warning if the oldKey is set.
+// warnNoAlias records a warning pointing at newKey when oldKey is set.
 func (d *deprecator) warnNoAlias(newKey, oldKey string) {
 	if conf.IsSet(oldKey) {
-		d.warns.Add(
-			fmt.Sprintf(
-				"The %q configuration key is deprecated. Use %q instead. %q has been removed.",
-				oldKey,
-				newKey,
-				oldKey,
-			),
-		)
+		d.addWarn(deprecation{OldKey: oldKey, NewKey: newKey})
+	}
+}
+
+// apply logs the warnings and adds one [ConfigError] per removed key to v.
+func (d *deprecator) apply(v *configValidator) {
+	for _, w := range d.warns {
+		log.Warn().Msgf("configuration key %q is deprecated; use %q instead", w.OldKey, w.NewKey)
+	}
+
+	for _, f := range d.fatals {
+		ce := &ConfigError{
+			Reason:  fmt.Sprintf("configuration key %s has been removed", f.OldKey),
+			Current: []KV{{f.OldKey, conf.Get(f.OldKey)}},
+			Hint:    f.Hint,
+		}
+
+		switch {
+		case f.NewKey != "":
+			ce.Reason += "; use " + f.NewKey + " instead"
+			ce.Hint = fmt.Sprintf("remove %s and set %s", f.OldKey, f.NewKey)
+		case ce.Hint == "":
+			ce.Hint = fmt.Sprintf("remove %s; see the changelog for context", f.OldKey)
+		}
+
+		v.Add(ce)
 	}
 }
 
@@ -2265,8 +2485,7 @@ func (c *Config) addMagicDNSRoutes(cfg *tailcfg.DNSConfig) {
 		// DNS routes vanish, taking the resolver with them for ~6 min
 		// until the next route-changing netmap. Empty slice survives
 		// Clone and carries the same "resolve locally" semantics
-		// (tailscale.com/ipn/ipnlocal/node_backend.go:869 documents the
-		// empty-resolver Routes form for Issue 2706).
+		// ([tailcfg.DNSConfig.Routes] documents the empty-resolver form).
 		cfg.Routes[d.WithoutTrailingDot()] = []*dnstype.Resolver{}
 	}
 }

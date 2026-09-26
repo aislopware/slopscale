@@ -69,7 +69,7 @@ func registerACLValidate(api huma.API, b Backend) {
 	}, scope.PolicyFileRead), "policy.validate", "policy", ""), func(
 		ctx context.Context, in *validateACLInput,
 	) (*validateACLOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

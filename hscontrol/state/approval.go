@@ -81,6 +81,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see IDTokenSigner", ErrUnknownSetting, key)
 	case types.SettingTailnetLock:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see TailnetLock", ErrUnknownSetting, key)
+	case types.SettingTailnetID:
+		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see TailnetID", ErrUnknownSetting, key)
 	case types.SettingDNS:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetDNS", ErrUnknownSetting, key)
 	case types.SettingDERP:
@@ -113,7 +115,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return s.approvePendingUsers()
 	case types.SettingDNS, types.SettingDERP, types.SettingKeyExpiry, types.SettingPostureIdentityOn,
 		types.SettingSSHRecorders, types.SettingSSHRecordingEnforce, types.SettingDeviceAttributesOn,
-		types.SettingIDTokenKey, types.SettingTailnetLock, types.SettingTraffic, types.SettingTrafficFold:
+		types.SettingIDTokenKey, types.SettingTailnetLock, types.SettingTraffic, types.SettingTrafficFold,
+		types.SettingTailnetID:
 		return change.Change{}, nil
 	default:
 		return change.Change{}, nil

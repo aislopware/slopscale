@@ -72,6 +72,10 @@ const (
 // ErrUnsupportedPolicyMode is returned for invalid policy modes. Valid modes are "file" and "db".
 var ErrUnsupportedPolicyMode = errors.New("unsupported policy mode")
 
+// ErrPolicyRejected wraps why a policy written through the API was refused;
+// the previous policy stays in force.
+var ErrPolicyRejected = errors.New("policy rejected")
+
 // ErrNodeNotFound is returned when a node cannot be found by its ID.
 var ErrNodeNotFound = errors.New("node not found")
 
@@ -147,6 +151,9 @@ type State struct {
 	derp derpState
 	// settings holds the tailnet-wide switches; see [State.Settings].
 	settings atomic.Pointer[types.Settings]
+	// tailnetID is set once by [NewState] and never changes; see
+	// [State.TailnetID].
+	tailnetID tailcfg.StableTailnetID
 	// idTokenSigner signs identity tokens once a key is loaded or made;
 	// idTokenMu serialises that first use. See [State.IDTokenSigner].
 	idTokenSigner atomic.Pointer[idtoken.Signer]
@@ -262,6 +269,10 @@ type State struct {
 	// so that two setters cannot publish each other's stale copy.
 	settingsMu sync.Mutex
 
+	// policyWriteMu serialises policy writes, so a refused write restores
+	// the stored policy rather than one a concurrent write put in force.
+	policyWriteMu sync.Mutex
+
 	// networkMu serialises network writes with the route reconciliation
 	// that follows them, so a toggle cannot approve prefixes a concurrent
 	// change already withdrew.
@@ -370,6 +381,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	s.settings.Store(&settings)
+
+	s.tailnetID, err = loadTailnetID(db)
+	if err != nil {
+		return nil, err
+	}
 
 	err = s.loadStoredConfig()
 	if err != nil {
@@ -735,10 +751,11 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 	return c, nil
 }
 
-// Connect marks a node connected and returns the resulting changes
+// Connect acquires a control session and returns the resulting changes
 // plus a session epoch identifying this poll session. Every Connect
 // acquires one live session; the caller must release it with exactly
 // one [State.Disconnect] call once the session ends (see poll.go).
+// An expired key can keep polling control, but cannot make the node online.
 func (s *State) Connect(id types.NodeID) ([]change.Change, uint64) {
 	prevRoutes := s.nodeStore.PrimaryRoutes()
 
@@ -752,7 +769,7 @@ func (s *State) Connect(id types.NodeID) ([]change.Change, uint64) {
 		n.SessionEpoch++
 		epoch = n.SessionEpoch
 		n.ActiveSessions++
-		n.IsOnline = new(true)
+		n.IsOnline = new(n.ShouldBeOnline())
 		n.LastSeen = &seen
 		n.Unhealthy = false
 	})
@@ -764,6 +781,9 @@ func (s *State) Connect(id types.NodeID) ([]change.Change, uint64) {
 	// routers, relay targets, and via targets get their full peer recompute
 	// from the gated PolicyChange below, so no full update is needed here.
 	c := []change.Change{change.NodeOnline(node.ID(), seen)}
+	if !node.Online() {
+		c[0] = change.NodeAdded(node.ID())
+	}
 
 	log.Info().EmbedObject(node).Msg("node connected")
 
@@ -784,7 +804,7 @@ func (s *State) Connect(id types.NodeID) ([]change.Change, uint64) {
 }
 
 // Disconnect releases one poll session previously acquired by
-// [State.Connect] and marks the node offline only when that was its
+// [State.Connect] and marks the node offline when that was its
 // last live session. Sessions are counted rather than compared by
 // epoch: overlapping sessions for one node — a rapid reconnect, or a
 // cancelled map request whose handler ran late — release in any order
@@ -812,7 +832,7 @@ func (s *State) Disconnect(id types.NodeID, epoch uint64) ([]change.Change, erro
 		wentOffline = true
 
 		n.LastSeen = &seen
-		n.IsOnline = new(false)
+		n.IsOnline = new(n.ShouldBeOnline())
 		// The warnings describe a running client; the next map request
 		// brings the current set.
 		n.ClientWarnings = nil
@@ -829,7 +849,7 @@ func (s *State) Disconnect(id types.NodeID, epoch uint64) ([]change.Change, erro
 		log.Debug().
 			Uint64("disconnect_epoch", epoch).
 			Int("active_sessions", node.ActiveSessions()).
-			Msg("session released, other sessions keep node online")
+			Msg("session released, other control sessions remain")
 
 		return nil, nil
 	}
@@ -967,51 +987,19 @@ func (s *State) ListNodesByUser(userID types.UserID) views.Slice[types.NodeView]
 	return s.nodeStore.ListNodesByUser(userID)
 }
 
-// ListPeers retrieves nodes that can communicate with the specified node based on policy.
+// ListPeers returns the peers the node may see, from the NodeStore's peer
+// map; with peerIDs, only those of them. The peer map is the one decision
+// on visibility (policy, approval, suspension, sharing) for the full map
+// and the incremental paths alike: every write that changes one of its
+// inputs rebuilds it before the change is published. It never holds the
+// node itself, so a change batch naming the recipient does not hand it
+// back as its own peer.
 func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Slice[types.NodeView] {
 	if len(peerIDs) == 0 {
 		return s.nodeStore.ListPeers(nodeID)
 	}
 
-	// For specific peerIDs, filter from all nodes.
-	// This path is used for incremental updates (NodeAdded, NodeChanged)
-	// where the caller already knows which peer IDs are involved.
-	// Peer visibility filtering happens in the mapper against the live
-	// policy (buildTailPeers and filterVisiblePeerPatches), because
-	// the snapshot peer map is not rebuilt on policy changes. Approval is
-	// applied here as the snapshot peer map applies it: a node waiting for
-	// approval, or suspended, has no peers and is nobody's peer.
-	if requester, ok := s.nodeStore.GetNode(nodeID); !ok || !requester.IsAdmitted() {
-		return views.SliceOf([]types.NodeView{})
-	}
-
-	allNodes := s.nodeStore.ListNodes()
-
-	nodeIDSet := make(map[types.NodeID]struct{}, len(peerIDs))
-	for _, id := range peerIDs {
-		nodeIDSet[id] = struct{}{}
-	}
-
-	var filteredNodes []types.NodeView
-
-	for _, node := range allNodes.All() {
-		// A node is never its own peer. The snapshot peer map keeps this
-		// out, but the caller may name the recipient in peerIDs (a change
-		// batch that includes it), and the mapper's only other self filter
-		// is [change.Change.OriginNode], which a broadcast change does not
-		// carry. Self would then reach the client in
-		// [tailcfg.MapResponse.PeersChanged], where it is merged into the
-		// peer map and listed alongside the self node.
-		if node.ID() == nodeID {
-			continue
-		}
-
-		if _, exists := nodeIDSet[node.ID()]; exists && node.IsAdmitted() {
-			filteredNodes = append(filteredNodes, node)
-		}
-	}
-
-	return views.SliceOf(filteredNodes)
+	return s.nodeStore.ListPeersAmong(nodeID, peerIDs)
 }
 
 // ListEphemeralNodes retrieves all ephemeral (temporary) nodes in the system.
@@ -1032,13 +1020,20 @@ func (s *State) ListEphemeralNodes() views.Slice[types.NodeView] {
 // SetNodeExpiry updates the expiration time for a node.
 // If expiry is nil, the node's expiry is disabled (node will never expire).
 func (s *State) SetNodeExpiry(nodeID types.NodeID, expiry *time.Time) (types.NodeView, change.Change, error) {
+	var onlineChanged bool
+
 	// Update [NodeStore] before database to ensure consistency. The [NodeStore] update
 	// is blocking and will be the source of truth for the batcher. The database update
 	// must make the exact same change. If the database update fails, the [NodeStore]
 	// change will remain, but since we return an error, no change notification will be
 	// sent to the batcher, preventing inconsistent state propagation.
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
+		wasOnline := node.Online()
 		node.Expiry = expiry
+		// Control stays connected in NeedsLogin so an expiry extension can
+		// recover the client, but an expired key is not online.
+		node.IsOnline = new(node.ShouldBeOnline())
+		onlineChanged = wasOnline != node.Online()
 	})
 
 	if !ok {
@@ -1057,8 +1052,11 @@ func (s *State) SetNodeExpiry(nodeID types.NodeID, expiry *time.Time) (types.Nod
 		return n, change.Change{}, fmt.Errorf("updating policy manager after setting expiry: %w", err)
 	}
 
-	if c.IsEmpty() {
-		c = change.NodeAdded(n.ID())
+	// Resolve expiry and online status together from the current snapshot
+	// when the mapper sends the change, including after a rapid restoration.
+	c = c.Merge(change.NodeAdded(n.ID()))
+	if onlineChanged && s.polMan.NodeNeedsPeerRecompute(n) {
+		c = c.Merge(change.PolicyChange())
 	}
 
 	return n, c.Merge(s.trafficRecheck()), nil
@@ -1244,7 +1242,8 @@ func (s *State) ExpireExpiredNodes(lastCheck time.Time) (time.Time, []change.Cha
 	// while this function is running by using a consistent timestamp for the next check
 	started := time.Now()
 
-	var updates []change.Change
+	nodeUpdates := make(map[types.NodeID]UpdateNodeFunc)
+	expiredNodes := make(map[types.NodeID]bool)
 
 	for _, node := range s.nodeStore.ListNodes().All() {
 		if !node.Valid() {
@@ -1253,10 +1252,41 @@ func (s *State) ExpireExpiredNodes(lastCheck time.Time) (time.Time, []change.Cha
 
 		// Why check After(lastCheck): We only want to notify about nodes that
 		// expired since the last check to avoid duplicate notifications
-		if node.IsExpired() && node.Expiry().Valid() && node.Expiry().Get().After(lastCheck) {
-			updates = append(updates, change.KeyExpiryFor(node.ID(), node.Expiry().Get()))
-			s.emitNodeKeyExpired(node)
+		if !node.IsExpired() || !node.Expiry().Get().After(lastCheck) {
+			continue
 		}
+
+		nodeUpdates[node.ID()] = func(n *types.Node) {
+			// The key may have been restored since the snapshot was read.
+			if !n.IsExpired() || !n.Expiry.After(lastCheck) {
+				return
+			}
+
+			expiredNodes[n.ID] = n.Online()
+			n.IsOnline = new(n.ShouldBeOnline())
+		}
+	}
+
+	// Publish simultaneous expirations together so route election sees all
+	// unavailable nodes in one snapshot.
+	s.nodeStore.UpdateNodes(nodeUpdates)
+
+	updates := make([]change.Change, 0, len(expiredNodes))
+
+	for id, wasOnline := range expiredNodes {
+		current, ok := s.nodeStore.GetNode(id)
+		if !ok {
+			continue
+		}
+
+		c := change.NodeAdded(id)
+		if wasOnline && s.polMan.NodeNeedsPeerRecompute(current) {
+			c = c.Merge(change.PolicyChange())
+		}
+
+		updates = append(updates, c)
+
+		s.emitNodeKeyExpired(current)
 	}
 
 	if len(updates) > 0 {
@@ -1302,19 +1332,6 @@ func (s *State) MatchersForNode(node types.NodeView) ([]matcher.Match, error) {
 	return s.polMan.MatchersForNode(node)
 }
 
-// VisiblePeers narrows candidates to the peers node may see under the
-// live policy, by the pairwise rule the NodeStore's peer map was built
-// with. The full map takes its peers from that map; the incremental
-// paths take theirs from here, so a node the policy hands an empty
-// filter (autogroup:shared before anything is shared, say) sees nobody
-// rather than everybody.
-func (s *State) VisiblePeers(
-	node types.NodeView,
-	candidates views.Slice[types.NodeView],
-) views.Slice[types.NodeView] {
-	return s.polMan.VisiblePeers(node, candidates)
-}
-
 // NodeCapMap returns the policy-derived CapMap for the given node, suitable
 // for merging into [tailcfg.Node.CapMap] when the node is rendered as self or
 // as someone else's peer.
@@ -1351,6 +1368,10 @@ func (s *State) SetPolicy(pol []byte) (bool, error) {
 	changed, err := s.polMan.SetPolicy(pol)
 	if err != nil {
 		return changed, err
+	}
+
+	if changed {
+		s.nodeStore.RebuildPeerMaps()
 	}
 
 	// Clear SSH check auth times when policy changes.
@@ -1405,6 +1426,47 @@ func (s *State) GetPolicy() (*types.Policy, error) {
 // SetPolicyInDB stores policy data in the database.
 func (s *State) SetPolicyInDB(data string) (*types.Policy, error) {
 	return s.db.SetPolicy(data)
+}
+
+// ReplacePolicy puts data in force as the database policy. It is compiled
+// against the live tailnet and its SSH rules resolved before it is stored; a
+// policy that fails either, or cannot be stored, is taken back out by
+// restoring the stored one. The changes returned then (a policy change) put
+// clients back on it, because map requests in between may have used the
+// refused policy, so callers dispatch them whether or not err is nil.
+// Refusals wrap [ErrPolicyRejected].
+func (s *State) ReplacePolicy(data string) (*types.Policy, []change.Change, error) {
+	s.policyWriteMu.Lock()
+	defer s.policyWriteMu.Unlock()
+
+	_, err := s.SetPolicy([]byte(data))
+	if err != nil {
+		return nil, s.restoreStoredPolicy(), fmt.Errorf("%w: %w", ErrPolicyRejected, err)
+	}
+
+	// SSH rule validation needs a node, so a server with no nodes cannot
+	// catch every case here.
+	nodes := s.ListNodes()
+	if nodes.Len() > 0 {
+		_, err = s.SSHPolicy(nodes.At(0))
+		if err != nil {
+			return nil, s.restoreStoredPolicy(), fmt.Errorf("%w: verifying SSH rules: %w", ErrPolicyRejected, err)
+		}
+	}
+
+	updated, err := s.SetPolicyInDB(data)
+	if err != nil {
+		return nil, s.restoreStoredPolicy(), fmt.Errorf("storing policy: %w", err)
+	}
+
+	// Reload even when content is unchanged: routes manually disabled before
+	// may now qualify for auto-approval, so they must be re-evaluated.
+	cs, err := s.ReloadPolicy()
+	if err != nil {
+		return nil, nil, fmt.Errorf("reloading policy: %w", err)
+	}
+
+	return updated, cs, nil
 }
 
 // GetNodePrimaryRoutes returns the primary routes for a node.
@@ -1587,8 +1649,7 @@ var haHealthUpdates = promauto.NewCounterVec(prometheus.CounterOpts{
 func healthSetter(healthy bool) UpdateNodeFunc {
 	return func(n *types.Node) {
 		if !healthy {
-			online := n.IsOnline != nil && *n.IsOnline
-			if !online || len(n.AllApprovedRoutes()) == 0 {
+			if !n.Online() || len(n.AllApprovedRoutes()) == 0 {
 				haHealthUpdates.WithLabelValues("rejected").Inc()
 
 				return
@@ -2199,6 +2260,13 @@ func (s *State) HandleNodeFromPreAuthKey(
 		}
 	}
 
+	// Checked before key validation and any allocation so new nodes and
+	// re-registrations are held to the same rule.
+	err = checkPreAuthKeyRequestTags(pak, regReq.Hostinfo)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, err
+	}
+
 	// Helper to get username for logging (handles nil User for tags-only keys)
 	pakUsername := func() string {
 		if pak.User != nil {
@@ -2393,10 +2461,8 @@ func (s *State) HandleNodeFromPreAuthKey(
 
 			node.AuthKey = pak
 			node.AuthKeyID = &pak.ID
-			// Do NOT reset IsOnline here. Online status is managed exclusively by
-			// [State.Connect]/[State.Disconnect] in the poll session lifecycle.
-			// Resetting it during re-registration causes a false offline blip
-			// to peers.
+			// Preserve online state during re-registration so a live node does
+			// not appear offline before the client restarts its map stream.
 			node.LastSeen = new(time.Now())
 
 			// Tagged nodes keep their existing expiry (disabled).
@@ -3779,12 +3845,8 @@ func (s *State) mutateNodeForAuthUpdate(
 	if len(regData.Endpoints) > 0 {
 		node.Endpoints = regData.Endpoints
 	}
-	// Do NOT reset IsOnline here. Online status is managed exclusively by
-	// [State.Connect]/[State.Disconnect] in the poll session lifecycle.
-	// Resetting it during re-registration causes a false offline blip: the
-	// change notification triggers a map regeneration showing the node as
-	// offline to peers, even though [State.Connect] will immediately set it
-	// back to true.
+	// Preserve online state during re-registration so a live node does
+	// not appear offline before the client restarts its map stream.
 	node.LastSeen = new(time.Now())
 
 	// On conversion (tagged → user) we set the new register method.
@@ -3982,31 +4044,42 @@ func assignNodeOwnership(nodeToRegister *types.Node, params newNodeParams) {
 	}
 }
 
-// applyAdvertiseTags validates and applies client-requested advertise-tags
-// (tailscale up --advertise-tags). PreAuthKey nodes get their tags from the
-// key itself, so a request is only accepted when it asks for tags the key
-// already carries; anything more is rejected early, before any resource
-// allocation.
-func (s *State) applyAdvertiseTags(nodeToRegister *types.Node, params newNodeParams) error {
-	if params.Hostinfo == nil || len(params.Hostinfo.RequestTags) == 0 {
+// checkPreAuthKeyRequestTags rejects advertise-tags a pre-auth key does not
+// carry. The key fixes the node's tags, so the client may name them again
+// (tailscale up --authkey with --advertise-tags, which Tailscale accepts, and
+// which the client's OAuth authkey flow always does) but may not ask for
+// anything more.
+func checkPreAuthKeyRequestTags(pak *types.PreAuthKey, hostinfo *tailcfg.Hostinfo) error {
+	if hostinfo == nil {
 		return nil
 	}
 
-	if params.PreAuthKey != nil {
-		// The key fixes the node's tags, so the client may name them again
-		// (tailscale up --authkey with --advertise-tags, which Tailscale
-		// accepts) but may not ask for anything the key does not carry.
-		for _, tag := range params.Hostinfo.RequestTags {
-			if !slices.Contains(params.PreAuthKey.Tags, tag) {
-				return fmt.Errorf(
-					"%w %v are not permitted: the pre-auth key allows %v",
-					ErrRequestedTagsInvalidOrNotPermitted,
-					params.Hostinfo.RequestTags,
-					params.PreAuthKey.Tags,
-				)
-			}
-		}
+	var extra []string
 
+	for _, tag := range hostinfo.RequestTags {
+		if !slices.Contains(pak.Tags, tag) {
+			extra = append(extra, tag)
+		}
+	}
+
+	if len(extra) > 0 {
+		return fmt.Errorf(
+			"%w %v are not permitted: the pre-auth key allows %v",
+			ErrRequestedTagsInvalidOrNotPermitted,
+			extra,
+			pak.Tags,
+		)
+	}
+
+	return nil
+}
+
+// applyAdvertiseTags validates and applies client-requested advertise-tags
+// (tailscale up --advertise-tags), rejecting them early, before any resource
+// allocation. PreAuthKey nodes get their tags from the key itself;
+// [State.HandleNodeFromPreAuthKey] has already checked the request against it.
+func (s *State) applyAdvertiseTags(nodeToRegister *types.Node, params newNodeParams) error {
+	if params.Hostinfo == nil || len(params.Hostinfo.RequestTags) == 0 || params.PreAuthKey != nil {
 		return nil
 	}
 
@@ -4186,8 +4259,8 @@ func dnsLabelReason(err error) string {
 	const marker = "is not a valid DNS label: "
 
 	msg := err.Error()
-	if i := strings.LastIndex(msg, marker); i >= 0 {
-		return msg[i+len(marker):]
+	if _, reason, found := strings.CutLast(msg, marker); found {
+		return reason
 	}
 
 	return msg
@@ -4236,6 +4309,28 @@ func (s *State) loadStoredConfig() error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// restoreStoredPolicy puts the stored policy back in force after a refused
+// write and returns the change that moves clients back onto it.
+func (s *State) restoreStoredPolicy() []change.Change {
+	pol, err := hsdb.PolicyBytes(s.db, s.cfg)
+	if err == nil {
+		var changed bool
+
+		changed, err = s.SetPolicy(pol)
+		if err == nil {
+			if !changed {
+				return nil
+			}
+
+			return []change.Change{change.PolicyChange()}
+		}
+	}
+
+	log.Error().Err(err).Msg("restoring the stored policy after a refused write")
 
 	return nil
 }

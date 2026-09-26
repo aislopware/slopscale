@@ -1,51 +1,14 @@
 package db
 
 import (
-	"encoding/base64"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// TestVerifySecretConcurrent runs more concurrent verifications than the Argon2
-// concurrency semaphore admits, asserting the limiter releases correctly (no
-// deadlock) and stays correct under contention. Run with -race.
-func TestVerifySecretConcurrent(t *testing.T) {
-	t.Parallel()
-
-	hash, err := hashSecret("s3cr3t")
-	require.NoError(t, err)
-
-	const n = 64
-
-	var wg sync.WaitGroup
-
-	errs := make([]error, n)
-
-	for i := range n {
-		wg.Go(func() {
-			if i%2 == 0 {
-				errs[i] = verifySecret(hash, "s3cr3t")
-			} else {
-				errs[i] = verifySecret(hash, "wrong")
-			}
-		})
-	}
-
-	wg.Wait()
-
-	for i, e := range errs {
-		if i%2 == 0 {
-			assert.NoError(t, e, "correct secret must verify")
-		} else {
-			assert.Error(t, e, "wrong secret must fail")
-		}
-	}
-}
 
 func TestOAuthClientCreateAndAuthenticate(t *testing.T) {
 	t.Parallel()
@@ -68,9 +31,8 @@ func TestOAuthClientCreateAndAuthenticate(t *testing.T) {
 	// Scopes/tags are deduplicated and sorted for stable storage.
 	assert.Equal(t, []string{"auth_keys", "devices:core"}, client.Scopes)
 	assert.Equal(t, []string{"tag:ci"}, client.Tags)
-	// Only the Argon2id hash is stored, never the plaintext.
-	assert.NotEmpty(t, client.SecretHash)
-	assert.True(t, strings.HasPrefix(string(client.SecretHash), "$argon2id$"))
+	// Only the SHA-256 hash is stored, never the plaintext.
+	assert.True(t, strings.HasPrefix(string(client.SecretHash), hashPrefixSHA256))
 
 	// The secret authenticates, deriving the client id from the secret itself.
 	got, err := db.AuthenticateOAuthClient(secret)
@@ -86,34 +48,49 @@ func TestOAuthClientCreateAndAuthenticate(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestHashSecretRoundTrip(t *testing.T) {
+// TestOAuthClientAuthenticateTailscalePrefix asserts the same stored client
+// authenticates under the tskey-client- alias, and that only a leading prefix
+// is recognised.
+func TestOAuthClientAuthenticateTailscalePrefix(t *testing.T) {
 	t.Parallel()
 
-	const secret = "a-high-entropy-credential-secret"
-
-	encoded, err := hashSecret(secret)
+	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(string(encoded), "$argon2id$v="))
 
-	// The same secret hashes to a different value each time (random salt) yet
-	// still verifies.
-	encoded2, err := hashSecret(secret)
+	secret, client, err := db.CreateOAuthClient([]string{"auth_keys"}, []string{"tag:ci"}, "", nil)
 	require.NoError(t, err)
-	assert.NotEqual(t, encoded, encoded2)
 
-	require.NoError(t, verifySecret(encoded, secret))
-	require.ErrorIs(t, verifySecret(encoded, "wrong-secret"), errSecretMismatch)
-	require.ErrorIs(t, verifySecret([]byte("not-a-phc-string"), secret), errSecretHashMalformed)
+	rest := strings.TrimPrefix(secret, types.OAuthClientPrefix)
+	tsSecret := types.TailscaleOAuthClientPrefix + rest
 
-	// A well-formed PHC string whose hash segment decodes to something other
-	// than sha256.Size bytes (e.g. a truncated or corrupted stored hash) must
-	// be rejected before the constant-time compare, not misread as a shorter
-	// Argon2 key.
-	parts := strings.Split(string(encoded), "$")
-	require.Len(t, parts, 6)
-	parts[5] = base64.RawStdEncoding.EncodeToString(make([]byte, 16))
-	shortHash := strings.Join(parts, "$")
-	require.ErrorIs(t, verifySecret([]byte(shortHash), secret), errSecretHashMalformed)
+	for _, s := range []string{
+		tsSecret,
+		// Callers may pass the raw auth-key form; ?attributes are stripped.
+		tsSecret + "?baseURL=http://127.0.0.1:8080&ephemeral=true",
+	} {
+		got, authErr := db.AuthenticateOAuthClient(s)
+		require.NoError(t, authErr, s)
+		assert.Equal(t, client.ClientID, got.ClientID)
+	}
+
+	// A wrong secret under the alias parses but fails verification.
+	_, err = db.AuthenticateOAuthClient(
+		types.TailscaleOAuthClientPrefix + client.ClientID + "-" + strings.Repeat("0", 64),
+	)
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrOAuthClientFailedToParse)
+
+	for _, s := range []string{
+		types.TailscaleOAuthClientPrefix,
+		"tskey-auth-" + rest,
+		"tskey-" + rest,
+		"junk-" + tsSecret,
+		"junk-" + secret,
+		types.TailscaleOAuthClientPrefix + secret,
+	} {
+		_, authErr := db.AuthenticateOAuthClient(s)
+		require.ErrorIs(t, authErr, ErrOAuthClientFailedToParse, s)
+	}
 }
 
 func TestOAuthClientRevoke(t *testing.T) {
