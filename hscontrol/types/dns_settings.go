@@ -253,14 +253,7 @@ func (s DNSSettings) Validate() error {
 		return err
 	}
 
-	for _, r := range s.ExtraRecords {
-		err := validateRecord(r)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return ValidateExtraRecords(s.ExtraRecords)
 }
 
 func validateNameserver(ns string) error {
@@ -318,6 +311,19 @@ func validateDomain(domain string) error {
 	for label := range strings.SplitSeq(domain, ".") {
 		if !domainLabelRe.MatchString(label) {
 			return fmt.Errorf("%w: %q", ErrDNSDomainInvalid, domain)
+		}
+	}
+
+	return nil
+}
+
+// ValidateExtraRecords checks normalized records the way [DNSSettings.Validate]
+// does, for records that come from a file rather than the settings API.
+func ValidateExtraRecords(records []tailcfg.DNSRecord) error {
+	for _, r := range records {
+		err := validateRecord(r)
+		if err != nil {
+			return err
 		}
 	}
 
