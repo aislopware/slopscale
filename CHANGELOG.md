@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## [0.50.0](https://github.com/aislopware/slopscale/compare/v0.49.0...v0.50.0) (2026-09-26)
+
+
+### Changes
+
+* **api/v2:** accept the tailnet ID in place of "-" and show it in the server info ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **cmd/slopscale:** suggest how to find the socket holding a port when serve cannot bind ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **db:** accept tskey-client- OAuth client secrets so the stock tailscale client and GitHub Action can mint auth keys ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **mapper:** tell clients their tailnet's stable ID, shown by tailscale status --json ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **types:** refuse to start when two listeners would bind the same socket ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **types:** report every configuration problem in one start, naming the key, its value and the fix ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **web:** show the tailnet ID, ready to copy, on Settings › Tailnet ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+
+
+### Fixes
+
+* **cli:** tell no matching user apart from several, list the matches, and refuse --identifier 0 ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **db:** hash pre-auth keys from before 0.28 instead of storing them in plaintext ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **db:** keep a revoked pre-auth key while a node still uses it, so an ephemeral node does not turn permanent ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **db:** name the nodes that block a user deletion ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **db:** refuse a database from headscale 0.24 or earlier instead of half-migrating it ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **hscontrol:** keep renewing Let's Encrypt certificates after a badNonce reply ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **hscontrol:** name the listener that cannot bind, and stop a taken ACME port from exiting the process ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **mapper:** stop dropping healthy connections under load and sending empty map frames ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **policy/v2:** accept '#' metadata fields in grants, ssh, nodeAttrs and at the top level ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **state:** leave the previous policy in force when a policy write is refused or cannot be stored ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **state:** refuse advertise-tags a pre-auth key lacks when a node re-registers, not only on first join ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **state:** show a node offline once its key expires, and back online when the expiry is lifted ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **state:** show the gateway to the nodes its DNS log resolver grant admits ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+
+
+### Performance
+
+* **db:** verify API keys, auth keys and OAuth credentials with SHA-256 instead of bcrypt and Argon2id, upgrading each stored hash on its next use ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **mapper:** cut the policy work of online, offline and endpoint updates from quadratic to linear ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+
+
+### Dependencies
+
+* update tailscale.com to capability version 148 and refresh the Go modules ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+* **web:** update the console dependencies to Kumo 2.14, oxlint 1.85 and oxfmt 0.70 ([59d2244](https://github.com/aislopware/slopscale/commit/59d2244d45b940f31122ff2616f480904eeb58cf))
+
 ## [0.49.0](https://github.com/aislopware/slopscale/compare/v0.48.0...v0.49.0) (2026-09-26)
 
 
