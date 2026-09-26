@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/aislopware/slopscale/hscontrol/api/principal"
@@ -210,7 +211,7 @@ func slopscaleTests(tests []aclTest) (json.RawMessage, error) {
 
 		out = append(out, policyv2.PolicyTest{
 			Src:    src,
-			Accept: append(append([]string{}, t.Accept...), t.Allow...),
+			Accept: slices.Concat(t.Accept, t.Allow),
 			Deny:   t.Deny,
 		})
 	}

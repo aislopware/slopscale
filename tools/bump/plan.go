@@ -24,7 +24,6 @@ func cmdPlan(ctx context.Context) error {
 func planLines(ctx context.Context, r *repo) []string {
 	lines := []string{"flake.lock: `nix flake update` moves nixpkgs, flake-utils and flake-checks"}
 
-	lines = append(lines, planBun(ctx, r))
 	lines = append(lines, planBuilders(ctx, r)...)
 	lines = append(lines, planLockstep(ctx, r)...)
 	lines = append(lines, planImages(ctx, r)...)
@@ -41,25 +40,6 @@ func planLines(ctx context.Context, r *repo) []string {
 	}
 
 	return append(lines, gap("Makefile oapi-codegen", version, latest))
-}
-
-func planBun(ctx context.Context, r *repo) string {
-	content, err := r.readFile("flake.nix")
-	if err != nil {
-		return "bun: " + err.Error()
-	}
-
-	have, err := pinnedBun(content)
-	if err != nil {
-		return "bun: " + err.Error()
-	}
-
-	want, err := latestBun(ctx)
-	if err != nil {
-		return "bun: " + err.Error()
-	}
-
-	return gap("flake.nix bun", have, want)
 }
 
 func planImages(ctx context.Context, r *repo) []string {

@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"net/netip"
 	"slices"
@@ -19,7 +20,6 @@ import (
 	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/types/dnstype"
 	"tailscale.com/types/views"
-	"tailscale.com/util/multierr"
 )
 
 // MapResponseBuilder provides a fluent interface for building [tailcfg.MapResponse].
@@ -369,7 +369,7 @@ func (b *MapResponseBuilder) WithPeersRemoved(removedIDs ...types.NodeID) *MapRe
 // Build finalizes the response and returns marshaled bytes.
 func (b *MapResponseBuilder) Build() (*tailcfg.MapResponse, error) {
 	if len(b.errs) > 0 {
-		return nil, fmt.Errorf("building map response: %w", multierr.New(b.errs...))
+		return nil, fmt.Errorf("building map response: %w", errors.Join(b.errs...))
 	}
 
 	if debugDumpMapResponsePath != "" {

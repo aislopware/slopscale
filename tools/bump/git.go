@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"strings"
 )
 
@@ -43,18 +42,9 @@ func headSHA(ctx context.Context, r *repo) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
-// treeSHA identifies the content of the working commit, independent of message
-// or parentage. It is what the pull request marker records so a rerun can tell
-// "nothing new" from "same change, previously rejected".
-func treeSHA(ctx context.Context, r *repo) (string, error) {
-	out, err := r.run(ctx, "git", "rev-parse", "HEAD^{tree}")
-
-	return strings.TrimSpace(out), err
-}
-
 // resetTo rewinds the worktree to sha, leaving nothing behind. Every dropped
 // area goes through here, which is why a drop cannot leave a partial edit in
-// the pull request.
+// the branch.
 func resetTo(ctx context.Context, r *repo, sha string) error {
 	_, err := r.run(ctx, "git", "reset", "--hard", sha)
 	if err != nil {
@@ -72,16 +62,15 @@ func commitAll(ctx context.Context, r *repo, message string) error {
 		return err
 	}
 
-	// The bot's own commits are machine-generated and already gated; the
-	// hooks re-run the same checks far more slowly.
+	// Each area is gated before it is committed; the hooks would re-run the
+	// same checks far more slowly.
 	_, err = r.run(ctx, "git", "commit", "--no-verify", "--message", message)
 
 	return err
 }
 
 // startBranch rebuilds the working branch from the base every run. The branch
-// therefore never accumulates history, never conflicts, and the bot keeps no
-// state on disk between runs.
+// therefore never accumulates history and never conflicts.
 func startBranch(ctx context.Context, r *repo, remote, base, branch string) error {
 	_, err := r.run(ctx, "git", "fetch", remote, base)
 	if err != nil {
@@ -91,28 +80,4 @@ func startBranch(ctx context.Context, r *repo, remote, base, branch string) erro
 	_, err = r.run(ctx, "git", "checkout", "-B", branch, remote+"/"+base)
 
 	return err
-}
-
-// remoteBranchSHA is the tip of branch on remote, or "" when it does not exist.
-func remoteBranchSHA(ctx context.Context, r *repo, remote, branch string) string {
-	out, err := r.run(ctx, "git", "ls-remote", "--heads", remote, branch)
-	if err != nil {
-		return ""
-	}
-
-	fields := strings.Fields(out)
-	if len(fields) == 0 {
-		return ""
-	}
-
-	return fields[0]
-}
-
-func forcePush(ctx context.Context, r *repo, remote, branch string) error {
-	_, err := r.run(ctx, "git", "push", "--force", remote, "HEAD:refs/heads/"+branch)
-	if err != nil {
-		return fmt.Errorf("pushing %s: %w", branch, err)
-	}
-
-	return nil
 }

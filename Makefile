@@ -109,7 +109,7 @@ docs-deps:
 .PHONY: docs
 docs: docs-deps
 	@echo "Building documentation..."
-	cd docs && bun run build && bun run validate
+	cd docs && bun run build && bun run validate && bun run audit
 
 .PHONY: docs-dev
 docs-dev: docs-deps

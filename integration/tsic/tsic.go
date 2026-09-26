@@ -31,7 +31,6 @@ import (
 	"tailscale.com/paths"
 	"tailscale.com/types/key"
 	"tailscale.com/types/netmap"
-	"tailscale.com/util/multierr"
 	"tailscale.com/util/rands"
 	"tailscale.com/wgengine/filter"
 )
@@ -1141,7 +1140,7 @@ func (t *TailscaleInContainer) WaitForRunning(timeout time.Duration) error {
 // - All peers have a hostname
 // - All peers have a DERP relay assigned
 //
-// Uses multierr to collect all validation errors.
+// Collects all validation errors.
 func (t *TailscaleInContainer) WaitForPeers(expected int, timeout, retryInterval time.Duration) error {
 	ticker := time.NewTicker(retryInterval)
 	defer ticker.Stop()
@@ -1160,7 +1159,7 @@ func (t *TailscaleInContainer) WaitForPeers(expected int, timeout, retryInterval
 					expected,
 					t.hostname,
 					timeout,
-					multierr.New(lastErrs...),
+					errors.Join(lastErrs...),
 				)
 			}
 

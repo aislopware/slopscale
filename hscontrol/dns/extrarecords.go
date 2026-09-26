@@ -313,7 +313,12 @@ func readExtraRecordsFromPath(path string) ([]tailcfg.DNSRecord, [32]byte, error
 		return nil, zero, fmt.Errorf("unmarshalling records, content: %q: %w", string(b), err)
 	}
 
-	hash := sha256.Sum256(b)
+	records = types.NormalizeExtraRecords(records)
 
-	return types.NormalizeExtraRecords(records), hash, nil
+	err = types.ValidateExtraRecords(records)
+	if err != nil {
+		return nil, zero, fmt.Errorf("validating records in %s: %w", path, err)
+	}
+
+	return records, sha256.Sum256(b), nil
 }
