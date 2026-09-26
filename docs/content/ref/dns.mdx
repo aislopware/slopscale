@@ -157,6 +157,9 @@ Currently, [only A and AAAA records are processed by Tailscale](https://github.c
       Slopscale uses a checksum to detect changes to the file and a stable output avoids unnecessary processing.
     - Slopscale reads the file once it has been left alone for a moment, so a script may write it in several
       steps. Record names are lowercased on the way in, as a client only matches lowercase names.
+    - Records are checked like those set at runtime: a file with an invalid name or a value that does not match
+      its type stops Slopscale from starting, and an invalid edit while it runs is logged and the records already
+      served stay in place.
     :::
 
     </Tab>
