@@ -112,6 +112,18 @@ has to be stored anywhere.
   and fetched through `egress.Transport()` because the issuer is operator
   input. Every exchange, refused or not, is audited as `oauth.token.exchange`.
 
+## OAuth with the tailscale client and GitHub Action
+
+The stock `tailscale` client (`feature/oauthkey`) accepts an OAuth client secret
+as an auth key: it exchanges it at `/api/v2/oauth/token`, mints a tagged key via
+`CreateKey`, then registers re-advertising those tags. Server-side this relies on
+two things: `db.AuthenticateOAuthClient` accepting the `tskey-client-` prefix
+alias (the client only runs the exchange for it), and pre-auth key registration
+tolerating `RequestTags` that are a subset of the key's tags.
+`TestAPIv2OAuthTailscaleClientAuthKey` in `servertest/` drives the real client
+code through this; `.github/workflows/tailscale-action-integration.yml` covers
+the GitHub Action. User-facing setup is in `docs/content/ref/api.mdx`.
+
 ## Endpoints beyond the core
 
 - **Policy validation** `POST /api/v2/tailnet/-/acl/validate` (`acl_validate.go`).
