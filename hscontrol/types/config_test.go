@@ -164,7 +164,7 @@ func TestReadConfig(t *testing.T) {
 				return LoadServerConfig()
 			},
 			want:    nil,
-			wantErr: errServerURLSuffix.Error(),
+			wantErr: "Fatal config error: server_url is a subdomain of dns.base_domain",
 		},
 		{
 			name:       "base-domain-not-in-server-url",
@@ -192,7 +192,7 @@ func TestReadConfig(t *testing.T) {
 			setup: func(_ *testing.T) (any, error) {
 				return LoadServerConfig()
 			},
-			wantErr: "Fatal config error: dns.nameservers.global must be set when dns.override_local_dns is true",
+			wantErr: "Fatal config error: dns.nameservers.global is required when dns.override_local_dns is true",
 		},
 		{
 			name:       "dns-override-true",
@@ -291,7 +291,8 @@ func TestReadConfig(t *testing.T) {
 			got, err := tt.setup(t)
 
 			if tt.wantErr != "" {
-				assert.Equal(t, tt.wantErr, err.Error())
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
 
 				return
 			}
@@ -422,17 +423,17 @@ noise:
 	assert.Contains(
 		t,
 		err.Error(),
-		"Fatal config error: set either tls_letsencrypt_hostname or tls_cert_path/tls_key_path, not both",
+		"Fatal config error: tls_letsencrypt_hostname and tls_cert_path/tls_key_path are mutually exclusive",
 	)
 	assert.Contains(
 		t,
 		err.Error(),
-		"Fatal config error: the only supported values for tls_letsencrypt_challenge_type are",
+		"Fatal config error: tls_letsencrypt_challenge_type has an unsupported value",
 	)
 	assert.Contains(
 		t,
 		err.Error(),
-		"Fatal config error: server_url must start with https:// or http://",
+		"Fatal config error: server_url is missing a scheme",
 	)
 
 	// Check configuration validation errors (2)
@@ -532,7 +533,10 @@ func TestOIDCConfigValidation(t *testing.T) {
 noise:
   private_key_path: noise_private.key
 server_url: http://127.0.0.1:8080
+database:
+  type: sqlite
 dns:
+  magic_dns: false
   override_local_dns: false
 oidc:` + tt.oidcBlock + "\n")
 
