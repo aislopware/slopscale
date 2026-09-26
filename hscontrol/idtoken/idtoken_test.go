@@ -82,6 +82,86 @@ func TestKeyRoundTrip(t *testing.T) {
 	require.ErrorIs(t, err, idtoken.ErrNoKey)
 }
 
+func TestVerify(t *testing.T) {
+	t.Parallel()
+
+	key, err := idtoken.GenerateKey()
+	require.NoError(t, err)
+
+	signer, err := idtoken.New(key)
+	require.NoError(t, err)
+
+	const (
+		issuer   = "https://control.example.com"
+		audience = "slopscale-flowd"
+	)
+
+	now := time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC)
+	claims := idtoken.NewClaims(issuer, audience, now)
+	claims.NodeID = 7
+	claims.Key = "nodekey:abcd"
+
+	token, err := signer.Sign(claims)
+	require.NoError(t, err)
+
+	got, err := signer.Verify(token, issuer, audience, now.Add(time.Minute))
+	require.NoError(t, err)
+	assert.Equal(t, uint64(7), got.NodeID)
+	assert.Equal(t, "nodekey:abcd", got.Key)
+
+	otherKey, err := idtoken.GenerateKey()
+	require.NoError(t, err)
+
+	other, err := idtoken.New(otherKey)
+	require.NoError(t, err)
+
+	forged, err := other.Sign(claims)
+	require.NoError(t, err)
+
+	noExpiry := claims
+	noExpiry.Expiry = nil
+
+	undated, err := signer.Sign(noExpiry)
+	require.NoError(t, err)
+
+	for name, check := range map[string]func() error{
+		"another key": func() error {
+			_, err := signer.Verify(forged, issuer, audience, now)
+			return err
+		},
+		"another audience": func() error {
+			_, err := signer.Verify(token, issuer, "https://vault.example.com", now)
+			return err
+		},
+		"another issuer": func() error {
+			_, err := signer.Verify(token, "https://evil.example.com", audience, now)
+			return err
+		},
+		"expired": func() error {
+			_, err := signer.Verify(token, issuer, audience, now.Add(idtoken.TokenLifetime+2*time.Minute))
+			return err
+		},
+		"not yet valid": func() error {
+			_, err := signer.Verify(token, issuer, audience, now.Add(-5*time.Minute))
+			return err
+		},
+		"no expiry": func() error {
+			_, err := signer.Verify(undated, issuer, audience, now)
+			return err
+		},
+		"not a token": func() error {
+			_, err := signer.Verify("garbage", issuer, audience, now)
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			require.ErrorIs(t, check(), idtoken.ErrInvalidToken)
+		})
+	}
+}
+
 func TestDiscovery(t *testing.T) {
 	t.Parallel()
 

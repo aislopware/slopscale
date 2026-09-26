@@ -139,7 +139,7 @@ export function Shell({
         <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
           <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
             <RouteProgress />
-            <Trail place={place} />
+            <Trail place={place} pathname={pathname} />
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <AccountMenu me={me} />
@@ -152,9 +152,31 @@ export function Shell({
           </main>
         </div>
         <QuickSearch me={me} pages={pages} open={searchOpen} onOpenChange={setSearchOpen} />
+        <CurrentPageIntoView key={pathname} />
       </Sidebar.Provider>
     </BreadcrumbProvider>
   );
+}
+
+/**
+ * On a short screen the pages low in the sidebar sit below its fold, so the current one would be
+ * out of sight. Keyed by the path, this brings it into view on every page change, a frame later so
+ * its branch has opened.
+ */
+function CurrentPageIntoView(): null {
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector('[data-sidebar="content"] [data-active]')
+        ?.scrollIntoView({ block: "nearest" });
+    });
+
+    return (): void => {
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return null;
 }
 
 interface Toggles {
@@ -293,15 +315,24 @@ function useDocumentTitle(title: string): void {
 /**
  * Breadcrumb trail: the sidebar item, then the page under it when the item is a branch, or the page
  * a detail route announced through useBreadcrumb. A branch's crumb goes straight to its first page
- * the caller may see, the one its own address would redirect to.
+ * the caller may see, the one its own address would redirect to. A detail page below a page of a
+ * branch (one machine's traffic under Traffic, Machines) gets all three: branch, page, detail.
  */
-function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElement {
+function Trail({
+  place,
+  pathname,
+}: {
+  readonly place: NavPlace | undefined;
+  readonly pathname: string;
+}): ReactElement {
   const leaf = useBreadcrumbLeaf();
   const brand = useBrand();
   const current = place?.item;
-  const last: string | null = place?.child?.label ?? leaf;
+  const page = place?.child;
+  const detail = page !== undefined && pathname !== page.to && leaf !== null ? leaf : null;
+  const last: string | null = page?.label ?? leaf;
 
-  useDocumentTitle(documentTitle(brand.title, current?.label, last));
+  useDocumentTitle(documentTitle(brand.title, current?.label, detail ?? last));
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -315,7 +346,15 @@ function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElemen
               {current.label}
             </Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
+            {detail === null || page === undefined ? (
+              <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
+            ) : (
+              <>
+                <Breadcrumbs.Link href={page.to}>{page.label}</Breadcrumbs.Link>
+                <Breadcrumbs.Separator />
+                <Breadcrumbs.Current>{detail}</Breadcrumbs.Current>
+              </>
+            )}
           </>
         )}
       </Breadcrumbs>

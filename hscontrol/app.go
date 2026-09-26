@@ -35,6 +35,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/recorder"
 	"github.com/aislopware/slopscale/hscontrol/state"
 	"github.com/aislopware/slopscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/traffic"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -98,6 +99,17 @@ type Slopscale struct {
 	// funnelAddrs is where the embedded Funnel ingress listens while it
 	// runs; see [Slopscale.FunnelIngressAddrs].
 	funnelAddrs atomic.Pointer[[]string]
+
+	// asnRefreshedAt is when the ASN table was last downloaded; see
+	// refreshASNIfDue.
+	asnRefreshedAt atomic.Pointer[time.Time]
+	asnRefreshing  atomic.Bool
+
+	// trafficIngests counts the traffic reports being applied; see
+	// TrafficReportHandler. trafficTicking is set while a trafficTick
+	// runs.
+	trafficIngests atomic.Int32
+	trafficTicking atomic.Bool
 
 	clientStreamsOpen sync.WaitGroup
 }
@@ -931,7 +943,14 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 	integrationTicker := time.NewTicker(state.PostureIntegrationSyncInterval)
 	defer integrationTicker.Stop()
 
+	// Gateway resolvers leave the clients' DNS within the freshness
+	// window of their last report plus one tick.
+	trafficTicker := time.NewTicker(trafficTickInterval)
+	defer trafficTicker.Stop()
+
 	go h.syncPostureIntegrations(ctx)
+	go h.refreshASNIfDue(ctx)
+	go h.trafficMaintenance()
 
 	lastScheduleCheck := time.Now()
 
@@ -948,6 +967,9 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 			h.reapExpiredAccessTokens()
 			h.reapExpiredSessions()
 			h.reapAuditEvents()
+
+			go h.trafficMaintenance()
+			go h.refreshASNIfDue(ctx)
 
 		case <-expireTicker.C:
 			lastExpiryCheck = h.expireNodesTick(lastExpiryCheck)
@@ -985,6 +1007,9 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 
 		case <-integrationTicker.C:
 			go h.syncPostureIntegrations(ctx)
+
+		case now := <-trafficTicker.C:
+			go h.trafficTick(now)
 
 		case now := <-attributeTicker.C:
 			h.expireNodeAttributes()
@@ -1367,6 +1392,10 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r.Get("/windows", h.WindowsConfigMessage)
 
 	r.Post("/verify", h.VerifyHandler)
+
+	// Traffic reports from slopscale-flowd on the gateways; the agent
+	// authenticates with its node's identity token, not an API key.
+	r.Post(traffic.ReportPath, h.TrafficReportHandler)
 
 	// The relay routes are always mounted: the handler answers 404 while
 	// the settings keep the embedded relay off, so turning it on at

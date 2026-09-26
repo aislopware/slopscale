@@ -46,9 +46,33 @@ builds:
       - -linkmode=external
       - -extldflags=-static
 
+  # The traffic agent is pure Go and runs on the gateways, not the server.
+  - id: slopscale-flowd
+    main: ./cmd/slopscale-flowd
+    binary: slopscale-flowd
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    env:
+      - CGO_ENABLED=0
+    targets:
+      - linux_amd64
+      - linux_arm64
+    flags:
+      - -mod=readonly
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
 archives:
   - id: golang-cross
+    ids:
+      - slopscale
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}{{ with .Mips }}_{{ . }}{{ end }}{{ if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}'
+    formats:
+      - binary
+  - id: slopscale-flowd
+    ids:
+      - slopscale-flowd
+    name_template: "slopscale-flowd_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats:
       - binary
 
@@ -68,7 +92,8 @@ nfpms:
   # List file contents: dpkg -c dist/slopscale...deb
   # Package metadata: dpkg --info dist/slopscale....deb
   #
-  - ids:
+  - id: slopscale
+    ids:
       - slopscale
     package_name: slopscale
     priority: optional
@@ -107,6 +132,42 @@ nfpms:
     deb:
       lintian_overrides:
         - no-changelog # Our CHANGELOG.md uses a different formatting
+        - no-manual-page
+        - statically-linked-binary
+
+  - id: slopscale-flowd
+    ids:
+      - slopscale-flowd
+    package_name: slopscale-flowd
+    priority: optional
+    vendor: slopscale
+    maintainer: Cong Tran <trancong12102@gmail.com>
+    homepage: https://github.com/aislopware/slopscale
+    description: |-
+      Traffic reporter for Tailscale gateways coordinated by slopscale.
+      Runs next to tailscaled on an exit node, subnet router or app connector
+      and reports to the slopscale server how many bytes each tailnet node
+      sends through it and to which destinations, named from TLS and QUIC
+      handshakes and DNS answers. Needs no configuration.
+    bindir: /usr/bin
+    section: net
+    formats:
+      - deb
+    # Not a dependency: tailscaled may come from the static tarball.
+    recommends:
+      - tailscale
+    contents:
+      - src: ./packaging/systemd/slopscale-flowd.service
+        dst: /usr/lib/systemd/system/slopscale-flowd.service
+      - src: LICENSE
+        dst: /usr/share/doc/slopscale-flowd/copyright
+    scripts:
+      postinstall: ./packaging/deb/flowd/postinst
+      postremove: ./packaging/deb/flowd/postrm
+      preremove: ./packaging/deb/flowd/prerm
+    deb:
+      lintian_overrides:
+        - no-changelog
         - no-manual-page
         - statically-linked-binary
 

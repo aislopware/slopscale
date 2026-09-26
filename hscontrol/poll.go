@@ -181,6 +181,11 @@ func (m *mapSession) serve() {
 	}
 
 	m.h.Change(c)
+
+	if dns := m.h.state.TakeTrafficDNSChange(m.node.ID()); !dns.IsEmpty() {
+		m.h.Change(dns)
+	}
+
 	m.h.collectServicesIfStale(m.ctx, m.node.ID())
 
 	// If OmitPeers is true and Stream is false
@@ -319,6 +324,10 @@ func (m *mapSession) serveLongPoll() {
 
 		return
 	}
+
+	// The initial map carries the node's DNS, so an exit node move in
+	// this request needs no change of its own.
+	m.h.state.TakeTrafficDNSChange(m.node.ID())
 
 	// Connect the node after its state has been updated.
 	// We send two separate change notifications because these are distinct operations:

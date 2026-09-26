@@ -27,6 +27,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/logstream"
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/traffic/asn"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -162,6 +163,40 @@ type State struct {
 	logStreams *logstream.Streamer
 	// logStreamMu orders writes to the log streams against reloads.
 	logStreamMu sync.Mutex
+
+	// trafficSettings holds the traffic monitor settings; see
+	// [State.TrafficSettings].
+	trafficSettings atomic.Pointer[types.TrafficSettings]
+	// trafficMu guards trafficReporters, the gateways as their last
+	// report left them, trafficResolvers, the gateway resolvers the
+	// clients are pointed at, and trafficBoot, when the server started,
+	// which counts as every gateway's last report.
+	trafficMu        sync.Mutex
+	trafficReporters map[types.NodeID]types.TrafficReporter
+	trafficResolvers []types.TrafficResolver
+	trafficBoot      time.Time
+	// trafficExitNodes are the gateways of trafficResolvers, nil while
+	// there are none, for the map request path to tell in one atomic load
+	// whether an exit node move changes a node's DNS. trafficDNSMoved
+	// holds the nodes whose DNS such a move changed until the map session
+	// takes the change; see [State.TakeTrafficDNSChange].
+	trafficExitNodes atomic.Pointer[[]tailcfg.StableNodeID]
+	trafficDNSMoved  sync.Map
+	// trafficIngest holds a *sync.Mutex per gateway, so one gateway's
+	// reports are applied one at a time.
+	trafficIngest sync.Map
+	// trafficFoldMu keeps one maintenance run at a time and guards
+	// trafficFoldMarks, how far it has folded. trafficDirty holds, for
+	// the hourly and the daily rows, the oldest bucket a report wrote to
+	// since the last run.
+	trafficFoldMu    sync.Mutex
+	trafficFoldMarks types.TrafficFoldMarks
+	trafficDirty     [2]atomic.Int64
+	// asnTable names destinations' networks; nil until one is loaded.
+	asnTable atomic.Pointer[asn.Table]
+	// asnBackfilled is the table the stored destinations were last named
+	// with; see BackfillTrafficASN.
+	asnBackfilled atomic.Pointer[asn.Table]
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]
@@ -336,42 +371,7 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	s.settings.Store(&settings)
 
-	err = s.applySSHRecording()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadDNS()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadDERP()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.loadAccessModel()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.loadVIPServices()
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = s.loadAppConnectors()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadPostureIntegrations()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.loadTailnetLock()
+	err = s.loadStoredConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -399,6 +399,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	s.logStreams = logstream.New(db, tailnetName(cfg))
 
 	err = s.loadLogStreams()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.loadTraffic()
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +711,7 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 
 	s.ipAlloc.FreeIPs(node.IPs())
 
-	c := change.NodeRemoved(node.ID())
+	c := change.NodeRemoved(node.ID()).Merge(s.trafficForgetNode(node.ID()))
 
 	// The database dropped the node's group memberships by cascade; the
 	// policy manager's copy follows.
@@ -1056,7 +1061,7 @@ func (s *State) SetNodeExpiry(nodeID types.NodeID, expiry *time.Time) (types.Nod
 		c = change.NodeAdded(n.ID())
 	}
 
-	return n, c, nil
+	return n, c.Merge(s.trafficRecheck()), nil
 }
 
 // SetNodeTags assigns tags to a node, making it a "tagged node".
@@ -1126,7 +1131,7 @@ func (s *State) SetNodeTags(nodeID types.NodeID, tags []string) (types.NodeView,
 	// Setting OriginNode ensures the node gets a self-update with the new tags.
 	c.OriginNode = nodeID
 
-	return nodeView, c, nil
+	return nodeView, c.Merge(s.trafficRecheck()), nil
 }
 
 // SetApprovedRoutes sets the network routes that a node is approved to advertise.
@@ -1163,7 +1168,7 @@ func (s *State) SetApprovedRoutes(nodeID types.NodeID, routes []netip.Prefix) (t
 		c = change.PolicyChange()
 	}
 
-	return nodeView, c, nil
+	return nodeView, c.Merge(s.trafficRecheck()), nil
 }
 
 // RenameNode changes the display name of a node. The admin supplies
@@ -2772,6 +2777,14 @@ func (s *State) UpdateNodeFromMapRequest(
 		delta.postureChanged = newHostinfo != nil &&
 			!types.HostinfoPostureEqual(currentNode.Hostinfo, newHostinfo)
 
+		if newHostinfo != nil {
+			if currentNode.Hostinfo != nil {
+				delta.oldExitNode = currentNode.Hostinfo.ExitNodeID
+			}
+
+			delta.newExitNode = newHostinfo.ExitNodeID
+		}
+
 		// A change carrying only an updated LastSeen is not worth a
 		// full-row database UPDATE plus the O(n) policy rescan: LastSeen
 		// is best-effort and rides along the next substantive write. DERP
@@ -2879,6 +2892,10 @@ func (s *State) UpdateNodeFromMapRequest(
 
 	if !ok {
 		return change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, id)
+	}
+
+	if delta.oldExitNode != delta.newExitNode {
+		s.noteTrafficExitNodeMove(id, delta.oldExitNode, delta.newExitNode)
 	}
 
 	// The attestation record is a column of its own, so it is written
@@ -4174,4 +4191,51 @@ func dnsLabelReason(err error) string {
 	}
 
 	return msg
+}
+
+// loadStoredConfig puts in force what operators configured through the
+// API and the database keeps: SSH recording, DNS, DERP, the access
+// model, services, app connectors, posture integrations and tailnet lock.
+func (s *State) loadStoredConfig() error {
+	err := s.applySSHRecording()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadDNS()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadDERP()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.loadAccessModel()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.loadVIPServices()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.loadAppConnectors()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadPostureIntegrations()
+	if err != nil {
+		return err
+	}
+
+	err = s.loadTailnetLock()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

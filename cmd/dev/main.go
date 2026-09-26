@@ -115,6 +115,11 @@ unix_socket_permission: "0770"
 ssh_recording:
   dir: %s/recordings
 
+# The default cache path is not writable here, and a table that cannot be
+# cached is never put in use.
+traffic:
+  asn_cache_path: %s/ip2asn-combined.tsv.gz
+
 # A mock identity provider runs inside cmd/dev; the console signs in
 # through it and the user below comes out an admin.
 oidc:
@@ -180,7 +185,7 @@ func run() error {
 	configContent := fmt.Sprintf(
 		devConfig,
 		publicURL, *port, metricsPort,
-		tmpDir, tmpDir, tmpDir, tmpDir,
+		tmpDir, tmpDir, tmpDir, tmpDir, tmpDir,
 		provider.Issuer(), provider.ClientID, provider.ClientSecret, oidcUser,
 	)
 

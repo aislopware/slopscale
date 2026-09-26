@@ -2319,6 +2319,10 @@ type Policy struct {
 	// services are the tailnet's services by name, attached by the
 	// policy manager; svc: aliases resolve to their addresses.
 	services map[tailcfg.ServiceName]types.VIPService
+
+	// trafficResolvers are the traffic monitor's gateway resolvers,
+	// attached by the policy manager; every node gets a grant to them.
+	trafficResolvers []netip.Addr
 }
 
 // postureContext is what this compile evaluates postures with.

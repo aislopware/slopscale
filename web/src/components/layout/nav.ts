@@ -1,6 +1,7 @@
 import type { Icon } from "@phosphor-icons/react";
 import {
   AppWindowIcon,
+  ArrowsDownUpIcon,
   ClockCounterClockwiseIcon,
   DesktopIcon,
   GearSixIcon,
@@ -61,7 +62,14 @@ export type NavPath =
   | "/settings/tailnet"
   | "/settings/server"
   | "/audit"
-  | "/sessions";
+  | "/sessions"
+  | "/traffic"
+  | "/traffic/overview"
+  | "/traffic/machines"
+  | "/traffic/destinations"
+  | "/traffic/dns"
+  | "/traffic/gateways"
+  | "/traffic/settings";
 
 /** The live counts the sidebar can show next to an item. */
 export type NavBadge = "pendingNodes" | "pendingUsers" | "pendingRoutes" | "pendingRequests";
@@ -212,6 +220,20 @@ export const navGroups: readonly NavGroup[] = [
         label: "SSH sessions",
         icon: TerminalWindowIcon,
         scope: "logs:configuration:read",
+      },
+      {
+        to: "/traffic",
+        label: "Traffic",
+        icon: ArrowsDownUpIcon,
+        scope: "logs:network:read",
+        children: [
+          { to: "/traffic/overview", label: "Overview" },
+          { to: "/traffic/machines", label: "Machines" },
+          { to: "/traffic/destinations", label: "Destinations" },
+          { to: "/traffic/dns", label: "DNS lookups" },
+          { to: "/traffic/gateways", label: "Gateways" },
+          { to: "/traffic/settings", label: "Settings" },
+        ],
       },
     ],
   },

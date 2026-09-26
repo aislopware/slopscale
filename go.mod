@@ -22,10 +22,12 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/klauspost/compress v1.20.0
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/confmap v1.0.1
 	github.com/knadh/koanf/v2 v2.3.6
 	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/mdlayher/netlink v1.11.2
 	github.com/moby/go-archive v0.3.3
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
@@ -46,14 +48,19 @@ require (
 	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	github.com/tailscale/squibble v0.0.0-20260831233316-9a4c8961e6f5
 	github.com/tailscale/tailsql v0.0.0-20260831145903-795321974573
+	github.com/ti-mo/conntrack v0.6.0
+	github.com/ti-mo/netfilter v0.5.3
 	github.com/zitadel/oidc/v3 v3.49.6
 	go.yaml.in/yaml/v3 v3.0.5
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
+	golang.org/x/net v0.59.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.46.0
+	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
 	tailscale.com v1.103.0-pre.0.20260911203917-e2ed432399c9
 	tailscale.com/client/tailscale/v2 v2.10.1
@@ -130,14 +137,12 @@ require (
 	github.com/jsimonetti/rtnetlink v1.4.2 // indirect
 	github.com/kamstrup/intmap v0.5.2 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.30 // indirect
-	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.7.0 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
@@ -154,6 +159,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/peterbourgon/ff/v3 v3.4.0 // indirect
 	github.com/pires/go-proxyproto v0.15.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/rs/cors v1.11.1 // indirect
@@ -181,11 +187,8 @@ require (
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260603202125-055de637280b // indirect
 	golang.org/x/image v0.41.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
 	golang.org/x/vuln v1.7.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect

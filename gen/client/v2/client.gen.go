@@ -367,6 +367,21 @@ type LogstreamConfiguration struct {
 	Url             string `json:"url"`
 }
 
+// NetworkFlowLog defines model for NetworkFlowLog.
+type NetworkFlowLog struct {
+	End           time.Time       `json:"end"`
+	ExitTraffic   *[]TrafficStats `json:"exitTraffic,omitempty"`
+	Logged        time.Time       `json:"logged"`
+	NodeId        string          `json:"nodeId"`
+	Start         time.Time       `json:"start"`
+	SubnetTraffic *[]TrafficStats `json:"subnetTraffic,omitempty"`
+}
+
+// NetworkLogsOutputBody defines model for NetworkLogsOutputBody.
+type NetworkLogsOutputBody struct {
+	Logs []NetworkFlowLog `json:"logs"`
+}
+
 // PostureIntegration defines model for PostureIntegration.
 type PostureIntegration struct {
 	ClientId *string `json:"clientId,omitempty"`
@@ -448,6 +463,17 @@ type TailnetSettings struct {
 	RegionalRoutingOn                      bool   `json:"regionalRoutingOn"`
 	UsersApprovalOn                        bool   `json:"usersApprovalOn"`
 	UsersRoleAllowedToJoinExternalTailnets string `json:"usersRoleAllowedToJoinExternalTailnets"`
+}
+
+// TrafficStats defines model for TrafficStats.
+type TrafficStats struct {
+	Dst     *string `json:"dst,omitempty"`
+	Proto   *int64  `json:"proto,omitempty"`
+	RxBytes *int64  `json:"rxBytes,omitempty"`
+	RxPkts  *int64  `json:"rxPkts,omitempty"`
+	Src     *string `json:"src,omitempty"`
+	TxBytes *int64  `json:"txBytes,omitempty"`
+	TxPkts  *int64  `json:"txPkts,omitempty"`
 }
 
 // UpdateKeyRequest defines model for UpdateKeyRequest.
@@ -590,6 +616,15 @@ type SetDNSSplitJSONBody map[string]*[]string
 type ListKeysParams struct {
 	// All Accepted for compatibility; Slopscale returns all keys.
 	All *bool `form:"all,omitempty" json:"all,omitempty"`
+}
+
+// ListNetworkFlowLogsParams defines parameters for ListNetworkFlowLogs.
+type ListNetworkFlowLogsParams struct {
+	// Start RFC 3339.
+	Start time.Time `form:"start" json:"start"`
+
+	// End RFC 3339.
+	End time.Time `form:"end" json:"end"`
 }
 
 // ListUsersParams defines parameters for ListUsers.
@@ -1206,6 +1241,15 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
 	SetKey(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListNetworkFlowLogs List network flow logs
+	//
+	// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/network (the `ListNetworkFlowLogs` operationId).
+	ListNetworkFlowLogs(ctx context.Context, tailnet string, params *ListNetworkFlowLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteLogstreamConfiguration Delete the log stream configuration
 	//
@@ -2422,6 +2466,25 @@ func (c *Client) SetKeyWithBody(ctx context.Context, tailnet string, keyId strin
 // Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
 func (c *Client) SetKey(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetKeyRequest(c.Server, tailnet, keyId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListNetworkFlowLogs List network flow logs
+//
+// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/network (the `ListNetworkFlowLogs` operationId).
+func (c *Client) ListNetworkFlowLogs(ctx context.Context, tailnet string, params *ListNetworkFlowLogsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListNetworkFlowLogsRequest(c.Server, tailnet, params)
 	if err != nil {
 		return nil, err
 	}
@@ -4615,6 +4678,71 @@ func NewSetKeyRequestWithBody(server string, tailnet string, keyId string, conte
 	return req, nil
 }
 
+// NewListNetworkFlowLogsRequest constructs an http.Request for the ListNetworkFlowLogs method
+func NewListNetworkFlowLogsRequest(server string, tailnet string, params *ListNetworkFlowLogsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/logging/network", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", false, "start", params.Start, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", false, "end", params.End, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteLogstreamConfigurationRequest constructs an http.Request for the DeleteLogstreamConfiguration method
 func NewDeleteLogstreamConfigurationRequest(server string, tailnet string, logType string) (*http.Request, error) {
 	var err error
@@ -6096,6 +6224,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
 	SetKeyWithResponse(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetKeyResponse, error)
+
+	// ListNetworkFlowLogsWithResponse List network flow logs
+	//
+	// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/network (the `ListNetworkFlowLogs` operationId).
+	ListNetworkFlowLogsWithResponse(ctx context.Context, tailnet string, params *ListNetworkFlowLogsParams, reqEditors ...RequestEditorFn) (*ListNetworkFlowLogsResponse, error)
 
 	// DeleteLogstreamConfigurationWithResponse Delete the log stream configuration
 	//
@@ -9079,6 +9218,89 @@ func (r SetKeyResponse) ContentType() string {
 	return ""
 }
 
+type ListNetworkFlowLogsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NetworkLogsOutputBody
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListNetworkFlowLogsResponse) GetJSON200() *NetworkLogsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListNetworkFlowLogsResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListNetworkFlowLogsResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListNetworkFlowLogsResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListNetworkFlowLogsResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ListNetworkFlowLogsResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ListNetworkFlowLogsResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListNetworkFlowLogsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListNetworkFlowLogsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListNetworkFlowLogsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListNetworkFlowLogsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type DeleteLogstreamConfigurationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11670,6 +11892,23 @@ func (c *ClientWithResponses) SetKeyWithResponse(ctx context.Context, tailnet st
 		return nil, err
 	}
 	return ParseSetKeyResponse(rsp)
+}
+
+// ListNetworkFlowLogsWithResponse List network flow logs
+//
+// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/network (the `ListNetworkFlowLogs` operationId).
+func (c *ClientWithResponses) ListNetworkFlowLogsWithResponse(ctx context.Context, tailnet string, params *ListNetworkFlowLogsParams, reqEditors ...RequestEditorFn) (*ListNetworkFlowLogsResponse, error) {
+	rsp, err := c.ListNetworkFlowLogs(ctx, tailnet, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListNetworkFlowLogsResponse(rsp)
 }
 
 // DeleteLogstreamConfigurationWithResponse Delete the log stream configuration
@@ -14271,6 +14510,74 @@ func ParseSetKeyResponse(rsp *http.Response) (*SetKeyResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Key
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListNetworkFlowLogsResponse parses an HTTP response from a ListNetworkFlowLogsWithResponse call
+func ParseListNetworkFlowLogsResponse(rsp *http.Response) (*ListNetworkFlowLogsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListNetworkFlowLogsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NetworkLogsOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

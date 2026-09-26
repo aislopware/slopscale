@@ -21,6 +21,7 @@ import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.t
 import { ServicesSection } from "~/components/machines/services.tsx";
 import { SharingSection } from "~/components/machines/sharing.tsx";
 import { ClientWarnings } from "~/components/machines/warnings.tsx";
+import { MachineTrafficSection } from "~/components/traffic/machine-section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 import { nodeName } from "~/lib/node.ts";
 
@@ -94,6 +95,7 @@ function MachinePage(): ReactElement {
         <div className="flex flex-col gap-6">
           <AddressesSection node={node} />
           <ConnectivitySection node={node} />
+          {can(me, "logs:network:read") ? <MachineTrafficSection nodeId={node.id} /> : null}
           <ClientHealthSection node={node} me={me} />
           <GlobalExitSection node={node} canEdit={routes} />
           {mayManageNode(me, node) ? (

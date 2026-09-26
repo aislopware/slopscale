@@ -360,6 +360,57 @@ func (e GetNodeDiagnosticParamsKind) Valid() bool {
 	}
 }
 
+// Defines values for ListTrafficDestinationsParamsGroupBy.
+const (
+	ListTrafficDestinationsParamsGroupByAsn         ListTrafficDestinationsParamsGroupBy = "asn"
+	ListTrafficDestinationsParamsGroupByCountry     ListTrafficDestinationsParamsGroupBy = "country"
+	ListTrafficDestinationsParamsGroupByDestination ListTrafficDestinationsParamsGroupBy = "destination"
+	ListTrafficDestinationsParamsGroupByHost        ListTrafficDestinationsParamsGroupBy = "host"
+	ListTrafficDestinationsParamsGroupByNode        ListTrafficDestinationsParamsGroupBy = "node"
+	ListTrafficDestinationsParamsGroupByPort        ListTrafficDestinationsParamsGroupBy = "port"
+	ListTrafficDestinationsParamsGroupByReporter    ListTrafficDestinationsParamsGroupBy = "reporter"
+)
+
+// Valid indicates whether the value is a known member of the ListTrafficDestinationsParamsGroupBy enum.
+func (e ListTrafficDestinationsParamsGroupBy) Valid() bool {
+	switch e {
+	case ListTrafficDestinationsParamsGroupByAsn:
+		return true
+	case ListTrafficDestinationsParamsGroupByCountry:
+		return true
+	case ListTrafficDestinationsParamsGroupByDestination:
+		return true
+	case ListTrafficDestinationsParamsGroupByHost:
+		return true
+	case ListTrafficDestinationsParamsGroupByNode:
+		return true
+	case ListTrafficDestinationsParamsGroupByPort:
+		return true
+	case ListTrafficDestinationsParamsGroupByReporter:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListTrafficNamesParamsGroupBy.
+const (
+	ListTrafficNamesParamsGroupByName ListTrafficNamesParamsGroupBy = "name"
+	ListTrafficNamesParamsGroupByNode ListTrafficNamesParamsGroupBy = "node"
+)
+
+// Valid indicates whether the value is a known member of the ListTrafficNamesParamsGroupBy enum.
+func (e ListTrafficNamesParamsGroupBy) Valid() bool {
+	switch e {
+	case ListTrafficNamesParamsGroupByName:
+		return true
+	case ListTrafficNamesParamsGroupByNode:
+		return true
+	default:
+		return false
+	}
+}
+
 // AccessDecisionBody defines model for AccessDecisionBody.
 type AccessDecisionBody struct {
 	DurationSeconds *int64  `json:"durationSeconds,omitempty"`
@@ -2308,6 +2359,221 @@ type TailnetLockKey struct {
 	Votes int64 `json:"votes"`
 }
 
+// TrafficCollector defines model for TrafficCollector.
+type TrafficCollector struct {
+	Enabled bool `json:"enabled"`
+
+	// Error Why the collector is not working; empty while it works.
+	Error string `json:"error"`
+}
+
+// TrafficCollectors defines model for TrafficCollectors.
+type TrafficCollectors struct {
+	AppConnector TrafficCollector `json:"appConnector"`
+	Conntrack    TrafficCollector `json:"conntrack"`
+	Dns          TrafficCollector `json:"dns"`
+	Sni          TrafficCollector `json:"sni"`
+}
+
+// TrafficCounts defines model for TrafficCounts.
+type TrafficCounts struct {
+	// Conns Connections that started.
+	Conns     int64 `json:"conns"`
+	RxBytes   int64 `json:"rxBytes"`
+	RxPackets int64 `json:"rxPackets"`
+	TxBytes   int64 `json:"txBytes"`
+	TxPackets int64 `json:"txPackets"`
+}
+
+// TrafficDNSOutputBody defines model for TrafficDNSOutputBody.
+type TrafficDNSOutputBody struct {
+	End   time.Time     `json:"end"`
+	Names []TrafficName `json:"names"`
+
+	// Resolution Seconds per bucket: 60, 3600 or 86400.
+	Resolution int64     `json:"resolution"`
+	Start      time.Time `json:"start"`
+}
+
+// TrafficDestination defines model for TrafficDestination.
+type TrafficDestination struct {
+	// AsName The network's name, from the ASN table.
+	AsName string `json:"asName"`
+
+	// Asn The network's AS number; 0 when unknown.
+	Asn int64 `json:"asn"`
+
+	// Conns Connections that started.
+	Conns int64 `json:"conns"`
+
+	// Country ISO 3166 code of the network's registration.
+	Country string `json:"country"`
+
+	// Dst The address; empty on the folded remainder of the smaller destinations.
+	Dst string `json:"dst"`
+
+	// Host The name the traffic was for, from the handshake or a lookup.
+	Host string `json:"host"`
+
+	// NodeId Set when grouped by node or reporter.
+	NodeId   string `json:"nodeId"`
+	NodeName string `json:"nodeName"`
+
+	// Nodes How many nodes the group covers.
+	Nodes int64 `json:"nodes"`
+	Port  int64 `json:"port"`
+
+	// Private A private address, or a group of only private ones.
+	Private bool `json:"private"`
+
+	// Proto IP protocol number: 6 TCP, 17 UDP.
+	Proto     int64 `json:"proto"`
+	RxBytes   int64 `json:"rxBytes"`
+	RxPackets int64 `json:"rxPackets"`
+	TxBytes   int64 `json:"txBytes"`
+	TxPackets int64 `json:"txPackets"`
+}
+
+// TrafficDestinationsOutputBody defines model for TrafficDestinationsOutputBody.
+type TrafficDestinationsOutputBody struct {
+	Destinations []TrafficDestination `json:"destinations"`
+	End          time.Time            `json:"end"`
+
+	// Resolution Seconds per bucket: 60, 3600 or 86400.
+	Resolution int64     `json:"resolution"`
+	Start      time.Time `json:"start"`
+}
+
+// TrafficName defines model for TrafficName.
+type TrafficName struct {
+	// Failed Questions answered with an error or not at all.
+	Failed int64 `json:"failed"`
+
+	// Name Empty on the folded remainder, or when grouped by node.
+	Name string `json:"name"`
+
+	// NodeId Set when grouped by node.
+	NodeId   string `json:"nodeId"`
+	NodeName string `json:"nodeName"`
+
+	// Nodes How many nodes asked.
+	Nodes   int64 `json:"nodes"`
+	Queries int64 `json:"queries"`
+}
+
+// TrafficNode defines model for TrafficNode.
+type TrafficNode struct {
+	// Conns Connections that started.
+	Conns  int64  `json:"conns"`
+	NodeId string `json:"nodeId"`
+
+	// NodeName Empty when the node no longer exists.
+	NodeName  string `json:"nodeName"`
+	RxBytes   int64  `json:"rxBytes"`
+	RxPackets int64  `json:"rxPackets"`
+	TxBytes   int64  `json:"txBytes"`
+	TxPackets int64  `json:"txPackets"`
+}
+
+// TrafficPoint defines model for TrafficPoint.
+type TrafficPoint struct {
+	// Conns Connections that started.
+	Conns     int64     `json:"conns"`
+	RxBytes   int64     `json:"rxBytes"`
+	RxPackets int64     `json:"rxPackets"`
+	Start     time.Time `json:"start"`
+	TxBytes   int64     `json:"txBytes"`
+	TxPackets int64     `json:"txPackets"`
+}
+
+// TrafficReporter defines model for TrafficReporter.
+type TrafficReporter struct {
+	Collectors TrafficCollectors `json:"collectors"`
+
+	// DnsListen Where the agent's resolver answers.
+	DnsListen   []string  `json:"dnsListen"`
+	Dropped     int64     `json:"dropped"`
+	FirstSeenAt time.Time `json:"firstSeenAt"`
+
+	// Instance Changes each time the agent starts.
+	Instance           string     `json:"instance"`
+	LastReportAt       time.Time  `json:"lastReportAt"`
+	NodeId             string     `json:"nodeId"`
+	NodeName           string     `json:"nodeName"`
+	Online             bool       `json:"online"`
+	Refused            string     `json:"refused"`
+	ResolverActive     bool       `json:"resolverActive"`
+	ResolverApprovedAt *time.Time `json:"resolverApprovedAt,omitempty"`
+
+	// Stale No report for 90 seconds.
+	Stale        bool  `json:"stale"`
+	Unattributed int64 `json:"unattributed"`
+
+	// Version The agent's version.
+	Version string `json:"version"`
+}
+
+// TrafficReporterPatch defines model for TrafficReporterPatch.
+type TrafficReporterPatch struct {
+	Resolver bool `json:"resolver"`
+}
+
+// TrafficReportersOutputBody defines model for TrafficReportersOutputBody.
+type TrafficReportersOutputBody struct {
+	AsnRanges        int64             `json:"asnRanges"`
+	Reporters        []TrafficReporter `json:"reporters"`
+	Resolvers        []string          `json:"resolvers"`
+	SkippedUpstreams []string          `json:"skippedUpstreams"`
+}
+
+// TrafficRetention defines model for TrafficRetention.
+type TrafficRetention struct {
+	// DayDays Daily ones, in days.
+	DayDays int64 `json:"dayDays"`
+
+	// HourDays Hourly totals, destinations and names, in days.
+	HourDays int64 `json:"hourDays"`
+
+	// MinuteHours Per-minute totals, in hours.
+	MinuteHours int64 `json:"minuteHours"`
+}
+
+// TrafficRetentionPatch defines model for TrafficRetentionPatch.
+type TrafficRetentionPatch struct {
+	DayDays     *int64 `json:"dayDays,omitempty"`
+	HourDays    *int64 `json:"hourDays,omitempty"`
+	MinuteHours *int64 `json:"minuteHours,omitempty"`
+}
+
+// TrafficSettings defines model for TrafficSettings.
+type TrafficSettings struct {
+	DnsLogging bool             `json:"dnsLogging"`
+	Retention  TrafficRetention `json:"retention"`
+
+	// Sni Agents name destinations from TLS and QUIC handshakes.
+	Sni bool `json:"sni"`
+}
+
+// TrafficSettingsPatch defines model for TrafficSettingsPatch.
+type TrafficSettingsPatch struct {
+	DnsLogging *bool                  `json:"dnsLogging,omitempty"`
+	Retention  *TrafficRetentionPatch `json:"retention,omitempty"`
+	Sni        *bool                  `json:"sni,omitempty"`
+}
+
+// TrafficSummaryOutputBody defines model for TrafficSummaryOutputBody.
+type TrafficSummaryOutputBody struct {
+	End       time.Time     `json:"end"`
+	Nodes     []TrafficNode `json:"nodes"`
+	Reporters []TrafficNode `json:"reporters"`
+
+	// Resolution Seconds per bucket: 60, 3600 or 86400.
+	Resolution int64          `json:"resolution"`
+	Series     []TrafficPoint `json:"series"`
+	Start      time.Time      `json:"start"`
+	Total      TrafficCounts  `json:"total"`
+}
+
 // UpdateNodePreferencesRequestBody defines model for UpdateNodePreferencesRequestBody.
 type UpdateNodePreferencesRequestBody struct {
 	AcceptDns          *bool     `json:"acceptDns,omitempty"`
@@ -2587,6 +2853,98 @@ type ListSSHRecordingsParams struct {
 	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListTrafficDestinationsParams defines parameters for ListTrafficDestinations.
+type ListTrafficDestinationsParams struct {
+	// Start RFC 3339; defaults to a day before end.
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+
+	// End RFC 3339; defaults to now.
+	End *time.Time `form:"end,omitempty" json:"end,omitempty"`
+
+	// NodeId Keep the traffic of one node.
+	NodeId *string `form:"nodeId,omitempty" json:"nodeId,omitempty"`
+
+	// ReporterId Keep the traffic through one gateway.
+	ReporterId *string                               `form:"reporterId,omitempty" json:"reporterId,omitempty"`
+	GroupBy    *ListTrafficDestinationsParamsGroupBy `form:"groupBy,omitempty" json:"groupBy,omitempty"`
+
+	// Q Keep hosts or addresses containing this.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Host Keep one host exactly: a name, or the address of a destination without one.
+	Host *string `form:"host,omitempty" json:"host,omitempty"`
+
+	// Dst Keep one destination address exactly.
+	Dst *string `form:"dst,omitempty" json:"dst,omitempty"`
+
+	// Private Keep only destinations in private ranges (LAN).
+	Private *bool `form:"private,omitempty" json:"private,omitempty"`
+
+	// Asn Keep one network (AS number).
+	Asn *int64 `form:"asn,omitempty" json:"asn,omitempty"`
+
+	// Country Keep one country (ISO 3166).
+	Country *string `form:"country,omitempty" json:"country,omitempty"`
+
+	// Proto Keep one IP protocol.
+	Proto *int64 `form:"proto,omitempty" json:"proto,omitempty"`
+
+	// Port Keep one port; needs proto.
+	Port *int64 `form:"port,omitempty" json:"port,omitempty"`
+
+	// Limit At most 1000; default 100.
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListTrafficDestinationsParamsGroupBy defines parameters for ListTrafficDestinations.
+type ListTrafficDestinationsParamsGroupBy string
+
+// ListTrafficNamesParams defines parameters for ListTrafficNames.
+type ListTrafficNamesParams struct {
+	// Start RFC 3339; defaults to a day before end.
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+
+	// End RFC 3339; defaults to now.
+	End *time.Time `form:"end,omitempty" json:"end,omitempty"`
+
+	// NodeId Keep the traffic of one node.
+	NodeId *string `form:"nodeId,omitempty" json:"nodeId,omitempty"`
+
+	// ReporterId Keep the traffic through one gateway.
+	ReporterId *string                        `form:"reporterId,omitempty" json:"reporterId,omitempty"`
+	GroupBy    *ListTrafficNamesParamsGroupBy `form:"groupBy,omitempty" json:"groupBy,omitempty"`
+
+	// Q Keep names containing this.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Name Keep one name exactly.
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// Limit At most 1000; default 100.
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListTrafficNamesParamsGroupBy defines parameters for ListTrafficNames.
+type ListTrafficNamesParamsGroupBy string
+
+// GetTrafficSummaryParams defines parameters for GetTrafficSummary.
+type GetTrafficSummaryParams struct {
+	// Start RFC 3339; defaults to a day before end.
+	Start *time.Time `form:"start,omitempty" json:"start,omitempty"`
+
+	// End RFC 3339; defaults to now.
+	End *time.Time `form:"end,omitempty" json:"end,omitempty"`
+
+	// NodeId Keep the traffic of one node.
+	NodeId *string `form:"nodeId,omitempty" json:"nodeId,omitempty"`
+
+	// ReporterId Keep the traffic through one gateway.
+	ReporterId *string `form:"reporterId,omitempty" json:"reporterId,omitempty"`
+
+	// Limit How many top nodes, at most 100; default 10.
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	Id    *string `form:"id,omitempty" json:"id,omitempty"`
@@ -2767,6 +3125,12 @@ type UpdateSettingsJSONRequestBody = UpdateSettingsRequestBody
 
 // CreateSSHSessionJSONRequestBody defines body for CreateSSHSession for application/json ContentType.
 type CreateSSHSessionJSONRequestBody = CreateSSHSessionRequestBody
+
+// UpdateTrafficReporterJSONRequestBody defines body for UpdateTrafficReporter for application/json ContentType.
+type UpdateTrafficReporterJSONRequestBody = TrafficReporterPatch
+
+// UpdateTrafficSettingsJSONRequestBody defines body for UpdateTrafficSettings for application/json ContentType.
+type UpdateTrafficSettingsJSONRequestBody = TrafficSettingsPatch
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequestBody
@@ -4715,6 +5079,102 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
 	DisableTailnetLock(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTrafficDestinations List traffic destinations
+	//
+	// Where the traffic went, largest first, read at hourly or daily resolution. groupBy host merges the addresses of one name; node and reporter rank the nodes and gateways for the filter.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/traffic/destinations (the `ListTrafficDestinations` operationId).
+	ListTrafficDestinations(ctx context.Context, params *ListTrafficDestinationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTrafficNames List looked-up names
+	//
+	// The names the nodes asked the gateways' resolvers about, most asked first, read at hourly or daily resolution. Empty unless DNS logging is on.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/traffic/dns (the `ListTrafficNames` operationId).
+	ListTrafficNames(ctx context.Context, params *ListTrafficNamesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTrafficReporters List traffic reporters
+	//
+	// The gateways whose agent has reported, with each collector's state and the resolvers their exit node users are pointed at.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/traffic/reporters (the `ListTrafficReporters` operationId).
+	ListTrafficReporters(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTrafficReporter Remove traffic reporter
+	//
+	// Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/traffic/reporters/{nodeId} (the `DeleteTrafficReporter` operationId).
+	DeleteTrafficReporter(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTrafficReporterWithBody Approve a gateway resolver
+	//
+	// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporterWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTrafficReporter Approve a gateway resolver
+	//
+	// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporter(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTrafficSettings Get traffic settings
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/traffic/settings (the `GetTrafficSettings` operationId).
+	GetTrafficSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTrafficSettingsWithBody Update traffic settings
+	//
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+	UpdateTrafficSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTrafficSettings Update traffic settings
+	//
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+	UpdateTrafficSettings(ctx context.Context, body UpdateTrafficSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTrafficSummary Get traffic summary
+	//
+	// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/traffic/summary (the `GetTrafficSummary` operationId).
+	GetTrafficSummary(ctx context.Context, params *GetTrafficSummaryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListUsers List users
 	//
@@ -8805,6 +9265,202 @@ func (c *Client) GetTailnetLock(ctx context.Context, reqEditors ...RequestEditor
 // Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
 func (c *Client) DisableTailnetLock(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDisableTailnetLockRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListTrafficDestinations List traffic destinations
+//
+// Where the traffic went, largest first, read at hourly or daily resolution. groupBy host merges the addresses of one name; node and reporter rank the nodes and gateways for the filter.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/traffic/destinations (the `ListTrafficDestinations` operationId).
+func (c *Client) ListTrafficDestinations(ctx context.Context, params *ListTrafficDestinationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTrafficDestinationsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListTrafficNames List looked-up names
+//
+// The names the nodes asked the gateways' resolvers about, most asked first, read at hourly or daily resolution. Empty unless DNS logging is on.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/traffic/dns (the `ListTrafficNames` operationId).
+func (c *Client) ListTrafficNames(ctx context.Context, params *ListTrafficNamesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTrafficNamesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListTrafficReporters List traffic reporters
+//
+// The gateways whose agent has reported, with each collector's state and the resolvers their exit node users are pointed at.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/traffic/reporters (the `ListTrafficReporters` operationId).
+func (c *Client) ListTrafficReporters(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTrafficReportersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteTrafficReporter Remove traffic reporter
+//
+// Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/traffic/reporters/{nodeId} (the `DeleteTrafficReporter` operationId).
+func (c *Client) DeleteTrafficReporter(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTrafficReporterRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTrafficReporterWithBody Approve a gateway resolver
+//
+// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *Client) UpdateTrafficReporterWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTrafficReporterRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTrafficReporter Approve a gateway resolver
+//
+// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *Client) UpdateTrafficReporter(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTrafficReporterRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTrafficSettings Get traffic settings
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/traffic/settings (the `GetTrafficSettings` operationId).
+func (c *Client) GetTrafficSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTrafficSettingsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTrafficSettingsWithBody Update traffic settings
+//
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+func (c *Client) UpdateTrafficSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTrafficSettingsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTrafficSettings Update traffic settings
+//
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+func (c *Client) UpdateTrafficSettings(ctx context.Context, body UpdateTrafficSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTrafficSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTrafficSummary Get traffic summary
+//
+// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/traffic/summary (the `GetTrafficSummary` operationId).
+func (c *Client) GetTrafficSummary(ctx context.Context, params *GetTrafficSummaryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTrafficSummaryRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -14989,6 +15645,631 @@ func NewDisableTailnetLockRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListTrafficDestinationsRequest constructs an http.Request for the ListTrafficDestinations method
+func NewListTrafficDestinationsRequest(server string, params *ListTrafficDestinationsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/destinations")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Start != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "start", *params.Start, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.End != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "end", *params.End, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.NodeId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "nodeId", *params.NodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReporterId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "reporterId", *params.ReporterId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.GroupBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "groupBy", *params.GroupBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Host != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "host", *params.Host, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Dst != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "dst", *params.Dst, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Private != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "private", *params.Private, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Asn != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "asn", *params.Asn, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Country != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "country", *params.Country, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Proto != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "proto", *params.Proto, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Port != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "port", *params.Port, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListTrafficNamesRequest constructs an http.Request for the ListTrafficNames method
+func NewListTrafficNamesRequest(server string, params *ListTrafficNamesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/dns")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Start != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "start", *params.Start, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.End != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "end", *params.End, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.NodeId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "nodeId", *params.NodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReporterId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "reporterId", *params.ReporterId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.GroupBy != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "groupBy", *params.GroupBy, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Q != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Name != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "name", *params.Name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListTrafficReportersRequest constructs an http.Request for the ListTrafficReporters method
+func NewListTrafficReportersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/reporters")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteTrafficReporterRequest constructs an http.Request for the DeleteTrafficReporter method
+func NewDeleteTrafficReporterRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/reporters/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateTrafficReporterRequest calls the generic UpdateTrafficReporter builder with application/json body
+func NewUpdateTrafficReporterRequest(server string, nodeId string, body UpdateTrafficReporterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTrafficReporterRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewUpdateTrafficReporterRequestWithBody constructs an http.Request for the UpdateTrafficReporter method, with any body, and a specified content type
+func NewUpdateTrafficReporterRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/reporters/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetTrafficSettingsRequest constructs an http.Request for the GetTrafficSettings method
+func NewGetTrafficSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateTrafficSettingsRequest calls the generic UpdateTrafficSettings builder with application/json body
+func NewUpdateTrafficSettingsRequest(server string, body UpdateTrafficSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTrafficSettingsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateTrafficSettingsRequestWithBody constructs an http.Request for the UpdateTrafficSettings method, with any body, and a specified content type
+func NewUpdateTrafficSettingsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetTrafficSummaryRequest constructs an http.Request for the GetTrafficSummary method
+func NewGetTrafficSummaryRequest(server string, params *GetTrafficSummaryParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/summary")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Start != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "start", *params.Start, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.End != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "end", *params.End, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.NodeId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "nodeId", *params.NodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ReporterId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "reporterId", *params.ReporterId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListUsersRequest constructs an http.Request for the ListUsers method
 func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
 	var err error
@@ -17766,6 +19047,114 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
 	DisableTailnetLockWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableTailnetLockResponse, error)
+
+	// ListTrafficDestinationsWithResponse List traffic destinations
+	//
+	// Where the traffic went, largest first, read at hourly or daily resolution. groupBy host merges the addresses of one name; node and reporter rank the nodes and gateways for the filter.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/traffic/destinations (the `ListTrafficDestinations` operationId).
+	ListTrafficDestinationsWithResponse(ctx context.Context, params *ListTrafficDestinationsParams, reqEditors ...RequestEditorFn) (*ListTrafficDestinationsResponse, error)
+
+	// ListTrafficNamesWithResponse List looked-up names
+	//
+	// The names the nodes asked the gateways' resolvers about, most asked first, read at hourly or daily resolution. Empty unless DNS logging is on.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/traffic/dns (the `ListTrafficNames` operationId).
+	ListTrafficNamesWithResponse(ctx context.Context, params *ListTrafficNamesParams, reqEditors ...RequestEditorFn) (*ListTrafficNamesResponse, error)
+
+	// ListTrafficReportersWithResponse List traffic reporters
+	//
+	// The gateways whose agent has reported, with each collector's state and the resolvers their exit node users are pointed at.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/traffic/reporters (the `ListTrafficReporters` operationId).
+	ListTrafficReportersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListTrafficReportersResponse, error)
+
+	// DeleteTrafficReporterWithResponse Remove traffic reporter
+	//
+	// Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/traffic/reporters/{nodeId} (the `DeleteTrafficReporter` operationId).
+	DeleteTrafficReporterWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*DeleteTrafficReporterResponse, error)
+
+	// UpdateTrafficReporterWithBodyWithResponse Approve a gateway resolver
+	//
+	// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporterWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error)
+
+	// UpdateTrafficReporterWithResponse Approve a gateway resolver
+	//
+	// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporterWithResponse(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error)
+
+	// GetTrafficSettingsWithResponse Get traffic settings
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/traffic/settings (the `GetTrafficSettings` operationId).
+	GetTrafficSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTrafficSettingsResponse, error)
+
+	// UpdateTrafficSettingsWithBodyWithResponse Update traffic settings
+	//
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+	UpdateTrafficSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTrafficSettingsResponse, error)
+
+	// UpdateTrafficSettingsWithResponse Update traffic settings
+	//
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+	UpdateTrafficSettingsWithResponse(ctx context.Context, body UpdateTrafficSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTrafficSettingsResponse, error)
+
+	// GetTrafficSummaryWithResponse Get traffic summary
+	//
+	// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+	//
+	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/traffic/summary (the `GetTrafficSummary` operationId).
+	GetTrafficSummaryWithResponse(ctx context.Context, params *GetTrafficSummaryParams, reqEditors ...RequestEditorFn) (*GetTrafficSummaryResponse, error)
 
 	// ListUsersWithResponse List users
 	//
@@ -24912,6 +26301,390 @@ func (r DisableTailnetLockResponse) ContentType() string {
 	return ""
 }
 
+type ListTrafficDestinationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficDestinationsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListTrafficDestinationsResponse) GetJSON200() *TrafficDestinationsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListTrafficDestinationsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListTrafficDestinationsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListTrafficDestinationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListTrafficDestinationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListTrafficDestinationsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListTrafficNamesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficDNSOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListTrafficNamesResponse) GetJSON200() *TrafficDNSOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListTrafficNamesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListTrafficNamesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListTrafficNamesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListTrafficNamesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListTrafficNamesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListTrafficReportersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficReportersOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListTrafficReportersResponse) GetJSON200() *TrafficReportersOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListTrafficReportersResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListTrafficReportersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListTrafficReportersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListTrafficReportersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListTrafficReportersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteTrafficReporterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteTrafficReporterResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteTrafficReporterResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteTrafficReporterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTrafficReporterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTrafficReporterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteTrafficReporterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateTrafficReporterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficReporter
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateTrafficReporterResponse) GetJSON200() *TrafficReporter {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateTrafficReporterResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateTrafficReporterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTrafficReporterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTrafficReporterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateTrafficReporterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTrafficSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficSettings
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTrafficSettingsResponse) GetJSON200() *TrafficSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetTrafficSettingsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTrafficSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTrafficSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTrafficSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTrafficSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateTrafficSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficSettings
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateTrafficSettingsResponse) GetJSON200() *TrafficSettings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateTrafficSettingsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateTrafficSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTrafficSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTrafficSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateTrafficSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTrafficSummaryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficSummaryOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTrafficSummaryResponse) GetJSON200() *TrafficSummaryOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetTrafficSummaryResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTrafficSummaryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTrafficSummaryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTrafficSummaryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTrafficSummaryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -29014,6 +30787,174 @@ func (c *ClientWithResponses) DisableTailnetLockWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseDisableTailnetLockResponse(rsp)
+}
+
+// ListTrafficDestinationsWithResponse List traffic destinations
+//
+// Where the traffic went, largest first, read at hourly or daily resolution. groupBy host merges the addresses of one name; node and reporter rank the nodes and gateways for the filter.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/traffic/destinations (the `ListTrafficDestinations` operationId).
+func (c *ClientWithResponses) ListTrafficDestinationsWithResponse(ctx context.Context, params *ListTrafficDestinationsParams, reqEditors ...RequestEditorFn) (*ListTrafficDestinationsResponse, error) {
+	rsp, err := c.ListTrafficDestinations(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListTrafficDestinationsResponse(rsp)
+}
+
+// ListTrafficNamesWithResponse List looked-up names
+//
+// The names the nodes asked the gateways' resolvers about, most asked first, read at hourly or daily resolution. Empty unless DNS logging is on.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/traffic/dns (the `ListTrafficNames` operationId).
+func (c *ClientWithResponses) ListTrafficNamesWithResponse(ctx context.Context, params *ListTrafficNamesParams, reqEditors ...RequestEditorFn) (*ListTrafficNamesResponse, error) {
+	rsp, err := c.ListTrafficNames(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListTrafficNamesResponse(rsp)
+}
+
+// ListTrafficReportersWithResponse List traffic reporters
+//
+// The gateways whose agent has reported, with each collector's state and the resolvers their exit node users are pointed at.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/traffic/reporters (the `ListTrafficReporters` operationId).
+func (c *ClientWithResponses) ListTrafficReportersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListTrafficReportersResponse, error) {
+	rsp, err := c.ListTrafficReporters(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListTrafficReportersResponse(rsp)
+}
+
+// DeleteTrafficReporterWithResponse Remove traffic reporter
+//
+// Forgets a gateway's agent and takes its resolver out of its exit node users' DNS. What it reported stays until the retention removes it; an agent still running comes back with its next report.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/traffic/reporters/{nodeId} (the `DeleteTrafficReporter` operationId).
+func (c *ClientWithResponses) DeleteTrafficReporterWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*DeleteTrafficReporterResponse, error) {
+	rsp, err := c.DeleteTrafficReporter(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTrafficReporterResponse(rsp)
+}
+
+// UpdateTrafficReporterWithBodyWithResponse Approve a gateway resolver
+//
+// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *ClientWithResponses) UpdateTrafficReporterWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error) {
+	rsp, err := c.UpdateTrafficReporterWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTrafficReporterResponse(rsp)
+}
+
+// UpdateTrafficReporterWithResponse Approve a gateway resolver
+//
+// Lets the nodes using a gateway as their exit node use its resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies, and only by the nodes using the gateway as their exit node right now. Needs the dns scope too, since it moves their DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *ClientWithResponses) UpdateTrafficReporterWithResponse(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error) {
+	rsp, err := c.UpdateTrafficReporter(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTrafficReporterResponse(rsp)
+}
+
+// GetTrafficSettingsWithResponse Get traffic settings
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/traffic/settings (the `GetTrafficSettings` operationId).
+func (c *ClientWithResponses) GetTrafficSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTrafficSettingsResponse, error) {
+	rsp, err := c.GetTrafficSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTrafficSettingsResponse(rsp)
+}
+
+// UpdateTrafficSettingsWithBodyWithResponse Update traffic settings
+//
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+func (c *ClientWithResponses) UpdateTrafficSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTrafficSettingsResponse, error) {
+	rsp, err := c.UpdateTrafficSettingsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTrafficSettingsResponse(rsp)
+}
+
+// UpdateTrafficSettingsWithResponse Update traffic settings
+//
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points the nodes using a gateway as their exit node at the gateway's approved resolver while it reports, and logs what they look up while they do; turning it off points them back. Nodes that use no exit node, and clients older than Tailscale 1.86, are never logged. Changing DNS logging needs the dns scope too.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/traffic/settings (the `UpdateTrafficSettings` operationId).
+func (c *ClientWithResponses) UpdateTrafficSettingsWithResponse(ctx context.Context, body UpdateTrafficSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTrafficSettingsResponse, error) {
+	rsp, err := c.UpdateTrafficSettings(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTrafficSettingsResponse(rsp)
+}
+
+// GetTrafficSummaryWithResponse Get traffic summary
+//
+// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+//
+// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/traffic/summary (the `GetTrafficSummary` operationId).
+func (c *ClientWithResponses) GetTrafficSummaryWithResponse(ctx context.Context, params *GetTrafficSummaryParams, reqEditors ...RequestEditorFn) (*GetTrafficSummaryResponse, error) {
+	rsp, err := c.GetTrafficSummary(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTrafficSummaryResponse(rsp)
 }
 
 // ListUsersWithResponse List users
@@ -34175,6 +36116,270 @@ func ParseDisableTailnetLockResponse(rsp *http.Response) (*DisableTailnetLockRes
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest TailnetLock
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListTrafficDestinationsResponse parses an HTTP response from a ListTrafficDestinationsWithResponse call
+func ParseListTrafficDestinationsResponse(rsp *http.Response) (*ListTrafficDestinationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListTrafficDestinationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficDestinationsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListTrafficNamesResponse parses an HTTP response from a ListTrafficNamesWithResponse call
+func ParseListTrafficNamesResponse(rsp *http.Response) (*ListTrafficNamesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListTrafficNamesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficDNSOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListTrafficReportersResponse parses an HTTP response from a ListTrafficReportersWithResponse call
+func ParseListTrafficReportersResponse(rsp *http.Response) (*ListTrafficReportersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListTrafficReportersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficReportersOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTrafficReporterResponse parses an HTTP response from a DeleteTrafficReporterWithResponse call
+func ParseDeleteTrafficReporterResponse(rsp *http.Response) (*DeleteTrafficReporterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTrafficReporterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTrafficReporterResponse parses an HTTP response from a UpdateTrafficReporterWithResponse call
+func ParseUpdateTrafficReporterResponse(rsp *http.Response) (*UpdateTrafficReporterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTrafficReporterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficReporter
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTrafficSettingsResponse parses an HTTP response from a GetTrafficSettingsWithResponse call
+func ParseGetTrafficSettingsResponse(rsp *http.Response) (*GetTrafficSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTrafficSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTrafficSettingsResponse parses an HTTP response from a UpdateTrafficSettingsWithResponse call
+func ParseUpdateTrafficSettingsResponse(rsp *http.Response) (*UpdateTrafficSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTrafficSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficSettings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTrafficSummaryResponse parses an HTTP response from a GetTrafficSummaryWithResponse call
+func ParseGetTrafficSummaryResponse(rsp *http.Response) (*GetTrafficSummaryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTrafficSummaryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficSummaryOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

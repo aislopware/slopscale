@@ -464,6 +464,16 @@ func DNSConfig() Change {
 	}
 }
 
+// SelfDNS sends one node its DNS configuration, for a change only its
+// own configuration sees.
+func SelfDNS(nodeID types.NodeID) Change {
+	return Change{
+		Reason:     "self DNS config update",
+		TargetNode: nodeID,
+		IncludeDNS: true,
+	}
+}
+
 // NodeOnline creates a patch response for a node coming online. seen is
 // when it connected: tailcfg carries LastSeen next to Online in a
 // [tailcfg.PeerChange], and a client on the peer-delta path (Tailscale

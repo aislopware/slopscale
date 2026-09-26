@@ -124,6 +124,10 @@ var badRequestErrors = []error{
 	types.ErrPostureIntegrationConfig,
 	state.ErrUnknownDiagnostic,
 	types.ErrPreferencesInvalid,
+	types.ErrTrafficRetentionInvalid,
+	types.ErrTrafficRangeInvalid,
+	types.ErrTrafficGroupUnknown,
+	types.ErrTrafficFilterInvalid,
 }
 
 // notFoundErrors are the missing records; mapError answers them with 404.
@@ -147,6 +151,7 @@ var notFoundErrors = []error{
 	types.ErrVIPServiceNotFound,
 	types.ErrAppConnectorNotFound,
 	types.ErrPostureIntegrationNotFound,
+	state.ErrTrafficReporterNotFound,
 }
 
 // conflictErrors are the clashes with existing state; mapError answers

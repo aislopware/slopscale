@@ -94,6 +94,10 @@ type PolicyManager struct {
 	// [PolicyManager.SetSSHRecording].
 	sshRecording SSHRecording
 
+	// trafficResolvers are the traffic monitor's gateway resolvers; see
+	// [PolicyManager.SetTrafficResolvers].
+	trafficResolvers []netip.Addr
+
 	// compiledGrants are the grants with sources pre-resolved.
 	// The single source of truth for filter compilation. Both
 	// global and per-node filter rules are derived from these.
@@ -1922,6 +1926,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 		pm.pol.access = pm.access
 		pm.pol.country = pm.country
 		pm.pol.recording = pm.sshRecording
+		pm.pol.trafficResolvers = pm.trafficResolvers
 		pm.pol.services = servicesByName(pm.vipServices)
 	}
 

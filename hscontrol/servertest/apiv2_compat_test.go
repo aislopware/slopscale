@@ -262,8 +262,8 @@ func TestAPIv2Compat(t *testing.T) {
 		require.Error(t, err, "a destination slopscale cannot encode for is refused")
 
 		_, err = logging.LogstreamConfiguration(ctx, tsclient.LogTypeNetwork)
-		require.Error(t, err, "slopscale collects no network flow logs")
-		assert.Contains(t, err.Error(), "network flow logs are not available")
+		require.Error(t, err, "slopscale does not stream network flow logs")
+		assert.Contains(t, err.Error(), "network flow logs are not streamed")
 
 		require.NoError(t, logging.DeleteLogstreamConfiguration(ctx, tsclient.LogTypeConfig))
 

@@ -17,6 +17,7 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/traffic/asn"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/prometheus/common/model"
@@ -164,6 +165,12 @@ type Config struct {
 	// dnsOverride is the DNS settings from the settings table, nil when
 	// the config file is in force; see [Config.SetDNSOverride].
 	dnsOverride *DNSSettings
+	// trafficResolvers are the gateway resolvers the traffic monitor's
+	// DNS log uses; see [Config.SetTrafficResolvers].
+	// tailcfgDNSByExitNode holds, per gateway, the DNS configuration of
+	// the nodes using it as their exit node.
+	trafficResolvers     []TrafficResolver
+	tailcfgDNSByExitNode map[tailcfg.StableNodeID]*tailcfg.DNSConfig
 	// dnsFileRecords holds the records read from dns.extra_records_path
 	// once the watcher has read the file.
 	dnsFileRecords    []tailcfg.DNSRecord
@@ -205,6 +212,9 @@ type Config struct {
 
 	// Egress bounds where the server's own outbound requests may go.
 	Egress EgressConfig
+
+	// Traffic configures the traffic monitor's destination enrichment.
+	Traffic TrafficConfig
 
 	// Debug turns on endpoints meant for developing slopscale.
 	Debug DebugConfig
@@ -585,6 +595,22 @@ func funnelConfig() (FunnelConfig, error) {
 	return cfg, nil
 }
 
+// TrafficConfig is where the traffic monitor gets the table that names a
+// destination's network and country.
+type TrafficConfig struct {
+	// ASNDatabaseURL is downloaded daily; empty turns the naming off.
+	ASNDatabaseURL string
+	// ASNCachePath keeps the last good copy across restarts.
+	ASNCachePath string
+}
+
+func trafficConfig() TrafficConfig {
+	return TrafficConfig{
+		ASNDatabaseURL: conf.GetString("traffic.asn_database_url"),
+		ASNCachePath:   util.AbsolutePathFromConfigPath(conf.GetString("traffic.asn_cache_path")),
+	}
+}
+
 func sshRecordingConfig() SSHRecordingConfig {
 	return SSHRecordingConfig{
 		Enabled:         conf.GetBool("ssh_recording.enabled"),
@@ -760,6 +786,8 @@ func setNodeServiceDefaults() {
 	conf.SetDefault("funnel.listen_addrs", []string{":443", ":8443", ":10000"})
 	conf.SetDefault("funnel.state_dir", "/var/lib/slopscale/ingress")
 	conf.SetDefault("funnel.ports", []int{443, 8443, 10000})
+	conf.SetDefault("traffic.asn_database_url", asn.DefaultURL)
+	conf.SetDefault("traffic.asn_cache_path", "/var/lib/slopscale/ip2asn-combined.tsv.gz")
 	conf.SetDefault("client_updates.check", true)
 	conf.SetDefault("client_updates.interval", DefaultClientUpdatesInterval)
 	conf.SetDefault("egress.deny_private_targets", false)
@@ -1797,6 +1825,8 @@ func LoadServerConfig() (*Config, error) {
 
 		Egress: egressConfig(),
 
+		Traffic: trafficConfig(),
+
 		Debug: debugConfig(),
 
 		HTTPSCerts: httpsCerts,
@@ -2095,6 +2125,56 @@ func (c *Config) RebuildTailcfgDNS() {
 	c.rebuildTailcfgDNSLocked()
 }
 
+// SetTrafficResolvers sets the traffic monitor's gateway resolvers: a node
+// is pointed at one of them only while it uses that gateway as its exit
+// node; nil stops. They are not part of the effective settings, so an
+// operator saving the DNS page never stores them.
+// [Config.TailcfgDNSConfig] stays the configuration without them.
+func (c *Config) SetTrafficResolvers(resolvers []TrafficResolver) {
+	tailcfgDNSMu.Lock()
+	defer tailcfgDNSMu.Unlock()
+
+	c.trafficResolvers = slices.Clone(resolvers)
+	c.rebuildTailcfgDNSLocked()
+}
+
+// TrafficResolvers returns the resolvers set with
+// [Config.SetTrafficResolvers].
+func (c *Config) TrafficResolvers() []TrafficResolver {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	return slices.Clone(c.trafficResolvers)
+}
+
+// CloneTailcfgDNSConfigFor is [Config.CloneTailcfgDNSConfig] for node id,
+// which reports exitNode as the exit node it uses: while that exit node
+// is a gateway whose resolver the DNS log uses, the configuration that
+// sends the node's queries to it. Every other node, and a node that uses
+// no exit node, gets the tailnet's configuration unchanged.
+func (c *Config) CloneTailcfgDNSConfigFor(id NodeID, exitNode tailcfg.StableNodeID) *tailcfg.DNSConfig {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	cfg := c.TailcfgDNSConfig
+
+	if exitNode != "" {
+		for _, r := range c.trafficResolvers {
+			if r.Stable == exitNode && r.Node != id {
+				cfg = c.tailcfgDNSByExitNode[exitNode]
+
+				break
+			}
+		}
+	}
+
+	if cfg == nil {
+		return nil
+	}
+
+	return cfg.Clone()
+}
+
 func (c *Config) effectiveDNSLocked() DNSConfig {
 	d := c.DNSConfig
 	if c.dnsOverride != nil {
@@ -2113,9 +2193,44 @@ func (c *Config) rebuildTailcfgDNSLocked() {
 		return
 	}
 
-	cfg := dnsToTailcfgDNS(c.effectiveDNSLocked())
-	c.addMagicDNSRoutes(cfg)
-	c.TailcfgDNSConfig = cfg
+	effective := c.effectiveDNSLocked()
+
+	own := dnsToTailcfgDNS(effective)
+	c.addMagicDNSRoutes(own)
+	c.TailcfgDNSConfig = own
+
+	c.tailcfgDNSByExitNode = make(map[tailcfg.StableNodeID]*tailcfg.DNSConfig, len(c.trafficResolvers))
+
+	for _, r := range c.trafficResolvers {
+		c.tailcfgDNSByExitNode[r.Stable] = withTrafficResolver(own, r)
+	}
+}
+
+// withTrafficResolver is the DNS of a node using the gateway of r as its
+// exit node. A client with an exit node keeps only the resolvers flagged
+// for use with one, and otherwise asks the exit node itself, so the
+// gateway's resolver goes first, then the gateway's own exit node
+// resolver, which answers as it would without the monitor should the
+// agent stop, then the operator's own resolvers flagged for exit nodes.
+// The client asks them in parallel, so the gateway's resolver sees every
+// question while it answers.
+func withTrafficResolver(own *tailcfg.DNSConfig, r TrafficResolver) *tailcfg.DNSConfig {
+	cfg := own.Clone()
+
+	resolvers := []*dnstype.Resolver{{Addr: r.Addr.String(), UseWithExitNode: true}}
+	if r.DoH != "" {
+		resolvers = append(resolvers, &dnstype.Resolver{Addr: r.DoH, UseWithExitNode: true})
+	}
+
+	for _, res := range own.Resolvers {
+		if res.UseWithExitNode && res.Addr != r.Addr.String() {
+			resolvers = append(resolvers, res)
+		}
+	}
+
+	cfg.Resolvers = resolvers
+
+	return cfg
 }
 
 // addMagicDNSRoutes maps the IPv4/IPv6 reverse zones of the tailnet's

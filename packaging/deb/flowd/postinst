@@ -1,0 +1,34 @@
+#!/bin/sh
+# postinst script for slopscale-flowd, following the snippets
+# dh_installsystemd generates.
+
+set -e
+
+SERVICE="slopscale-flowd.service"
+
+case "$1" in
+    configure|abort-upgrade|abort-deconfigure|abort-remove)
+      # Only removes the mask postrm set on removal, never an admin's.
+      deb-systemd-helper unmask "$SERVICE" >/dev/null || true
+
+      if deb-systemd-helper --quiet was-enabled "$SERVICE"; then
+        deb-systemd-helper enable "$SERVICE" >/dev/null || true
+      else
+        deb-systemd-helper update-state "$SERVICE" >/dev/null || true
+      fi
+
+      if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null || true
+        if [ -n "$2" ]; then
+          deb-systemd-invoke restart "$SERVICE" >/dev/null || true
+        else
+          deb-systemd-invoke start "$SERVICE" >/dev/null || true
+        fi
+      fi
+    ;;
+
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+    ;;
+esac

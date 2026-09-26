@@ -168,7 +168,7 @@ linters:
         - github\.com/google/go-cmp/cmp\.Option
         # jet's builder returns its statement interfaces; qrm.DB is what
         # jet executes on (a pool, a transaction or a prepared statement).
-        - github\.com/go-jet/jet/v2/sqlite\.(SelectStatement|BoolExpression|Expression)
+        - github\.com/go-jet/jet/v2/sqlite\.(SelectStatement|InsertStatement|BoolExpression|Expression|IntegerExpression|OrderByClause)
         - github\.com/go-jet/jet/v2/qrm\.DB
         # dockertest v4 hands out containers only as these interfaces.
         - github\.com/ory/dockertest/v4\.(ClosableResource|Resource)

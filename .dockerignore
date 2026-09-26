@@ -16,6 +16,10 @@ README.md
 LICENSE
 .vscode
 
+# Local agent worktrees and test run artefacts run to gigabytes.
+.claude
+control_logs
+
 *.sock
 
 **/node_modules/

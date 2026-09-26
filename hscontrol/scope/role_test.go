@@ -12,7 +12,9 @@ import (
 func TestForRoleMatrix(t *testing.T) {
 	t.Parallel()
 
-	writes := []Scope{AuthKeys, OAuthKeys, DevicesCore, DevicesRoutes, PolicyFile, FeatureSettings, Users}
+	writes := []Scope{
+		AuthKeys, OAuthKeys, DevicesCore, DevicesRoutes, PolicyFile, FeatureSettings, Users, LogsNetwork,
+	}
 
 	tests := []struct {
 		role       types.Role
@@ -21,7 +23,7 @@ func TestForRoleMatrix(t *testing.T) {
 	}{
 		{types.RoleOwner, writes, true},
 		{types.RoleAdmin, writes, true},
-		{types.RoleNetworkAdmin, []Scope{PolicyFile, DevicesRoutes, Webhooks}, true},
+		{types.RoleNetworkAdmin, []Scope{PolicyFile, DevicesRoutes, Webhooks, LogsNetwork}, true},
 		{types.RoleITAdmin, []Scope{Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings, Webhooks}, true},
 		{types.RoleAuditor, nil, true},
 		{types.RoleMember, nil, false},

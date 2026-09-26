@@ -4,6 +4,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -12,6 +13,7 @@ import { render } from "vitest-browser-react";
 
 import type { Me } from "~/auth/me.ts";
 import { documentTitle, Shell } from "~/components/layout/shell.tsx";
+import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
 const allAccess: Me = {
   kind: "api_key",
@@ -22,14 +24,33 @@ const allAccess: Me = {
   permissions: { all: true, "devices:core:read": true, "users:read": true },
 };
 
-function app(me: Me): ReactElement {
+function MachineTraffic(): ReactElement {
+  useBreadcrumb("backup-nas");
+
+  return <>machine traffic</>;
+}
+
+function app(me: Me, path = "/"): ReactElement {
   const rootRoute = createRootRoute({
-    component: () => <Shell me={me}>page body</Shell>,
+    component: () => (
+      <Shell me={me}>
+        <Outlet />
+      </Shell>
+    ),
   });
-  const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/" });
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => <>page body</>,
+  });
+  const detailRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/traffic/machines/$nodeId",
+    component: MachineTraffic,
+  });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([indexRoute]),
-    history: createMemoryHistory({ initialEntries: ["/"] }),
+    routeTree: rootRoute.addChildren([indexRoute, detailRoute]),
+    history: createMemoryHistory({ initialEntries: [path] }),
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -88,6 +109,25 @@ describe(Shell, () => {
     await render(app(allAccess));
 
     await expect.poll(() => document.title).toBe("Overview - Slopscale");
+  });
+
+  it("trails a detail below a branch's page with the branch, the page and the detail", async () => {
+    const screen = await render(
+      app(
+        { ...allAccess, permissions: { ...allAccess.permissions, "logs:network:read": true } },
+        "/traffic/machines/42",
+      ),
+    );
+
+    await expect.element(screen.getByText("machine traffic")).toBeVisible();
+    await expect.element(screen.getByRole("link", { name: "Traffic" }).first()).toBeVisible();
+    await expect.poll(() => document.title).toBe("backup-nas - Traffic - Slopscale");
+
+    const trail = screen.getByRole("navigation", { name: "breadcrumb" });
+
+    await expect.element(trail.getByRole("link", { name: "Machines" })).toBeVisible();
+    await expect.element(trail.getByRole("link", { name: "Traffic" }).first()).toBeInTheDocument();
+    await expect.element(trail.getByText("backup-nas").first()).toBeInTheDocument();
   });
 
   it("opens the account menu for a key without a user", async () => {

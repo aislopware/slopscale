@@ -43,7 +43,8 @@ func (s *State) DNS() DNSStatus {
 // SetDNS replaces the runtime DNS settings. The settings are normalized
 // and validated, stored, applied to the map responses and pushed to every
 // client. Extra records cannot be set here while dns.extra_records_path
-// owns them.
+// owns them. The global nameservers decide whether the DNS log can point
+// clients at the gateway resolvers, so the resolvers follow at once.
 func (s *State) SetDNS(settings types.DNSSettings) (DNSStatus, change.Change, error) {
 	settings = settings.Normalize()
 
@@ -56,33 +57,45 @@ func (s *State) SetDNS(settings types.DNSSettings) (DNSStatus, change.Change, er
 		return DNSStatus{}, change.Change{}, types.ErrDNSExtraRecordsFromFile
 	}
 
+	err = s.saveDNS(&settings)
+	if err != nil {
+		return DNSStatus{}, change.Change{}, err
+	}
+
+	return s.DNS(), change.DNSConfig().Merge(s.trafficRecheck()), nil
+}
+
+// saveDNS stores the override, nil to drop it, and puts it in force.
+func (s *State) saveDNS(settings *types.DNSSettings) error {
 	s.dnsMu.Lock()
 	defer s.dnsMu.Unlock()
 
-	err = s.db.SaveDNSSettings(settings)
-	if err != nil {
-		return DNSStatus{}, change.Change{}, fmt.Errorf("saving dns settings: %w", err)
+	if settings == nil {
+		err := s.db.DeleteDNSSettings()
+		if err != nil {
+			return fmt.Errorf("deleting dns settings: %w", err)
+		}
+	} else {
+		err := s.db.SaveDNSSettings(*settings)
+		if err != nil {
+			return fmt.Errorf("saving dns settings: %w", err)
+		}
 	}
 
-	s.cfg.SetDNSOverride(&settings)
+	s.cfg.SetDNSOverride(settings)
 
-	return s.DNS(), change.DNSConfig(), nil
+	return nil
 }
 
 // ResetDNS drops the runtime DNS settings so the config file is in force
 // again, and pushes the result to every client.
 func (s *State) ResetDNS() (DNSStatus, change.Change, error) {
-	s.dnsMu.Lock()
-	defer s.dnsMu.Unlock()
-
-	err := s.db.DeleteDNSSettings()
+	err := s.saveDNS(nil)
 	if err != nil {
-		return DNSStatus{}, change.Change{}, fmt.Errorf("deleting dns settings: %w", err)
+		return DNSStatus{}, change.Change{}, err
 	}
 
-	s.cfg.SetDNSOverride(nil)
-
-	return s.DNS(), change.DNSConfig(), nil
+	return s.DNS(), change.DNSConfig().Merge(s.trafficRecheck()), nil
 }
 
 // loadDNS applies the stored override, if any, when the server starts.
