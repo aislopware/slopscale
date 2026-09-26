@@ -15,8 +15,8 @@ import (
 //
 // TODO(kradalby): These tests wait for real-time grace periods and
 // GC intervals (up to 60s). testing/synctest would allow instant
-// fake-clock advancement, but three blockers prevent adoption
-// as of Go 1.26:
+// fake-clock advancement, but two blockers prevent adoption
+// as of Go 1.27:
 //
 //  1. golang-lru/v2/expirable janitor goroutine: No Close() method;
 //     the deleteExpired ticker goroutine never exits because the done
@@ -27,9 +27,10 @@ import (
 //     durably blocking in synctest, causing hangs.
 //     - https://github.com/golang/go/issues/77687 (mutex as durably blocking)
 //
-//  3. net/http server goroutines: I/O-blocked goroutines are not durably
-//     blocking, preventing bubble termination.
-//     - https://github.com/golang/go/issues/76608 (httptest synctest support)
+// The third, net/http server goroutines never durably blocking, is gone:
+// Go 1.27's httptest.NewTestServer serves over an in-memory network that a
+// synctest bubble can wait on (golang/go#76608), so servertest would
+// serve through it once the two above are resolved.
 func TestEphemeralNodes(t *testing.T) {
 	t.Parallel()
 
