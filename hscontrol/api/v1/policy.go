@@ -12,6 +12,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/audit"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/state"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2"
@@ -155,37 +156,17 @@ func handleSetPolicy(ctx context.Context, b Backend, in *setPolicyInput) (*setPo
 	// The policy body itself is never audited, only its size.
 	audit.Detail(ctx, "bytes", len(p))
 
-	// Reject policy that would fail when building a map response. SSH rule
-	// validation needs a node, so a server with no nodes can't catch every
-	// case here.
-	nodes := b.State.ListNodes()
+	updated, cs, err := b.State.ReplacePolicy(p)
+	if len(cs) > 0 {
+		b.Change(cs...)
+	}
 
-	_, err := b.State.SetPolicy([]byte(p))
-	if err != nil {
+	if errors.Is(err, state.ErrPolicyRejected) {
 		return nil, huma.Error400BadRequest("setting policy", err)
 	}
 
-	if nodes.Len() > 0 {
-		_, err = b.State.SSHPolicy(nodes.At(0))
-		if err != nil {
-			return nil, huma.Error400BadRequest("verifying SSH rules", err)
-		}
-	}
-
-	updated, err := b.State.SetPolicyInDB(p)
 	if err != nil {
 		return nil, huma.Error500InternalServerError("setting policy", err)
-	}
-
-	// Reload even when content is unchanged: routes manually disabled before
-	// may now qualify for auto-approval, so they must be re-evaluated.
-	cs, err := b.State.ReloadPolicy()
-	if err != nil {
-		return nil, huma.Error500InternalServerError("reloading policy", err)
-	}
-
-	if len(cs) > 0 {
-		b.Change(cs...)
 	}
 
 	out := &setPolicyOutput{}

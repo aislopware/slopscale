@@ -72,6 +72,10 @@ const (
 // ErrUnsupportedPolicyMode is returned for invalid policy modes. Valid modes are "file" and "db".
 var ErrUnsupportedPolicyMode = errors.New("unsupported policy mode")
 
+// ErrPolicyRejected wraps why a policy written through the API was refused;
+// the previous policy stays in force.
+var ErrPolicyRejected = errors.New("policy rejected")
+
 // ErrNodeNotFound is returned when a node cannot be found by its ID.
 var ErrNodeNotFound = errors.New("node not found")
 
@@ -264,6 +268,10 @@ type State struct {
 	// settingsMu serialises the read-modify-write of the settings cache
 	// so that two setters cannot publish each other's stale copy.
 	settingsMu sync.Mutex
+
+	// policyWriteMu serialises policy writes, so a refused write restores
+	// the stored policy rather than one a concurrent write put in force.
+	policyWriteMu sync.Mutex
 
 	// networkMu serialises network writes with the route reconciliation
 	// that follows them, so a toggle cannot approve prefixes a concurrent
@@ -1418,6 +1426,47 @@ func (s *State) GetPolicy() (*types.Policy, error) {
 // SetPolicyInDB stores policy data in the database.
 func (s *State) SetPolicyInDB(data string) (*types.Policy, error) {
 	return s.db.SetPolicy(data)
+}
+
+// ReplacePolicy puts data in force as the database policy. It is compiled
+// against the live tailnet and its SSH rules resolved before it is stored; a
+// policy that fails either, or cannot be stored, is taken back out by
+// restoring the stored one. The changes returned then (a policy change) put
+// clients back on it, because map requests in between may have used the
+// refused policy, so callers dispatch them whether or not err is nil.
+// Refusals wrap [ErrPolicyRejected].
+func (s *State) ReplacePolicy(data string) (*types.Policy, []change.Change, error) {
+	s.policyWriteMu.Lock()
+	defer s.policyWriteMu.Unlock()
+
+	_, err := s.SetPolicy([]byte(data))
+	if err != nil {
+		return nil, s.restoreStoredPolicy(), fmt.Errorf("%w: %w", ErrPolicyRejected, err)
+	}
+
+	// SSH rule validation needs a node, so a server with no nodes cannot
+	// catch every case here.
+	nodes := s.ListNodes()
+	if nodes.Len() > 0 {
+		_, err = s.SSHPolicy(nodes.At(0))
+		if err != nil {
+			return nil, s.restoreStoredPolicy(), fmt.Errorf("%w: verifying SSH rules: %w", ErrPolicyRejected, err)
+		}
+	}
+
+	updated, err := s.SetPolicyInDB(data)
+	if err != nil {
+		return nil, s.restoreStoredPolicy(), fmt.Errorf("storing policy: %w", err)
+	}
+
+	// Reload even when content is unchanged: routes manually disabled before
+	// may now qualify for auto-approval, so they must be re-evaluated.
+	cs, err := s.ReloadPolicy()
+	if err != nil {
+		return nil, nil, fmt.Errorf("reloading policy: %w", err)
+	}
+
+	return updated, cs, nil
 }
 
 // GetNodePrimaryRoutes returns the primary routes for a node.
@@ -4260,6 +4309,28 @@ func (s *State) loadStoredConfig() error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// restoreStoredPolicy puts the stored policy back in force after a refused
+// write and returns the change that moves clients back onto it.
+func (s *State) restoreStoredPolicy() []change.Change {
+	pol, err := hsdb.PolicyBytes(s.db, s.cfg)
+	if err == nil {
+		var changed bool
+
+		changed, err = s.SetPolicy(pol)
+		if err == nil {
+			if !changed {
+				return nil
+			}
+
+			return []change.Change{change.PolicyChange()}
+		}
+	}
+
+	log.Error().Err(err).Msg("restoring the stored policy after a refused write")
 
 	return nil
 }

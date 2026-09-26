@@ -12,6 +12,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/api/principal"
 	"github.com/aislopware/slopscale/hscontrol/audit"
 	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/state"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2"
@@ -125,33 +126,17 @@ func registerACL(api huma.API, b Backend) {
 		// The policy body itself is never audited, only its size.
 		audit.Detail(ctx, "bytes", len(in.RawBody))
 
-		// Mirror the v1 setPolicy flow: validate, SSH-check, persist, reload.
-		nodes := b.State.ListNodes()
+		updated, cs, err := b.State.ReplacePolicy(string(in.RawBody))
+		if len(cs) > 0 {
+			b.Change(cs...)
+		}
 
-		_, err = b.State.SetPolicy(in.RawBody)
-		if err != nil {
+		if errors.Is(err, state.ErrPolicyRejected) {
 			return nil, huma.Error400BadRequest("setting policy", err)
 		}
 
-		if nodes.Len() > 0 {
-			_, err = b.State.SSHPolicy(nodes.At(0))
-			if err != nil {
-				return nil, huma.Error400BadRequest("verifying SSH rules", err)
-			}
-		}
-
-		updated, err := b.State.SetPolicyInDB(string(in.RawBody))
 		if err != nil {
 			return nil, huma.Error500InternalServerError("setting policy", err)
-		}
-
-		cs, err := b.State.ReloadPolicy()
-		if err != nil {
-			return nil, huma.Error500InternalServerError("reloading policy", err)
-		}
-
-		if len(cs) > 0 {
-			b.Change(cs...)
 		}
 
 		return streamPolicy([]byte(updated.Data), aclContentType(in.Accept)), nil
