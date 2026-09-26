@@ -113,7 +113,7 @@ func gateGenerate(ctx context.Context, r *repo) error {
 // applyFormat re-runs everything that decides whether the tree is acceptable to
 // CI, and commits whatever it rewrites. Two reasons it cannot be skipped:
 // nixpkgs and the console's lockfile pick which gofumpt, golines, oxfmt and
-// nixpkgs-fmt the tree is formatted with, so a bump reformats files no area
+// nixfmt the tree is formatted with, so a bump reformats files no area
 // touched; and the bot rewrites workflow YAML and Dockerfiles, where a stray
 // trailing space or an unformatted file fails a hook rather than the compiler.
 func applyFormat(ctx context.Context, r *repo) (change, error) {

@@ -92,7 +92,7 @@ func applyFlake(ctx context.Context, r *repo) (change, error) {
 		return change{Empty: true}, nil
 	}
 
-	// The lock decides which gofumpt, golines and nixpkgs-fmt the tree is
+	// The lock decides which gofumpt, golines and nixfmt the tree is
 	// judged by, so moving it can leave files no bump touched failing the
 	// formatting check. Reformatting belongs in this commit rather than a later
 	// one: the gate below judges this tree, and the cause is this change.

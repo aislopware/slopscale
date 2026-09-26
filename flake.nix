@@ -151,7 +151,7 @@
             # oxfmt, TypeScript and Vite from web/bun.lock.
             bun
             golines
-            nixpkgs-fmt
+            nixfmt
             goreleaser
             nfpm
             gotestsum
@@ -243,14 +243,13 @@
           # golangci-lint built against the pinned Go.
           golangci-lint = fc.goLint common;
 
-          # nixpkgs-fmt only. goFmt = "off": Go formatting (golines, gofumpt)
+          # nixfmt only. goFmt = "off": Go formatting (golines, gofumpt)
           # is enforced by the golangci-lint check, not treefmt. Markup and
           # config files are formatted by oxfmt from the console toolchain
           # (`make lint-markup`, run by the admin console workflow), which
           # the sandboxed check cannot fetch.
           formatting = fc.goFormat (common // {
             goFmt = "off";
-            nixFmt = "nixpkgs-fmt";
             prettier = false;
             fmtExclude = [ ./gen ./docs ./web ];
           });
