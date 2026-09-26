@@ -202,3 +202,33 @@ func TestFetchKeepsACache(t *testing.T) {
 	assert.Equal(t, 6, cached.Len(), "the cache survives failed downloads")
 	assert.Equal(t, int32(4), requests.Load())
 }
+
+// A download over the bound is refused rather than cut short: a truncated
+// table can still parse, and would then be cached as the new one.
+func TestFetchRefusesAnOversizedTable(t *testing.T) {
+	t.Parallel()
+
+	body := gzipped(t, sample)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+
+	cache := filepath.Join(t.TempDir(), "ip2asn.tsv.gz")
+	src := asn.Source{
+		URL: srv.URL, CachePath: cache, Client: srv.Client(), MinRanges: 1,
+		MaxDownload: int64(len(body) - 1),
+	}
+
+	_, err := src.Fetch(t.Context())
+	require.ErrorIs(t, err, asn.ErrTooLarge)
+
+	_, err = os.Stat(cache)
+	require.ErrorIs(t, err, os.ErrNotExist, "nothing is cached")
+
+	src.MaxDownload = int64(len(body))
+
+	_, err = src.Fetch(t.Context())
+	require.NoError(t, err, "a table exactly at the bound is accepted")
+}
