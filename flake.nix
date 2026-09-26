@@ -136,7 +136,8 @@
           );
         };
     }
-    // flake-utils.lib.eachDefaultSystem (
+    # nixpkgs 26.11 dropped x86_64-darwin, and bun is pinned for these three only.
+    // flake-utils.lib.eachSystem [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ] (
       system:
       let
         pkgs = import nixpkgs {
