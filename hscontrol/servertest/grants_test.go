@@ -157,16 +157,10 @@ func TestGrantPolicies(t *testing.T) {
 
 		for _, m := range nm1.PacketFilter {
 			for _, cm := range m.Caps {
-				switch cm.Cap { //nolint:exhaustive // only checking grant-specific caps
-				case peercap.Taildrive:
-					foundDrive = true
-				case peercap.TaildriveSharer:
-					foundDriveSharer = true
-				case peercap.Relay:
-					foundRelay = true
-				case peercap.RelayTarget:
-					foundRelayTarget = true
-				}
+				foundDrive = foundDrive || cm.Cap == peercap.Taildrive
+				foundDriveSharer = foundDriveSharer || cm.Cap == peercap.TaildriveSharer
+				foundRelay = foundRelay || cm.Cap == peercap.Relay
+				foundRelayTarget = foundRelayTarget || cm.Cap == peercap.RelayTarget
 			}
 		}
 

@@ -180,6 +180,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # The apt repository is the release itself: its index goes up next to
+      # the packages, and releases/latest/download points apt at the newest
+      # one (packaging/apt/build-repo.sh). Until this step ends, apt update
+      # fails on the new release's missing index. The runner's own shell has
+      # apt-ftparchive; the Nix shell does not.
+      - name: Apt repository
+        shell: bash
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          command -v apt-ftparchive >/dev/null || sudo apt-get install -y -qq apt-utils
+          packaging/apt/build-repo.sh "$RUNNER_TEMP/apt" dist/*.deb
+          gh release upload "$TAG" "$RUNNER_TEMP"/apt/* --clobber
+
       - name: Release URL
         shell: bash
         env:
