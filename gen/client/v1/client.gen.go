@@ -2171,6 +2171,7 @@ type ServerInfo struct {
 	PolicyPath                 string    `json:"policyPath"`
 	ServerUrl                  string    `json:"serverUrl"`
 	StartedAt                  time.Time `json:"startedAt"`
+	TailnetId                  string    `json:"tailnetId"`
 	Tls                        string    `json:"tls"`
 	Version                    string    `json:"version"`
 }

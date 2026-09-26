@@ -3443,11 +3443,14 @@ components:
         startedAt:
           format: date-time
           type: string
+        tailnetId:
+          type: string
         tls:
           type: string
         version:
           type: string
       required:
+        - tailnetId
         - version
         - commit
         - buildTime
