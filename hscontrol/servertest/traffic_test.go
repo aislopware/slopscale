@@ -362,7 +362,12 @@ func TestTrafficMonitor(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/approve_routes",
 			map[string]any{"routes": []string{"0.0.0.0/0", "::/0"}})
-		assert.Equal(c, http.StatusOK, status, body)
+		// Refused until the exit node's routes reach the server; field
+		// fails the whole test rather than the attempt, so it waits for 200.
+		if !assert.Equal(c, http.StatusOK, status, body) {
+			return
+		}
+
 		assert.Len(c, field(t, body, "node", "approvedRoutes"), 2)
 	}, trafficWait, 100*time.Millisecond)
 
@@ -1435,7 +1440,12 @@ func TestTrafficNamesNetworksReportedBeforeTheTable(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/approve_routes",
 			map[string]any{"routes": []string{"0.0.0.0/0", "::/0"}})
-		assert.Equal(c, http.StatusOK, status, body)
+		// Refused until the exit node's routes reach the server; field
+		// fails the whole test rather than the attempt, so it waits for 200.
+		if !assert.Equal(c, http.StatusOK, status, body) {
+			return
+		}
+
 		assert.Len(c, field(t, body, "node", "approvedRoutes"), 2)
 	}, trafficWait, 100*time.Millisecond)
 
