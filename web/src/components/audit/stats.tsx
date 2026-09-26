@@ -140,6 +140,7 @@ function Activity({ events }: { readonly events: readonly AuditEvent[] }): React
         height={chartHeight}
         isDarkMode={dark}
         yAxisTickCount={3}
+        yAxisMinInterval={1}
         xAxisTickFormat={(value) => (withinDay ? timeOfDay : dayOfMonth).format(new Date(value))}
         tooltipValueFormat={(value) => `${value} ${value === 1 ? "event" : "events"}`}
         ariaDescription={`Events over time, ${bucketCount} bars from ${formatAbsolute(from)} to now`}
