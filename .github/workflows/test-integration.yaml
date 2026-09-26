@@ -46,6 +46,7 @@ jobs:
               - '*.nix'
               - 'go.*'
               - '**/*.go'
+              - 'flake.lock'
               - 'integration/**'
               - 'config-example.yaml'
               - '.github/workflows/test-integration.yaml'
@@ -76,6 +77,7 @@ jobs:
             '*.nix',
             'go.*',
             '**/*.go',
+            'flake.lock',
             'integration/**',
             'config-example.yaml',
             '.github/workflows/test-integration.yaml',
