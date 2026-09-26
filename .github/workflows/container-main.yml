@@ -34,6 +34,8 @@ jobs:
     if: github.repository == 'aislopware/slopscale'
     runs-on: ubuntu-latest
     permissions:
+      # hestia lists the cache entries to skip packs GitHub has evicted.
+      actions: read
       packages: write
       contents: read
     steps:
