@@ -3,6 +3,7 @@ package v2
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net/netip"
 	"slices"
@@ -4092,13 +4093,22 @@ func TestACL_UnmarshalJSON_WithCommentFields(t *testing.T) {
 		},
 	}
 
+	// The entry is validated as part of a whole policy, the only path that
+	// filters '#' members, so groups and tags used below must be declared.
+	const wrapper = `{
+		"groups": {"group:developers": ["user1@example.com"]},
+		"tagOwners": {
+			"tag:client": ["user1@example.com"],
+			"tag:server": ["user1@example.com"]
+		},
+		"acls": [%s]
+	}`
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var acl ACL
-
-			err := json.Unmarshal([]byte(tt.input), &acl)
+			pol, err := unmarshalPolicy(fmt.Appendf(nil, wrapper, tt.input))
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -4106,6 +4116,9 @@ func TestACL_UnmarshalJSON_WithCommentFields(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			require.Len(t, pol.ACLs, 1)
+
+			acl := pol.ACLs[0]
 			assert.Equal(t, tt.expected.Action, acl.Action)
 			assert.Equal(t, tt.expected.Protocol, acl.Protocol)
 			assert.Len(t, acl.Sources, len(tt.expected.Sources))
@@ -6435,4 +6448,128 @@ func TestUnmarshalPolicyLeavesInputIntact(t *testing.T) {
 	_, err := unmarshalPolicy(input)
 	require.NoError(t, err)
 	require.Equal(t, want, string(input))
+}
+
+// TestPolicyMetadataFields covers https://github.com/juanfont/headscale/issues/3479:
+// '#'-prefixed members are editor metadata wherever they appear in the policy,
+// not only in ACL entries, and must not trip the unknown-field check.
+func TestPolicyMetadataFields(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		policy  string
+		wantErr string
+		check   func(t *testing.T, pol *Policy)
+	}{
+		{
+			name: "acl",
+			policy: `{
+				"acls": [{
+					"#ha-meta": {"name": "web"},
+					"action": "accept",
+					"src": ["*"],
+					"dst": ["*:80"]
+				}]
+			}`,
+		},
+		{
+			name: "grant",
+			policy: `{
+				"grants": [{
+					"#ha-meta": {"name": "web"},
+					"src": ["*"],
+					"dst": ["*"],
+					"ip": ["tcp:80"]
+				}]
+			}`,
+		},
+		{
+			name: "ssh",
+			policy: `{
+				"ssh": [{
+					"#ha-meta": {"name": "admins"},
+					"action": "accept",
+					"src": ["user1@example.com"],
+					"dst": ["autogroup:self"],
+					"users": ["root"]
+				}]
+			}`,
+		},
+		{
+			name: "nodeattr",
+			policy: `{
+				"nodeAttrs": [{
+					"#ha-meta": {"name": "all"},
+					"target": ["*"],
+					"attr": ["randomize-client-port"]
+				}]
+			}`,
+		},
+		{
+			name: "toplevel",
+			policy: `{
+				"#ha-meta": {"version": 1},
+				"acls": [{"action": "accept", "src": ["*"], "dst": ["*:80"]}]
+			}`,
+		},
+		{
+			name: "metadata as last member, after a comment",
+			policy: `{
+				// a HuJSON comment
+				"acls": [{
+					"action": "accept",
+					"src": ["*"],
+					"dst": ["*:80"],
+					"#ha-meta": {"name": "web"}
+				}],
+				"#ha-meta": {"version": 1}
+			}`,
+		},
+		{
+			name: "unknown field is still rejected",
+			policy: `{
+				"acls": [{"action": "accept", "src": ["*"], "dst": ["*:80"], "protocol": "tcp"}]
+			}`,
+			wantErr: `unknown field: "protocol"`,
+		},
+		{
+			name: "app capability payload is left alone",
+			policy: `{
+				"grants": [{
+					"#ha-meta": {"name": "web"},
+					"src": ["*"],
+					"dst": ["*"],
+					"app": {"example.com/cap/web": [{"#note": "kept", "domain": ["example.com"]}]}
+				}]
+			}`,
+			check: func(t *testing.T, pol *Policy) {
+				t.Helper()
+
+				require.Len(t, pol.Grants, 1)
+				payload := pol.Grants[0].App["example.com/cap/web"]
+				require.Len(t, payload, 1)
+				assert.JSONEq(t, `{"#note": "kept", "domain": ["example.com"]}`, string(payload[0]))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pol, err := unmarshalPolicy([]byte(tt.policy))
+
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tt.check != nil {
+				tt.check(t, pol)
+			}
+		})
+	}
 }
