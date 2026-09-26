@@ -729,7 +729,7 @@ func onlineAdvertisers(nodes map[types.NodeID]types.Node) map[netip.Prefix][]typ
 	var advertisers map[netip.Prefix][]types.NodeID
 
 	for id, n := range nodes {
-		if n.IsOnline == nil || !*n.IsOnline {
+		if !n.Online() {
 			continue
 		}
 
