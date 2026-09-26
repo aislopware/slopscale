@@ -29,11 +29,15 @@ go run ./tools/bump plan     # which pins are stale; changes nothing
 go run ./tools/bump verify   # do the interlocked pins still agree
 ```
 
-Version bumps go through `tools/bump` (the Version bump workflow opens the
-pull request); its package doc lists the interlocks a bump by hand must
-keep too: gvisor and wireguard-windows at the versions tailscale.com pins,
-`go run ./cmd/vendorhash update` after go.sum moves, a `go` directive no
-newer than nixpkgs' Go, and bun pinned by hand in flake.nix.
+A version bump is never only the pin move. `go run ./tools/bump run` moves
+the pins on a local branch, one gated commit per area, and publishes
+nothing; its package doc lists the interlocks a bump by hand must keep too
+(gvisor and wireguard-windows at the versions tailscale.com pins,
+`go run ./cmd/vendorhash update` after go.sum or the imported packages move,
+a `go` directive no newer than nixpkgs' Go, bun pinned by hand in
+flake.nix). Then every moved item's changes between the two versions are
+read and acted on in the same pull request: drop what they make redundant,
+change what they deprecate, adopt what slopscale can use.
 
 Needs go, golangci-lint and bun on PATH; `nix develop` pins the CI
 versions but isn't required. Markup and config files outside `docs/` and

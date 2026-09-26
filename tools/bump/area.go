@@ -26,7 +26,7 @@ type change struct {
 }
 
 // area is one independently revertible unit of work. Areas are the granularity
-// at which the bot succeeds or fails: each becomes its own commit, so a broken
+// at which a run succeeds or fails: each becomes its own commit, so a broken
 // one can be dropped without disturbing the others.
 type area struct {
 	Name  string
@@ -111,24 +111,12 @@ func allAreas() []area {
 }
 
 // shippedAreas change what an operator runs: the binary, the console embedded
-// in it, or the image it is published in.
+// in it, or the image it is published in. Their commits are deps, a changelog
+// line; the rest are build.
 var shippedAreas = map[string]bool{
 	"gomod":            true,
 	"packages:web":     true,
 	"image:distroless": true,
-}
-
-// titleOf is the pull request title, which the squash merge makes the commit
-// subject on main. A deps subject is a changelog line and a patch release, so
-// it is only used when something that ships moved.
-func titleOf(results []result) string {
-	for _, res := range results {
-		if res.Commit != "" && shippedAreas[res.Area] {
-			return "deps: update the Go modules, console packages and base image slopscale ships with"
-		}
-	}
-
-	return "build: bump the pinned toolchain, build images and CI actions"
 }
 
 // runAreas applies each area in order, committing the ones that hold and

@@ -1,5 +1,7 @@
-// Command bump keeps slopscale's pinned versions current and puts the result
-// in front of a maintainer as a single reviewable pull request.
+// Command bump moves slopscale's pinned versions on a local branch and reports
+// what moved. It never publishes: a bump is finished by reading each moved
+// item's changes and acting on what slopscale should drop, change or adopt,
+// and only then does a pull request open.
 //
 // The pins are interlocked. flake.nix asks nixpkgs for the newest Go, so a lock
 // update moves the compiler and every devShell tool at once, except bun, which
@@ -12,10 +14,10 @@
 // tags, so it goes stale without anyone touching the repository.
 //
 // Each of those is an area: applied, gated, and committed on its own, so one
-// failure costs one commit rather than the whole pull request.
+// failure costs one commit rather than the whole run.
 //
 //	bump plan     resolve every source of truth and print what would change
-//	bump run      apply, gate, and open or update the pull request
+//	bump run      apply and gate on a local branch, one commit per area, and report
 //	bump verify   assert the pins are mutually consistent
 package main
 
@@ -32,15 +34,12 @@ import (
 )
 
 type runFlags struct {
-	DryRun bool   `flag:"dry-run,default=false,Rebuild the branch locally and report; no final gate, no push"`
-	NoPR   bool   `flag:"no-pr,default=false,Push nothing and open no pull request"`
+	DryRun bool   `flag:"dry-run,default=false,Apply and report without the final gate"`
 	Areas  string `flag:"areas,Comma-separated areas to run (default: all)"`
 	Skip   string `flag:"skip,Comma-separated areas to skip"`
-	Force  bool   `flag:"force,default=false,Open a pull request even if an identical one was closed unmerged"`
-	Branch string `flag:"branch,default=automation/version-bump,Branch to push"`
+	Branch string `flag:"branch,default=chore/version-bump,Local branch the areas are committed on"`
 	Base   string `flag:"base,default=main,Base branch"`
-	Remote string `flag:"remote,default=origin,Git remote"`
-	Repo   string `flag:"repo,GitHub repository (default: the one the job runs in)"`
+	Remote string `flag:"remote,default=origin,Git remote the base is fetched from"`
 	Gate   string `flag:"gate,default=full,Final gate level: none, quick or full"`
 }
 
@@ -63,7 +62,7 @@ func main() {
 			},
 			{
 				Name:     "run",
-				Help:     "Apply, gate, and open or update the pull request",
+				Help:     "Apply and gate on a local branch, one commit per area, and report",
 				SetFlags: command.Flags(flax.MustBind, &runCfg),
 				Run:      func(env *command.Env) error { return cmdRun(env.Context()) },
 			},
@@ -107,10 +106,8 @@ func selector(only, skip string) func(string) bool {
 
 func cmdRun(ctx context.Context) error {
 	gate := runCfg.Gate
-	noPR := runCfg.NoPR
-
 	if runCfg.DryRun {
-		gate, noPR = gateNone, true
+		gate = gateNone
 	}
 
 	r, err := openRepo(ctx)
@@ -144,49 +141,15 @@ func cmdRun(ctx context.Context) error {
 		return err
 	}
 
-	tree, err := treeSHA(ctx, r)
-	if err != nil {
-		return err
-	}
-
-	head, err := headSHA(ctx, r)
-	if err != nil {
-		return err
-	}
-
-	body := renderBody(results, markerOf(results, tree, head), gate)
-
-	err = writeStepSummary(body)
-	if err != nil {
-		return err
-	}
-
 	if !anyApplied(results) {
 		log.Print("nothing moved")
 
 		return nil
 	}
 
-	if noPR {
-		fmt.Print(body)
+	fmt.Print(renderReport(results, gate))
 
-		return nil
-	}
-
-	slug, err := currentSlug(ctx, r, runCfg.Repo)
-	if err != nil {
-		return err
-	}
-
-	return publish(ctx, r, publishOptions{
-		Slug:   slug,
-		Remote: runCfg.Remote,
-		Branch: runCfg.Branch,
-		Base:   runCfg.Base,
-		Title:  titleOf(results),
-		Gate:   gate,
-		Force:  runCfg.Force,
-	}, results)
+	return nil
 }
 
 func anyApplied(results []result) bool {
@@ -197,27 +160,4 @@ func anyApplied(results []result) bool {
 	}
 
 	return false
-}
-
-// writeStepSummary mirrors the report into the workflow run page, so a run that
-// opens no pull request still says why.
-func writeStepSummary(body string) error {
-	path := os.Getenv("GITHUB_STEP_SUMMARY")
-	if path == "" {
-		return nil
-	}
-
-	//nolint:gosec // the path is the workflow runner's own summary file
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("opening step summary: %w", err)
-	}
-	defer f.Close()
-
-	_, err = f.WriteString(body)
-	if err != nil {
-		return fmt.Errorf("writing step summary: %w", err)
-	}
-
-	return nil
 }
