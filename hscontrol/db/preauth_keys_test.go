@@ -528,3 +528,56 @@ func TestGetPreAuthKeyUnknownMapsToRecordNotFound(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound,
 		"unknown pre-auth key must map to record-not-found (handled as 401)")
 }
+
+// TestDestroyRevokedPreAuthKeysKeepsKeysBackingNodes asserts the collector
+// reaps a revoked key only once no node references it: an ephemeral node's
+// ephemerality lives on its key, so reaping the key would make the node
+// permanent after the next restart.
+func TestDestroyRevokedPreAuthKeysKeepsKeysBackingNodes(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	user := db.CreateUserForTest("revoked-reaper")
+
+	backing, err := db.CreatePreAuthKey(user.TypedID(), false, true, nil, nil)
+	require.NoError(t, err)
+
+	unused, err := db.CreatePreAuthKey(user.TypedID(), false, true, nil, nil)
+	require.NoError(t, err)
+
+	node := types.Node{
+		Hostname:       "ephemeral",
+		UserID:         &user.ID,
+		RegisterMethod: util.RegisterMethodAuthKey,
+		AuthKeyID:      new(backing.ID),
+	}
+	require.NoError(t, CreateNode(db, &node))
+
+	require.NoError(t, db.RevokePreAuthKey(backing.ID))
+	require.NoError(t, db.RevokePreAuthKey(unused.ID))
+
+	cutoff := time.Now().Add(time.Minute)
+
+	reaped, err := db.DestroyRevokedPreAuthKeysBefore(cutoff)
+	require.NoError(t, err)
+	assert.Equal(t, 1, reaped)
+
+	_, err = db.GetPreAuthKeyByID(unused.ID)
+	require.ErrorIs(t, err, ErrNotFound)
+
+	kept, err := GetNodeByID(db, node.ID)
+	require.NoError(t, err)
+	require.NotNil(t, kept.AuthKeyID, "the node keeps its key")
+	assert.True(t, kept.IsEphemeral())
+
+	require.NoError(t, db.DeleteNode(&node))
+
+	reaped, err = db.DestroyRevokedPreAuthKeysBefore(cutoff)
+	require.NoError(t, err)
+	assert.Equal(t, 1, reaped, "the key goes once its node is gone")
+
+	_, err = db.GetPreAuthKeyByID(backing.ID)
+	require.ErrorIs(t, err, ErrNotFound)
+}

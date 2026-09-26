@@ -488,17 +488,23 @@ func RevokePreAuthKey(q Querier, id uint64) error {
 
 // DestroyRevokedPreAuthKeysBefore hard-deletes every key revoked before cutoff,
 // returning how many were removed. The background collector calls this to reap
-// soft-revoked keys after the retention window.
+// soft-revoked keys after the retention window. Keys still referenced by a node
+// are kept until the node is deleted: the node's ephemerality lives on its key,
+// and revoking a key must not change nodes already registered with it.
 func (hsdb *HSDatabase) DestroyRevokedPreAuthKeysBefore(cutoff time.Time) (int, error) {
 	var count int
 
 	err := hsdb.Write(func(tx *Tx) error {
 		var ids []idRow
 
+		backingANode := jet.SELECT(table.Nodes.AuthKeyID).FROM(table.Nodes).
+			WHERE(table.Nodes.AuthKeyID.IS_NOT_NULL())
+
 		err := tx.ex.query(
 			jet.SELECT(table.PreAuthKeys.ID.AS("id_row.id")).FROM(table.PreAuthKeys).
 				WHERE(table.PreAuthKeys.Revoked.IS_NOT_NULL().
-					AND(table.PreAuthKeys.Revoked.LT(jet.TimestampExp(timeArg(cutoff))))),
+					AND(table.PreAuthKeys.Revoked.LT(jet.TimestampExp(timeArg(cutoff)))).
+					AND(table.PreAuthKeys.ID.NOT_IN(backingANode))),
 			&ids,
 		)
 		if err != nil {
