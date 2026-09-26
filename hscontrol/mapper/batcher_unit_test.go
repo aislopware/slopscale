@@ -1095,7 +1095,9 @@ func TestBatcher_CloseThenStartIsNoop(t *testing.T) {
 
 	goroutinesAfter := runtime.NumGoroutine()
 
-	assert.InDelta(t, goroutinesBefore, goroutinesAfter, 1,
+	// Only an increase matters: goroutines left by earlier tests may still
+	// be exiting, which lowers the count without saying anything about Start.
+	assert.LessOrEqual(t, goroutinesAfter, goroutinesBefore,
 		"Start() after Close() should not spawn new goroutines; before=%d after=%d",
 		goroutinesBefore, goroutinesAfter)
 }
