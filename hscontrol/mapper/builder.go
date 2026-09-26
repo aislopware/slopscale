@@ -31,7 +31,7 @@ type MapResponseBuilder struct {
 	errs   []error
 
 	debugType debugType
-	// visiblePeers is the peer set the last [buildTailPeers] admitted,
+	// visiblePeers is the peer set the last [buildTailPeers] was given,
 	// for [WithUserProfilesOfPeers].
 	visiblePeers views.Slice[types.NodeView]
 }
@@ -282,9 +282,8 @@ func (b *MapResponseBuilder) WithUserProfiles(peers views.Slice[types.NodeView])
 
 // WithUserProfilesOfPeers adds the profiles of the node's own user and of
 // the users of the peers the response carries. Call it after [WithPeers]
-// or [WithPeerChanges]: those run the policy over the peers once and keep
-// the visible ones, so no user is named whose node the response leaves
-// out, and the policy is not run a second time for the profiles.
+// or [WithPeerChanges], so no user is named whose node the response
+// leaves out.
 func (b *MapResponseBuilder) WithUserProfilesOfPeers() *MapResponseBuilder {
 	return b.WithUserProfiles(b.visiblePeers)
 }
@@ -402,18 +401,18 @@ func (b *MapResponseBuilder) node() (types.NodeView, bool) {
 	return nv, ok
 }
 
-// buildTailPeers converts [views.Slice] of [types.NodeView] to a slice of [tailcfg.Node]
-// with policy filtering and sorting.
+// buildTailPeers converts [views.Slice] of [types.NodeView] to a sorted slice
+// of [tailcfg.Node]. The peers come from [state.State.ListPeers], whose peer
+// map already decided visibility. Running the policy over them again cost a
+// pair check per peer per recipient, O(n²) for every patch fan-out, and
+// changed nothing; see BenchmarkPeerVisibility.
 func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) ([]*tailcfg.Node, error) {
 	node, ok := b.mapper.state.GetNodeByID(b.nodeID)
 	if !ok {
 		return nil, ErrNodeNotFoundMapper
 	}
 
-	// The policy decides which of the candidates the node may see, by
-	// the same rule that built the full map's peer list.
-	changedViews := b.mapper.state.VisiblePeers(node, peers)
-	b.visiblePeers = changedViews
+	b.visiblePeers = peers
 
 	// The node's unreduced matchers (every rule where it is source or
 	// destination) drive the per-peer route computation below.
@@ -430,9 +429,9 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	serviceHosts := b.mapper.state.ServiceHosts()
 
 	// Build tail nodes with per-peer via-aware route function.
-	tailPeers := make([]*tailcfg.Node, 0, changedViews.Len())
+	tailPeers := make([]*tailcfg.Node, 0, peers.Len())
 
-	for _, peer := range changedViews.All() {
+	for _, peer := range peers.All() {
 		// Pass the peer's policy CapMap so per-peer address-shape rules
 		// (today: disable-ipv4) apply consistently in the viewer's
 		// netmap; the entry's own CapMap is set by PeerCapMap below.

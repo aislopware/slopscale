@@ -979,51 +979,19 @@ func (s *State) ListNodesByUser(userID types.UserID) views.Slice[types.NodeView]
 	return s.nodeStore.ListNodesByUser(userID)
 }
 
-// ListPeers retrieves nodes that can communicate with the specified node based on policy.
+// ListPeers returns the peers the node may see, from the NodeStore's peer
+// map; with peerIDs, only those of them. The peer map is the one decision
+// on visibility (policy, approval, suspension, sharing) for the full map
+// and the incremental paths alike: every write that changes one of its
+// inputs rebuilds it before the change is published. It never holds the
+// node itself, so a change batch naming the recipient does not hand it
+// back as its own peer.
 func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Slice[types.NodeView] {
 	if len(peerIDs) == 0 {
 		return s.nodeStore.ListPeers(nodeID)
 	}
 
-	// For specific peerIDs, filter from all nodes.
-	// This path is used for incremental updates (NodeAdded, NodeChanged)
-	// where the caller already knows which peer IDs are involved.
-	// Peer visibility filtering happens in the mapper against the live
-	// policy (buildTailPeers and filterVisiblePeerPatches), because
-	// the snapshot peer map is not rebuilt on policy changes. Approval is
-	// applied here as the snapshot peer map applies it: a node waiting for
-	// approval, or suspended, has no peers and is nobody's peer.
-	if requester, ok := s.nodeStore.GetNode(nodeID); !ok || !requester.IsAdmitted() {
-		return views.SliceOf([]types.NodeView{})
-	}
-
-	allNodes := s.nodeStore.ListNodes()
-
-	nodeIDSet := make(map[types.NodeID]struct{}, len(peerIDs))
-	for _, id := range peerIDs {
-		nodeIDSet[id] = struct{}{}
-	}
-
-	var filteredNodes []types.NodeView
-
-	for _, node := range allNodes.All() {
-		// A node is never its own peer. The snapshot peer map keeps this
-		// out, but the caller may name the recipient in peerIDs (a change
-		// batch that includes it), and the mapper's only other self filter
-		// is [change.Change.OriginNode], which a broadcast change does not
-		// carry. Self would then reach the client in
-		// [tailcfg.MapResponse.PeersChanged], where it is merged into the
-		// peer map and listed alongside the self node.
-		if node.ID() == nodeID {
-			continue
-		}
-
-		if _, exists := nodeIDSet[node.ID()]; exists && node.IsAdmitted() {
-			filteredNodes = append(filteredNodes, node)
-		}
-	}
-
-	return views.SliceOf(filteredNodes)
+	return s.nodeStore.ListPeersAmong(nodeID, peerIDs)
 }
 
 // ListEphemeralNodes retrieves all ephemeral (temporary) nodes in the system.
@@ -1354,19 +1322,6 @@ func (s *State) FilterForNode(node types.NodeView) ([]tailcfg.FilterRule, error)
 // MatchersForNode returns matchers for peer relationship determination (unreduced).
 func (s *State) MatchersForNode(node types.NodeView) ([]matcher.Match, error) {
 	return s.polMan.MatchersForNode(node)
-}
-
-// VisiblePeers narrows candidates to the peers node may see under the
-// live policy, by the pairwise rule the NodeStore's peer map was built
-// with. The full map takes its peers from that map; the incremental
-// paths take theirs from here, so a node the policy hands an empty
-// filter (autogroup:shared before anything is shared, say) sees nobody
-// rather than everybody.
-func (s *State) VisiblePeers(
-	node types.NodeView,
-	candidates views.Slice[types.NodeView],
-) views.Slice[types.NodeView] {
-	return s.polMan.VisiblePeers(node, candidates)
 }
 
 // NodeCapMap returns the policy-derived CapMap for the given node, suitable

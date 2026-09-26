@@ -217,8 +217,8 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 
 // TestBuildFromChangeFiltersPeerPatchesByVisibility proves that incremental
 // peer-change patches (online/offline, endpoint, key-expiry) are restricted to
-// the recipient's ACL-visible peer set, the same way buildTailPeers filters
-// full peer objects via State.VisiblePeers. Without it, a node receives the
+// the recipient's ACL-visible peer set, the NodeStore peer map buildTailPeers
+// is fed from. Without it, a node receives the
 // existence, presence, and addresses of peers its policy forbids accessing.
 func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 	t.Parallel()
@@ -304,8 +304,8 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 
 // TestBuildFromChangeFiltersUserProfilesByVisibility proves the incremental
 // PeersChanged path restricts UserProfiles to the recipient's ACL-visible
-// peers, like the full-map path (whose ListPeers returns the
-// BuildPeerMap-filtered set). Without it, a changed node broadcast to all
+// peers, from the same BuildPeerMap-filtered set the full-map path reads.
+// Without it, a changed node broadcast to all
 // nodes leaks its owner's identity (login name, display name, avatar) to
 // recipients whose policy forbids accessing that node.
 func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
@@ -379,11 +379,10 @@ func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
 // full-map path under every policy shape, and a cross-user UserProfile must not
 // leak. If a future refactor lets one path drift from another, this fails.
 //
-// It pins two behaviours the scattered per-path filters get wrong today and the
-// consolidation onto the snapshot peer map must fix: deny-all (empty matchers)
-// must hide every peer on the incremental path rather than fall open to "no
-// matchers => all visible", and per-node policies (autogroup:self) must agree
-// across paths.
+// It pins two behaviours of the snapshot peer map every path reads: deny-all
+// (empty matchers) must hide every peer on the incremental path rather than
+// fall open to "no matchers => all visible", and per-node policies
+// (autogroup:self) must agree across paths.
 //
 //nolint:tparallel // subtests install different policies on one shared State
 func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
