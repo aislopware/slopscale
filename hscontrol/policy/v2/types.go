@@ -22,7 +22,6 @@ import (
 	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/tailcfg/peercap"
 	"tailscale.com/types/views"
-	"tailscale.com/util/multierr"
 	"tailscale.com/util/set"
 	"tailscale.com/util/slicesx"
 )
@@ -1352,7 +1351,7 @@ func (a *Aliases) Resolve(p *Policy, users types.Users, nodes views.Slice[types.
 func buildIPSetMultiErr(ipBuilder *netipx.IPSetBuilder, errs []error) (*netipx.IPSet, error) {
 	ips, err := ipBuilder.IPSet()
 
-	combinedErr := multierr.New(append(errs, err)...)
+	combinedErr := errors.Join(append(errs, err)...)
 	if combinedErr != nil {
 		return ips, fmt.Errorf("building IP set: %w", combinedErr)
 	}
@@ -3204,7 +3203,7 @@ func (pol *Policy) validate() error {
 	errs = append(errs, pol.validatePostures()...)
 
 	if len(errs) > 0 {
-		return fmt.Errorf("validating policy: %w", multierr.New(errs...))
+		return fmt.Errorf("validating policy: %w", errors.Join(errs...))
 	}
 
 	pol.validated = true
@@ -3766,7 +3765,7 @@ func validateTests(pol *Policy, tests []PolicyTest) error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("%w:\n%w", errPolicyTestsFailed, multierr.New(errs...))
+		return fmt.Errorf("%w:\n%w", errPolicyTestsFailed, errors.Join(errs...))
 	}
 
 	return nil
@@ -3837,7 +3836,7 @@ func validateSSHTests(pol *Policy, tests []SSHPolicyTest) error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("%w:\n%w", errSSHPolicyTestsFailed, multierr.New(errs...))
+		return fmt.Errorf("%w:\n%w", errSSHPolicyTestsFailed, errors.Join(errs...))
 	}
 
 	return nil

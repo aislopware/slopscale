@@ -59,6 +59,8 @@ linters:
               desc: use slices from the standard library
             - pkg: golang.org/x/exp/constraints
               desc: use cmp.Ordered
+            - pkg: tailscale.com/util/multierr
+              desc: deprecated upstream; use errors.Join
             - pkg: modernc.org/sqlite
               desc: SQLite is mattn/go-sqlite3 (cgo), registered as "sqlite" by hscontrol/db/sqliteconfig; a second driver with that name panics at init
             - pkg: github.com/glebarez/sqlite
