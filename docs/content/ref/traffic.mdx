@@ -87,16 +87,23 @@ dependencies. The gateway must:
   refused, since no other node sees another machine's traffic.
 - be approved, not suspended and not expired.
 
-Install the Debian package from the [release](https://github.com/aislopware/slopscale/releases) that matches your
-server:
+Install the Debian package from the slopscale apt repository, the same one the
+[server packages](/setup/install/official) come from:
 
 ```shell
-export SLOPSCALE_VERSION="X.Y.Z" # See the releases page
-export SLOPSCALE_ARCH="amd64"    # or arm64
-wget --output-document=slopscale-flowd.deb \
-  "https://github.com/aislopware/slopscale/releases/download/v${SLOPSCALE_VERSION}/slopscale-flowd_${SLOPSCALE_VERSION}_linux_${SLOPSCALE_ARCH}.deb"
-sudo apt install ./slopscale-flowd.deb
+sudo curl -fsSLo /usr/share/keyrings/slopscale-archive-keyring.gpg \
+  https://github.com/aislopware/slopscale/releases/latest/download/slopscale-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/slopscale-archive-keyring.gpg] https://github.com/aislopware/slopscale/releases/latest/download ./" |
+  sudo tee /etc/apt/sources.list.d/slopscale.list
+sudo apt update
+sudo apt install slopscale-flowd
 ```
+
+`apt upgrade` then keeps the agent on the latest release and restarts it. The
+repository lists only the latest release; an agent is meant to match the server,
+so on a server that lags behind, install the agent's `.deb` of the server's
+version from the [releases page](https://github.com/aislopware/slopscale/releases)
+and `sudo apt-mark hold slopscale-flowd`.
 
 The package enables and starts `slopscale-flowd.service`. The agent needs
 no configuration:

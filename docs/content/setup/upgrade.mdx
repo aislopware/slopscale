@@ -18,6 +18,10 @@ Update an existing Slopscale installation to a new version:
 - Stop Slopscale
 - **[Create a backup of your installation](#backup)**
 - Update Slopscale to the new version, preferably by following the same installation method.
+  With the [apt repository](/setup/install/official), that is `sudo apt update && sudo apt install slopscale`. The
+  repository offers only the latest release, so when you are more than one minor version behind, install the versions
+  in between from their `.deb` on the releases page first. `sudo apt-mark hold slopscale` keeps `apt upgrade` from
+  updating the server along with everything else.
 - Compare and update the [configuration](/ref/configuration) file.
 - Start Slopscale
 

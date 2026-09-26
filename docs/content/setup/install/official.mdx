@@ -11,20 +11,29 @@ It is recommended to use our DEB packages to install slopscale on a Debian based
 local user to run slopscale, provide a default configuration and ship with a systemd service file. Supported
 distributions are Ubuntu 22.04 or newer, Debian 12 or newer.
 
-1. Download the [latest slopscale package](https://github.com/aislopware/slopscale/releases/latest) for your platform (`.deb` for Ubuntu and Debian).
+1. Add the slopscale apt repository. Every release carries a signed apt index next to its packages, and the source
+   below follows the latest release, so `apt upgrade` brings each new version:
 
     ```shell
-    SLOPSCALE_VERSION="" # See above URL for latest version, e.g. "X.Y.Z" (NOTE: do not add the "v" prefix!)
-    SLOPSCALE_ARCH="" # Your system architecture, e.g. "amd64"
-    wget --output-document=slopscale.deb \
-     "https://github.com/aislopware/slopscale/releases/download/v${SLOPSCALE_VERSION}/slopscale_${SLOPSCALE_VERSION}_linux_${SLOPSCALE_ARCH}.deb"
+    sudo curl -fsSLo /usr/share/keyrings/slopscale-archive-keyring.gpg \
+      https://github.com/aislopware/slopscale/releases/latest/download/slopscale-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/slopscale-archive-keyring.gpg] https://github.com/aislopware/slopscale/releases/latest/download ./" |
+      sudo tee /etc/apt/sources.list.d/slopscale.list
     ```
+
+    The index is signed by the key with fingerprint `4794 9BAF CFFE 9FC0 38C9 1CA4 7CCC 320C F713 D772`, which is also
+    in the repository as `packaging/apt/slopscale-archive-keyring.gpg`.
 
 1. Install slopscale:
 
     ```shell
-    sudo apt install ./slopscale.deb
+    sudo apt update
+    sudo apt install slopscale
     ```
+
+    The repository lists only the latest release. To install another version, download its `.deb` from the
+    [releases page](https://github.com/aislopware/slopscale/releases) and install it with
+    `sudo apt install ./slopscale_X.Y.Z_linux_amd64.deb`.
 
 1. [Configure slopscale by editing the configuration file](/ref/configuration). An up-to date example
    configuration file is also available in `/usr/share/doc/slopscale/examples/config-example.yaml`:
