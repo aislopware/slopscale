@@ -119,8 +119,13 @@ plane works against Slopscale unchanged: the
 
 - API endpoint: `/api/v2`, e.g. `https://slopscale.example.com/api/v2`
 - Documentation: `/api/v2/docs`
-- The tailnet in every path is `-`; Slopscale serves one tailnet, and any other
-  name is a `404`.
+- The tailnet in every path is `-` or the tailnet ID; Slopscale serves one
+  tailnet, and any other name is a `404`. The tailnet ID is made on the
+  server's first start and never changes. It has the shape of a Tailscale
+  tailnet ID, such as `T4bXk29QaZmCNTRL`. It is shown on the console's
+  _Settings › Tailnet_ page and as `tailnetId` in `GET /api/v1/server`. A
+  machine whose client knows the field (capability version 148 and later)
+  reports it as `CurrentTailnet.StableID` in `tailscale status --json`.
 - Authenticate with an [API key](#rest-api), which is all-access, or with
   [OAuth 2.0 client credentials](#oauth-clients), which are limited to the
   scopes and tags they were created with. Point the Terraform provider at
