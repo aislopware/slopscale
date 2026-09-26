@@ -53,10 +53,10 @@ func hashSecret(secret string) []byte {
 	return []byte(hashPrefixSHA256 + hex.EncodeToString(sum[:]))
 }
 
-// verifySecret reports whether secret matches a stored hash. Hashes written
-// before SHA-256 (bcrypt for API and pre-auth keys, Argon2id for OAuth
-// clients and tokens) still verify and return needsRehash, so the caller can
-// upgrade them.
+// verifySecret returns nil when secret matches a stored hash, and reports in
+// its bool whether the hash is a legacy one to rewrite. Hashes written before
+// SHA-256 (bcrypt for API and pre-auth keys, Argon2id for OAuth clients and
+// tokens) still verify, so the caller can upgrade them.
 func verifySecret(encoded []byte, secret string) (bool, error) {
 	if hexSum, ok := bytes.CutPrefix(encoded, []byte(hashPrefixSHA256)); ok {
 		want, err := hex.DecodeString(string(hexSum))
