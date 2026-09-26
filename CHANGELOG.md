@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.48.0](https://github.com/aislopware/slopscale/compare/v0.47.1...v0.48.0) (2026-09-26)
+
+
+### Changes
+
+* **api/v2:** read the traffic through gateways in Tailscale's network log shape ([c5d371f](https://github.com/aislopware/slopscale/commit/c5d371f86fd7ca2f248e67f9986b7ec512534da5))
+* **cli:** read and configure the traffic monitor with slopscale traffic ([c5d371f](https://github.com/aislopware/slopscale/commit/c5d371f86fd7ca2f248e67f9986b7ec512534da5))
+* **traffic:** log the names machines look up while they use a gateway as their exit node, once the gateway's resolver is approved ([c5d371f](https://github.com/aislopware/slopscale/commit/c5d371f86fd7ca2f248e67f9986b7ec512534da5))
+* **traffic:** see how much each machine sends through the gateways and where it goes, reported by the new slopscale-flowd agent ([c5d371f](https://github.com/aislopware/slopscale/commit/c5d371f86fd7ca2f248e67f9986b7ec512534da5))
+* **web:** read and configure the traffic monitor on the console's Traffic pages ([c5d371f](https://github.com/aislopware/slopscale/commit/c5d371f86fd7ca2f248e67f9986b7ec512534da5))
+
 ## [0.47.1](https://github.com/aislopware/slopscale/compare/v0.47.0...v0.47.1) (2026-09-20)
 
 
