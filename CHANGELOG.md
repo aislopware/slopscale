@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.49.0](https://github.com/aislopware/slopscale/compare/v0.48.0...v0.49.0) (2026-09-26)
+
+
+### Changes
+
+* **packaging:** install and upgrade slopscale and slopscale-flowd with apt ([#34](https://github.com/aislopware/slopscale/issues/34)) ([3b6bc51](https://github.com/aislopware/slopscale/commit/3b6bc51a8d29a953351ab81763d2e628e5e9625f))
+
 ## [0.48.0](https://github.com/aislopware/slopscale/compare/v0.47.1...v0.48.0) (2026-09-26)
 
 
