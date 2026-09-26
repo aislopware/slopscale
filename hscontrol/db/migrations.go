@@ -17,7 +17,8 @@ import (
 // on an old database gives the same result years later.
 //
 // Migrations start from v0.25.0. If upgrading from v0.24.x or earlier, you
-// must first upgrade to v0.25.1 before upgrading to this version.
+// must first upgrade to v0.25.1 before upgrading to this version;
+// runMigrations refuses a database that has not.
 //
 // Raw SQL uses $1..$n placeholders, which both drivers accept. Statements
 // that only make sense on one dialect check tx.ex.dialect.

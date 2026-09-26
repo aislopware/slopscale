@@ -27,7 +27,16 @@ const initSchemaMigrationID = "SCHEMA_INIT"
 // no new migration may run with foreign keys disabled.
 const lastMigrationRequiringFKDisabled = "202501311657"
 
+// firstMigrationID is the first migration of v0.25.0, where the history
+// starts. A database that has recorded neither it nor a later one predates
+// the history: the steps that bring it up to 0.25 are not in the list, so
+// replaying the list would leave it half-migrated.
+const firstMigrationID = "202501221827"
+
 var (
+	errDatabaseTooOld = errors.New(
+		"database predates headscale 0.25; upgrade it with headscale v0.25.1 first",
+	)
 	errMigrationHistoryMissing = errors.New(
 		"database has tables but no migration history; " +
 			"it was not created by slopscale 0.25 or later",
@@ -53,6 +62,10 @@ func (hsdb *HSDatabase) runMigrations(migrations []migration) error {
 		return errMigrationHistoryMissing
 	}
 
+	if !reachedHistory(applied) {
+		return errDatabaseTooOld
+	}
+
 	if hsdb.ex.dialect == dialectSQLite {
 		return hsdb.runSQLiteMigrations(migrations, applied)
 	}
@@ -60,6 +73,19 @@ func (hsdb *HSDatabase) runMigrations(migrations []migration) error {
 	_, err = hsdb.applyPending(migrations, applied)
 
 	return err
+}
+
+// reachedHistory reports whether applied records [firstMigrationID] or a
+// later migration. IDs start with a timestamp, so they order chronologically
+// as strings.
+func reachedHistory(applied map[string]struct{}) bool {
+	for id := range applied {
+		if id != initSchemaMigrationID && id >= firstMigrationID {
+			return true
+		}
+	}
+
+	return false
 }
 
 func validateMigrationIDs(migrations []migration) error {

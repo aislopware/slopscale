@@ -93,6 +93,57 @@ func TestExistingDatabaseWithoutHistoryIsRejected(t *testing.T) {
 	require.ErrorIs(t, err, errMigrationHistoryMissing)
 }
 
+// TestDatabaseBeforeHistoryIsRejected covers a database last run by
+// headscale 0.24 or earlier: its history holds only migrations the list no
+// longer carries, so replaying the list would skip them.
+func TestDatabaseBeforeHistoryIsRejected(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = db.Close() })
+
+	_, err = db.DB.ExecContext(t.Context(), "DELETE FROM migrations")
+	require.NoError(t, err)
+
+	for _, id := range []string{initSchemaMigrationID, "202312101416", "2024041121742", "202410071005"} {
+		_, err = db.DB.ExecContext(t.Context(), "INSERT INTO migrations(id) VALUES ($1)", id)
+		require.NoError(t, err)
+	}
+
+	err = db.runMigrations(migrations(db.cfg))
+	require.ErrorIs(t, err, errDatabaseTooOld)
+}
+
+func TestReachedHistory(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		ids  []string
+		want bool
+	}{
+		{name: "only pre-0.25 ids", ids: []string{"202312101416", "2024041121742", "202410071005"}},
+		{name: "schema marker alone", ids: []string{initSchemaMigrationID}},
+		{name: "first migration", ids: []string{"202410071005", firstMigrationID}, want: true},
+		{name: "a later migration", ids: []string{"202609251000-traffic"}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			applied := map[string]struct{}{}
+			for _, id := range tt.ids {
+				applied[id] = struct{}{}
+			}
+
+			assert.Equal(t, tt.want, reachedHistory(applied))
+		})
+	}
+}
+
 func TestPendingMigrationsRunOnceEachInOrder(t *testing.T) {
 	t.Parallel()
 
