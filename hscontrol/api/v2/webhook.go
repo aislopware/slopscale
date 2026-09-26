@@ -122,7 +122,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.WebhooksRead), func(_ context.Context, in *tailnetInput) (*listWebhooksOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +154,7 @@ func registerWebhooks(api huma.API, b Backend) {
 	}, scope.Webhooks), "webhook.create", "webhook", ""), func(
 		ctx context.Context, in *createWebhookInput,
 	) (*webhookOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

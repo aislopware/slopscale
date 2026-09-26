@@ -107,7 +107,7 @@ type Key struct {
 
 type (
 	createKeyInput struct {
-		Tailnet string `doc:"Tailnet; must be \"-\" (the single Slopscale tailnet)." path:"tailnet"`
+		Tailnet string `doc:"Tailnet: \"-\" or the tailnet ID (Slopscale serves one tailnet)." path:"tailnet"`
 		Body    CreateKeyRequest
 	}
 
@@ -219,7 +219,7 @@ func registerKeys(api huma.API, b Backend) {
 }
 
 func handleCreateKey(ctx context.Context, b Backend, in *createKeyInput) (*keyOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func handleCreateKey(ctx context.Context, b Backend, in *createKeyInput) (*keyOu
 }
 
 func handleListKeys(ctx context.Context, b Backend, in *listKeysInput) (*listKeysOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func handleListKeys(ctx context.Context, b Backend, in *listKeysInput) (*listKey
 // without it cannot tell a real client id (403) from an unknown key (404)
 // and there is no client-existence oracle.
 func handleGetKey(ctx context.Context, b Backend, in *keyByIDInput) (*keyOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func handleGetKey(ctx context.Context, b Backend, in *keyByIDInput) (*keyOutput,
 // (write) for the same no-existence-oracle reason as handleGetKey: a token
 // without it must not learn that an id is an OAuth client.
 func handleDeleteKey(ctx context.Context, b Backend, in *keyByIDInput) (*deleteKeyOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}

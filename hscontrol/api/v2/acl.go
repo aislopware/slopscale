@@ -69,7 +69,7 @@ func registerACL(api huma.API, b Backend) {
 			http.StatusInternalServerError,
 		},
 	}, scope.PolicyFileRead), func(_ context.Context, in *getACLInput) (*huma.StreamResponse, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +100,7 @@ func registerACL(api huma.API, b Backend) {
 	}, scope.PolicyFile), "policy.set", "policy", ""), func(
 		ctx context.Context, in *setACLInput,
 	) (*huma.StreamResponse, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

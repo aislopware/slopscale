@@ -74,7 +74,7 @@ const portsDoNotValidate = "do-not-validate"
 // putVIPService is the PUT create-or-update body for registerServices: it
 // creates the service when it does not exist yet and updates it otherwise.
 func (b Backend) putVIPService(ctx context.Context, in *putVIPServiceInput) (*vipServiceOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func registerServices(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.ServicesRead), func(_ context.Context, in *tailnetInput) (*listVIPServicesOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +174,7 @@ func registerServices(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.ServicesRead), func(_ context.Context, in *vipServiceInput) (*vipServiceOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +215,7 @@ func registerServices(api huma.API, b Backend) {
 	}, scope.Services), "service.delete", "service", "name"), func(
 		ctx context.Context, in *vipServiceInput,
 	) (*struct{}, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

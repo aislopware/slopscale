@@ -94,7 +94,7 @@ func registerSettings(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.FeatureSettingsRead), func(_ context.Context, in *getSettingsInput) (*settingsOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -115,7 +115,7 @@ func registerSettings(api huma.API, b Backend) {
 	}, scope.FeatureSettings), "settings.set", "", ""), func(
 		ctx context.Context, in *patchSettingsInput,
 	) (*settingsOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}

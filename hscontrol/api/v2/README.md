@@ -18,8 +18,9 @@ slopscale's own conventions. The slopscale-native admin API stays at `/api/v1`
 ## Conventions
 
 - Operations derived from Tailscale carry the `Tailscale compat` tag.
-- The `{tailnet}` path segment must be `-` (the single Slopscale tailnet);
-  anything else is `404`. See `requireDefaultTailnet`.
+- The `{tailnet}` path segment must be `-` or the tailnet ID
+  (`State.TailnetID`, the single Slopscale tailnet); anything else is `404`.
+  See `requireTailnet`.
 - Errors use **Tailscale's** body (`{"message","data","status"}`), installed as
   a per-API transform (`tailscaleErrorTransformer` in `errors.go`). A future
   slopscale-native v2 operation would keep Huma's RFC 9457 problem+json.

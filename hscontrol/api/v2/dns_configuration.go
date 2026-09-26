@@ -62,7 +62,7 @@ func registerDNSConfiguration(api huma.API, b Backend) {
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DNSRead), func(_ context.Context, in *tailnetInput) (*dnsConfigurationOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
+		err := b.requireTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
@@ -93,7 +93,7 @@ func registerDNSConfiguration(api huma.API, b Backend) {
 func handleSetDNSConfiguration(
 	ctx context.Context, b Backend, in *setDNSConfigurationInput,
 ) (*dnsConfigurationOutput, error) {
-	err := requireDefaultTailnet(in.Tailnet)
+	err := b.requireTailnet(in.Tailnet)
 	if err != nil {
 		return nil, err
 	}
