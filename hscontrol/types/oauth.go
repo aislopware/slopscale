@@ -81,7 +81,7 @@ type FederatedIdentitySpec struct {
 
 // OAuthClient is a long-lived OAuth 2.0 client-credentials principal. It mints
 // short-lived [OAuthAccessToken]s limited to its Scopes and Tags. The secret is
-// stored only as an Argon2id hash. ClientID is public and embedded in the secret
+// stored only as a SHA-256 hash. ClientID is public and embedded in the secret
 // string (hskey-client-<ClientID>-<secret>) so the token endpoint can derive it
 // from the secret alone, matching Tailscale, where the client id is a substring
 // of the client secret.
@@ -127,7 +127,7 @@ type OAuthClient struct {
 
 // OAuthAccessToken is a short-lived bearer token minted by an [OAuthClient] via
 // the client-credentials grant. It carries the scope/tag set granted at mint
-// time (a subset of the issuing client's), is stored as an Argon2id hash of its
+// time (a subset of the issuing client's), is stored as a SHA-256 hash of its
 // secret, and authenticates v2 API requests as Authorization: Bearer.
 type OAuthAccessToken struct {
 	ID     uint64

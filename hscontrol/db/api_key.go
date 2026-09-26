@@ -9,7 +9,6 @@ import (
 	"github.com/aislopware/slopscale/gen/jet/table"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"golang.org/x/crypto/bcrypt"
 	"tailscale.com/util/rands"
 )
 
@@ -36,20 +35,17 @@ func (hsdb *HSDatabase) CreateAPIKey(
 	return hsdb.CreateScopedAPIKey(expiration, nil, "")
 }
 
+var apiKeyHash = hashColumn{table.APIKeys, table.APIKeys.ID, table.APIKeys.Hash}
+
 // newAPIKeySecret mints the credential material for a key and returns, in
 // order, the whole key string shown once to the operator, the public prefix
-// it is looked up by, and the bcrypt hash of its secret.
-func newAPIKeySecret() (string, string, []byte, error) {
+// it is looked up by, and the hash of its secret.
+func newAPIKeySecret() (string, string, []byte) {
 	// Public prefix (12 chars) and secret (64 chars).
 	prefix := rands.HexString(apiKeyPrefixLength)
 	secret := rands.HexString(apiKeyHashLength)
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcryptCost)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("hashing API key secret: %w", err)
-	}
-
-	return apiKeyPrefix + prefix + "-" + secret, prefix, hash, nil
+	return apiKeyPrefix + prefix + "-" + secret, prefix, hashSecret(secret)
 }
 
 // CreateScopedAPIKey creates a key that carries scopes and a description.
@@ -59,10 +55,7 @@ func (hsdb *HSDatabase) CreateScopedAPIKey(
 	scopes []string,
 	description string,
 ) (string, *types.APIKey, error) {
-	keyStr, prefix, hash, err := newAPIKeySecret()
-	if err != nil {
-		return "", nil, err
-	}
+	keyStr, prefix, hash := newAPIKeySecret()
 
 	now := time.Now()
 	key := types.APIKey{
@@ -201,10 +194,7 @@ func (hsdb *HSDatabase) ExpireAPIKey(key *types.APIKey) error {
 // cleared, since it described the secret that has just been retired. A nil
 // expiration keeps the one the key already has.
 func (hsdb *HSDatabase) RotateAPIKey(key *types.APIKey, expiration *time.Time) (string, error) {
-	keyStr, prefix, hash, err := newAPIKeySecret()
-	if err != nil {
-		return "", err
-	}
+	keyStr, prefix, hash := newAPIKeySecret()
 
 	newExpiration := key.Expiration
 	if expiration != nil {
@@ -347,8 +337,7 @@ func validateAPIKey(q Querier, keyStr string) (*types.APIKey, error) {
 		return nil, fmt.Errorf("API key not found: %w", err)
 	}
 
-	// Verify bcrypt hash
-	err = bcrypt.CompareHashAndPassword(key.Hash, []byte(secret))
+	err = verifyCredential(q, apiKeyHash, key.ID, key.Hash, secret)
 	if err != nil {
 		return nil, fmt.Errorf("invalid API key: %w", err)
 	}
@@ -374,8 +363,7 @@ func validateLegacyAPIKey(q Querier, keyStr string) (*types.APIKey, error) {
 		return nil, fmt.Errorf("API key not found: %w", err)
 	}
 
-	// Verify bcrypt (key.Hash stores bcrypt of full secret)
-	err = bcrypt.CompareHashAndPassword(key.Hash, []byte(secret))
+	err = verifyCredential(q, apiKeyHash, key.ID, key.Hash, secret)
 	if err != nil {
 		return nil, fmt.Errorf("invalid API key: %w", err)
 	}

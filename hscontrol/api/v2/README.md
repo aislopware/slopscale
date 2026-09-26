@@ -78,9 +78,11 @@ operator is OAuth-only. Supporting OAuth lets all of them drive Slopscale.
   owned-by them via the policy `tagOwners` (`State.TagOwnedByTags` →
   `policy/v2`), so e.g. an operator token tagged `tag:k8s-operator` may mint
   `tag:k8s` keys.
-- Credentials/tokens are stored like API keys: a public id/prefix plus an
-  **Argon2id** hash of the secret (no JWT, no signing keys). `OAuthClient` and
-  `OAuthAccessToken` live in `types/oauth.go` and `db/oauth.go`.
+- Credentials/tokens are stored like API keys: a public id/prefix plus a
+  **SHA-256** hash of the 256-bit secret (no JWT, no signing keys); rows
+  hashed with Argon2id before are rewritten on their next successful use
+  (`db/secret.go`). `OAuthClient` and `OAuthAccessToken` live in
+  `types/oauth.go` and `db/oauth.go`.
 - **Updating a client** is `PUT /api/v2/tailnet/-/keys/{keyId}` with
   `{"keyType":"client","scopes":[…],"tags":[…],"description":"…"}`
   (`keys_update.go`), which the provider's `tailscale_oauth_client` resource

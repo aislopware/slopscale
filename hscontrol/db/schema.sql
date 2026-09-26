@@ -87,7 +87,7 @@ CREATE TABLE api_keys(
 CREATE UNIQUE INDEX idx_api_keys_prefix ON api_keys(prefix);
 
 -- OAuth 2.0 client-credentials clients for the v2 API. client_id is public and
--- embedded in the secret (hskey-client-<client_id>-<secret>); only the bcrypt
+-- embedded in the secret (hskey-client-<client_id>-<secret>); only the SHA-256
 -- hash of the secret is stored. Mirrors the api_keys security model.
 -- key_type tells a client from a federated identity, which holds no secret and
 -- authenticates with a JWT its issuer signed; the issuer/audience/subject and
@@ -110,7 +110,7 @@ CREATE TABLE oauth_clients(
 );
 CREATE UNIQUE INDEX idx_oauth_clients_client_id ON oauth_clients(client_id);
 
--- Short-lived bearer access tokens minted by an oauth_client. Stored as a bcrypt
+-- Short-lived bearer access tokens minted by an oauth_client. Stored as a SHA-256
 -- hash of the secret, looked up by prefix.
 CREATE TABLE oauth_access_tokens(
   id integer PRIMARY KEY AUTOINCREMENT,

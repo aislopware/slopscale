@@ -10,7 +10,6 @@ import (
 	"github.com/aislopware/slopscale/gen/jet/table"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"golang.org/x/crypto/bcrypt"
 	"tailscale.com/util/rands"
 	"tailscale.com/util/set"
 )
@@ -154,6 +153,8 @@ func updatePreAuthKeyColumn(q Querier, where jet.BoolExpression, column jet.Colu
 	return q.executor().exec(table.PreAuthKeys.UPDATE(column).SET(value).WHERE(where))
 }
 
+var preAuthKeyHash = hashColumn{table.PreAuthKeys, table.PreAuthKeys.ID, table.PreAuthKeys.Hash}
+
 const (
 	authKeyPrefix       = "hskey-auth-"
 	authKeyPrefixLength = 12
@@ -221,11 +222,6 @@ func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreA
 
 	keyStr := authKeyPrefix + prefix + "-" + toBeHashed
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), bcryptCost)
-	if err != nil {
-		return nil, fmt.Errorf("hashing pre-auth key: %w", err)
-	}
-
 	key := types.PreAuthKey{
 		UserID:        userID, // nil for system-created keys, or "created by" for tagged keys
 		User:          user,   // nil for system-created keys
@@ -236,8 +232,8 @@ func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreA
 		Expiration:    expiration,
 		Tags:          aclTags, // empty for user-owned keys
 		Groups:        spec.Groups,
-		Prefix:        prefix, // Store prefix
-		Hash:          hash,   // Store hash
+		Prefix:        prefix,
+		Hash:          hashSecret(toBeHashed),
 	}
 
 	err = insertPreAuthKey(q, &key)
@@ -326,8 +322,7 @@ func findAuthKey(q Querier, keyStr string) (*types.PreAuthKey, error) {
 		return nil, ErrPreAuthKeyNotFound
 	}
 
-	// Verify hash matches
-	err = bcrypt.CompareHashAndPassword(pak.Hash, []byte(hash))
+	err = verifyCredential(q, preAuthKeyHash, pak.ID, pak.Hash, hash)
 	if err != nil {
 		return nil, fmt.Errorf("invalid auth key: %w", err)
 	}

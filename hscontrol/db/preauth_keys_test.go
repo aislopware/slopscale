@@ -189,7 +189,7 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 			},
 		},
 		{
-			name: "new_key_bcrypt",
+			name: "new_key_hashed",
 			setupKey: func() string {
 				// Create new key via API
 				keyStr, err := db.CreatePreAuthKey(
@@ -242,7 +242,7 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 			wantValidateErr: false,
 		},
 		{
-			name: "invalid_bcrypt_hash",
+			name: "wrong_secret",
 			setupKey: func() string {
 				// Create valid key
 				key, err := db.CreatePreAuthKey(
@@ -429,7 +429,7 @@ func TestMultipleLegacyKeysAllowed(t *testing.T) {
 
 	assert.Len(t, legacyKeys, 5, "should have created 5 legacy keys")
 
-	// Now create new bcrypt-based keys - these should have unique prefixes
+	// Now create new hashed keys - these should have unique prefixes
 	key1, err := db.CreatePreAuthKey(user.TypedID(), true, false, nil, nil)
 	require.NoError(t, err)
 	assert.NotEmpty(t, key1.Key)

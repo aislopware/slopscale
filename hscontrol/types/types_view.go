@@ -529,10 +529,9 @@ func (v PreAuthKeyView) ID() uint64 { return v.ж.ID }
 // Legacy plaintext key (for backwards compatibility)
 func (v PreAuthKeyView) Key() string { return v.ж.Key }
 
-// New bcrypt-based authentication
-func (v PreAuthKeyView) Prefix() string { return v.ж.Prefix }
-
-// bcrypt
+// Prefix is the public lookup id. Hash is the SHA-256 digest of the
+// secret, or a bcrypt hash until the key is next used.
+func (v PreAuthKeyView) Prefix() string                { return v.ж.Prefix }
 func (v PreAuthKeyView) Hash() views.ByteSlice[[]byte] { return views.ByteSliceOf(v.ж.Hash) }
 
 // For tagged keys: [PreAuthKey.UserID] tracks who created the key (informational)
