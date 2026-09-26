@@ -386,7 +386,7 @@ func requireAllClientsOnlineWithSingleTimeout(
 			if node, exists := nodeStore[nodeID]; exists {
 				if status, exists := nodeStatus[nodeID]; exists {
 					// Check if node is online in nodestore
-					status.NodeStore = node.IsOnline != nil && *node.IsOnline
+					status.NodeStore = node.Online()
 					nodeStatus[nodeID] = status
 				}
 			}
@@ -498,11 +498,10 @@ func requireAllClientsOfflineStaged(t *testing.T, slopscale ControlServer, expec
 
 		for _, nodeID := range expectedNodes {
 			if node, exists := nodeStore[nodeID]; exists {
-				isOnline := node.IsOnline != nil && *node.IsOnline
-				if isOnline {
+				if node.Online() {
 					allNodeStoreOffline = false
 
-					assert.False(c, isOnline, "Node %d should be offline in nodestore", nodeID)
+					assert.False(c, node.Online(), "Node %d should be offline in nodestore", nodeID)
 				}
 			}
 		}
