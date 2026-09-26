@@ -4186,8 +4186,8 @@ func dnsLabelReason(err error) string {
 	const marker = "is not a valid DNS label: "
 
 	msg := err.Error()
-	if i := strings.LastIndex(msg, marker); i >= 0 {
-		return msg[i+len(marker):]
+	if _, reason, found := strings.CutLast(msg, marker); found {
+		return reason
 	}
 
 	return msg
