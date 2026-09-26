@@ -63,6 +63,9 @@ func (k *softwareAttestationKey) Sign(_ io.Reader, digest []byte, _ crypto.Signe
 
 // MarshalJSON encodes the raw private key, which is all it takes to
 // rebuild it; the real keys never leave their TPM and encode a handle.
+// The receiver is a pointer so a nil key encodes as "", like theirs.
+//
+//nolint:revive // marshal-receiver: see above
 func (k *softwareAttestationKey) MarshalJSON() ([]byte, error) {
 	if k.IsZero() {
 		return json.Marshal("")

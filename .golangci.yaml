@@ -212,6 +212,16 @@ linters:
       allow-unused: false
       require-specific: true
       require-explanation: true
+    recvcheck:
+      # revive's marshal-receiver wants MarshalJSON on the value, so a value
+      # held in a non-addressable place still encodes through it.
+      exclusions:
+        - "*.MarshalJSON"
+    revive:
+      enable-default-rules: true
+      rules:
+        - name: marshal-receiver
+        - name: use-slices-concat
     staticcheck:
       checks:
         - all
