@@ -34,6 +34,12 @@ Slopscale only supports two values for `tls_letsencrypt_challenge_type`: `HTTP-0
 
 For `HTTP-01`, slopscale must be reachable on port 80 for the Let's Encrypt automated validation, in addition to whatever port is configured in `listen_addr`. By default, slopscale listens on port 80 on all local IPs for Let's Encrypt automated validation.
 
+:::warning[The main listener cannot also use port 80]
+
+`listen_addr` and `tls_letsencrypt_listen` must not bind the same TCP socket. A common mistake is `listen_addr: 0.0.0.0:80` together with `tls_letsencrypt_hostname`: both listeners claim port 80. Slopscale refuses to start with `Fatal config error: listen_addr and tls_letsencrypt_listen would bind the same tcp socket`. Use `listen_addr: 0.0.0.0:443` (or any port other than 80) when HTTP-01 is in use. `metrics_listen_addr` and, while the Funnel ingress is on, `funnel.listen_addrs` are checked the same way.
+
+:::
+
 If you need to change the ip and/or port used by slopscale for the Let's Encrypt validation process, set `tls_letsencrypt_listen` to the appropriate value. This can be handy if you are running slopscale as a non-root user (or can't run `setcap`). Keep in mind, however, that Let's Encrypt will _only_ connect to port 80 for the validation callback, so if you change `tls_letsencrypt_listen` you will also need to configure something else (e.g. a firewall rule) to forward the traffic from port 80 to the ip:port combination specified in `tls_letsencrypt_listen`.
 
 #### TLS-ALPN-01
