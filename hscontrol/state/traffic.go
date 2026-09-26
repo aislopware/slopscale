@@ -439,6 +439,9 @@ func (s *State) applyTrafficResolversLocked(now time.Time) (change.Change, error
 		return change.Change{}, fmt.Errorf("granting the traffic resolvers: %w", err)
 	}
 
+	// The grant admits every node to the gateways, so it moves peers.
+	s.nodeStore.RebuildPeerMaps()
+
 	prev := s.trafficResolvers
 	s.trafficResolvers = next
 	s.cfg.SetTrafficResolvers(next)

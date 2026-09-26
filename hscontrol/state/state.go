@@ -1407,6 +1407,10 @@ func (s *State) SetPolicy(pol []byte) (bool, error) {
 		return changed, err
 	}
 
+	if changed {
+		s.nodeStore.RebuildPeerMaps()
+	}
+
 	// Clear SSH check auth times when policy changes.
 	s.ClearSSHCheckAuth()
 
