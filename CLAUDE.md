@@ -25,7 +25,15 @@ make build / test / fmt / lint
 make generate                # regenerate gen/; never edit it by hand
 go run ./cmd/hi doctor
 go run ./cmd/hi run "TestName" [--postgres]
+go run ./tools/bump plan     # which pins are stale; changes nothing
+go run ./tools/bump verify   # do the interlocked pins still agree
 ```
+
+Version bumps go through `tools/bump` (the Version bump workflow opens the
+pull request); its package doc lists the interlocks a bump by hand must
+keep too: gvisor and wireguard-windows at the versions tailscale.com pins,
+`go run ./cmd/vendorhash update` after go.sum moves, a `go` directive no
+newer than nixpkgs' Go, and bun pinned by hand in flake.nix.
 
 Needs go, golangci-lint and bun on PATH; `nix develop` pins the CI
 versions but isn't required. Markup and config files outside `docs/` and
