@@ -152,7 +152,7 @@ func recordTokenEvent(b Backend, r *http.Request, clientID string, outcome int, 
 func clientIDFromSecret(secret string) string {
 	secret, _, _ = strings.Cut(secret, "?")
 
-	rest, found := strings.CutPrefix(secret, types.OAuthClientPrefix)
+	rest, found := types.CutOAuthClientPrefix(secret)
 	if !found {
 		return ""
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,6 +85,51 @@ func TestOAuthClientCreateAndAuthenticate(t *testing.T) {
 	// Wrong secret for a real client id is rejected by the constant-time compare.
 	_, err = db.AuthenticateOAuthClient("hskey-client-" + client.ClientID + "-" + strings.Repeat("0", 64))
 	require.Error(t, err)
+}
+
+// TestOAuthClientAuthenticateTailscalePrefix asserts the same stored client
+// authenticates under the tskey-client- alias, and that only a leading prefix
+// is recognised.
+func TestOAuthClientAuthenticateTailscalePrefix(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	secret, client, err := db.CreateOAuthClient([]string{"auth_keys"}, []string{"tag:ci"}, "", nil)
+	require.NoError(t, err)
+
+	rest := strings.TrimPrefix(secret, types.OAuthClientPrefix)
+	tsSecret := types.TailscaleOAuthClientPrefix + rest
+
+	for _, s := range []string{
+		tsSecret,
+		// Callers may pass the raw auth-key form; ?attributes are stripped.
+		tsSecret + "?baseURL=http://127.0.0.1:8080&ephemeral=true",
+	} {
+		got, authErr := db.AuthenticateOAuthClient(s)
+		require.NoError(t, authErr, s)
+		assert.Equal(t, client.ClientID, got.ClientID)
+	}
+
+	// A wrong secret under the alias parses but fails verification.
+	_, err = db.AuthenticateOAuthClient(
+		types.TailscaleOAuthClientPrefix + client.ClientID + "-" + strings.Repeat("0", 64),
+	)
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrOAuthClientFailedToParse)
+
+	for _, s := range []string{
+		types.TailscaleOAuthClientPrefix,
+		"tskey-auth-" + rest,
+		"tskey-" + rest,
+		"junk-" + tsSecret,
+		"junk-" + secret,
+		types.TailscaleOAuthClientPrefix + secret,
+	} {
+		_, authErr := db.AuthenticateOAuthClient(s)
+		require.ErrorIs(t, authErr, ErrOAuthClientFailedToParse, s)
+	}
 }
 
 func TestHashSecretRoundTrip(t *testing.T) {

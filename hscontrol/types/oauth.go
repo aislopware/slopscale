@@ -15,12 +15,31 @@ const (
 	// hskey-client-<clientID>-<secret>.
 	OAuthClientPrefix = "hskey-client-"
 
+	// TailscaleOAuthClientPrefix is an accepted alias for [OAuthClientPrefix].
+	// The tailscale client only runs its OAuth client-credentials exchange
+	// (feature/oauthkey) for secrets with this prefix, so accepting it lets the
+	// stock client and the GitHub Action mint auth keys against slopscale. The
+	// prefix is only a label, cut before lookup; the same stored client
+	// authenticates under either.
+	TailscaleOAuthClientPrefix = "tskey-client-"
+
 	// AccessTokenPrefix prefixes an OAuth access token:
 	// hskey-oauthtok-<prefix>-<secret>. The v2 auth middleware dispatches a
 	// scope-limited token from an all-access admin key on this prefix alone, so
 	// it is one canonical constant shared by the db and api layers.
 	AccessTokenPrefix = "hskey-oauthtok-" //nolint:gosec // prefix, not a credential
 )
+
+// CutOAuthClientPrefix returns secret without its leading OAuth client prefix,
+// either [OAuthClientPrefix] or its [TailscaleOAuthClientPrefix] alias, and
+// whether one was there.
+func CutOAuthClientPrefix(secret string) (string, bool) {
+	if rest, ok := strings.CutPrefix(secret, OAuthClientPrefix); ok {
+		return rest, true
+	}
+
+	return strings.CutPrefix(secret, TailscaleOAuthClientPrefix)
+}
 
 // The kinds a row of the oauth_clients table can be, Tailscale's keyType
 // values. A client holds a secret and mints tokens with the

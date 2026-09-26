@@ -248,7 +248,7 @@ func (hsdb *HSDatabase) AuthenticateOAuthClient(secretStr string) (*types.OAuthC
 	// used directly as an auth key; strip them before parsing.
 	secretStr, _, _ = strings.Cut(secretStr, "?")
 
-	_, rest, found := strings.Cut(secretStr, types.OAuthClientPrefix)
+	rest, found := types.CutOAuthClientPrefix(secretStr)
 	if !found {
 		return nil, ErrOAuthClientFailedToParse
 	}
