@@ -1,6 +1,7 @@
 package apiv2
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 
@@ -20,10 +21,10 @@ var serviceTags = []string{"Services", tagTailscaleCompat}
 
 // VIPService is Tailscale's service shape, what the Go client's
 // ServicesResource reads and writes. Tags and annotations are accepted
-// and ignored: slopscale approves hosts per node, and the display name
-// travels as the "displayName" annotation.
+// and ignored: slopscale approves hosts per node.
 type VIPService struct {
 	Name        string            `json:"name"`
+	DisplayName string            `json:"displayName,omitempty"`
 	Addrs       []string          `json:"addrs"                 nullable:"false"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -35,6 +36,7 @@ type VIPService struct {
 // must match the path.
 type PutVIPServiceRequest struct {
 	Name        string            `json:"name,omitempty"`
+	DisplayName string            `json:"displayName,omitempty"`
 	Comment     string            `json:"comment,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty"`
 	Ports       []string          `json:"ports,omitempty"`
@@ -61,8 +63,8 @@ type (
 	}
 )
 
-// displayNameAnnotation carries the display name, which Tailscale's
-// shape has no field for.
+// displayNameAnnotation carried the display name before Tailscale's shape
+// had a field for it; a client written then still sends it.
 const displayNameAnnotation = "displayName"
 
 // portsDoNotValidate is the sentinel the Kubernetes operator sends while
@@ -91,7 +93,7 @@ func (b Backend) putVIPService(ctx context.Context, in *putVIPServiceInput) (*vi
 		}
 	}
 
-	displayName := in.Body.Annotations[displayNameAnnotation]
+	displayName := cmp.Or(in.Body.DisplayName, in.Body.Annotations[displayNameAnnotation])
 	ports := in.Body.Ports
 
 	if len(ports) == 0 || (len(ports) == 1 && ports[0] == portsDoNotValidate) {
@@ -122,19 +124,16 @@ func (b Backend) putVIPService(ctx context.Context, in *putVIPServiceInput) (*vi
 
 func vipServiceFrom(svc types.VIPService) VIPService {
 	out := VIPService{
-		Name:    string(svc.Name),
-		Addrs:   []string{},
-		Comment: svc.Comment,
-		Ports:   emptyIfNil(types.ServicePortsStrings(svc.Ports)),
-		Tags:    []string{},
+		Name:        string(svc.Name),
+		DisplayName: svc.DisplayName,
+		Addrs:       []string{},
+		Comment:     svc.Comment,
+		Ports:       emptyIfNil(types.ServicePortsStrings(svc.Ports)),
+		Tags:        []string{},
 	}
 
 	for _, addr := range svc.Addrs() {
 		out.Addrs = append(out.Addrs, addr.String())
-	}
-
-	if svc.DisplayName != "" {
-		out.Annotations = map[string]string{displayNameAnnotation: svc.DisplayName}
 	}
 
 	return out
