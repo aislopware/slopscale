@@ -667,8 +667,8 @@ func (pm *PolicyManager) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 // For autogroup:self policies (empty global filter), it builds per-node
 // peer maps using each node's specific filter rules.
 //
-// Compared to [policy.ReduceNodes], which builds the list per node, we end
-// up with doing the full work for every node O(n^2), while this will reduce
+// Compared to building the list per node, which ends up doing the full
+// work for every node O(n^2), this will reduce
 // the list as we see relationships while building the map, making it
 // O(n^2/2) in the end, but with less work per node.
 func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[types.NodeID][]types.NodeView {

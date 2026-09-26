@@ -218,7 +218,7 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 // TestBuildFromChangeFiltersPeerPatchesByVisibility proves that incremental
 // peer-change patches (online/offline, endpoint, key-expiry) are restricted to
 // the recipient's ACL-visible peer set, the same way buildTailPeers filters
-// full peer objects via policy.ReduceNodes. Without it, a node receives the
+// full peer objects via State.VisiblePeers. Without it, a node receives the
 // existence, presence, and addresses of peers its policy forbids accessing.
 func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 	t.Parallel()
@@ -687,9 +687,8 @@ func TestGenerateDNSConfigNilHostinfoNoPanic(t *testing.T) {
 // policyShapes covers the paths that decide how the mapper filters peers: a
 // global filter with matchers, a per-node (autogroup:self) filter, a policy
 // that leaves every node with zero matchers, and no rules at all. The
-// zero-matcher shape is the interesting one, because
-// [MapResponseBuilder.buildTailPeers] skips [policy.ReduceNodes] there and
-// emits its input as given.
+// zero-matcher shape is the interesting one: it must hide every peer, not
+// fall open to "no matchers => all visible".
 var policyShapes = []struct {
 	name   string
 	policy string

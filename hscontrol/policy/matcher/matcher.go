@@ -49,8 +49,8 @@ func MatchesFromFilterRules(rules []tailcfg.FilterRule) []Match {
 // and [tailcfg.FilterRule.CapGrant][].Dsts: cap-grant-only rules (e.g.
 // tailscale.com/cap/relay) carry their destinations in CapGrant.Dsts and
 // would otherwise contribute nothing to peer-visibility derivation in
-// [policy.ReduceNodes], hiding the cap target
-// from the source unless a companion IP-level rule also exists.
+// the peer map, hiding the cap target from the source unless a companion
+// IP-level rule also exists.
 func MatchFromFilterRule(rule tailcfg.FilterRule) Match {
 	dests := new(netipx.IPSetBuilder)
 
