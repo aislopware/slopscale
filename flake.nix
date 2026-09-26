@@ -11,20 +11,23 @@
   };
 
   outputs =
-    { self
-    , nixpkgs
-    , flake-utils
-    , flake-checks
-    , ...
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      flake-checks,
+      ...
     }:
     let
       slopscaleVersion = self.shortRev or self.dirtyShortRev;
       commitHash = self.rev or self.dirtyRev;
       # C flags for the SQLite bundled in mattn/go-sqlite3 (see
       # sqlite.cflags); exported as CGO_CFLAGS wherever Go compiles it.
-      sqliteCFlags = nixpkgs.lib.concatStringsSep " "
-        (nixpkgs.lib.filter (l: l != "" && !nixpkgs.lib.hasPrefix "#" l)
-          (nixpkgs.lib.splitString "\n" (builtins.readFile ./sqlite.cflags)));
+      sqliteCFlags = nixpkgs.lib.concatStringsSep " " (
+        nixpkgs.lib.filter (l: l != "" && !nixpkgs.lib.hasPrefix "#" l) (
+          nixpkgs.lib.splitString "\n" (builtins.readFile ./sqlite.cflags)
+        )
+      );
     in
     {
       # NixOS module
@@ -33,7 +36,8 @@
         default = slopscale;
       };
 
-      overlays.default = _: prev:
+      overlays.default =
+        _: prev:
         let
           pkgs = nixpkgs.legacyPackages.${prev.stdenv.hostPlatform.system};
           # Tracks the newest Go in nixpkgs so a Go release bump is a
@@ -108,40 +112,47 @@
 
           # web/bun.lock is written by bun 1.4 (lockfile version 2), which
           # older bun cannot parse; pin the version the console is built with.
-          bun = prev.bun.overrideAttrs (finalAttrs: _: {
-            version = "1.4.2";
-            __intentionallyOverridingVersion = true;
-            passthru = {
-              sources = {
-                "aarch64-darwin" = prev.fetchurl {
-                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-darwin-aarch64.zip";
-                  hash = "sha256-kJh6OhbX21VtiGrD1VHnttPt8KHPQ6yu1iLoZ2vh0S8=";
-                };
-                "aarch64-linux" = prev.fetchurl {
-                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-aarch64.zip";
-                  hash = "sha256-VDKLvC2cjgyfiSxUTWbFeoO4QTnjSQnl7oF1jxrI/ac=";
-                };
-                "x86_64-linux" = prev.fetchurl {
-                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-x64-baseline.zip";
-                  hash = "sha256-xngEDxT+BEDrg503y9DOTAUaMtpygGrJfeamqra/co8=";
+          bun = prev.bun.overrideAttrs (
+            finalAttrs: _: {
+              version = "1.4.2";
+              __intentionallyOverridingVersion = true;
+              passthru = {
+                sources = {
+                  "aarch64-darwin" = prev.fetchurl {
+                    url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-darwin-aarch64.zip";
+                    hash = "sha256-kJh6OhbX21VtiGrD1VHnttPt8KHPQ6yu1iLoZ2vh0S8=";
+                  };
+                  "aarch64-linux" = prev.fetchurl {
+                    url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-aarch64.zip";
+                    hash = "sha256-VDKLvC2cjgyfiSxUTWbFeoO4QTnjSQnl7oF1jxrI/ac=";
+                  };
+                  "x86_64-linux" = prev.fetchurl {
+                    url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-x64-baseline.zip";
+                    hash = "sha256-xngEDxT+BEDrg503y9DOTAUaMtpygGrJfeamqra/co8=";
+                  };
                 };
               };
-            };
-          });
+            }
+          );
         };
     }
-    // flake-utils.lib.eachDefaultSystem
-      (system:
+    // flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = import nixpkgs {
           overlays = [ self.overlays.default ];
           inherit system;
         };
-        buildDeps = with pkgs; [ git go_latest gnumake ];
+        buildDeps = with pkgs; [
+          git
+          go_latest
+          gnumake
+        ];
         # zig is the C cross compiler behind zigcc for the Linux release
         # binaries and container images (cgo needs a compiler per target).
         crossDeps = with pkgs; [ zig ];
-        devDeps = with pkgs;
+        devDeps =
+          with pkgs;
           buildDeps
           ++ crossDeps
           ++ [
@@ -222,10 +233,15 @@
           ];
         };
         goChecks = {
-          build = fc.goBuild (common // {
-            subPackages = [ "cmd/slopscale" ];
-            env = { CGO_CFLAGS = sqliteCFlags; };
-          });
+          build = fc.goBuild (
+            common
+            // {
+              subPackages = [ "cmd/slopscale" ];
+              env = {
+                CGO_CFLAGS = sqliteCFlags;
+              };
+            }
+          );
 
           # The pure unit subset. ./integration (Docker) and
           # ./hscontrol/servertest (slow: 10s+ convergence plus race/stress/HA
@@ -233,11 +249,17 @@
           # from the test set but kept in source so cmd/hi and friends still
           # compile; TestPostgres* needs a server (the SQLite equivalents still
           # run). The SQLite C flags match the build.
-          gotest = fc.goTest (common // {
-            testExclude = [ "/integration" "/hscontrol/servertest" ];
-            goSkip = [ "TestPostgres" ];
-            testEnv = "export CGO_CFLAGS=\"${sqliteCFlags}\"";
-          });
+          gotest = fc.goTest (
+            common
+            // {
+              testExclude = [
+                "/integration"
+                "/hscontrol/servertest"
+              ];
+              goSkip = [ "TestPostgres" ];
+              testEnv = "export CGO_CFLAGS=\"${sqliteCFlags}\"";
+            }
+          );
 
           # Full-tree golangci-lint (golines, gofumpt, etc.); uses the overlay's
           # golangci-lint built against the pinned Go.
@@ -248,55 +270,54 @@
           # config files are formatted by oxfmt from the console toolchain
           # (`make lint-markup`, run by the admin console workflow), which
           # the sandboxed check cannot fetch.
-          formatting = fc.goFormat (common // {
-            goFmt = "off";
-            prettier = false;
-            fmtExclude = [ ./gen ./docs ./web ];
-          });
+          formatting = fc.goFormat (
+            common
+            // {
+              goFmt = "off";
+              prettier = false;
+              fmtExclude = [
+                ./gen
+                ./docs
+                ./web
+              ];
+            }
+          );
         };
       in
       {
         # `nix develop`
         devShells.default = pkgs.mkShell {
-          buildInputs =
-            devDeps
-            ++ [
-              (pkgs.writeShellScriptBin
-                "nix-vendor-sri"
-                ''
-                  set -eu
-                  exec go run ./cmd/vendorhash update "$@"
-                '')
+          buildInputs = devDeps ++ [
+            (pkgs.writeShellScriptBin "nix-vendor-sri" ''
+              set -eu
+              exec go run ./cmd/vendorhash update "$@"
+            '')
 
-              # cgo cross compiler for go build, goreleaser and ko: maps the
-              # GOOS/GOARCH they set to a zig target so the SQLite C sources
-              # compile for every Linux release target and link statically
-              # against musl. Native builds use the platform compiler.
-              (pkgs.writeShellScriptBin
-                "zigcc"
-                ''
-                  set -eu
-                  case "''${GOOS:-}/''${GOARCH:-}''${GOARM:+v$GOARM}" in
-                    linux/amd64) target=x86_64-linux-musl ;;
-                    linux/arm64) target=aarch64-linux-musl ;;
-                    linux/arm | linux/armv7) target=arm-linux-musleabihf ;;
-                    *)
-                      echo "zigcc: no zig target for GOOS=''${GOOS:-} GOARCH=''${GOARCH:-}" >&2
-                      exit 1
-                      ;;
-                  esac
-                  # zig cc turns on UBSan for C by default and Go's linker has
-                  # no runtime for it; the SQLite amalgamation is built without.
-                  exec ${pkgs.zig}/bin/zig cc -target "$target" -fno-sanitize=undefined "$@"
-                '')
+            # cgo cross compiler for go build, goreleaser and ko: maps the
+            # GOOS/GOARCH they set to a zig target so the SQLite C sources
+            # compile for every Linux release target and link statically
+            # against musl. Native builds use the platform compiler.
+            (pkgs.writeShellScriptBin "zigcc" ''
+              set -eu
+              case "''${GOOS:-}/''${GOARCH:-}''${GOARM:+v$GOARM}" in
+                linux/amd64) target=x86_64-linux-musl ;;
+                linux/arm64) target=aarch64-linux-musl ;;
+                linux/arm | linux/armv7) target=arm-linux-musleabihf ;;
+                *)
+                  echo "zigcc: no zig target for GOOS=''${GOOS:-} GOARCH=''${GOARCH:-}" >&2
+                  exit 1
+                  ;;
+              esac
+              # zig cc turns on UBSan for C by default and Go's linker has
+              # no runtime for it; the SQLite amalgamation is built without.
+              exec ${pkgs.zig}/bin/zig cc -target "$target" -fno-sanitize=undefined "$@"
+            '')
 
-              (pkgs.writeShellScriptBin
-                "go-mod-update-all"
-                ''
-                  cat go.mod | ${pkgs.ripgrep}/bin/rg "\t" | ${pkgs.ripgrep}/bin/rg -v '^\s*//' | ${pkgs.ripgrep}/bin/rg -v indirect | ${pkgs.gawk}/bin/awk '{print $1}' | ${pkgs.findutils}/bin/xargs go get -u
-                  go mod tidy
-                '')
-            ];
+            (pkgs.writeShellScriptBin "go-mod-update-all" ''
+              cat go.mod | ${pkgs.ripgrep}/bin/rg "\t" | ${pkgs.ripgrep}/bin/rg -v '^\s*//' | ${pkgs.ripgrep}/bin/rg -v indirect | ${pkgs.gawk}/bin/awk '{print $1}' | ${pkgs.findutils}/bin/xargs go get -u
+              go mod tidy
+            '')
+          ];
 
           shellHook = ''
             export PATH="$PWD/result/bin:$PATH"
@@ -326,5 +347,6 @@
         # The Go build/test checks are gated to Linux: parts of the tree are
         # Linux-specific and the pure unit subset is validated by CI.
         // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux goChecks;
-      });
+      }
+    );
 }
