@@ -2244,6 +2244,13 @@ func (s *State) HandleNodeFromPreAuthKey(
 		}
 	}
 
+	// Checked before key validation and any allocation so new nodes and
+	// re-registrations are held to the same rule.
+	err = checkPreAuthKeyRequestTags(pak, regReq.Hostinfo)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, err
+	}
+
 	// Helper to get username for logging (handles nil User for tags-only keys)
 	pakUsername := func() string {
 		if pak.User != nil {
@@ -4021,31 +4028,42 @@ func assignNodeOwnership(nodeToRegister *types.Node, params newNodeParams) {
 	}
 }
 
-// applyAdvertiseTags validates and applies client-requested advertise-tags
-// (tailscale up --advertise-tags). PreAuthKey nodes get their tags from the
-// key itself, so a request is only accepted when it asks for tags the key
-// already carries; anything more is rejected early, before any resource
-// allocation.
-func (s *State) applyAdvertiseTags(nodeToRegister *types.Node, params newNodeParams) error {
-	if params.Hostinfo == nil || len(params.Hostinfo.RequestTags) == 0 {
+// checkPreAuthKeyRequestTags rejects advertise-tags a pre-auth key does not
+// carry. The key fixes the node's tags, so the client may name them again
+// (tailscale up --authkey with --advertise-tags, which Tailscale accepts, and
+// which the client's OAuth authkey flow always does) but may not ask for
+// anything more.
+func checkPreAuthKeyRequestTags(pak *types.PreAuthKey, hostinfo *tailcfg.Hostinfo) error {
+	if hostinfo == nil {
 		return nil
 	}
 
-	if params.PreAuthKey != nil {
-		// The key fixes the node's tags, so the client may name them again
-		// (tailscale up --authkey with --advertise-tags, which Tailscale
-		// accepts) but may not ask for anything the key does not carry.
-		for _, tag := range params.Hostinfo.RequestTags {
-			if !slices.Contains(params.PreAuthKey.Tags, tag) {
-				return fmt.Errorf(
-					"%w %v are not permitted: the pre-auth key allows %v",
-					ErrRequestedTagsInvalidOrNotPermitted,
-					params.Hostinfo.RequestTags,
-					params.PreAuthKey.Tags,
-				)
-			}
-		}
+	var extra []string
 
+	for _, tag := range hostinfo.RequestTags {
+		if !slices.Contains(pak.Tags, tag) {
+			extra = append(extra, tag)
+		}
+	}
+
+	if len(extra) > 0 {
+		return fmt.Errorf(
+			"%w %v are not permitted: the pre-auth key allows %v",
+			ErrRequestedTagsInvalidOrNotPermitted,
+			extra,
+			pak.Tags,
+		)
+	}
+
+	return nil
+}
+
+// applyAdvertiseTags validates and applies client-requested advertise-tags
+// (tailscale up --advertise-tags), rejecting them early, before any resource
+// allocation. PreAuthKey nodes get their tags from the key itself;
+// [State.HandleNodeFromPreAuthKey] has already checked the request against it.
+func (s *State) applyAdvertiseTags(nodeToRegister *types.Node, params newNodeParams) error {
+	if params.Hostinfo == nil || len(params.Hostinfo.RequestTags) == 0 || params.PreAuthKey != nil {
 		return nil
 	}
 
