@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -125,7 +126,9 @@ func TestDestroyUserErrors(t *testing.T) {
 				require.NoError(t, CreateNode(db, &node))
 
 				err = db.DestroyUser(types.UserID(user.ID))
-				assert.ErrorIs(t, err, ErrUserStillHasNodes)
+				require.ErrorIs(t, err, ErrUserStillHasNodes)
+				// The error names the blocking node so it can be found.
+				require.ErrorContains(t, err, fmt.Sprintf("%d (testnode)", node.ID))
 			},
 		},
 		{
@@ -238,14 +241,22 @@ func TestDestroyUserErrors(t *testing.T) {
 		},
 	}
 
+	// User deletion depends on foreign-key actions, which schema.sql and
+	// schema_postgres.sql define separately, so run every case on both. The
+	// Postgres variant skips when no local server can be started.
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name+"-sqlite", func(t *testing.T) {
 			t.Parallel()
 
 			db, err := newSQLiteTestDB()
 			require.NoError(t, err)
 
 			tt.test(t, db)
+		})
+		t.Run(tt.name+"-postgres", func(t *testing.T) {
+			t.Parallel()
+
+			tt.test(t, newPostgresTestDB(t))
 		})
 	}
 }
