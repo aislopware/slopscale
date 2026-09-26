@@ -68,6 +68,7 @@ domain) points at this machine.`,
 			Hostname:    hostname,
 			StateDir:    stateDir,
 			ListenAddrs: listen,
+			ListenKey:   "--listen",
 		}, nil)
 		if err != nil {
 			return fmt.Errorf("running the ingress: %w", err)

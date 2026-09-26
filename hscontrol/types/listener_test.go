@@ -1,12 +1,18 @@
 package types
 
 import (
+	"errors"
+	"fmt"
+	"net"
+	"syscall"
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+var errTestBindFailure = errors.New("listen tcp :80: bind: address already in use")
 
 func TestPortFromAddr(t *testing.T) {
 	tests := []struct {
@@ -116,4 +122,38 @@ func TestACMEListenAddr(t *testing.T) {
 
 	conf.Set("tls_letsencrypt_listen", "127.0.0.1:8080")
 	assert.Equal(t, "127.0.0.1:8080", ACMEListenAddr())
+}
+
+func TestListenerBindError_IsEADDRINUSE(t *testing.T) {
+	bindErr := &ListenerBindError{
+		Listener:  "main HTTP",
+		ConfigKey: "listen_addr",
+		Network:   "tcp",
+		Addr:      "0.0.0.0:80",
+		Err:       &net.OpError{Op: "listen", Net: "tcp", Err: syscall.EADDRINUSE},
+	}
+
+	wrapped := fmt.Errorf("serve: %w", bindErr)
+	require.ErrorIs(t, wrapped, syscall.EADDRINUSE)
+
+	got, ok := errors.AsType[*ListenerBindError](wrapped)
+	require.True(t, ok)
+	assert.Equal(t, "main HTTP", got.Listener)
+	assert.Equal(t, "listen_addr", got.ConfigKey)
+	assert.Equal(t, "0.0.0.0:80", got.Addr)
+}
+
+func TestListenerBindError_Render(t *testing.T) {
+	bindErr := &ListenerBindError{
+		Listener:  "ACME HTTP-01 challenge",
+		ConfigKey: "tls_letsencrypt_listen",
+		Network:   "tcp",
+		Addr:      ":http",
+		Err:       errTestBindFailure,
+	}
+	assert.Equal(t,
+		`binding ACME HTTP-01 challenge listener (tls_letsencrypt_listen=":http"): `+
+			`listen tcp :80: bind: address already in use`,
+		bindErr.Error(),
+	)
 }

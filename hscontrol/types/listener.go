@@ -16,6 +16,26 @@ const DefaultACMEListenAddr = ":http"
 
 var errEmptyListenAddr = errors.New("address is empty")
 
+// ListenerBindError is a listener that could not bind, named with the
+// configuration key its address came from so the operator knows which
+// socket collided. Unwrap keeps the [net.OpError] and the errno below it
+// reachable, so errors.Is(err, syscall.EADDRINUSE) holds through any
+// wrapping.
+type ListenerBindError struct {
+	Listener  string
+	ConfigKey string
+	// Network is "tcp" or "udp".
+	Network string
+	Addr    string
+	Err     error
+}
+
+func (e *ListenerBindError) Error() string {
+	return fmt.Sprintf("binding %s listener (%s=%q): %v", e.Listener, e.ConfigKey, e.Addr, e.Err)
+}
+
+func (e *ListenerBindError) Unwrap() error { return e.Err }
+
 // PortFromAddr returns the port of a host:port listen address. The port is
 // a number or one of the service names "http" and "https"; the table is
 // fixed so the result never depends on /etc/services.
