@@ -3,7 +3,6 @@ package types
 import (
 	"errors"
 	"fmt"
-	"net"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,10 +22,6 @@ const FunnelIngressHostname = "slopscale-ingress"
 // DefaultFunnelPorts are the ports Funnel may be turned on for when the
 // config names none, the same three the hosted control plane allows.
 var DefaultFunnelPorts = []uint16{443, 8443, 10000}
-
-// ErrFunnelListenAddrInvalid is returned for an ingress listen address
-// that is not host:port.
-var ErrFunnelListenAddrInvalid = errors.New("funnel listen address must be host:port")
 
 // ErrFunnelPortInvalid is returned for a Funnel port outside 1-65535.
 var ErrFunnelPortInvalid = errors.New("funnel port must be between 1 and 65535")
@@ -74,15 +69,9 @@ func (c FunnelConfig) FunnelPortsCap() nodecap.Cap {
 	return nodecap.Cap(string(nodecap.FunnelPorts) + "?ports=" + strings.Join(parts, ","))
 }
 
-// Validate checks the listen addresses and ports.
+// Validate checks the ports. The listen addresses are checked with the
+// server's other listeners, which they must not collide with.
 func (c FunnelConfig) Validate() error {
-	for _, addr := range c.ListenAddrs {
-		_, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			return fmt.Errorf("%w: %q", ErrFunnelListenAddrInvalid, addr)
-		}
-	}
-
 	for _, p := range c.Ports {
 		if p == 0 {
 			return fmt.Errorf("%w: %d", ErrFunnelPortInvalid, p)

@@ -45,6 +45,110 @@ func reasons(errs []*ConfigError) []string {
 	return out
 }
 
+func TestValidateListenerCollisions(t *testing.T) {
+	const acme = "tls_letsencrypt_hostname: example.com\n"
+
+	tests := []struct {
+		name    string
+		extra   string
+		wantErr string // empty: no error
+	}{
+		{
+			name:    "acme-collision-numeric",
+			extra:   acme + "listen_addr: \":80\"\ntls_letsencrypt_listen: \":80\"\n",
+			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+		},
+		{
+			name:    "acme-collision-named-vs-numeric",
+			extra:   acme + "listen_addr: 0.0.0.0:80\ntls_letsencrypt_listen: \":http\"\n",
+			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+		},
+		{
+			name:    "acme-collision-unset-listen-is-port-80",
+			extra:   acme + "listen_addr: 0.0.0.0:80\n",
+			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+		},
+		{
+			name:    "acme-collision-https-named",
+			extra:   acme + "listen_addr: \":443\"\ntls_letsencrypt_listen: \":https\"\n",
+			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+		},
+		{
+			name:  "acme-canonical",
+			extra: acme + "listen_addr: 0.0.0.0:443\ntls_letsencrypt_listen: \":http\"\n",
+		},
+		{
+			name:  "acme-without-hostname-is-skipped",
+			extra: "listen_addr: 0.0.0.0:80\ntls_letsencrypt_listen: \":http\"\n",
+		},
+		{
+			name:  "acme-tls-alpn-01-is-skipped",
+			extra: acme + "tls_letsencrypt_challenge_type: TLS-ALPN-01\nlisten_addr: 0.0.0.0:80\n",
+		},
+		{
+			name:  "acme-different-ports",
+			extra: acme + "listen_addr: \":8080\"\ntls_letsencrypt_listen: \":8081\"\n",
+		},
+		{
+			name:    "metrics-on-listen-port",
+			extra:   "listen_addr: 0.0.0.0:8080\nmetrics_listen_addr: 127.0.0.1:8080\n",
+			wantErr: "listen_addr and metrics_listen_addr would bind the same tcp socket",
+		},
+		{
+			name:  "metrics-same-port-different-hosts",
+			extra: "listen_addr: 127.0.0.1:9090\nmetrics_listen_addr: 127.0.0.2:9090\n",
+		},
+		{
+			name:    "funnel-default-addrs-on-listen-port",
+			extra:   "listen_addr: 0.0.0.0:443\nfunnel:\n  enabled: true\n",
+			wantErr: "listen_addr and funnel.listen_addrs[0] would bind the same tcp socket",
+		},
+		{
+			name:  "funnel-disabled-is-skipped",
+			extra: "listen_addr: 0.0.0.0:443\n",
+		},
+		{
+			name: "funnel-duplicate-addrs",
+			extra: "listen_addr: 0.0.0.0:8080\nfunnel:\n  enabled: true\n" +
+				"  listen_addrs: [\":8443\", \"0.0.0.0:8443\"]\n",
+			wantErr: "funnel.listen_addrs[0] and funnel.listen_addrs[1] would bind the same tcp socket",
+		},
+		{
+			name:    "funnel-unparseable-addr",
+			extra:   "funnel:\n  enabled: true\n  listen_addrs: [\"8443\"]\n",
+			wantErr: "cannot parse funnel.listen_addrs[0]",
+		},
+		{
+			name:  "stun-udp-does-not-collide-with-tcp",
+			extra: "listen_addr: 0.0.0.0:3478\n",
+		},
+		{
+			name:    "stun-unparseable-addr",
+			extra:   "derp:\n  server:\n    stun_listen_addr: \"3478\"\n",
+			wantErr: "cannot parse derp.server.stun_listen_addr",
+		},
+		{
+			name:  "stun-off-is-skipped",
+			extra: "derp:\n  server:\n    stun_enabled: false\n    stun_listen_addr: \"3478\"\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loadTestConfig(t, validBaseConfig+tt.extra)
+
+			err := validateServerConfig()
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, ErrConfig)
+			assert.Contains(t, reasons(ConfigErrors(err)), tt.wantErr)
+		})
+	}
+}
+
 // TestFormerlyFatalRulesAreReported proves the rules that used to end the
 // process from inside a section reader, and the removed keys, come back as
 // one report instead.

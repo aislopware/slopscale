@@ -20,8 +20,7 @@ func TestFunnelConfigPorts(t *testing.T) {
 	assert.Equal(t, nodecap.Cap("https://tailscale.com/cap/funnel-ports?ports=443,9443"),
 		FunnelConfig{Ports: []uint16{9443, 443, 9443}}.FunnelPortsCap())
 
-	require.NoError(t, FunnelConfig{ListenAddrs: []string{":443", "203.0.113.1:8443"}}.Validate())
-	require.ErrorIs(t, FunnelConfig{ListenAddrs: []string{"443"}}.Validate(), ErrFunnelListenAddrInvalid)
+	require.NoError(t, FunnelConfig{Ports: []uint16{443, 8443}}.Validate())
 	require.ErrorIs(t, FunnelConfig{Ports: []uint16{0}}.Validate(), ErrFunnelPortInvalid)
 }
 

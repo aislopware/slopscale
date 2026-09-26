@@ -969,6 +969,7 @@ func validateServerConfigInto(v *configValidator) {
 	validateOIDCSettings(v)
 	validateServerSettings(v)
 	validateTLSSettings(v)
+	validateListenerCollisions(v)
 	validateNodeSettings(v)
 	validateDNSSettings(v)
 	validateMagicDNSConfig(v)
@@ -1290,7 +1291,7 @@ func tlsConfig() TLSConfig {
 	return TLSConfig{
 		LetsEncrypt: LetsEncryptConfig{
 			Hostname: conf.GetString("tls_letsencrypt_hostname"),
-			Listen:   conf.GetString("tls_letsencrypt_listen"),
+			Listen:   ACMEListenAddr(),
 			CacheDir: util.AbsolutePathFromConfigPath(
 				conf.GetString("tls_letsencrypt_cache_dir"),
 			),
