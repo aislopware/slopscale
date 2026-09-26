@@ -109,67 +109,78 @@ Currently, [only A and AAAA records are processed by Tailscale](https://github.c
 
 1. Configure extra DNS records using one of the available configuration options:
 
-    === "Static entries, via `dns.extra_records`"
+    <Tabs>
+    <Tab title="Static entries, via dns.extra_records">
 
-        ```yaml title="config.yaml"
-        dns:
-          ...
-          extra_records:
-            - name: "grafana.myvpn.example.com"
-              type: "A"
-              value: "100.64.0.3"
+    ```yaml title="config.yaml"
+    dns:
+      ...
+      extra_records:
+        - name: "grafana.myvpn.example.com"
+          type: "A"
+          value: "100.64.0.3"
 
-            - name: "prometheus.myvpn.example.com"
-              type: "A"
-              value: "100.64.0.3"
-          ...
-        ```
+        - name: "prometheus.myvpn.example.com"
+          type: "A"
+          value: "100.64.0.3"
+      ...
+    ```
 
-        Restart your slopscale instance.
+    Restart your slopscale instance.
 
-    === "Dynamic entries, via `dns.extra_records_path`"
+    </Tab>
+    <Tab title="Dynamic entries, via dns.extra_records_path">
 
-        ```json title="extra-records.json"
-        [
-          {
-            "name": "grafana.myvpn.example.com",
-            "type": "A",
-            "value": "100.64.0.3"
-          },
-          {
-            "name": "prometheus.myvpn.example.com",
-            "type": "A",
-            "value": "100.64.0.3"
-          }
-        ]
-        ```
+    ```json title="extra-records.json"
+    [
+      {
+        "name": "grafana.myvpn.example.com",
+        "type": "A",
+        "value": "100.64.0.3"
+      },
+      {
+        "name": "prometheus.myvpn.example.com",
+        "type": "A",
+        "value": "100.64.0.3"
+      }
+    ]
+    ```
 
-        Slopscale picks up changes to the above JSON file automatically.
+    Slopscale picks up changes to the above JSON file automatically.
 
-        !!! tip "Good to know"
+    :::tip[Good to know]
 
-            - The `dns.extra_records_path` option in the [configuration file](/ref/configuration) needs to reference the
-              JSON file containing extra DNS records.
-            - Be sure to "sort keys" and produce a stable output in case you generate the JSON file with a script.
-              Slopscale uses a checksum to detect changes to the file and a stable output avoids unnecessary processing.
-            - Slopscale reads the file once it has been left alone for a moment, so a script may write it in several
-              steps. Record names are lowercased on the way in, as a client only matches lowercase names.
+    - The `dns.extra_records_path` option in the [configuration file](/ref/configuration) needs to reference the
+      JSON file containing extra DNS records.
+    - Be sure to "sort keys" and produce a stable output in case you generate the JSON file with a script.
+      Slopscale uses a checksum to detect changes to the file and a stable output avoids unnecessary processing.
+    - Slopscale reads the file once it has been left alone for a moment, so a script may write it in several
+      steps. Record names are lowercased on the way in, as a client only matches lowercase names.
+    :::
+
+    </Tab>
+    </Tabs>
 
 1. Verify that DNS records are properly set using the DNS querying tool of your choice:
 
-    === "Query with dig"
+    <Tabs>
+    <Tab title="Query with dig">
 
-        ```console
-        dig +short grafana.myvpn.example.com
-        100.64.0.3
-        ```
+    ```console
+    dig +short grafana.myvpn.example.com
+    100.64.0.3
+    ```
 
-    === "Query with drill"
+    </Tab>
+    <Tab title="Query with drill">
 
-        ```console
-        drill -Q grafana.myvpn.example.com
-        100.64.0.3
-        ```
+    ```console
+    drill -Q grafana.myvpn.example.com
+    100.64.0.3
+    ```
+
+    </Tab>
+    </Tabs>
 
 1. Optional: Setup the reverse proxy
 
