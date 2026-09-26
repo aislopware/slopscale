@@ -478,7 +478,9 @@ func trafficBuildFlowd(t *testing.T) []byte {
 
 	out := filepath.Join(t.TempDir(), "slopscale-flowd")
 
-	cmd := exec.CommandContext(t.Context(), "go", "build", "-o", out, "../cmd/slopscale-flowd")
+	// The CI runner's checkout is not a git repository the test container
+	// can read, and the version stamp does not matter here.
+	cmd := exec.CommandContext(t.Context(), "go", "build", "-buildvcs=false", "-o", out, "../cmd/slopscale-flowd")
 
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
 
