@@ -108,6 +108,10 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 	// TKAInfo carries the head to sync to, or that the lock is off.
 	tailnode.CapMap[nodecap.TailnetLock] = nil
 
+	// Only the self node carries the tailnet's ID; the client ignores it
+	// on peers and the hosted control plane leaves it off them.
+	tailnode.StableTailnetID = b.mapper.state.TailnetID()
+
 	b.resp.Node = tailnode
 	b.resp.TKAInfo = b.mapper.state.TKAInfo()
 	b.resp.DisplayMessages = displayMessages(nv, b.mapper.cfg.ServerURL)

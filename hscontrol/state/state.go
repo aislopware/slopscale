@@ -147,6 +147,9 @@ type State struct {
 	derp derpState
 	// settings holds the tailnet-wide switches; see [State.Settings].
 	settings atomic.Pointer[types.Settings]
+	// tailnetID is set once by [NewState] and never changes; see
+	// [State.TailnetID].
+	tailnetID tailcfg.StableTailnetID
 	// idTokenSigner signs identity tokens once a key is loaded or made;
 	// idTokenMu serialises that first use. See [State.IDTokenSigner].
 	idTokenSigner atomic.Pointer[idtoken.Signer]
@@ -370,6 +373,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	s.settings.Store(&settings)
+
+	s.tailnetID, err = loadTailnetID(db)
+	if err != nil {
+		return nil, err
+	}
 
 	err = s.loadStoredConfig()
 	if err != nil {

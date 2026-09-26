@@ -73,10 +73,11 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 
 			continue
 		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey, types.SettingTailnetLock,
-			types.SettingTraffic, types.SettingTrafficFold:
-			// Hold JSON or key material and are read by LoadDNSSettings,
-			// LoadDERPSettings, LoadIDTokenKey, LoadTailnetLock,
-			// LoadTrafficSettings and LoadTrafficFoldMarks.
+			types.SettingTraffic, types.SettingTrafficFold, types.SettingTailnetID:
+			// Hold JSON, key material or an ID and are read by
+			// LoadDNSSettings, LoadDERPSettings, LoadIDTokenKey,
+			// LoadTailnetLock, LoadTrafficSettings, LoadTrafficFoldMarks and
+			// EnsureTailnetID.
 			continue
 		default:
 			continue
@@ -330,6 +331,61 @@ func (hsdb *HSDatabase) SaveKeyExpiry(d time.Duration) error {
 	return hsdb.Write(func(tx *Tx) error {
 		return saveSettingValue(tx, types.SettingKeyExpiry, d.String())
 	})
+}
+
+// loadSettingValue reads the raw value of one settings row; empty when
+// the row does not exist.
+func loadSettingValue(ex *executor, key types.SettingKey) (string, error) {
+	var records []settingRecord
+
+	err := ex.query(
+		jet.SELECT(table.Settings.AllColumns).
+			FROM(table.Settings).
+			WHERE(table.Settings.Key.EQ(jet.String(string(key)))),
+		&records,
+	)
+	if err != nil {
+		return "", fmt.Errorf("loading setting %q: %w", key, err)
+	}
+
+	if len(records) == 0 {
+		return "", nil
+	}
+
+	return records[0].Setting.Value, nil
+}
+
+// ensureSettingValue stores value under key unless the row exists, and
+// returns the value in force: of two servers on one database that both
+// make one, the first to write wins and the other adopts its value.
+func (hsdb *HSDatabase) ensureSettingValue(key types.SettingKey, value string) (string, error) {
+	stored, err := Write(hsdb, func(tx *Tx) (string, error) {
+		existing, err := loadSettingValue(tx.executor(), key)
+		if err != nil || existing != "" {
+			return existing, err
+		}
+
+		row := settingRow{Key: string(key), Value: value, UpdatedAt: time.Now().UTC()}
+
+		_, err = tx.executor().exec(table.Settings.INSERT(table.Settings.AllColumns).MODEL(&row))
+		if err != nil {
+			return "", fmt.Errorf("storing setting %q: %w", key, err)
+		}
+
+		return value, nil
+	})
+	if err != nil {
+		// The insert lost a race with another server; its value is the
+		// one to use.
+		existing, loadErr := loadSettingValue(hsdb.executor(), key)
+		if loadErr == nil && existing != "" {
+			return existing, nil
+		}
+
+		return "", err
+	}
+
+	return stored, nil
 }
 
 func saveSettingValue(q Querier, key types.SettingKey, value string) error {
