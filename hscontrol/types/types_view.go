@@ -526,11 +526,10 @@ func (v *PreAuthKeyView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 
 func (v PreAuthKeyView) ID() uint64 { return v.ж.ID }
 
-// Legacy plaintext key (for backwards compatibility)
-func (v PreAuthKeyView) Key() string { return v.ж.Key }
-
 // Prefix is the public lookup id. Hash is the SHA-256 digest of the
-// secret, or a bcrypt hash until the key is next used.
+// secret, or a bcrypt hash until the key is next used. A key from
+// before headscale 0.28 has a "legacy-" prefix derived from the whole
+// key, which is also its secret.
 func (v PreAuthKeyView) Prefix() string                { return v.ж.Prefix }
 func (v PreAuthKeyView) Hash() views.ByteSlice[[]byte] { return views.ByteSliceOf(v.ж.Hash) }
 
@@ -579,7 +578,6 @@ func (v PreAuthKeyView) Revoked() views.ValuePointer[time.Time] {
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _PreAuthKeyViewNeedsRegeneration = PreAuthKey(struct {
 	ID            uint64
-	Key           string
 	Prefix        string
 	Hash          []byte
 	UserID        *uint

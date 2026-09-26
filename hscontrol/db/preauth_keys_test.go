@@ -152,6 +152,8 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 
 	user := db.CreateUserForTest("test-user")
 
+	const legacyKey = "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+
 	tests := []struct {
 		name            string
 		setupKey        func() string // Returns key string to test
@@ -162,18 +164,8 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 		{
 			name: "legacy_key_plaintext",
 			setupKey: func() string {
-				// Insert legacy key directly using GORM (simulate existing production key)
-				// Note: We use raw SQL to bypass GORM's handling and set prefix to empty string
-				// which simulates how legacy keys exist in production databases
-				legacyKey := "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
-				now := time.Now()
-
-				// Use raw SQL to insert with empty prefix to avoid UNIQUE constraint
-				_, err := db.DB.ExecContext(t.Context(), `
-					INSERT INTO pre_auth_keys (key, user_id, reusable, ephemeral, used, created_at)
-					VALUES ($1, $2, $3, $4, $5, $6)
-				`, legacyKey, user.ID, true, false, false, now)
-				require.NoError(t, err)
+				insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: legacyKey, reusable: true})
+				hashLegacyPreAuthKeysForTest(t, db)
 
 				return legacyKey
 			},
@@ -183,10 +175,57 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 				t.Helper()
 
 				assert.Equal(t, user.ID, *pak.UserID)
-				assert.NotEmpty(t, pak.Key) // Legacy keys have Key populated
-				assert.Empty(t, pak.Prefix) // Legacy keys have empty Prefix
-				assert.Nil(t, pak.Hash)     // Legacy keys have nil Hash
+				assert.Equal(t, legacyAuthKeyIdentifier(legacyKey), pak.Prefix)
+				assert.Equal(t, hashSecret(legacyKey), pak.Hash)
 			},
+		},
+		{
+			name: "legacy_key_wrong_secret",
+			setupKey: func() string {
+				// A row under the key's derived prefix holding the hash of
+				// another secret: the prefix finds it, the hash rejects it.
+				key := "wrongsecretlegacykey000000000000000000000000000"
+				id := insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: "", reusable: true})
+				_, err := db.DB.ExecContext(
+					t.Context(), `UPDATE pre_auth_keys SET prefix = $1, hash = $2 WHERE id = $3`,
+					legacyAuthKeyIdentifier(key), hashSecret("another secret"), id,
+				)
+				require.NoError(t, err)
+
+				return key
+			},
+			wantFindErr: true,
+		},
+		{
+			name: "legacy_key_never_stored",
+			setupKey: func() string {
+				return "neverstoredlegacykey00000000000000000000000000"
+			},
+			wantFindErr: true,
+		},
+		{
+			name: "legacy_prefix_is_not_a_key",
+			setupKey: func() string {
+				key := "prefixonlylegacykey000000000000000000000000000"
+				insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: key, reusable: true})
+				hashLegacyPreAuthKeysForTest(t, db)
+
+				return legacyAuthKeyIdentifier(key)
+			},
+			wantFindErr: true,
+		},
+		{
+			name: "revoked_legacy_key",
+			setupKey: func() string {
+				key := "revokedlegacykey00000000000000000000000000000"
+				insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{
+					key: key, reusable: true, revoked: new(time.Now()),
+				})
+				hashLegacyPreAuthKeysForTest(t, db)
+
+				return key
+			},
+			wantValidateErr: true,
 		},
 		{
 			name: "new_key_hashed",
@@ -206,7 +245,6 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 				t.Helper()
 
 				assert.Equal(t, user.ID, *pak.UserID)
-				assert.Empty(t, pak.Key)       // New keys have empty Key
 				assert.NotEmpty(t, pak.Prefix) // New keys have Prefix
 				assert.NotNil(t, pak.Hash)     // New keys have Hash
 				assert.Len(t, pak.Prefix, 12)  // Prefix is 12 chars
@@ -325,15 +363,10 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 			name: "expired_legacy_key",
 			setupKey: func() string {
 				legacyKey := "expired_legacy_key_123456789012345678901234"
-				now := time.Now()
-				expiration := time.Now().Add(-1 * time.Hour) // Expired 1 hour ago
-
-				// Use raw SQL to avoid UNIQUE constraint on empty prefix
-				_, err := db.DB.ExecContext(t.Context(), `
-					INSERT INTO pre_auth_keys (key, user_id, reusable, ephemeral, used, created_at, expiration)
-					VALUES ($1, $2, $3, $4, $5, $6, $7)
-				`, legacyKey, user.ID, true, false, false, now, expiration)
-				require.NoError(t, err)
+				insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{
+					key: legacyKey, reusable: true, expiration: new(time.Now().Add(-time.Hour)),
+				})
+				hashLegacyPreAuthKeysForTest(t, db)
 
 				return legacyKey
 			},
@@ -344,14 +377,8 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 			name: "used_single_use_legacy_key",
 			setupKey: func() string {
 				legacyKey := "used_legacy_key_123456789012345678901234567"
-				now := time.Now()
-
-				// Use raw SQL to avoid UNIQUE constraint on empty prefix
-				_, err := db.DB.ExecContext(t.Context(), `
-					INSERT INTO pre_auth_keys (key, user_id, reusable, ephemeral, used, created_at)
-					VALUES ($1, $2, $3, $4, $5, $6)
-				`, legacyKey, user.ID, false, false, true, now)
-				require.NoError(t, err)
+				insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: legacyKey, used: true})
+				hashLegacyPreAuthKeysForTest(t, db)
 
 				return legacyKey
 			},
@@ -580,4 +607,132 @@ func TestDestroyRevokedPreAuthKeysKeepsKeysBackingNodes(t *testing.T) {
 
 	_, err = db.GetPreAuthKeyByID(backing.ID)
 	require.ErrorIs(t, err, ErrNotFound)
+}
+
+// plaintextPreAuthKey is a pre-auth key as headscale stored it before 0.28:
+// the key itself in the key column, no prefix and no hash.
+type plaintextPreAuthKey struct {
+	key        string
+	reusable   bool
+	used       bool
+	expiration *time.Time
+	revoked    *time.Time
+}
+
+func insertPlaintextPreAuthKey(t *testing.T, db *HSDatabase, userID uint, k plaintextPreAuthKey) uint64 {
+	t.Helper()
+
+	var id uint64
+
+	err := db.DB.QueryRowContext(t.Context(), `INSERT INTO pre_auth_keys
+  (key, user_id, reusable, ephemeral, used, created_at, expiration, revoked)
+VALUES ($1, $2, $3, false, $4, $5, $6, $7) RETURNING id`,
+		k.key, userID, k.reusable, k.used, time.Now(), k.expiration, k.revoked,
+	).Scan(&id)
+	require.NoError(t, err)
+
+	return id
+}
+
+// hashLegacyPreAuthKeysForTest runs the migration that hashes plaintext
+// pre-auth keys over what the test inserted after the database was created.
+func hashLegacyPreAuthKeysForTest(t *testing.T, db *HSDatabase) {
+	t.Helper()
+
+	require.NoError(t, db.Write(migrateHashLegacyPreAuthKeys))
+}
+
+// TestHashLegacyPreAuthKeysMigration upgrades a database holding plaintext
+// pre-auth keys from before headscale 0.28: each keeps authenticating with
+// the original string and keeps its state, and no plaintext is left.
+func TestHashLegacyPreAuthKeysMigration(t *testing.T) {
+	t.Parallel()
+
+	const (
+		migrationID = "202609261000-hash-legacy-pre-auth-keys"
+		activeKey   = "0123456789abcdef0123456789abcdef0123456789abcdef"
+		revokedKey  = "1123456789abcdef0123456789abcdef0123456789abcdef"
+		expiredKey  = "2123456789abcdef0123456789abcdef0123456789abcdef"
+		usedKey     = "3123456789abcdef0123456789abcdef0123456789abcdef"
+	)
+
+	forEachDialect(t, func(t *testing.T, db *HSDatabase) {
+		// Back to before the migration: out of the history, and the
+		// plaintext column indexed again.
+		_, err := db.DB.ExecContext(t.Context(), `DELETE FROM migrations WHERE id = $1`, migrationID)
+		require.NoError(t, err)
+		_, err = db.DB.ExecContext(t.Context(), `CREATE INDEX idx_pre_auth_keys_key ON pre_auth_keys(key)`)
+		require.NoError(t, err)
+
+		user := db.CreateUserForTest("legacy")
+
+		current, err := db.CreatePreAuthKey(user.TypedID(), true, false, nil, nil)
+		require.NoError(t, err)
+
+		active := insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: activeKey, reusable: true})
+		revoked := insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{
+			key: revokedKey, reusable: true, revoked: new(time.Now()),
+		})
+		expired := insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{
+			key: expiredKey, reusable: true, expiration: new(time.Now().Add(-time.Hour)),
+		})
+		used := insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: usedKey, used: true})
+		// A later row holding the same key never authenticated, since the
+		// plaintext lookup returned the lowest id.
+		duplicate := insertPlaintextPreAuthKey(t, db, user.ID, plaintextPreAuthKey{key: activeKey, reusable: true})
+
+		require.NoError(t, db.runMigrations(migrations(db.cfg)))
+
+		applied, err := db.appliedMigrations()
+		require.NoError(t, err)
+		assert.Contains(t, applied, migrationID)
+
+		var plaintext int
+
+		err = db.DB.QueryRowContext(t.Context(),
+			`SELECT count(*) FROM pre_auth_keys WHERE key IS NOT NULL AND key != ''`).Scan(&plaintext)
+		require.NoError(t, err)
+		assert.Zero(t, plaintext, "no key may be left in plaintext")
+
+		_, err = db.DB.ExecContext(t.Context(), `DROP INDEX idx_pre_auth_keys_key`)
+		require.Error(t, err, "the index on the plaintext column is dropped")
+
+		pak, err := db.GetPreAuthKey(activeKey)
+		require.NoError(t, err)
+		assert.Equal(t, active, pak.ID)
+		assert.Equal(t, legacyAuthKeyIdentifier(activeKey), pak.Prefix)
+		assert.Equal(t, hashSecret(activeKey), pak.Hash)
+		require.NoError(t, pak.Validate())
+		assert.Equal(t, user.ID, pak.User.ID)
+
+		for key, want := range map[string]struct {
+			id  uint64
+			err error
+		}{
+			revokedKey: {revoked, types.PAKError("authkey revoked")},
+			expiredKey: {expired, types.PAKError("authkey expired")},
+			usedKey:    {used, types.PAKError("authkey already used")},
+		} {
+			legacy, findErr := db.GetPreAuthKey(key)
+			require.NoError(t, findErr)
+			assert.Equal(t, want.id, legacy.ID)
+			assert.Equal(t, want.err, legacy.Validate())
+		}
+
+		dup, err := db.GetPreAuthKeyByID(duplicate)
+		require.NoError(t, err)
+		assert.Empty(t, dup.Prefix)
+		assert.Empty(t, dup.Hash)
+		assert.NotNil(t, dup.Revoked, "the unreachable copy is revoked")
+
+		pak, err = db.GetPreAuthKey(current.Key)
+		require.NoError(t, err, "a current key is untouched")
+		assert.Equal(t, current.ID, pak.ID)
+
+		_, err = db.GetPreAuthKey(activeKey[:len(activeKey)-1] + "0")
+		require.ErrorIs(t, err, ErrPreAuthKeyNotFound)
+
+		_, err = db.GetPreAuthKey(legacyAuthKeyIdentifier(activeKey))
+		require.ErrorIs(t, err, ErrPreAuthKeyNotFound, "the stored prefix is not a key")
+	})
 }

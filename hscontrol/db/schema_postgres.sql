@@ -43,7 +43,6 @@ CREATE TABLE pre_auth_keys(
   CONSTRAINT fk_pre_auth_keys_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
-CREATE INDEX idx_pre_auth_keys_key ON pre_auth_keys(key);
 
 CREATE TABLE api_keys(
   id bigserial PRIMARY KEY,

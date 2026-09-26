@@ -18,11 +18,10 @@ func (e PAKError) Error() string { return string(e) }
 type PreAuthKey struct {
 	ID uint64
 
-	// Legacy plaintext key (for backwards compatibility)
-	Key string
-
 	// Prefix is the public lookup id. Hash is the SHA-256 digest of the
-	// secret, or a bcrypt hash until the key is next used.
+	// secret, or a bcrypt hash until the key is next used. A key from
+	// before headscale 0.28 has a "legacy-" prefix derived from the whole
+	// key, which is also its secret.
 	Prefix string
 	Hash   []byte
 

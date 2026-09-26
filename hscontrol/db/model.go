@@ -354,7 +354,7 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 // preAuthKeyRow is a row of the pre_auth_keys table.
 type preAuthKeyRow struct {
 	ID            uint64 `sql:"primary_key"`
-	Key           string
+	Key           string // pre-0.28 plaintext; always written empty, never read
 	Prefix        string
 	Hash          []byte
 	UserID        *uint
@@ -406,7 +406,6 @@ func preAuthKeyRecordsToKeys(records []preAuthKeyRecord) ([]types.PreAuthKey, er
 func (r *preAuthKeyRow) preAuthKey() (*types.PreAuthKey, error) {
 	key := &types.PreAuthKey{
 		ID:            r.ID,
-		Key:           r.Key,
 		Prefix:        r.Prefix,
 		Hash:          r.Hash,
 		UserID:        r.UserID,
@@ -446,7 +445,6 @@ func preAuthKeyRowFrom(key *types.PreAuthKey) (preAuthKeyRow, error) {
 
 	return preAuthKeyRow{
 		ID:            key.ID,
-		Key:           key.Key,
 		Prefix:        key.Prefix,
 		Hash:          key.Hash,
 		UserID:        key.UserID,

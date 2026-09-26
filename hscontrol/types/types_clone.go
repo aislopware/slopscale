@@ -181,7 +181,6 @@ func (src *PreAuthKey) Clone() *PreAuthKey {
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _PreAuthKeyCloneNeedsRegeneration = PreAuthKey(struct {
 	ID            uint64
-	Key           string
 	Prefix        string
 	Hash          []byte
 	UserID        *uint

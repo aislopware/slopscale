@@ -45,6 +45,9 @@ CREATE UNIQUE INDEX idx_name_no_provider_identifier ON users(name) WHERE provide
 
 CREATE TABLE pre_auth_keys(
   id integer PRIMARY KEY AUTOINCREMENT,
+  -- key held keys from before headscale 0.28 in plaintext; nothing reads
+  -- it since 202609261000-hash-legacy-pre-auth-keys moved them to prefix
+  -- and hash and emptied it.
   key text,
   prefix text,
   hash blob,
@@ -68,7 +71,6 @@ CREATE TABLE pre_auth_keys(
   CONSTRAINT fk_pre_auth_keys_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
-CREATE INDEX idx_pre_auth_keys_key ON pre_auth_keys(key);
 
 -- scopes is a JSON array of scope names narrowing the key below its
 -- owner's role, empty for the whole role; description names the key.

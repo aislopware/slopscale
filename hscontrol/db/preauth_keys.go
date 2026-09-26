@@ -1,6 +1,8 @@
 package db
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
@@ -98,16 +100,11 @@ func queryPreAuthKey(q Querier, where jet.BoolExpression) (*types.PreAuthKey, er
 	return record.preAuthKey()
 }
 
-// Pre-auth key lookups on the registration path, rendered once; see
-// [fixedSQL].
-var (
-	preAuthKeyByKey = newFixedSQL(func() statement {
-		return selectPreAuthKeys().WHERE(table.PreAuthKeys.Key.EQ(jet.String(""))).LIMIT(1)
-	})
-	preAuthKeyByPrefix = newFixedSQL(func() statement {
-		return selectPreAuthKeys().WHERE(table.PreAuthKeys.Prefix.EQ(jet.String(""))).LIMIT(1)
-	})
-)
+// preAuthKeyByPrefix is the pre-auth key lookup on the registration path,
+// rendered once; see [fixedSQL].
+var preAuthKeyByPrefix = newFixedSQL(func() statement {
+	return selectPreAuthKeys().WHERE(table.PreAuthKeys.Prefix.EQ(jet.String(""))).LIMIT(1)
+})
 
 func fixedPreAuthKey(q Querier, stmt *fixedSQL, args ...any) (*types.PreAuthKey, error) {
 	var record preAuthKeyRecord
@@ -293,41 +290,46 @@ func findAuthKey(q Querier, keyStr string) (*types.PreAuthKey, error) {
 		return nil, ErrPreAuthKeyFailedToParse
 	}
 
+	// Unprefixed: a key from before headscale 0.28, hashed by
+	// 202609261000-hash-legacy-pre-auth-keys under a prefix derived from it.
+	prefix, secret := legacyAuthKeyIdentifier(keyStr), keyStr
+
 	_, prefixAndHash, found := strings.Cut(keyStr, authKeyPrefix)
+	if found {
+		// New format: hskey-auth-{12-char-prefix}-{64-char-hash}
+		var err error
 
-	if !found {
-		// Legacy format (plaintext) - backwards compatibility
-		pak, err := fixedPreAuthKey(q, preAuthKeyByKey, keyStr, limitOne)
+		prefix, secret, err = parsePrefixedKey(
+			prefixAndHash,
+			authKeyPrefixLength,
+			authKeyLength,
+			ErrPreAuthKeyFailedToParse,
+		)
 		if err != nil {
-			return nil, ErrPreAuthKeyNotFound
+			return nil, err
 		}
-
-		return pak, nil
 	}
 
-	// New format: hskey-auth-{12-char-prefix}-{64-char-hash}
-	prefix, hash, err := parsePrefixedKey(
-		prefixAndHash,
-		authKeyPrefixLength,
-		authKeyLength,
-		ErrPreAuthKeyFailedToParse,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// Look up key by prefix
 	pak, err := fixedPreAuthKey(q, preAuthKeyByPrefix, prefix, limitOne)
 	if err != nil {
 		return nil, ErrPreAuthKeyNotFound
 	}
 
-	err = verifyCredential(q, preAuthKeyHash, pak.ID, pak.Hash, hash)
+	err = verifyCredential(q, preAuthKeyHash, pak.ID, pak.Hash, secret)
 	if err != nil {
 		return nil, fmt.Errorf("invalid auth key: %w", err)
 	}
 
 	return pak, nil
+}
+
+// legacyAuthKeyIdentifier derives the lookup prefix of a pre-0.28 plaintext
+// pre-auth key, which embeds none; the whole key is its secret. The "legacy-"
+// marker keeps it disjoint from the hex prefixes of current keys.
+func legacyAuthKeyIdentifier(key string) string {
+	sum := sha256.Sum256([]byte(key))
+
+	return "legacy-" + hex.EncodeToString(sum[:])[:authKeyPrefixLength]
 }
 
 // parsePrefixedKey splits the prefix-and-secret portion of a new-format key
