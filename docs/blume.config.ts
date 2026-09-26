@@ -15,7 +15,7 @@ export default defineConfig({
   },
   navigation: { sidebar: { display: "group" } },
   toc: true,
-  lastModified: true,
+  lastModified: "git",
   redirects: [
     { from: "/acls", to: "/ref/policy" },
     { from: "/ref/acls", to: "/ref/policy" },
