@@ -143,10 +143,12 @@ policy change never carries.
 
 Approval is a node property (`nodes.approved_at`; users have their own) and
 is enforced in exactly two places: the NodeStore's peer function drops
-unapproved nodes before the policy builds the peer map, and
-`State.ListPeers`'s explicit-ID branch, `FilterForNode` and `SSHPolicy`
-apply the same rule for the incremental paths. Nothing in the mapper or the
-policy engine knows about approval. `persistNodeToDB` never writes
+unapproved nodes before the policy builds the peer map, which every peer
+list and incremental update reads (`State.ListPeers` included), and
+`FilterForNode` and `SSHPolicy` apply the same rule to the node's own
+view. Nothing in the mapper or the policy engine knows about approval. The
+mapper takes visibility from the peer map alone, so every write that changes
+what the policy admits must rebuild it before its change goes out. `persistNodeToDB` never writes
 `approved_at` (like expiry); `NodeSetApproval` does. An approval change is a
 `PolicyChange` with `IncludeSelf`, not `OriginNode`: one change can carry a
 single origin, but switching a setting off admits many nodes at once and
