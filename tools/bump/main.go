@@ -4,9 +4,8 @@
 // and only then does a pull request open.
 //
 // The pins are interlocked. flake.nix asks nixpkgs for the newest Go, so a lock
-// update moves the compiler and every devShell tool at once, except bun, which
-// flake.nix pins by hand because web/bun.lock needs a newer one than nixpkgs
-// ships. Two Dockerfiles compile a tailscale tree cloned from an unpinned
+// update moves the compiler and every devShell tool at once, bun included, and
+// the lockfiles must still install with that bun. Two Dockerfiles compile a tailscale tree cloned from an unpinned
 // branch, so their builder image has to keep up with upstream's go directive.
 // go.mod follows tailscale.com's main branch and must hold gvisor and
 // wireguard-windows where that commit pins them. flakehashes.json has to follow

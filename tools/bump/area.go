@@ -59,15 +59,6 @@ func allAreas() []area {
 			Gate:    gateFlake,
 			Message: func(c change) string { return "build(nix): update flake inputs " + c.Summary },
 		},
-		{
-			// After the lock, so the lockfiles it rewrites are judged by the
-			// nixpkgs they will be built with; before the package areas, so
-			// those install with the bun that ships.
-			Name:    "bun",
-			Apply:   applyBun,
-			Gate:    gateBun,
-			Message: func(c change) string { return "build(nix): bump " + c.Summary },
-		},
 	}
 
 	areas = append(areas, toolAreas()...)

@@ -34,8 +34,8 @@ the pins on a local branch, one gated commit per area, and publishes
 nothing; its package doc lists the interlocks a bump by hand must keep too
 (gvisor and wireguard-windows at the versions tailscale.com pins,
 `go run ./cmd/vendorhash update` after go.sum or the imported packages move,
-a `go` directive no newer than nixpkgs' Go, bun pinned by hand in
-flake.nix). Then every moved item's changes between the two versions are
+a `go` directive no newer than nixpkgs' Go, and lockfiles that nixpkgs'
+bun still installs). Then every moved item's changes between the two versions are
 read and acted on in the same pull request: drop what they make redundant,
 change what they deprecate, adopt what slopscale can use.
 

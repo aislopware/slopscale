@@ -131,7 +131,20 @@ func gateFlake(ctx context.Context, r *repo) error {
 	// It is also the first commit, which is the worst case for a rewind that
 	// drops the newest commit first. Paying for one round of checks here is
 	// what stops the final gate paying for one round per area stacked above it.
-	return runFlakeChecks(ctx, r)
+	err = runFlakeChecks(ctx, r)
+	if err != nil {
+		return err
+	}
+
+	// bun comes from nixpkgs, and a bun too old for a lockfile cannot parse it.
+	for _, set := range packageSets {
+		_, err = r.nixRunIn(ctx, set.Dir, "bun", "install", "--frozen-lockfile")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // goVersion is the Go the devShell provides, without the "go" prefix.
