@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.51.0](https://github.com/aislopware/slopscale/compare/v0.50.1...v0.51.0) (2026-09-27)
+
+
+### Changes
+
+* show every machine's owner wherever the console names it ([#40](https://github.com/aislopware/slopscale/issues/40)) ([311bf9f](https://github.com/aislopware/slopscale/commit/311bf9f9afe295fa531b12cc0b6345c476444002))
+
 ## [0.50.1](https://github.com/aislopware/slopscale/compare/v0.50.0...v0.50.1) (2026-09-27)
 
 
