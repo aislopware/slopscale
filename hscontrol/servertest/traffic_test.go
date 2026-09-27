@@ -1217,7 +1217,7 @@ func TestTrafficMonitor(t *testing.T) {
 		assert.Equal(t, map[string]float64{"1.1.1.1": 11},
 			hosts("groupBy=destination&dst=1.1.1.1&proto=17&port=53"), "one address and one service")
 		assert.Equal(t, map[string]float64{"192.168.1.10": 300},
-			hosts("groupBy=destination&private=true"), "only the LAN destinations")
+			hosts("groupBy=destination&scope=private"), "only the LAN destinations")
 
 		status, body := apiCall(t, client, ownerKey, http.MethodGet,
 			v1+"/traffic/destinations?dst=github.com", nil)
@@ -1615,6 +1615,86 @@ func TestTrafficSummarySplitsByGateway(t *testing.T) {
 	assert.Equal(t, "phone", field(t, body, "nodes", "0", "nodeName"), "the phone is gw-b's busiest")
 	assert.Equal(t, []any{gwB.NodeIDString()}, field(t, body, "nodes", "1", "reporterIds"),
 		"the laptop's gw-a traffic is outside the read")
+}
+
+// TestTrafficSummaryScopes has a gateway serving both an exit node and a
+// subnet route report a laptop's traffic to the internet and to the
+// subnet, and checks each scope of the summary and the destinations
+// counts only its own.
+func TestTrafficSummaryScopes(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithRealListener(), servertest.WithTraffic(types.TrafficConfig{}))
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "scope-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	setStatePolicy(t, srv, `{
+		"tagOwners": {"tag:gateway": ["scope-owner@"]},
+		"grants": [{"src": ["scope-owner@"], "dst": ["autogroup:internet", "192.168.50.0/24"], "ip": ["*"]}]
+	}`)
+
+	gw := servertest.NewClient(t, srv, "gw", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
+	laptop := servertest.NewClient(t, srv, "laptop", servertest.WithUser(owner))
+
+	routes := append(tsaddr.ExitRoutes(), netip.MustParsePrefix("192.168.50.0/24"))
+
+	gw.Direct().SetHostinfo(&tailcfg.Hostinfo{
+		BackendLogID: "servertest-gw", Hostname: "gw", RoutableIPs: routes,
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	require.NoError(t, gw.Direct().SendUpdate(ctx))
+	cancel()
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost,
+			v1+"/node/"+gw.NodeIDString()+"/approve_routes",
+			map[string]any{"routes": []string{"0.0.0.0/0", "::/0", "192.168.50.0/24"}})
+		assert.Equal(c, http.StatusOK, status, body)
+	}, trafficWait, 100*time.Millisecond)
+
+	laptopIP := nodeIP4(t, laptop)
+	minute := minuteBucket(time.Now()) - 60
+
+	sendReport(t, client, srv.URL, idToken(t, srv, gw, traffic.Audience), traffic.Report{
+		Instance: "scope", Seq: 1,
+		Status: traffic.Status{Conntrack: traffic.Collector{Enabled: true}},
+		Flows: []traffic.Flow{
+			{
+				Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("140.82.112.3"), Proto: 6, Port: 443,
+				TxBytes: 100, RxBytes: 900, Conns: 1,
+			},
+			{
+				Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("192.168.50.10"), Proto: 6, Port: 445,
+				TxBytes: 1000, RxBytes: 4000, Conns: 2,
+			},
+		},
+	})
+
+	for scope, want := range map[string]float64{"": 6000, "all": 6000, "internet": 1000, "private": 5000} {
+		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary?scope="+scope, nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		tx, txOK := field(t, body, "total", "txBytes").(float64)
+		rx, rxOK := field(t, body, "total", "rxBytes").(float64)
+		require.True(t, txOK && rxOK, "byte counts are numbers")
+		assert.InDelta(t, want, tx+rx, 0, "summary total, scope %q", scope)
+		assert.Equal(t, "laptop", field(t, body, "nodes", "0", "nodeName"), "scope %q", scope)
+	}
+
+	for scope, want := range map[string]string{"internet": "140.82.112.3", "private": "192.168.50.10"} {
+		status, body := apiCall(t, client, ownerKey, http.MethodGet,
+			v1+"/traffic/destinations?scope="+scope, nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Len(t, field(t, body, "destinations"), 1, "scope %q", scope)
+		assert.Equal(t, want, field(t, body, "destinations", "0", "dst"), "scope %q", scope)
+	}
+
+	status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary?scope=lan", nil)
+	assert.Equal(t, http.StatusUnprocessableEntity, status, body)
 }
 
 // TestTrafficDNSLogFollowsTheExitNode proves the DNS log reaches only the

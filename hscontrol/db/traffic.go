@@ -144,19 +144,19 @@ func trafficTotalsUpsert(rows []types.TrafficTotal) jet.InsertStatement {
 	t := table.TrafficTotals
 
 	stmt := t.INSERT(
-		t.Resolution, t.Bucket, t.NodeID, t.ReporterID,
+		t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Private,
 		t.TxBytes, t.RxBytes, t.TxPackets, t.RxPackets, t.Conns,
 	)
 
 	for _, r := range rows {
 		stmt = stmt.VALUES(
-			r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(),
+			r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(), sqlFlag(r.Private),
 			toSQLInt(r.TxBytes), toSQLInt(r.RxBytes),
 			toSQLInt(r.TxPackets), toSQLInt(r.RxPackets), toSQLInt(r.Conns),
 		)
 	}
 
-	return stmt.ON_CONFLICT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID).DO_UPDATE(jet.SET(
+	return stmt.ON_CONFLICT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Private).DO_UPDATE(jet.SET(
 		t.TxBytes.SET(t.TxBytes.ADD(t.EXCLUDED.TxBytes)),
 		t.RxBytes.SET(t.RxBytes.ADD(t.EXCLUDED.RxBytes)),
 		t.TxPackets.SET(t.TxPackets.ADD(t.EXCLUDED.TxPackets)),
@@ -189,7 +189,7 @@ func trafficDestinationsUpsert(rows []types.TrafficDestination) jet.InsertStatem
 	}
 
 	return stmt.ON_CONFLICT(
-		t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Dst, t.Port, t.Proto, t.Host,
+		t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Dst, t.Port, t.Proto, t.Host, t.Private,
 	).DO_UPDATE(jet.SET(
 		t.HostSource.SET(jet.StringExp(jet.CASE().
 			WHEN(hostSourceRank(t.EXCLUDED.HostSource).GT(hostSourceRank(t.HostSource))).
@@ -613,9 +613,11 @@ func (hsdb *HSDatabase) DeleteTrafficReporter(id types.NodeID) error {
 	return nil
 }
 
-// trafficColumns are the key columns every traffic table shares.
+// trafficColumns are the key columns every traffic table shares, and
+// the private flag of the ones that have it.
 type trafficColumns struct {
 	resolution, bucket, nodeID, reporterID jet.ColumnInteger
+	private                                jet.ColumnInteger
 }
 
 var (
@@ -624,12 +626,14 @@ var (
 		bucket:     table.TrafficTotals.Bucket,
 		nodeID:     table.TrafficTotals.NodeID,
 		reporterID: table.TrafficTotals.ReporterID,
+		private:    table.TrafficTotals.Private,
 	}
 	destinationColumns = trafficColumns{
 		resolution: table.TrafficDestinations.Resolution,
 		bucket:     table.TrafficDestinations.Bucket,
 		nodeID:     table.TrafficDestinations.NodeID,
 		reporterID: table.TrafficDestinations.ReporterID,
+		private:    table.TrafficDestinations.Private,
 	}
 	dnsColumns = trafficColumns{
 		resolution: table.TrafficDNS.Resolution,
@@ -640,7 +644,7 @@ var (
 )
 
 // where is the part of a filter every table shares: resolution, range,
-// node and gateway.
+// node and gateway, and the scope on the tables that know it.
 func (c trafficColumns) where(f types.TrafficFilter) jet.BoolExpression {
 	cond := c.resolution.EQ(jet.Int64(f.Resolution)).
 		AND(c.bucket.GT_EQ(jet.Int64(f.Start.Unix()))).
@@ -652,6 +656,16 @@ func (c trafficColumns) where(f types.TrafficFilter) jet.BoolExpression {
 
 	if f.ReporterID != 0 {
 		cond = cond.AND(c.reporterID.EQ(jet.Uint64(f.ReporterID.Uint64())))
+	}
+
+	if c.private != nil {
+		switch f.Scope {
+		case types.TrafficScopeInternet:
+			cond = cond.AND(c.private.EQ(jet.Int64(sqlFlag(false))))
+		case types.TrafficScopePrivate:
+			cond = cond.AND(c.private.EQ(jet.Int64(sqlFlag(true))))
+		case types.TrafficScopeAll, "":
+		}
 	}
 
 	return cond
@@ -914,10 +928,6 @@ func destinationWhere(f types.TrafficFilter) jet.BoolExpression {
 
 	if f.Dst != "" {
 		cond = cond.AND(t.Dst.EQ(jet.String(f.Dst)))
-	}
-
-	if f.Private {
-		cond = cond.AND(t.Private.EQ(jet.Int64(sqlFlag(true))))
 	}
 
 	if f.ASN != 0 {

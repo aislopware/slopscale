@@ -45,6 +45,7 @@ const searchSchema = object({
   from: destinationSearchEntries.from,
   to: destinationSearchEntries.to,
   gateway: destinationSearchEntries.gateway,
+  network: destinationSearchEntries.network,
   by: destinationSearchEntries.by,
 });
 

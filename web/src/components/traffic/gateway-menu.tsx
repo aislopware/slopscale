@@ -17,7 +17,7 @@ import {
   useForgetGatewayMutation,
   useResolverApprovalMutation,
 } from "~/components/traffic/mutations.ts";
-import { defaultTrafficRange } from "~/components/traffic/range.ts";
+import { defaultTrafficWindow } from "~/components/traffic/range.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
@@ -116,7 +116,7 @@ export function GatewayMenu({
           render={
             <Link
               to="/traffic/overview"
-              search={{ range: defaultTrafficRange, from: "", to: "", gateway: reporter.nodeId }}
+              search={{ ...defaultTrafficWindow, gateway: reporter.nodeId }}
             >
               <ChartLineIcon className="mr-2 size-4" />
               Traffic through it

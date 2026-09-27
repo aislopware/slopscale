@@ -14,11 +14,13 @@ import (
 const trafficPruneRows = 5000
 
 // trafficGroupRow is one bucket of one node through one gateway that
-// holds more rows than a fold keeps.
+// holds more rows than a fold keeps: of its private destinations or of
+// the rest, which fold apart.
 type trafficGroupRow struct {
 	Bucket     int64
 	NodeID     int64
 	ReporterID int64
+	Private    int64
 }
 
 func (g trafficGroupRow) key(resolution int64) types.TrafficKey {
@@ -81,20 +83,27 @@ func crowdedGroups(
 	notRemainder jet.BoolExpression,
 	r foldRange,
 ) ([]trafficGroupRow, error) {
+	projections := []jet.Projection{
+		cols.nodeID.AS("traffic_group_row.node_id"),
+		cols.reporterID.AS("traffic_group_row.reporter_id"),
+	}
+	groupBy := []jet.GroupByClause{cols.bucket, cols.nodeID, cols.reporterID}
+
+	if cols.private != nil {
+		projections = append(projections, cols.private.AS("traffic_group_row.private"))
+		groupBy = append(groupBy, cols.private)
+	}
+
 	var groups []trafficGroupRow
 
 	err := q.executor().query(
-		jet.SELECT(
-			cols.bucket.AS("traffic_group_row.bucket"),
-			cols.nodeID.AS("traffic_group_row.node_id"),
-			cols.reporterID.AS("traffic_group_row.reporter_id"),
-		).
+		jet.SELECT(cols.bucket.AS("traffic_group_row.bucket"), projections...).
 			FROM(from).
 			WHERE(
 				cols.where(types.TrafficFilter{Resolution: r.resolution, Start: r.from, End: r.to}).
 					AND(notRemainder),
 			).
-			GROUP_BY(cols.bucket, cols.nodeID, cols.reporterID).
+			GROUP_BY(groupBy...).
 			HAVING(jet.COUNT(jet.STAR).GT(jet.Int64(int64(r.keep)))),
 		&groups,
 	)
@@ -131,7 +140,7 @@ func foldDestinations(hsdb *HSDatabase, r foldRange) (int64, error) {
 
 	for _, g := range groups {
 		key := g.key(r.resolution)
-		inGroup := destinationColumns.keyWhere(key).AND(notRemainder)
+		inGroup := destinationColumns.keyWhere(key).AND(notRemainder).AND(t.Private.EQ(jet.Int64(g.Private)))
 
 		err = hsdb.Write(func(tx *Tx) error {
 			var gone []foldedDestination
@@ -157,7 +166,7 @@ func foldDestinations(hsdb *HSDatabase, r foldRange) (int64, error) {
 				return nil
 			}
 
-			remainder := types.TrafficDestination{TrafficKey: key}
+			remainder := types.TrafficDestination{TrafficKey: key, Private: g.Private != 0}
 			for _, d := range gone {
 				remainder.Add(countsOf(d.Row.TxBytes, d.Row.RxBytes, d.Row.TxPackets, d.Row.RxPackets, d.Row.Conns))
 			}

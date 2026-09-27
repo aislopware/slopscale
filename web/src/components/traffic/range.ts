@@ -9,6 +9,16 @@ export type TrafficRange = (typeof trafficRanges)[number];
 
 export const defaultTrafficRange = "24h" satisfies TrafficRange;
 
+/**
+ * Where the traffic went: out to the internet through an exit node or app connector, or into a LAN
+ * behind a subnet router. The pages open on the internet, the traffic that costs the uplink.
+ */
+export const trafficNetworks = ["internet", "lan", "all"] as const;
+
+export type TrafficNetwork = (typeof trafficNetworks)[number];
+
+export const defaultTrafficNetwork = "internet" satisfies TrafficNetwork;
+
 const minute = 60_000;
 const hour = 3_600_000;
 const day = 86_400_000;
@@ -33,6 +43,7 @@ export interface TrafficWindowSearch {
   readonly to: string;
   /** A gateway (reporter node id) to keep, or "" for all of them. */
   readonly gateway: string;
+  readonly network: TrafficNetwork;
 }
 
 export interface TrafficWindow {
@@ -92,15 +103,36 @@ export const optionalRange = fallback(
   defaultTrafficRange,
 );
 
+const optionalNetwork = fallback(
+  optional(picklist(trafficNetworks), defaultTrafficNetwork),
+  defaultTrafficNetwork,
+);
+
 /** The search keys every traffic page shares, for its `validateSearch` schema. */
 export const trafficWindowEntries = {
   range: optionalRange,
   from: optionalText,
   to: optionalText,
   gateway: optionalText,
+  network: optionalNetwork,
 };
+
+/** The window a link opens with when it keeps nothing of the page it is on. */
+export const defaultTrafficWindow = {
+  range: defaultTrafficRange,
+  from: "",
+  to: "",
+  gateway: "",
+  network: defaultTrafficNetwork,
+} as const satisfies TrafficWindowSearch;
 
 /** The shared keys of a page's search, for links that keep the window while changing page. */
 export function windowOf(search: TrafficWindowSearch): TrafficWindowSearch {
-  return { range: search.range, from: search.from, to: search.to, gateway: search.gateway };
+  return {
+    range: search.range,
+    from: search.from,
+    to: search.to,
+    gateway: search.gateway,
+    network: search.network,
+  };
 }

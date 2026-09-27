@@ -9,8 +9,12 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { TrafficReporter } from "~/api/traffic.ts";
 import { TableToolbar } from "~/components/table/toolbar.tsx";
-import { defaultTrafficRange, trafficWindow } from "~/components/traffic/range.ts";
-import type { TrafficRange, TrafficWindowSearch } from "~/components/traffic/range.ts";
+import { defaultTrafficRange, trafficNetworks, trafficWindow } from "~/components/traffic/range.ts";
+import type {
+  TrafficNetwork,
+  TrafficRange,
+  TrafficWindowSearch,
+} from "~/components/traffic/range.ts";
 import { WindowRefusal } from "~/components/traffic/window-refusal.tsx";
 import { DateTimeField } from "~/components/ui/date-time-field.tsx";
 import { machineLabel } from "~/lib/node.ts";
@@ -23,6 +27,16 @@ const presetTabs: TabsItem[] = [
   { value: "30d", label: "30d" },
   { value: "90d", label: "90d" },
 ];
+
+const networkTabs: TabsItem[] = [
+  { value: "internet", label: "Internet" },
+  { value: "lan", label: "LAN" },
+  { value: "all", label: "All" },
+];
+
+function isNetwork(value: string): value is TrafficNetwork {
+  return (trafficNetworks as readonly string[]).includes(value);
+}
 
 /**
  * A search box among the toolbar's controls: it shares a phone's row with the gateway picker rather
@@ -75,13 +89,15 @@ function gatewayItems(reporters: readonly TrafficReporter[]): { value: string; l
 }
 
 /**
- * The controls every traffic page starts with: the window as presets or a custom range, and the
- * gateway to look through. A page adds its own controls as children, after these, and its actions.
- * When the server refuses the window, its reason sits above the controls that change it.
+ * The controls every traffic page starts with: the window as presets or a custom range, where the
+ * traffic went, and the gateway to look through. A page adds its own controls as children, after
+ * these, and its actions. When the server refuses the window, its reason sits above the controls
+ * that change it.
  */
 export function WindowToolbar({
   search,
   reporters,
+  networks = true,
   failure,
   onChange,
   children,
@@ -89,6 +105,8 @@ export function WindowToolbar({
 }: {
   readonly search: TrafficWindowSearch;
   readonly reporters: readonly TrafficReporter[];
+  /** Whether the page's reads split by network; the DNS log does not, so it leaves the choice out. */
+  readonly networks?: boolean;
   /** The page's window read's error, if any. */
   readonly failure?: unknown;
   readonly onChange: (next: TrafficWindowSearch) => void;
@@ -116,6 +134,19 @@ export function WindowToolbar({
           }}
         />
         <CustomRange search={search} onChange={onChange} />
+        {networks ? (
+          <Tabs
+            variant="segmented"
+            aria-label="Network"
+            tabs={networkTabs}
+            value={search.network}
+            onValueChange={(value) => {
+              if (isNetwork(value)) {
+                onChange({ ...search, network: value });
+              }
+            }}
+          />
+        ) : null}
         {reporters.length > 1 || search.gateway !== "" ? (
           <Select
             aria-label="Gateway"

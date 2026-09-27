@@ -37,6 +37,8 @@ func init() {
 	}
 
 	trafficSummaryCmd.Flags().Int64P("limit", "l", 0, "Top nodes to show (at most 100; default 10)")
+	trafficScopeFlag(trafficSummaryCmd)
+	trafficScopeFlag(trafficDestinationsCmd)
 	trafficDestinationFlags(trafficDestinationsCmd)
 	trafficDNSFlags(trafficDNSCmd)
 
@@ -63,6 +65,13 @@ func trafficRangeFlags(cmd *cobra.Command) {
 	cmd.Flags().String("until", "", "End of the range (RFC 3339 or a duration back from now); default now")
 	cmd.Flags().Uint64("node", 0, "Only the traffic of this node ID")
 	cmd.Flags().Uint64("reporter", 0, "Only the traffic through this gateway's node ID")
+}
+
+// trafficScopeFlag registers --scope, which defaults to the internet
+// traffic the way the console does.
+func trafficScopeFlag(cmd *cobra.Command) {
+	cmd.Flags().String("scope", "internet",
+		"internet, private (to private networks through a subnet route) or all")
 }
 
 func trafficDestinationFlags(cmd *cobra.Command) {
@@ -176,8 +185,11 @@ var trafficSummaryCmd = &cobra.Command{
 				return err
 			}
 
+			scope, _ := cmd.Flags().GetString("scope")
+
 			resp, err := client.GetTrafficSummaryWithResponse(ctx, &clientv1.GetTrafficSummaryParams{
 				Start: r.start, End: r.end, NodeId: r.node, ReporterId: r.reporter,
+				Scope: new(clientv1.GetTrafficSummaryParamsScope(scope)),
 				Limit: int64FlagIfSet(cmd, "limit"),
 			})
 			if err != nil {
@@ -287,10 +299,12 @@ func trafficDestinationParams(cmd *cobra.Command) (*clientv1.ListTrafficDestinat
 
 	group, _ := cmd.Flags().GetString("group-by")
 	groupBy := clientv1.ListTrafficDestinationsParamsGroupBy(group)
+	scope, _ := cmd.Flags().GetString("scope")
 
 	params := &clientv1.ListTrafficDestinationsParams{
 		Start: r.start, End: r.end, NodeId: r.node, ReporterId: r.reporter,
 		GroupBy: &groupBy,
+		Scope:   new(clientv1.ListTrafficDestinationsParamsScope(scope)),
 		Q:       stringFlagIfSet(cmd, "search"),
 		Asn:     int64FlagIfSet(cmd, "asn"),
 		Country: stringFlagIfSet(cmd, "country"),

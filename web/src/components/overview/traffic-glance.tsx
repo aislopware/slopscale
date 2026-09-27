@@ -9,7 +9,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { VolumeCell } from "~/components/traffic/cells.tsx";
 import { HostCell, isRemainder } from "~/components/traffic/destinations-table.tsx";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
-import { defaultTrafficRange } from "~/components/traffic/range.ts";
+import { defaultTrafficWindow } from "~/components/traffic/range.ts";
 import { noDestinationFilters, pickDestination } from "~/components/traffic/search.ts";
 import { TrafficSummaryPanels, emptySummary } from "~/components/traffic/summary.tsx";
 import { textLinkClass } from "~/components/traffic/window-header.tsx";
@@ -18,7 +18,7 @@ import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 
 /** The window the overview reads: the traffic pages' default, so their links open the same one. */
-export const glanceWindow = { range: defaultTrafficRange, from: "", to: "", gateway: "" } as const;
+export const glanceWindow = defaultTrafficWindow;
 
 /** Rows each list shows; the traffic pages list the rest. */
 export const glanceRows = 5;
@@ -171,7 +171,8 @@ export function TrafficGlance({
   const hosts = (destinations ?? []).slice(0, glanceRows);
   const header = {
     title: "Traffic",
-    description: "What the machines sent through the gateways in the last 24 hours.",
+    description:
+      "What the machines sent to the internet through the gateways in the last 24 hours.",
     actions: (
       <Link to="/traffic/overview" search={glanceWindow} className="text-kumo-link hover:underline">
         View traffic

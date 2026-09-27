@@ -119,6 +119,7 @@ function DnsPage(): ReactElement {
       />
       <WindowToolbar
         search={search}
+        networks={false}
         failure={names.error}
         reporters={reporters.data?.reporters ?? []}
         onChange={(next) => {

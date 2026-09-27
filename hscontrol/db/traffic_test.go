@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"net/netip"
+	"os"
 	"slices"
 	"testing"
 	"time"
@@ -904,5 +905,256 @@ func TestTrafficIngestLoad(t *testing.T) {
 		require.NoError(t, err)
 		t.Logf("prune: %d rows in %s", deleted, time.Since(start).Round(time.Millisecond))
 		assert.Equal(t, int64(3+4*traffic.MaxFlowsPerReport), deleted)
+	})
+}
+
+// TestTrafficScope proves each read keeps the traffic of its scope: the
+// totals by their private flag, the destinations by theirs, and no scope
+// both.
+func TestTrafficScope(t *testing.T) {
+	t.Parallel()
+
+	forEachDialect(t, func(t *testing.T, db *HSDatabase) {
+		f := newTrafficFixture(t, db)
+		internet := types.TrafficCounts{TxBytes: 100, RxBytes: 1000, Conns: 1}
+		lan := types.TrafficCounts{TxBytes: 20, RxBytes: 5000, Conns: 2}
+
+		batch := types.TrafficBatch{Reporter: f.reporter("a", 1)}
+
+		for _, res := range []int64{types.TrafficMinute, types.TrafficHour} {
+			batch.Totals = append(batch.Totals,
+				types.TrafficTotal{TrafficKey: f.key(res, f.hour, f.laptop), TrafficCounts: internet},
+				types.TrafficTotal{TrafficKey: f.key(res, f.hour, f.laptop), TrafficCounts: lan, Private: true},
+				types.TrafficTotal{TrafficKey: f.key(res, f.hour, f.phone), TrafficCounts: lan, Private: true},
+			)
+		}
+
+		batch.Destinations = []types.TrafficDestination{
+			{
+				TrafficKey: f.key(types.TrafficHour, f.hour, f.laptop), Dst: "142.250.1.1", Port: 443, Proto: 6,
+				TrafficCounts: internet,
+			},
+			{
+				TrafficKey: f.key(types.TrafficHour, f.hour, f.laptop), Dst: "192.168.1.5", Port: 445, Proto: 6,
+				Private: true, TrafficCounts: lan,
+			},
+		}
+
+		_, err := db.ApplyTrafficBatch(batch)
+		require.NoError(t, err)
+
+		scoped := func(res int64, scope types.TrafficScope) types.TrafficFilter {
+			filter := f.filter(res)
+			filter.Scope = scope
+
+			return filter
+		}
+
+		for scope, want := range map[types.TrafficScope]uint64{
+			types.TrafficScopeInternet: 100,
+			types.TrafficScopePrivate:  40,
+			types.TrafficScopeAll:      140,
+			"":                         140,
+		} {
+			sum, sumErr := db.TrafficSum(scoped(types.TrafficHour, scope))
+			require.NoError(t, sumErr)
+			assert.Equal(t, want, sum.TxBytes, "sum, scope %q", scope)
+
+			series, seriesErr := db.TrafficSeries(scoped(types.TrafficMinute, scope))
+			require.NoError(t, seriesErr)
+			require.Len(t, series, 1)
+			assert.Equal(t, want, series[0].TxBytes, "series, scope %q", scope)
+
+			gateways, topErr := db.TrafficTopNodes(scoped(types.TrafficHour, scope), true)
+			require.NoError(t, topErr)
+			require.Len(t, gateways, 1)
+			assert.Equal(t, want, gateways[0].TxBytes, "per gateway, scope %q", scope)
+		}
+
+		nodes, err := db.TrafficTopNodes(scoped(types.TrafficHour, types.TrafficScopeInternet), false)
+		require.NoError(t, err)
+		require.Len(t, nodes, 1, "the phone sent nothing to the internet")
+		assert.Equal(t, f.laptop, nodes[0].NodeID)
+
+		routes, err := db.TrafficNodeReporters(scoped(types.TrafficHour, types.TrafficScopeInternet),
+			[]types.NodeID{f.laptop, f.phone})
+		require.NoError(t, err)
+		assert.Equal(t, map[types.NodeID][]types.NodeID{f.laptop: {f.gateway}}, routes)
+
+		for scope, want := range map[types.TrafficScope][]string{
+			types.TrafficScopeInternet: {"142.250.1.1"},
+			types.TrafficScopePrivate:  {"192.168.1.5"},
+			types.TrafficScopeAll:      {"192.168.1.5", "142.250.1.1"},
+		} {
+			rows, readErr := db.TrafficDestinations(scoped(types.TrafficHour, scope), types.TrafficByDestination)
+			require.NoError(t, readErr)
+
+			var got []string
+			for _, r := range rows {
+				got = append(got, r.Dst)
+			}
+
+			assert.Equal(t, want, got, "destinations, scope %q", scope)
+		}
+	})
+}
+
+// TestTrafficFoldKeepsPrivateApart proves a fold keeps a bucket's
+// largest private and public destinations each and folds the rest of
+// each into its own remainder, so a scope still adds up after a fold.
+func TestTrafficFoldKeepsPrivateApart(t *testing.T) {
+	t.Parallel()
+
+	forEachDialect(t, func(t *testing.T, db *HSDatabase) {
+		f := newTrafficFixture(t, db)
+		key := f.key(types.TrafficHour, f.hour, f.laptop)
+		batch := types.TrafficBatch{Reporter: f.reporter("a", 1)}
+
+		for i, dst := range []string{"198.51.100.1", "198.51.100.2", "10.0.0.1", "10.0.0.2", "10.0.0.3"} {
+			batch.Destinations = append(batch.Destinations, types.TrafficDestination{
+				TrafficKey: key, Dst: dst, Port: 443, Proto: 6,
+				Private: types.IsPrivateTrafficDestination(dst), TxBytes: uint64(1000 * (i + 1)),
+			})
+		}
+
+		_, err := db.ApplyTrafficBatch(batch)
+		require.NoError(t, err)
+
+		start := time.Unix(f.hour, 0)
+		folded, err := db.FoldTraffic(types.TrafficHour, start, start.Add(time.Hour), 1)
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), folded, "one public and two private destinations beyond the largest of each")
+
+		read := func(scope types.TrafficScope) []types.TrafficDestinationSum {
+			t.Helper()
+
+			filter := f.filter(types.TrafficHour)
+			filter.Scope = scope
+
+			rows, readErr := db.TrafficDestinations(filter, types.TrafficByDestination)
+			require.NoError(t, readErr)
+
+			return rows
+		}
+
+		internet := read(types.TrafficScopeInternet)
+		require.Len(t, internet, 2)
+		assert.Equal(t, "198.51.100.2", internet[0].Dst)
+		assert.Empty(t, internet[1].Dst)
+		assert.Equal(t, uint64(1000), internet[1].TxBytes, "the public remainder holds only public traffic")
+
+		private := read(types.TrafficScopePrivate)
+		require.Len(t, private, 2)
+		assert.Empty(t, private[0].Dst)
+		assert.Equal(t, uint64(7000), private[0].TxBytes, "the private remainder: 3000+4000")
+		assert.True(t, private[0].Private)
+		assert.Equal(t, "10.0.0.3", private[1].Dst)
+	})
+}
+
+// TestMigrateTrafficPrivateSplit runs the migration on the tables as
+// 202609251000 created them and proves it splits the stored totals by
+// their destinations and leaves the schema a fresh database has.
+func TestMigrateTrafficPrivateSplit(t *testing.T) {
+	t.Parallel()
+
+	forEachDialect(t, func(t *testing.T, db *HSDatabase) {
+		f := newTrafficFixture(t, db)
+		minute, day := f.hour+120, f.hour-f.hour%types.TrafficDay
+
+		var old []tableDefinition
+
+		for _, def := range trafficTables {
+			if def.name == "traffic_totals" || def.name == "traffic_destinations" {
+				old = append(old, def)
+			}
+		}
+
+		require.Len(t, old, 2)
+
+		err := db.Write(func(tx *Tx) error {
+			for _, def := range old {
+				dropErr := tx.ex.dropTableIfExists(def.name)
+				if dropErr != nil {
+					return dropErr
+				}
+			}
+
+			createErr := createTables(tx, old)
+			if createErr != nil {
+				return createErr
+			}
+
+			for _, total := range [][]int64{
+				{types.TrafficHour, f.hour, int64(f.laptop), 1000, 500, 10, 5, 4},
+				{types.TrafficMinute, minute, int64(f.laptop), 100, 50, 1, 1, 1},
+				{types.TrafficDay, day, int64(f.phone), 70, 7, 1, 1, 1},
+			} {
+				_, execErr := tx.ex.execRaw(`INSERT INTO traffic_totals
+(resolution, bucket, node_id, reporter_id, tx_bytes, rx_bytes, tx_packets, rx_packets, conns)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+					total[0], total[1], total[2], int64(f.gateway), total[3], total[4], total[5], total[6], total[7])
+				if execErr != nil {
+					return execErr
+				}
+			}
+
+			for _, dest := range []struct {
+				dst     string
+				private int64
+				counts  []int64
+			}{
+				{"192.168.1.5", 1, []int64{300, 0, 3, 0, 1}},
+				{"142.250.1.1", 0, []int64{700, 500, 7, 5, 3}},
+			} {
+				_, execErr := tx.ex.execRaw(`INSERT INTO traffic_destinations
+(resolution, bucket, node_id, reporter_id, dst, port, proto, host, private,
+ tx_bytes, rx_bytes, tx_packets, rx_packets, conns)
+VALUES ($1, $2, $3, $4, $5, 443, 6, '', $6, $7, $8, $9, $10, $11)`,
+					types.TrafficHour, f.hour, int64(f.laptop), int64(f.gateway), dest.dst, dest.private,
+					dest.counts[0], dest.counts[1], dest.counts[2], dest.counts[3], dest.counts[4])
+				if execErr != nil {
+					return execErr
+				}
+			}
+
+			return migrateTrafficPrivateSplit(tx)
+		})
+		require.NoError(t, err)
+
+		if db.ex.dialect == dialectPostgres {
+			got, dumpErr := dumpPostgresSchema(t.Context(), db.DB)
+			require.NoError(t, dumpErr)
+
+			want, readErr := os.ReadFile(postgresGoldenPath)
+			require.NoError(t, readErr)
+			assert.Equal(t, string(want), got, "the migrated schema is the fresh one")
+		} else {
+			require.NoError(t, db.validateSQLiteSchema(), "the migrated schema is the fresh one")
+		}
+
+		sum := func(res int64, scope types.TrafficScope) types.TrafficCounts {
+			t.Helper()
+
+			filter := f.filter(res)
+			filter.Start, filter.Scope = time.Unix(day, 0), scope
+
+			counts, sumErr := db.TrafficSum(filter)
+			require.NoError(t, sumErr)
+
+			return counts
+		}
+
+		assert.Equal(t, types.TrafficCounts{TxBytes: 300, TxPackets: 3, Conns: 1},
+			sum(types.TrafficHour, types.TrafficScopePrivate), "an hour splits as its destinations do")
+		assert.Equal(t, types.TrafficCounts{TxBytes: 700, RxBytes: 500, TxPackets: 7, RxPackets: 5, Conns: 3},
+			sum(types.TrafficHour, types.TrafficScopeInternet))
+		assert.Equal(t, types.TrafficCounts{TxBytes: 30, Conns: 0},
+			sum(types.TrafficMinute, types.TrafficScopePrivate), "a minute splits as its hour does")
+		assert.Equal(t, types.TrafficCounts{TxBytes: 70, RxBytes: 50, TxPackets: 1, RxPackets: 1, Conns: 1},
+			sum(types.TrafficMinute, types.TrafficScopeInternet))
+		assert.Equal(t, types.TrafficCounts{TxBytes: 70, RxBytes: 7, TxPackets: 1, RxPackets: 1, Conns: 1},
+			sum(types.TrafficDay, types.TrafficScopeInternet), "a total without destinations stays public")
+		assert.Zero(t, sum(types.TrafficDay, types.TrafficScopePrivate))
 	})
 }
