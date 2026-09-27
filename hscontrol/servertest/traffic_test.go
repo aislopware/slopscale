@@ -173,13 +173,22 @@ func sendReport(t *testing.T, client *http.Client, srvURL, token string, r traff
 	return resp
 }
 
+// selfNetmap waits for the node's first netmap: a client registers
+// before its map stream starts, so under load it can have none yet.
+func selfNetmap(t *testing.T, node *servertest.TestClient) *netmap.NetworkMap {
+	t.Helper()
+
+	node.WaitForCondition(t, "its own node", trafficWait, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid()
+	})
+
+	return node.Netmap()
+}
+
 func nodeIP4(t *testing.T, node *servertest.TestClient) netip.Addr {
 	t.Helper()
 
-	nm := node.Netmap()
-	require.NotNil(t, nm)
-
-	for _, p := range nm.SelfNode.Addresses().All() {
+	for _, p := range selfNetmap(t, node).SelfNode.Addresses().All() {
 		if p.Addr().Is4() {
 			return p.Addr()
 		}
@@ -239,7 +248,7 @@ func useExitNode(t *testing.T, c *servertest.TestClient, gw tailcfg.StableNodeID
 func nodeIP6(t *testing.T, node *servertest.TestClient) netip.Addr {
 	t.Helper()
 
-	for _, p := range node.Netmap().SelfNode.Addresses().All() {
+	for _, p := range selfNetmap(t, node).SelfNode.Addresses().All() {
 		if p.Addr().Is6() {
 			return p.Addr()
 		}
@@ -1505,6 +1514,107 @@ func TestTrafficNamesNetworksReportedBeforeTheTable(t *testing.T) {
 
 	assert.Positive(t, srv.State().ASNRanges())
 	require.NoError(t, srv.State().BackfillTrafficASN(t.Context()), "a second walk with the same table is a no-op")
+}
+
+// TestTrafficSummarySplitsByGateway has two exit nodes report the same
+// laptop and checks the summary keeps them apart: each gateway's volume,
+// the gateways each machine went through, busiest first, and one gateway
+// alone when the read is narrowed to it.
+func TestTrafficSummarySplitsByGateway(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithRealListener(), servertest.WithTraffic(types.TrafficConfig{}))
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "split-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	setStatePolicy(t, srv, `{
+		"tagOwners": {"tag:gateway": ["split-owner@"]},
+		"grants": [{"src": ["split-owner@"], "dst": ["autogroup:internet"], "ip": ["*"]}]
+	}`)
+
+	gwA := servertest.NewClient(t, srv, "gw-a", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
+	gwB := servertest.NewClient(t, srv, "gw-b", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
+	laptop := servertest.NewClient(t, srv, "laptop", servertest.WithUser(owner))
+	phone := servertest.NewClient(t, srv, "phone", servertest.WithUser(owner))
+
+	for _, gw := range []*servertest.TestClient{gwA, gwB} {
+		gw.Direct().SetHostinfo(&tailcfg.Hostinfo{
+			BackendLogID: "servertest-" + gw.Name,
+			Hostname:     gw.Name,
+			RoutableIPs:  tsaddr.ExitRoutes(),
+		})
+
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		require.NoError(t, gw.Direct().SendUpdate(ctx))
+		cancel()
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			status, body := apiCall(t, client, ownerKey, http.MethodPost,
+				v1+"/node/"+gw.NodeIDString()+"/approve_routes",
+				map[string]any{"routes": []string{"0.0.0.0/0", "::/0"}})
+			assert.Equal(c, http.StatusOK, status, body)
+		}, trafficWait, 100*time.Millisecond)
+	}
+
+	laptopIP, phoneIP := nodeIP4(t, laptop), nodeIP4(t, phone)
+	minute := minuteBucket(time.Now()) - 60
+	flow := func(src netip.Addr, tx, rx uint64) traffic.Flow {
+		return traffic.Flow{
+			Bucket: minute, Src: src, Dst: netip.MustParseAddr("140.82.112.3"), Proto: 6, Port: 443,
+			TxBytes: tx, RxBytes: rx, Conns: 1,
+		}
+	}
+
+	// The laptop sends most through gw-a but also uses gw-b; the phone
+	// only gw-b.
+	sendReport(t, client, srv.URL, idToken(t, srv, gwA, traffic.Audience), traffic.Report{
+		Instance: "split-a", Seq: 1,
+		Status: traffic.Status{Conntrack: traffic.Collector{Enabled: true}},
+		Flows:  []traffic.Flow{flow(laptopIP, 1000, 9000)},
+	})
+	sendReport(t, client, srv.URL, idToken(t, srv, gwB, traffic.Audience), traffic.Report{
+		Instance: "split-b", Seq: 1,
+		Status: traffic.Status{Conntrack: traffic.Collector{Enabled: true}},
+		Flows:  []traffic.Flow{flow(laptopIP, 10, 90), flow(phoneIP, 400, 600)},
+	})
+
+	bytesAt := func(body map[string]any, path ...string) float64 {
+		t.Helper()
+
+		tx, txOK := field(t, body, append(path, "txBytes")...).(float64)
+		rx, rxOK := field(t, body, append(path, "rxBytes")...).(float64)
+		require.True(t, txOK && rxOK, "byte counts are numbers")
+
+		return tx + rx
+	}
+
+	status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary", nil)
+	require.Equal(t, http.StatusOK, status, body)
+
+	assert.Equal(t, "gw-a", field(t, body, "reporters", "0", "nodeName"))
+	assert.InDelta(t, 10_000, bytesAt(body, "reporters", "0"), 0)
+	assert.Equal(t, "gw-b", field(t, body, "reporters", "1", "nodeName"))
+	assert.InDelta(t, 1100, bytesAt(body, "reporters", "1"), 0)
+	assert.Equal(t, []any{}, field(t, body, "reporters", "0", "reporterIds"), "a gateway's row names no gateways")
+
+	assert.Equal(t, "laptop", field(t, body, "nodes", "0", "nodeName"))
+	assert.Equal(t, []any{gwA.NodeIDString(), gwB.NodeIDString()}, field(t, body, "nodes", "0", "reporterIds"),
+		"the laptop went through both, the busier first")
+	assert.Equal(t, "phone", field(t, body, "nodes", "1", "nodeName"))
+	assert.Equal(t, []any{gwB.NodeIDString()}, field(t, body, "nodes", "1", "reporterIds"))
+
+	status, body = apiCall(t, client, ownerKey, http.MethodGet,
+		v1+"/traffic/summary?reporterId="+gwB.NodeIDString(), nil)
+	require.Equal(t, http.StatusOK, status, body)
+
+	assert.InDelta(t, 1100, bytesAt(body, "total"), 0, "only what went through gw-b")
+	assert.Len(t, field(t, body, "reporters"), 1)
+	assert.Equal(t, "phone", field(t, body, "nodes", "0", "nodeName"), "the phone is gw-b's busiest")
+	assert.Equal(t, []any{gwB.NodeIDString()}, field(t, body, "nodes", "1", "reporterIds"),
+		"the laptop's gw-a traffic is outside the read")
 }
 
 // TestTrafficDNSLogFollowsTheExitNode proves the DNS log reaches only the

@@ -2497,10 +2497,13 @@ type TrafficNode struct {
 
 	// NodeOwner Absent when the node no longer exists.
 	NodeOwner *MachineOwner `json:"nodeOwner,omitempty"`
-	RxBytes   int64         `json:"rxBytes"`
-	RxPackets int64         `json:"rxPackets"`
-	TxBytes   int64         `json:"txBytes"`
-	TxPackets int64         `json:"txPackets"`
+
+	// ReporterIds The gateways the node went through, busiest first.
+	ReporterIds []string `json:"reporterIds"`
+	RxBytes     int64    `json:"rxBytes"`
+	RxPackets   int64    `json:"rxPackets"`
+	TxBytes     int64    `json:"txBytes"`
+	TxPackets   int64    `json:"txPackets"`
 }
 
 // TrafficPoint defines model for TrafficPoint.

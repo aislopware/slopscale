@@ -4115,6 +4115,11 @@ components:
         nodeOwner:
           $ref: "#/components/schemas/MachineOwner"
           description: Absent when the node no longer exists.
+        reporterIds:
+          description: The gateways the node went through, busiest first.
+          items:
+            type: string
+          type: array
         rxBytes:
           format: int64
           minimum: 0
@@ -4134,6 +4139,7 @@ components:
       required:
         - nodeId
         - nodeName
+        - reporterIds
         - txBytes
         - rxBytes
         - txPackets

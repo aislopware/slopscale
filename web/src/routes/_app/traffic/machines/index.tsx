@@ -86,6 +86,7 @@ function MachinesPage(): ReactElement {
         <Frame>
           <MachinesTable
             nodes={shown}
+            gateways={data?.reporters ?? []}
             whole={whole}
             search={search}
             empty={

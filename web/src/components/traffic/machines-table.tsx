@@ -9,10 +9,12 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { BytesCell, VolumeCell } from "~/components/traffic/cells.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
+import { gatewayName } from "~/components/traffic/gateway-traffic-table.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 import { useWidths } from "~/lib/breakpoint.ts";
 import type { Widths } from "~/lib/breakpoint.ts";
 import { machineLabel } from "~/lib/node.ts";
@@ -47,7 +49,11 @@ interface Row extends TrafficNode {
 
 const helper = createAppColumnHelper<Row>();
 
-function columns(search: TrafficWindowSearch, widths: Widths): ReturnType<typeof helper.columns> {
+function columns(
+  search: TrafficWindowSearch,
+  gateways: ReadonlyMap<string, string> | undefined,
+  widths: Widths,
+): ReturnType<typeof helper.columns> {
   const machine = helper.accessor((row) => trafficNodeLabel(row), {
     id: "machine",
     header: "Machine",
@@ -72,6 +78,17 @@ function columns(search: TrafficWindowSearch, widths: Widths): ReturnType<typeof
       />
     ),
     meta: { className: "w-[30%] max-w-0 min-w-40 truncate" },
+  });
+  const through = helper.accessor((row) => row.reporterIds.join(" "), {
+    id: "gateways",
+    header: "Gateways",
+    cell: ({ row }) => (
+      <ValueList
+        items={row.original.reporterIds.map((id) => gateways?.get(id) ?? `Gateway ${id}`)}
+        max={2}
+      />
+    ),
+    meta: { className: "max-w-0 w-[18%] min-w-32" },
   });
   const volume = helper.accessor((row) => total(row), {
     id: "total",
@@ -114,10 +131,23 @@ function columns(search: TrafficWindowSearch, widths: Widths): ReturnType<typeof
 
   return helper.columns([
     machine,
+    ...(gateways !== undefined && widths.md ? [through] : []),
     volume,
     ...(widths.sm ? [upload, download] : []),
     ...(widths.md ? [conns] : []),
   ]);
+}
+
+/**
+ * The gateways a machine's traffic went through, by name, when there is a choice to tell apart:
+ * with one gateway in the window, the page header already names it.
+ */
+function gatewayNames(carried: readonly TrafficNode[]): ReadonlyMap<string, string> | undefined {
+  if (carried.length < 2) {
+    return undefined;
+  }
+
+  return new Map(carried.map((gateway) => [gateway.nodeId, gatewayName(gateway)]));
 }
 
 /**
@@ -126,12 +156,15 @@ function columns(search: TrafficWindowSearch, widths: Widths): ReturnType<typeof
  */
 export function MachinesTable({
   nodes,
+  gateways,
   whole,
   search,
   footer,
   empty,
 }: {
   readonly nodes: readonly TrafficNode[];
+  /** The gateways that carried traffic in the window, which name each machine's gateways. */
+  readonly gateways: readonly TrafficNode[];
   /** Upload plus download over the whole window. */
   readonly whole: number;
   readonly search: TrafficWindowSearch;
@@ -145,7 +178,7 @@ export function MachinesTable({
   const rows: Row[] = nodes.map((node) => ({ ...node, widest, whole }));
   const table = useAppTable({
     data: rows,
-    columns: columns(search, widths),
+    columns: columns(search, gatewayNames(gateways), widths),
     getRowId: (row) => row.nodeId,
     initialState: { sorting: [{ id: "total", desc: true }] },
   });

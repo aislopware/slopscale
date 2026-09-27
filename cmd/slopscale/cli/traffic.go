@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -195,7 +196,10 @@ var trafficSummaryCmd = &cobra.Command{
 				fmt.Printf("Sent %s, received %s, %d connections\n\n",
 					formatBytes(s.Total.TxBytes), formatBytes(s.Total.RxBytes), s.Total.Conns)
 
-				err := renderTable(trafficNodeHeader("Node"), trafficNodeRows(s.Nodes))
+				err := renderTable(
+					append(trafficNodeHeader("Node"), "Gateways"),
+					trafficNodeRowsWithGateways(s.Nodes, s.Reporters),
+				)
 				if err != nil {
 					return err
 				}
@@ -219,6 +223,27 @@ func trafficNodeRows(nodes []clientv1.TrafficNode) [][]string {
 			n.NodeId, n.NodeName, formatBytes(n.TxBytes), formatBytes(n.RxBytes),
 			strconv.FormatInt(n.Conns, util.Base10),
 		})
+	}
+
+	return rows
+}
+
+// trafficNodeRowsWithGateways adds the gateways each node went through,
+// by name where the summary names them.
+func trafficNodeRowsWithGateways(nodes, reporters []clientv1.TrafficNode) [][]string {
+	names := make(map[string]string, len(reporters))
+	for _, r := range reporters {
+		names[r.NodeId] = cmp.Or(r.NodeName, r.NodeId)
+	}
+
+	rows := trafficNodeRows(nodes)
+	for i, n := range nodes {
+		gateways := make([]string, 0, len(n.ReporterIds))
+		for _, id := range n.ReporterIds {
+			gateways = append(gateways, cmp.Or(names[id], id))
+		}
+
+		rows[i] = append(rows[i], strings.Join(gateways, ", "))
 	}
 
 	return rows
