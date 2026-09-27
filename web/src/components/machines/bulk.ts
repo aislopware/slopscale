@@ -5,10 +5,10 @@ import { fetchClient } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import { invalidate } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
-import type { NodeClientUpdateResult } from "~/api/schema.gen.ts";
+import type { MachineOwner, NodeClientUpdateResult } from "~/api/schema.gen.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { toast } from "~/components/ui/toast.ts";
-import { nodeName } from "~/lib/node.ts";
+import { nodeName, nodeOwner } from "~/lib/node.ts";
 
 /** What the machines table can do to a whole selection at once. */
 export type BulkAction = "approve" | "expire" | "delete";
@@ -172,6 +172,7 @@ export function clientUpdatePlanSummary(plan: ClientUpdatePlan): string {
 export interface ClientUpdateRefusal {
   readonly nodeId: string;
   readonly name: string;
+  readonly owner: MachineOwner | undefined;
   readonly message: string;
 }
 
@@ -195,6 +196,7 @@ export function summariseClientUpdates(
     .map((result) => ({
       nodeId: result.nodeId,
       name: nameOf(nodes, result.nodeId),
+      owner: ownerOf(nodes, result.nodeId),
       // The server sends the field empty rather than leaving it out when the client said nothing.
       message: refusalMessage(result.error),
     }));
@@ -204,6 +206,12 @@ export function summariseClientUpdates(
 
 function refusalMessage(error: string | undefined): string {
   return error === undefined || error === "" ? "The client gave no reason." : error;
+}
+
+function ownerOf(nodes: readonly Node[], nodeId: string): MachineOwner | undefined {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+
+  return node === undefined ? undefined : nodeOwner(node);
 }
 
 function nameOf(nodes: readonly Node[], nodeId: string): string {

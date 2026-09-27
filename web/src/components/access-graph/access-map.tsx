@@ -232,9 +232,9 @@ function Legend(): ReactElement {
   );
 }
 
-/** The name a class goes by in a sentence: its label, and for several machines which ones. */
+/** The name a class goes by in a sentence: its label, and whose machine or which machines. */
 function classPhrase(group: AccessClass): string {
-  return group.members.length === 1 ? group.label : `${group.label} (${group.detail})`;
+  return `${group.label} (${group.detail})`;
 }
 
 /**
@@ -266,9 +266,7 @@ function ClassName({ group }: { readonly group: AccessClass }): ReactElement {
   return (
     <span className="flex items-baseline gap-x-1.5">
       <span className="font-medium text-kumo-default">{group.label}</span>
-      {group.members.length === 1 ? null : (
-        <span className="text-xs text-kumo-subtle">{group.detail}</span>
-      )}
+      <span className="text-xs text-kumo-subtle">{group.detail}</span>
     </span>
   );
 }

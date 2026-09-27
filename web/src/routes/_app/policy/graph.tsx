@@ -10,6 +10,7 @@ import { MachinePicker } from "~/components/access-graph/machine-picker.tsx";
 import {
   buildAccessMap,
   fitsMap,
+  graphNodeLabel,
   groupEdges,
   maxMapClasses,
   nodesById,
@@ -103,7 +104,7 @@ function Machine({
     <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
       <ReachPanel
         title="Can reach"
-        description={`The machines ${node.name} may open something on.`}
+        description={`The machines ${graphNodeLabel(node)} may open something on.`}
         empty="Reaches nothing"
         edges={groups.reachable}
         peer="dst"
@@ -111,7 +112,7 @@ function Machine({
       />
       <ReachPanel
         title="Reached by"
-        description={`The machines that may open something on ${node.name}.`}
+        description={`The machines that may open something on ${graphNodeLabel(node)}.`}
         empty="Nothing reaches it"
         edges={groups.reachedBy}
         peer="src"

@@ -585,9 +585,10 @@ type AppNode struct {
 	LearnedRoutes int64 `json:"learnedRoutes"`
 
 	// Name The node's given name.
-	Name   string `json:"name"`
-	NodeId string `json:"nodeId"`
-	Online bool   `json:"online"`
+	Name   string       `json:"name"`
+	NodeId string       `json:"nodeId"`
+	Online bool         `json:"online"`
+	Owner  MachineOwner `json:"owner"`
 
 	// Pending Advertised routes that are not approved yet.
 	Pending int64 `json:"pending"`
@@ -621,7 +622,8 @@ type AuditEvent struct {
 	ActorKind string `json:"actorKind"`
 
 	// ActorName The actor's user name, or the credential's prefix.
-	ActorName string `json:"actorName"`
+	ActorName  string        `json:"actorName"`
+	ActorOwner *MachineOwner `json:"actorOwner,omitempty"`
 
 	// ActorUserId The user behind the actor; empty for a credential without one.
 	ActorUserId string    `json:"actorUserId"`
@@ -632,11 +634,12 @@ type AuditEvent struct {
 	Id     string                 `json:"id"`
 
 	// Outcome The HTTP status the request ended with.
-	Outcome    int64  `json:"outcome"`
-	RemoteAddr string `json:"remoteAddr"`
-	TargetId   string `json:"targetId"`
-	TargetKind string `json:"targetKind"`
-	TargetName string `json:"targetName"`
+	Outcome     int64         `json:"outcome"`
+	RemoteAddr  string        `json:"remoteAddr"`
+	TargetId    string        `json:"targetId"`
+	TargetKind  string        `json:"targetKind"`
+	TargetName  string        `json:"targetName"`
+	TargetOwner *MachineOwner `json:"targetOwner,omitempty"`
 }
 
 // AuthApproveOutputBody defines model for AuthApproveOutputBody.
@@ -869,12 +872,13 @@ type DERPLatencyMachine struct {
 	HardNat bool `json:"hardNat"`
 
 	// HomeMs The round trip to the home region, 0 when unmeasured.
-	HomeMs        float64 `json:"homeMs"`
-	LinkType      string  `json:"linkType"`
-	Name          string  `json:"name"`
-	NodeId        string  `json:"nodeId"`
-	Online        bool    `json:"online"`
-	PreferredDerp int64   `json:"preferredDerp"`
+	HomeMs        float64      `json:"homeMs"`
+	LinkType      string       `json:"linkType"`
+	Name          string       `json:"name"`
+	NodeId        string       `json:"nodeId"`
+	Online        bool         `json:"online"`
+	Owner         MachineOwner `json:"owner"`
+	PreferredDerp int64        `json:"preferredDerp"`
 }
 
 // DERPLatencyRegion defines model for DERPLatencyRegion.
@@ -1222,8 +1226,9 @@ type Host struct {
 	Approved bool `json:"approved"`
 
 	// Name The node's given name.
-	Name   string `json:"name"`
-	NodeId string `json:"nodeId"`
+	Name   string       `json:"name"`
+	NodeId string       `json:"nodeId"`
+	Owner  MachineOwner `json:"owner"`
 
 	// Ports The protocol and ports the node serves it on.
 	Ports []string `json:"ports"`
@@ -1419,6 +1424,19 @@ type LogStreamTestOutputBody struct {
 	Status string `json:"status"`
 }
 
+// MachineOwner defines model for MachineOwner.
+type MachineOwner struct {
+	DisplayName   string `json:"displayName"`
+	ProfilePicUrl string `json:"profilePicUrl"`
+
+	// Tags A tagged machine belongs to its tags, not to a user.
+	Tags []string `json:"tags"`
+
+	// UserId The owning user; empty on a tagged machine.
+	UserId   string `json:"userId"`
+	UserName string `json:"userName"`
+}
+
 // Network defines model for Network.
 type Network struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -1482,11 +1500,12 @@ type NetworkRequestBody struct {
 
 // NetworkRouter defines model for NetworkRouter.
 type NetworkRouter struct {
-	MissingPrefixes []string `json:"missingPrefixes"`
-	Name            string   `json:"name"`
-	NodeId          string   `json:"nodeId"`
-	Online          bool     `json:"online"`
-	PrimaryPrefixes []string `json:"primaryPrefixes"`
+	MissingPrefixes []string      `json:"missingPrefixes"`
+	Name            string        `json:"name"`
+	NodeId          string        `json:"nodeId"`
+	Online          bool          `json:"online"`
+	Owner           *MachineOwner `json:"owner,omitempty"`
+	PrimaryPrefixes []string      `json:"primaryPrefixes"`
 }
 
 // Node defines model for Node.
@@ -2093,19 +2112,21 @@ type RuleOutputBody struct {
 
 // SSHRecording defines model for SSHRecording.
 type SSHRecording struct {
-	Command   string     `json:"command"`
-	Complete  bool       `json:"complete"`
-	DstNode   string     `json:"dstNode"`
-	DstNodeId string     `json:"dstNodeId"`
-	EndedAt   *time.Time `json:"endedAt"`
-	Id        string     `json:"id"`
-	LocalUser string     `json:"localUser"`
-	Size      int64      `json:"size"`
-	SrcNode   string     `json:"srcNode"`
-	SrcNodeId string     `json:"srcNodeId"`
-	SrcUser   string     `json:"srcUser"`
-	SshUser   string     `json:"sshUser"`
-	StartedAt time.Time  `json:"startedAt"`
+	Command   string        `json:"command"`
+	Complete  bool          `json:"complete"`
+	DstNode   string        `json:"dstNode"`
+	DstNodeId string        `json:"dstNodeId"`
+	DstOwner  *MachineOwner `json:"dstOwner,omitempty"`
+	EndedAt   *time.Time    `json:"endedAt"`
+	Id        string        `json:"id"`
+	LocalUser string        `json:"localUser"`
+	Size      int64         `json:"size"`
+	SrcNode   string        `json:"srcNode"`
+	SrcNodeId string        `json:"srcNodeId"`
+	SrcOwner  *MachineOwner `json:"srcOwner,omitempty"`
+	SrcUser   string        `json:"srcUser"`
+	SshUser   string        `json:"sshUser"`
+	StartedAt time.Time     `json:"startedAt"`
 }
 
 // SSHSession defines model for SSHSession.
@@ -2132,9 +2153,10 @@ type SSHSessionTarget struct {
 	DnsName string `json:"dnsName"`
 
 	// Name The node's given name, which the browser dials.
-	Name   string `json:"name"`
-	NodeId string `json:"nodeId"`
-	Online bool   `json:"online"`
+	Name   string       `json:"name"`
+	NodeId string       `json:"nodeId"`
+	Online bool         `json:"online"`
+	Owner  MachineOwner `json:"owner"`
 
 	// SshServer true while the target runs Tailscale SSH (tailscale set --ssh).
 	SshServer bool `json:"sshServer"`
@@ -2417,8 +2439,9 @@ type TrafficDestination struct {
 	Host string `json:"host"`
 
 	// NodeId Set when grouped by node or reporter.
-	NodeId   string `json:"nodeId"`
-	NodeName string `json:"nodeName"`
+	NodeId    string        `json:"nodeId"`
+	NodeName  string        `json:"nodeName"`
+	NodeOwner *MachineOwner `json:"nodeOwner,omitempty"`
 
 	// Nodes How many nodes the group covers.
 	Nodes int64 `json:"nodes"`
@@ -2454,8 +2477,9 @@ type TrafficName struct {
 	Name string `json:"name"`
 
 	// NodeId Set when grouped by node.
-	NodeId   string `json:"nodeId"`
-	NodeName string `json:"nodeName"`
+	NodeId    string        `json:"nodeId"`
+	NodeName  string        `json:"nodeName"`
+	NodeOwner *MachineOwner `json:"nodeOwner,omitempty"`
 
 	// Nodes How many nodes asked.
 	Nodes   int64 `json:"nodes"`
@@ -2469,11 +2493,14 @@ type TrafficNode struct {
 	NodeId string `json:"nodeId"`
 
 	// NodeName Empty when the node no longer exists.
-	NodeName  string `json:"nodeName"`
-	RxBytes   int64  `json:"rxBytes"`
-	RxPackets int64  `json:"rxPackets"`
-	TxBytes   int64  `json:"txBytes"`
-	TxPackets int64  `json:"txPackets"`
+	NodeName string `json:"nodeName"`
+
+	// NodeOwner Absent when the node no longer exists.
+	NodeOwner *MachineOwner `json:"nodeOwner,omitempty"`
+	RxBytes   int64         `json:"rxBytes"`
+	RxPackets int64         `json:"rxPackets"`
+	TxBytes   int64         `json:"txBytes"`
+	TxPackets int64         `json:"txPackets"`
 }
 
 // TrafficPoint defines model for TrafficPoint.
@@ -2497,14 +2524,15 @@ type TrafficReporter struct {
 	FirstSeenAt time.Time `json:"firstSeenAt"`
 
 	// Instance Changes each time the agent starts.
-	Instance           string     `json:"instance"`
-	LastReportAt       time.Time  `json:"lastReportAt"`
-	NodeId             string     `json:"nodeId"`
-	NodeName           string     `json:"nodeName"`
-	Online             bool       `json:"online"`
-	Refused            string     `json:"refused"`
-	ResolverActive     bool       `json:"resolverActive"`
-	ResolverApprovedAt *time.Time `json:"resolverApprovedAt,omitempty"`
+	Instance           string        `json:"instance"`
+	LastReportAt       time.Time     `json:"lastReportAt"`
+	NodeId             string        `json:"nodeId"`
+	NodeName           string        `json:"nodeName"`
+	NodeOwner          *MachineOwner `json:"nodeOwner,omitempty"`
+	Online             bool          `json:"online"`
+	Refused            string        `json:"refused"`
+	ResolverActive     bool          `json:"resolverActive"`
+	ResolverApprovedAt *time.Time    `json:"resolverApprovedAt,omitempty"`
 
 	// Stale No report for 90 seconds.
 	Stale        bool  `json:"stale"`

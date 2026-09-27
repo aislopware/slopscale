@@ -9,6 +9,7 @@ import type { ReactElement, SubmitEvent } from "react";
 import { api } from "~/api/client.ts";
 import { nodeSshUsernamesQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
+import type { MachineOwner } from "~/api/schema.gen.ts";
 import { SSHTerminal } from "~/components/ssh/terminal.tsx";
 import { UsernameField, usernamePrefillStep } from "~/components/ssh/username-field.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
@@ -16,8 +17,9 @@ import { Badge } from "~/components/ui/badge.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
-import { nodeName } from "~/lib/node.ts";
+import { machineLabel, machineOwnerLabel, nodeName, nodeOwner } from "~/lib/node.ts";
 import type { SSHSessionState, SSHStatus } from "~/tsconnect/types.ts";
 import { useSSHSession } from "~/tsconnect/use-ssh-session.ts";
 import type { SSHSession } from "~/tsconnect/use-ssh-session.ts";
@@ -54,6 +56,17 @@ function resolvePageTitle(node: Node | undefined, session: SSHSession | null): s
     return session.target.name;
   }
   return "SSH session";
+}
+
+function resolveOwner(
+  node: Node | undefined,
+  session: SSHSession | null,
+): MachineOwner | undefined {
+  if (node !== undefined) {
+    return nodeOwner(node);
+  }
+
+  return session?.target.owner;
 }
 
 /** The wait shown in place of the terminal, or null once the client can dial. */
@@ -117,7 +130,8 @@ function SSHPage(): ReactElement {
   } = useSSHSession(nodeId);
 
   const title = resolvePageTitle(node, session);
-  useBreadcrumb(`${title} (SSH)`);
+  const owner = resolveOwner(node, session);
+  useBreadcrumb(`SSH · ${machineLabel(title, owner)}`);
 
   const waiting = waitingMessage(state.status);
   const note = sessionDetail(state);
@@ -151,6 +165,16 @@ function SSHPage(): ReactElement {
         meta={
           <>
             <Badge tone={statuses[state.status].tone}>{statuses[state.status].label}</Badge>
+            {owner === undefined ? null : (
+              <>
+                <span aria-hidden>·</span>
+                {owner.tags.length > 0 ? (
+                  <TagList tags={owner.tags} size="sm" />
+                ) : (
+                  <span>{machineOwnerLabel(owner)}</span>
+                )}
+              </>
+            )}
             {session === null ? null : (
               <>
                 <span aria-hidden>·</span>
@@ -242,6 +266,7 @@ function TerminalPane({
       key={sessionKey}
       ipn={ipn}
       host={session.target.name}
+      hostLabel={machineLabel(session.target.name, session.target.owner)}
       username={username}
       onConnectionProgress={onConnectionProgress}
       onConnected={onConnected}

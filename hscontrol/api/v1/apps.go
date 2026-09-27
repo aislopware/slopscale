@@ -37,9 +37,10 @@ type App struct {
 
 // AppNode is a connector node's standing towards an app.
 type AppNode struct {
-	NodeID string `format:"uint64"              json:"nodeId"`
-	Name   string `doc:"The node's given name." json:"name"`
-	Online bool   `json:"online"`
+	NodeID string        `format:"uint64"              json:"nodeId"`
+	Name   string        `doc:"The node's given name." json:"name"`
+	Owner  *MachineOwner `json:"owner"`
+	Online bool          `json:"online"`
 	// Connector reports whether the client runs the app connector service
 	// (tailscale set --advertise-connector).
 	Connector bool `doc:"true while the client reports running the connector service." json:"connector"`
@@ -124,6 +125,7 @@ func (b Backend) appFrom(app types.AppConnector) App {
 		an := AppNode{
 			NodeID:    node.StringID(),
 			Name:      node.GivenName(),
+			Owner:     machineOwnerFrom(node),
 			Online:    node.IsOnline().Valid() && node.IsOnline().Get(),
 			Connector: node.Hostinfo().Valid() && node.Hostinfo().AppConnector().EqualBool(true),
 		}

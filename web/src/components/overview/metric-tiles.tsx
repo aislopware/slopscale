@@ -8,7 +8,7 @@ import { activeCount, pendingCount } from "~/components/access/request-model.ts"
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
-import { isExitNode, nodeName } from "~/lib/node.ts";
+import { isExitNode, nodeLabel } from "~/lib/node.ts";
 
 /** Column count by tile count, so a shorter strip still fills its row. */
 const columnsFor: readonly string[] = [
@@ -177,8 +177,8 @@ function ExitTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElement 
   if (global !== undefined) {
     context =
       marked > 1
-        ? `${nodeName(global)} first of ${marked} global`
-        : `${nodeName(global)} is global`;
+        ? `${nodeLabel(global)} first of ${marked} global`
+        : `${nodeLabel(global)} is global`;
   } else if (marked > 1) {
     context = `${marked} global, no order`;
   }

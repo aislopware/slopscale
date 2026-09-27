@@ -8,8 +8,9 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
 import { GatewayMenu } from "~/components/traffic/gateway-menu.tsx";
-import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { trafficNodeLabel, trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
+import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
@@ -212,12 +213,12 @@ function columns(
   });
 
   return helper.columns([
-    helper.accessor((reporter) => trafficNodeName(reporter), {
+    helper.accessor((reporter) => trafficNodeLabel(reporter), {
       id: "gateway",
       header: "Gateway",
       enableSorting: true,
       cell: ({ row }) => (
-        <span className="flex min-w-0 flex-col">
+        <span className="flex min-w-0 flex-col gap-0.5">
           <Link
             to="/machines/$nodeId"
             params={{ nodeId: row.original.nodeId }}
@@ -225,10 +226,14 @@ function columns(
           >
             {trafficNodeName(row.original)}
           </Link>
-          <span className="truncate text-xs text-kumo-subtle">
-            {row.original.version === ""
-              ? "Unknown version"
-              : `slopscale-flowd ${row.original.version}`}
+          <span className="flex min-w-0 items-center gap-1.5 text-xs text-kumo-subtle">
+            <MachineOwnerLine owner={row.original.nodeOwner} />
+            {row.original.nodeOwner === undefined ? null : <span aria-hidden>·</span>}
+            <span className="truncate">
+              {row.original.version === ""
+                ? "Unknown version"
+                : `slopscale-flowd ${row.original.version}`}
+            </span>
           </span>
         </span>
       ),

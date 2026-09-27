@@ -1,4 +1,5 @@
 import type { Node } from "~/api/queries.ts";
+import type { MachineOwner } from "~/api/schema.gen.ts";
 import { isPast, parseTime } from "~/lib/time.ts";
 
 export const exitRoutes: readonly string[] = ["0.0.0.0/0", "::/0"];
@@ -62,11 +63,53 @@ export function nodeName(node: Node): string {
 }
 
 export function ownerLabel(node: Node): string {
+  return machineOwnerLabel(nodeOwner(node));
+}
+
+/**
+ * Whose a machine is, in the shape the API sends beside every machine name. A tagged node's `user`
+ * is the synthetic "Tagged Devices" one, so the tags stand in for it.
+ */
+export function nodeOwner(node: Node): MachineOwner {
   if (isTagged(node)) {
-    return node.tags.join(", ");
+    return { tags: node.tags, userId: "", userName: "", displayName: "", profilePicUrl: "" };
   }
 
-  return node.user.displayName === "" ? node.user.name : node.user.displayName;
+  return {
+    tags: [],
+    userId: node.user.id,
+    userName: node.user.name,
+    displayName: node.user.displayName,
+    profilePicUrl: node.user.profilePicUrl,
+  };
+}
+
+/** The tags, or the person; empty when the machine is gone and nobody knows. */
+export function machineOwnerLabel(owner: MachineOwner | undefined): string {
+  if (owner === undefined) {
+    return "";
+  }
+
+  if (owner.tags.length > 0) {
+    return owner.tags.join(", ");
+  }
+
+  return owner.displayName === "" ? owner.userName : owner.displayName;
+}
+
+/**
+ * A machine as one line of text: "localhost (Alice Nguyen)". A given name such as "localhost" says
+ * neither which machine nor whose, so it is never shown on its own where there is room for only one
+ * line: a select, a breadcrumb, a sentence, an aria-label.
+ */
+export function machineLabel(name: string, owner: MachineOwner | undefined): string {
+  const whose = machineOwnerLabel(owner);
+
+  return whose === "" ? name : `${name} (${whose})`;
+}
+
+export function nodeLabel(node: Node): string {
+  return machineLabel(nodeName(node), nodeOwner(node));
 }
 
 export function userLabel(user: { name: string; displayName: string }): string {

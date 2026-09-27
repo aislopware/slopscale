@@ -63,3 +63,39 @@ func userFromView(u types.UserView) User {
 
 	return out
 }
+
+// MachineOwner is whose a machine is, sent beside every machine name a
+// response carries: a given name like "localhost" says nothing on its own.
+type MachineOwner struct {
+	Tags          []string `doc:"A tagged machine belongs to its tags, not to a user." json:"tags"   nullable:"false"`
+	UserID        string   `doc:"The owning user; empty on a tagged machine."          json:"userId"`
+	UserName      string   `json:"userName"`
+	DisplayName   string   `json:"displayName"`
+	ProfilePicURL string   `json:"profilePicUrl"`
+}
+
+// machineOwnerFrom reads the owner through [types.NodeView.IsTagged],
+// because a tagged node may still carry the user who created it.
+func machineOwnerFrom(node types.NodeView) *MachineOwner {
+	out := &MachineOwner{Tags: nonNilStrings(node.Tags().AsSlice())}
+	if node.IsTagged() || !node.User().Valid() {
+		return out
+	}
+
+	user := userFromView(node.User())
+	out.UserID, out.UserName = user.ID, user.Name
+	out.DisplayName, out.ProfilePicURL = user.DisplayName, user.ProfilePicURL
+
+	return out
+}
+
+// machineOwnerByID is [machineOwnerFrom] for a node known only by its ID;
+// nil once the node is gone.
+func (b Backend) machineOwnerByID(id types.NodeID) *MachineOwner {
+	node, ok := b.State.GetNodeByID(id)
+	if !ok {
+		return nil
+	}
+
+	return machineOwnerFrom(node)
+}

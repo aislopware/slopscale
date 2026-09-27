@@ -12,7 +12,7 @@ import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { TrafficReporter } from "~/api/traffic.ts";
-import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { trafficNodeLabel } from "~/components/traffic/machines-table.tsx";
 import {
   useForgetGatewayMutation,
   useResolverApprovalMutation,
@@ -36,7 +36,7 @@ function ResolverDialog({
   readonly onOpenChange: (open: boolean) => void;
 }): ReactElement {
   const approval = useResolverApprovalMutation();
-  const name = trafficNodeName(reporter);
+  const name = trafficNodeLabel(reporter);
   const approve = reporter.resolverApprovedAt === undefined;
 
   return (
@@ -44,10 +44,12 @@ function ResolverDialog({
       open={open}
       onOpenChange={onOpenChange}
       destructive={!approve}
-      title={approve ? `Use ${name}'s resolver for DNS?` : `Stop using ${name}'s resolver?`}
+      title={
+        approve ? `Use the resolver on ${name} for DNS?` : `Stop using the resolver on ${name}?`
+      }
       description={
         approve
-          ? `While DNS logging is on and ${name} keeps reporting, machines using ${name} as their exit node resolve through its resolver, and their lookups are logged only while they use it. Machines on another exit node or none, and any on Tailscale older than 1.86, keep their usual DNS and are never logged.`
+          ? `While DNS logging is on and ${name} keeps reporting, machines using it as their exit node resolve through its resolver, and their lookups are logged only while they use it. Machines on another exit node or none, and any on Tailscale older than 1.86, keep their usual DNS and are never logged.`
           : `The machines using ${name} as their exit node go back to its usual DNS with their next update, and their lookups are no longer logged.`
       }
       confirmLabel={approve ? "Approve resolver" : "Stop using it"}
@@ -104,7 +106,7 @@ export function GatewayMenu({
   const [forgetting, setForgetting] = useState(false);
   const [approving, setApproving] = useState(false);
   const forget = useForgetGatewayMutation();
-  const name = trafficNodeName(reporter);
+  const name = trafficNodeLabel(reporter);
   const approve = reporter.resolverApprovedAt === undefined;
 
   return (

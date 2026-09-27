@@ -215,7 +215,7 @@ describe(RoutesTab, () => {
 
     await expect.element(screen.getByText("Revoke this route?")).toBeVisible();
     await expect
-      .element(screen.getByText(/machine-1 stops carrying 10\.9\.0\.0\/24/u))
+      .element(screen.getByText(/machine-1 \(Ada\) stops carrying 10\.9\.0\.0\/24/u))
       .toBeVisible();
   });
 
@@ -226,7 +226,7 @@ describe(RoutesTab, () => {
 
     await expect.element(screen.getByText("Reject this route?")).toBeVisible();
     await expect
-      .element(screen.getByText(/machine-1 no longer advertises 10\.9\.0\.0\/24/u))
+      .element(screen.getByText(/machine-1 \(Ada\) no longer advertises 10\.9\.0\.0\/24/u))
       .toBeVisible();
   });
 

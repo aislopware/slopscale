@@ -14,10 +14,12 @@ import { Fragment } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
+import type { MachineOwner } from "~/api/schema.gen.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
+import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
@@ -134,7 +136,7 @@ export function ActorCell({ event }: { readonly event: AuditEvent }): ReactEleme
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-kumo-default">{name}</span>
-        {kind === null ? null : <span className="truncate text-xs text-kumo-subtle">{kind}</span>}
+        <KindLine kind={kind ?? ""} owner={event.actorOwner} />
       </div>
     </div>
   );
@@ -202,9 +204,27 @@ export function TargetCell({ event }: { readonly event: AuditEvent }): ReactNode
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <TargetLink event={event} name={name} />
-      {kind === "" ? null : <span className="truncate text-xs text-kumo-subtle">{kind}</span>}
+      <KindLine kind={kind} owner={event.targetOwner} />
     </div>
   );
+}
+
+/**
+ * The line under a name: whose machine it is when the name is a machine's, which also says it is a
+ * machine, else what kind of thing the name is.
+ */
+function KindLine({
+  kind,
+  owner,
+}: {
+  readonly kind: string;
+  readonly owner: MachineOwner | undefined;
+}): ReactElement | null {
+  if (owner !== undefined) {
+    return <MachineOwnerLine owner={owner} />;
+  }
+
+  return kind === "" ? null : <span className="truncate text-xs text-kumo-subtle">{kind}</span>;
 }
 
 /**

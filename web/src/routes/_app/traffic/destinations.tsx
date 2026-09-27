@@ -31,7 +31,7 @@ import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar, windowSearchClass } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
-import { nodeName } from "~/lib/node.ts";
+import { nodeLabel } from "~/lib/node.ts";
 
 /** The server's cap on one destinations read. */
 const allRows = 1000;
@@ -82,7 +82,7 @@ function DestinationsPage(): ReactElement {
   const machineName = (id: string): string => {
     const node = nodes.data?.nodes.find((candidate) => candidate.id === id);
 
-    return node === undefined ? `Machine ${id}` : nodeName(node);
+    return node === undefined ? `Machine ${id}` : nodeLabel(node);
   };
 
   return (

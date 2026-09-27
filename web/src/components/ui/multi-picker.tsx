@@ -7,6 +7,8 @@ export interface PickerItem {
   readonly label: string;
   /** A second, muted line: a username under a display name, a count under a group. */
   readonly hint?: string;
+  /** What a chosen item's chip says, where the label alone is ambiguous: a machine's owner. */
+  readonly chip?: string;
 }
 
 /**
@@ -52,7 +54,7 @@ export function MultiPicker({
           ) : (
             selected.map((item) => (
               <li key={item.value} className="text-sm text-kumo-default">
-                {item.label}
+                {item.chip ?? item.label}
               </li>
             ))
           )}
@@ -80,8 +82,8 @@ export function MultiPicker({
         placeholder={selected.length === 0 ? placeholder : ""}
         inputSide="right"
         renderItem={(item: PickerItem) => (
-          <Combobox.Chip key={item.value} removeLabel={`Remove ${item.label}`}>
-            {item.label}
+          <Combobox.Chip key={item.value} removeLabel={`Remove ${item.chip ?? item.label}`}>
+            {item.chip ?? item.label}
           </Combobox.Chip>
         )}
       />

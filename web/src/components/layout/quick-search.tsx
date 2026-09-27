@@ -11,7 +11,7 @@ import type { Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { can, canSeeMachines } from "~/auth/me.ts";
 import type { NavPage } from "~/components/layout/nav.ts";
-import { userHint, userLabel } from "~/lib/node.ts";
+import { nodeName, ownerLabel, userHint, userLabel } from "~/lib/node.ts";
 
 interface Command {
   readonly id: string;
@@ -204,8 +204,8 @@ function buildGroups(
       limit: maxResources,
       items: nodes.map((node) => ({
         id: `node:${node.id}`,
-        title: node.givenName,
-        hint: [node.user?.name, node.ipAddresses[0]].filter(Boolean).join(" · "),
+        title: nodeName(node),
+        hint: [ownerLabel(node), node.ipAddresses[0]].filter(Boolean).join(" · "),
         icon: DesktopIcon,
         go: () => {
           void navigate({ to: "/machines/$nodeId", params: { nodeId: node.id } });

@@ -30,6 +30,13 @@ const office: TrafficReporter = {
   lastReportAt: now,
   nodeId: "8",
   nodeName: "office-gateway",
+  nodeOwner: {
+    tags: ["tag:gateway"],
+    userId: "",
+    userName: "",
+    displayName: "",
+    profilePicUrl: "",
+  },
   online: true,
   refused: "",
   resolverActive: false,
@@ -98,7 +105,9 @@ describe(GatewaysTable, () => {
     };
     const screen = await render(app(<GatewaysTable reporters={[quiet]} writable canApprove />));
 
-    await screen.getByRole("button", { name: "Actions for gateway office-gateway" }).click();
+    await screen
+      .getByRole("button", { name: "Actions for gateway office-gateway (tag:gateway)" })
+      .click();
 
     await expect
       .element(screen.getByRole("menuitem", { name: "Use its resolver for DNS…" }))
@@ -116,13 +125,17 @@ describe(GatewaysTable, () => {
   it("asks before handing its exit node users' DNS to a gateway, and says whom it covers", async () => {
     const screen = await render(app(<GatewaysTable reporters={[office]} writable canApprove />));
 
-    await screen.getByRole("button", { name: "Actions for gateway office-gateway" }).click();
+    await screen
+      .getByRole("button", { name: "Actions for gateway office-gateway (tag:gateway)" })
+      .click();
     await screen.getByRole("menuitem", { name: "Use its resolver for DNS…" }).click();
 
     const dialog = screen.getByRole("alertdialog");
 
     await expect
-      .element(dialog.getByText(/machines using office-gateway as their exit node/u))
+      .element(
+        dialog.getByText(/office-gateway \(tag:gateway\) keeps reporting, machines using it/u),
+      )
       .toBeVisible();
     await expect.element(dialog.getByText(/older than 1\.86/u)).toBeVisible();
     await expect.element(dialog.getByRole("button", { name: "Approve resolver" })).toBeVisible();
@@ -133,7 +146,9 @@ describe(GatewaysTable, () => {
       app(<GatewaysTable reporters={[office]} writable canApprove={false} />),
     );
 
-    await screen.getByRole("button", { name: "Actions for gateway office-gateway" }).click();
+    await screen
+      .getByRole("button", { name: "Actions for gateway office-gateway (tag:gateway)" })
+      .click();
 
     await expect
       .element(screen.getByRole("menuitem", { name: "Use its resolver for DNS…" }))

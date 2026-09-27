@@ -35,6 +35,7 @@ const report: DerpLatencyReport = {
     {
       nodeId: "1",
       name: "laptop",
+      owner: { tags: [], userId: "1", userName: "alice", displayName: "Alice", profilePicUrl: "" },
       online: true,
       preferredDerp: 7,
       homeMs: 4,

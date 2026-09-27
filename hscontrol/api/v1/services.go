@@ -36,13 +36,14 @@ type Service struct {
 
 // Host is a node's standing towards a service.
 type Host struct {
-	NodeID    string   `format:"uint64"                                        json:"nodeId"`
-	Name      string   `doc:"The node's given name."                           json:"name"`
-	Announced bool     `doc:"true when the node's serve config announces it."  json:"announced"`
-	Ports     []string `doc:"The protocol and ports the node serves it on."    json:"ports"     nullable:"false"`
-	Active    bool     `doc:"true when the node advertises the service."       json:"active"`
-	Approved  bool     `doc:"true when the node may host the service."         json:"approved"`
-	Primary   bool     `doc:"true when clients route to this node for it now." json:"primary"`
+	NodeID    string        `format:"uint64"                                        json:"nodeId"`
+	Name      string        `doc:"The node's given name."                           json:"name"`
+	Owner     *MachineOwner `json:"owner"`
+	Announced bool          `doc:"true when the node's serve config announces it."  json:"announced"`
+	Ports     []string      `doc:"The protocol and ports the node serves it on."    json:"ports"     nullable:"false"`
+	Active    bool          `doc:"true when the node advertises the service."       json:"active"`
+	Approved  bool          `doc:"true when the node may host the service."         json:"approved"`
+	Primary   bool          `doc:"true when clients route to this node for it now." json:"primary"`
 }
 
 // CreateServiceRequestBody creates a service.
@@ -148,6 +149,7 @@ func (b Backend) serviceFrom(svc types.VIPService, hosts map[tailcfg.ServiceName
 		out.Hosts = append(out.Hosts, Host{
 			NodeID:    node.StringID(),
 			Name:      node.GivenName(),
+			Owner:     machineOwnerFrom(node),
 			Announced: ok,
 			Ports:     nonNilStrings(types.ServicePortsStrings(reported.Ports)),
 			Active:    reported.Active,

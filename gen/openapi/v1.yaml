@@ -427,6 +427,8 @@ components:
           type: string
         online:
           type: boolean
+        owner:
+          $ref: "#/components/schemas/MachineOwner"
         pending:
           description: Advertised routes that are not approved yet.
           format: int64
@@ -434,6 +436,7 @@ components:
       required:
         - nodeId
         - name
+        - owner
         - online
         - connector
         - learnedRoutes
@@ -491,6 +494,8 @@ components:
         actorName:
           description: The actor's user name, or the credential's prefix.
           type: string
+        actorOwner:
+          $ref: "#/components/schemas/MachineOwner"
         actorUserId:
           description: The user behind the actor; empty for a credential without one.
           type: string
@@ -516,6 +521,8 @@ components:
           type: string
         targetName:
           type: string
+        targetOwner:
+          $ref: "#/components/schemas/MachineOwner"
       required:
         - id
         - createdAt
@@ -926,12 +933,15 @@ components:
           type: string
         online:
           type: boolean
+        owner:
+          $ref: "#/components/schemas/MachineOwner"
         preferredDerp:
           format: int64
           type: integer
       required:
         - nodeId
         - name
+        - owner
         - online
         - preferredDerp
         - homeMs
@@ -1566,6 +1576,8 @@ components:
         nodeId:
           format: uint64
           type: string
+        owner:
+          $ref: "#/components/schemas/MachineOwner"
         ports:
           description: The protocol and ports the node serves it on.
           items:
@@ -1577,6 +1589,7 @@ components:
       required:
         - nodeId
         - name
+        - owner
         - announced
         - ports
         - active
@@ -1981,6 +1994,30 @@ components:
         - delivered
         - status
       type: object
+    MachineOwner:
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+        profilePicUrl:
+          type: string
+        tags:
+          description: A tagged machine belongs to its tags, not to a user.
+          items:
+            type: string
+          type: array
+        userId:
+          description: The owning user; empty on a tagged machine.
+          type: string
+        userName:
+          type: string
+      required:
+        - tags
+        - userId
+        - userName
+        - displayName
+        - profilePicUrl
+      type: object
     Network:
       additionalProperties: false
       properties:
@@ -2113,6 +2150,8 @@ components:
           type: string
         online:
           type: boolean
+        owner:
+          $ref: "#/components/schemas/MachineOwner"
         primaryPrefixes:
           items:
             type: string
@@ -3279,6 +3318,8 @@ components:
         dstNodeId:
           format: uint64
           type: string
+        dstOwner:
+          $ref: "#/components/schemas/MachineOwner"
         endedAt:
           format: date-time
           type:
@@ -3296,6 +3337,8 @@ components:
           type: string
         srcNodeId:
           type: string
+        srcOwner:
+          $ref: "#/components/schemas/MachineOwner"
         srcUser:
           type: string
         sshUser:
@@ -3361,6 +3404,8 @@ components:
           type: string
         online:
           type: boolean
+        owner:
+          $ref: "#/components/schemas/MachineOwner"
         sshServer:
           description: true while the target runs Tailscale SSH (tailscale set --ssh).
           type: boolean
@@ -3370,6 +3415,7 @@ components:
       required:
         - nodeId
         - name
+        - owner
         - dnsName
         - addresses
         - online
@@ -3942,6 +3988,8 @@ components:
           type: string
         nodeName:
           type: string
+        nodeOwner:
+          $ref: "#/components/schemas/MachineOwner"
         nodes:
           description: How many nodes the group covers.
           format: int64
@@ -4031,6 +4079,8 @@ components:
           type: string
         nodeName:
           type: string
+        nodeOwner:
+          $ref: "#/components/schemas/MachineOwner"
         nodes:
           description: How many nodes asked.
           format: int64
@@ -4062,6 +4112,9 @@ components:
         nodeName:
           description: Empty when the node no longer exists.
           type: string
+        nodeOwner:
+          $ref: "#/components/schemas/MachineOwner"
+          description: Absent when the node no longer exists.
         rxBytes:
           format: int64
           minimum: 0
@@ -4150,6 +4203,8 @@ components:
           type: string
         nodeName:
           type: string
+        nodeOwner:
+          $ref: "#/components/schemas/MachineOwner"
         online:
           type: boolean
         refused:

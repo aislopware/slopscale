@@ -1,6 +1,7 @@
 import type { Node, Service } from "~/api/queries.ts";
 import type { Tone } from "~/components/ui/status.tsx";
 import { dnsLabelIssue } from "~/lib/dns-label.ts";
+import { machineLabel } from "~/lib/node.ts";
 
 /** Every service name carries it; the label after it is what the operator names and MagicDNS uses. */
 export const servicePrefix = "svc:";
@@ -124,13 +125,19 @@ export interface ServiceRow extends Service {
   readonly hostNames: string;
 }
 
+function primaryHostLabel(service: Service): string {
+  const primary = service.hosts.find((host) => host.primary);
+
+  return primary === undefined ? "" : machineLabel(primary.name, primary.owner);
+}
+
 export function toServiceRows(services: readonly Service[]): ServiceRow[] {
   return services.map((service) => ({
     ...service,
     label: serviceLabel(service.name),
     reach: serviceReach(service),
-    primaryHost: service.hosts.find((host) => host.primary)?.name ?? "",
-    hostNames: service.hosts.map((host) => host.name).join(", "),
+    primaryHost: primaryHostLabel(service),
+    hostNames: service.hosts.map((host) => machineLabel(host.name, host.owner)).join(", "),
   }));
 }
 
