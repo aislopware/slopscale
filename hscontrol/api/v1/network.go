@@ -26,7 +26,9 @@ const tagNetworks = "Networks"
 type NetworkRouter struct {
 	NodeID string `format:"uint64" json:"nodeId"`
 	Name   string `json:"name"`
-	Online bool   `json:"online"`
+	// Owner is absent once the node is gone.
+	Owner  *MachineOwner `json:"owner,omitempty"`
+	Online bool          `json:"online"`
 	// MissingPrefixes are the network's prefixes the node does not
 	// advertise; the client needs --advertise-routes for them.
 	MissingPrefixes []string `json:"missingPrefixes" nullable:"false"`
@@ -194,7 +196,7 @@ func networkRouterFrom(b Backend, n types.Network, id types.NodeID) NetworkRoute
 		return router
 	}
 
-	router.Name = node.GivenName()
+	router.Name, router.Owner = node.GivenName(), machineOwnerFrom(node)
 	router.Online = node.IsOnline().Valid() && node.IsOnline().Get()
 	announced := node.AnnouncedRoutes()
 

@@ -86,13 +86,14 @@ type DERPLatencyReport struct {
 
 // DERPLatencyMachine is one machine's home region and round trip.
 type DERPLatencyMachine struct {
-	NodeID        string  `format:"uint64"                                              json:"nodeId"`
-	Name          string  `json:"name"`
-	Online        bool    `json:"online"`
-	PreferredDERP int     `json:"preferredDerp"`
-	HomeMs        float64 `doc:"The round trip to the home region, 0 when unmeasured."  json:"homeMs"`
-	HardNAT       bool    `doc:"true behind a NAT whose mapping varies by destination." json:"hardNat"`
-	LinkType      string  `json:"linkType"`
+	NodeID        string        `format:"uint64"                                              json:"nodeId"`
+	Name          string        `json:"name"`
+	Owner         *MachineOwner `json:"owner"`
+	Online        bool          `json:"online"`
+	PreferredDERP int           `json:"preferredDerp"`
+	HomeMs        float64       `doc:"The round trip to the home region, 0 when unmeasured."  json:"homeMs"`
+	HardNAT       bool          `doc:"true behind a NAT whose mapping varies by destination." json:"hardNat"`
+	LinkType      string        `json:"linkType"`
 }
 
 type derpLatencyOutput struct {
@@ -261,6 +262,7 @@ func (b Backend) derpLatencyReport() DERPLatencyReport {
 		machine := DERPLatencyMachine{
 			NodeID:        node.StringID(),
 			Name:          node.GivenName(),
+			Owner:         machineOwnerFrom(node),
 			Online:        node.IsOnline().Valid() && node.IsOnline().Get(),
 			PreferredDERP: ni.PreferredDERP,
 			HardNAT:       ni.MappingVariesByDestIP != nil && *ni.MappingVariesByDestIP,

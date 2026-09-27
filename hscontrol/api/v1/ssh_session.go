@@ -44,11 +44,12 @@ type SSHSession struct {
 
 // SSHSessionTarget is the machine the session is opened to.
 type SSHSessionTarget struct {
-	NodeID    string   `format:"uint64"                                              json:"nodeId"`
-	Name      string   `doc:"The node's given name, which the browser dials."        json:"name"`
-	DNSName   string   `doc:"The node's MagicDNS name, empty without a base domain." json:"dnsName"`
-	Addresses []string `json:"addresses"                                             nullable:"false"`
-	Online    bool     `json:"online"`
+	NodeID    string        `format:"uint64"                                              json:"nodeId"`
+	Name      string        `doc:"The node's given name, which the browser dials."        json:"name"`
+	Owner     *MachineOwner `json:"owner"`
+	DNSName   string        `doc:"The node's MagicDNS name, empty without a base domain." json:"dnsName"`
+	Addresses []string      `json:"addresses"                                             nullable:"false"`
+	Online    bool          `json:"online"`
 	// SSHServer reports whether the client runs Tailscale SSH, which the
 	// session needs on the target.
 	SSHServer bool `doc:"true while the target runs Tailscale SSH (tailscale set --ssh)." json:"sshServer"`
@@ -165,6 +166,7 @@ func (b Backend) sshSessionTarget(node types.NodeView, user *types.User) SSHSess
 	target := SSHSessionTarget{
 		NodeID:    node.StringID(),
 		Name:      node.GivenName(),
+		Owner:     machineOwnerFrom(node),
 		Addresses: nonNilStrings(node.IPsAsString()),
 		Online:    node.IsOnline().Valid() && node.IsOnline().Get(),
 		Username:  "root",

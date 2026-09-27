@@ -32,14 +32,17 @@ type SSHRecording struct {
 	EndedAt   *time.Time `json:"endedAt"`
 	// SrcNode is the connecting node's name as the client reported it,
 	// SrcNodeID its stable ID, SrcUser its user's login name (empty for
-	// a tagged node).
-	SrcNode   string `json:"srcNode"`
-	SrcNodeID string `json:"srcNodeId"`
-	SrcUser   string `json:"srcUser"`
+	// a tagged node), SrcOwner its owner now (absent once it is gone).
+	SrcNode   string        `json:"srcNode"`
+	SrcNodeID string        `json:"srcNodeId"`
+	SrcUser   string        `json:"srcUser"`
+	SrcOwner  *MachineOwner `json:"srcOwner,omitempty"`
 	// DstNodeID and DstNode name the node the session ran on; empty
-	// when the upload came from an address no node holds.
-	DstNodeID string `format:"uint64" json:"dstNodeId"`
-	DstNode   string `json:"dstNode"`
+	// when the upload came from an address no node holds. DstOwner is
+	// its owner now, absent once it is gone.
+	DstNodeID string        `format:"uint64"           json:"dstNodeId"`
+	DstNode   string        `json:"dstNode"`
+	DstOwner  *MachineOwner `json:"dstOwner,omitempty"`
 	// SSHUser is the name the client asked for, LocalUser the account
 	// the session got.
 	SSHUser   string `json:"sshUser"`
@@ -83,7 +86,7 @@ func parseSSHRecordingID(s string) (types.SSHRecordingID, error) {
 	return types.SSHRecordingID(id), nil
 }
 
-func sshRecordingFrom(r types.SSHRecording) SSHRecording {
+func (b Backend) sshRecordingFrom(r types.SSHRecording) SSHRecording {
 	out := SSHRecording{
 		ID:        formatID(uint64(r.ID)),
 		StartedAt: r.StartedAt,
@@ -101,6 +104,13 @@ func sshRecordingFrom(r types.SSHRecording) SSHRecording {
 
 	if r.DstNodeID != 0 {
 		out.DstNodeID = formatID(uint64(r.DstNodeID))
+		out.DstOwner = b.machineOwnerByID(r.DstNodeID)
+	}
+
+	// A stable node ID is the node ID in decimal (types.NodeID.StableID).
+	src, err := strconv.ParseUint(r.SrcNodeID, 10, 64)
+	if err == nil {
+		out.SrcOwner = b.machineOwnerByID(types.NodeID(src))
 	}
 
 	return out
@@ -132,7 +142,7 @@ func registerSSHRecordings(api huma.API, b Backend) {
 		out.Body.Recordings = make([]SSHRecording, 0, len(recordings))
 
 		for _, r := range recordings {
-			out.Body.Recordings = append(out.Body.Recordings, sshRecordingFrom(r))
+			out.Body.Recordings = append(out.Body.Recordings, b.sshRecordingFrom(r))
 		}
 
 		if len(recordings) == limit {
@@ -161,7 +171,7 @@ func registerSSHRecordings(api huma.API, b Backend) {
 		}
 
 		out := &sshRecordingOutput{}
-		out.Body.Recording = sshRecordingFrom(r)
+		out.Body.Recording = b.sshRecordingFrom(r)
 
 		return out, nil
 	})

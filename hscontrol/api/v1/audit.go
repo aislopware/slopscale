@@ -41,6 +41,11 @@ type AuditEvent struct {
 	TargetKind string `json:"targetKind"`
 	TargetID   string `json:"targetId"`
 	TargetName string `json:"targetName"`
+	// TargetOwner is a node target's owner now, and ActorOwner a node
+	// actor's; absent for other kinds and for a node that is gone. The
+	// names are the ones the node had at the time of the event.
+	TargetOwner *MachineOwner `json:"targetOwner,omitempty"`
+	ActorOwner  *MachineOwner `json:"actorOwner,omitempty"`
 
 	Outcome int            `doc:"The HTTP status the request ended with." json:"outcome"`
 	Detail  map[string]any `doc:"Action-specific fields."                 json:"detail"  nullable:"false"`
@@ -105,7 +110,7 @@ func registerAudit(api huma.API, b Backend) {
 		out.Body.Events = make([]AuditEvent, 0, len(events))
 
 		for i := range events {
-			out.Body.Events = append(out.Body.Events, auditEventFromType(&events[i]))
+			out.Body.Events = append(out.Body.Events, b.withMachineOwners(auditEventFromType(&events[i])))
 		}
 
 		if q.Limit > 0 && len(events) == q.Limit {
@@ -195,6 +200,27 @@ func auditEventFromType(e *types.AuditEvent) AuditEvent {
 	}
 
 	return out
+}
+
+// withMachineOwners resolves the owner of a node target and of a node
+// actor, which is always the node the event is about: a machine reports
+// only what happened on itself.
+func (b Backend) withMachineOwners(e AuditEvent) AuditEvent {
+	if e.TargetKind != "node" {
+		return e
+	}
+
+	id, err := strconv.ParseUint(e.TargetID, 10, 64)
+	if err != nil {
+		return e
+	}
+
+	e.TargetOwner = b.machineOwnerByID(types.NodeID(id))
+	if e.ActorKind == string(types.ActorNode) {
+		e.ActorOwner = e.TargetOwner
+	}
+
+	return e
 }
 
 const (

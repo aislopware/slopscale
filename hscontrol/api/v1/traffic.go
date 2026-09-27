@@ -62,8 +62,9 @@ type TrafficPoint struct {
 type TrafficNode struct {
 	TrafficCounts
 
-	NodeID   string `format:"uint64"                             json:"nodeId"`
-	NodeName string `doc:"Empty when the node no longer exists." json:"nodeName"`
+	NodeID    string        `format:"uint64"                              json:"nodeId"`
+	NodeName  string        `doc:"Empty when the node no longer exists."  json:"nodeName"`
+	NodeOwner *MachineOwner `doc:"Absent when the node no longer exists." json:"nodeOwner,omitempty"`
 }
 
 // TrafficDestination is a destination group's volume. Only the fields of
@@ -83,9 +84,11 @@ type TrafficDestination struct {
 	Private bool   `doc:"A private address, or a group of only private ones." json:"private"`
 
 	NodeID string `doc:"Set when grouped by node or reporter." format:"uint64" json:"nodeId"`
-	// NodeName is the node's (or gateway's) name when grouped by one.
-	NodeName string `json:"nodeName"`
-	Nodes    uint64 `doc:"How many nodes the group covers." json:"nodes"`
+	// NodeName and NodeOwner are the node's (or gateway's) when grouped
+	// by one.
+	NodeName  string        `json:"nodeName"`
+	NodeOwner *MachineOwner `json:"nodeOwner,omitempty"`
+	Nodes     uint64        `doc:"How many nodes the group covers." json:"nodes"`
 }
 
 // TrafficName is a DNS group's questions.
@@ -93,9 +96,11 @@ type TrafficName struct {
 	Name     string `doc:"Empty on the folded remainder, or when grouped by node." json:"name"`
 	NodeID   string `doc:"Set when grouped by node."                               format:"uint64" json:"nodeId"`
 	NodeName string `json:"nodeName"`
-	Queries  uint64 `json:"queries"`
-	Failed   uint64 `doc:"Questions answered with an error or not at all."         json:"failed"`
-	Nodes    uint64 `doc:"How many nodes asked."                                   json:"nodes"`
+	// NodeOwner is absent unless grouped by a node that still exists.
+	NodeOwner *MachineOwner `json:"nodeOwner,omitempty"`
+	Queries   uint64        `json:"queries"`
+	Failed    uint64        `doc:"Questions answered with an error or not at all." json:"failed"`
+	Nodes     uint64        `doc:"How many nodes asked."                           json:"nodes"`
 }
 
 // TrafficCollector is one of an agent's collectors.
@@ -117,6 +122,7 @@ type TrafficCollectors struct {
 type TrafficReporter struct {
 	NodeID       string            `format:"uint64"                           json:"nodeId"`
 	NodeName     string            `json:"nodeName"`
+	NodeOwner    *MachineOwner     `json:"nodeOwner,omitempty"`
 	Online       bool              `json:"online"`
 	Version      string            `doc:"The agent's version."                json:"version"`
 	Instance     string            `doc:"Changes each time the agent starts." json:"instance"`
@@ -387,7 +393,8 @@ func registerTrafficReads(api huma.API, b Backend) {
 		for _, s := range sums {
 			n := TrafficName{Name: s.Name, Queries: s.Queries, Failed: s.Failed, Nodes: s.Nodes}
 			if s.NodeID != 0 {
-				n.NodeID, n.NodeName = formatID(s.NodeID.Uint64()), names[s.NodeID]
+				n.NodeID = formatID(s.NodeID.Uint64())
+				n.NodeName, n.NodeOwner = names[s.NodeID].name, names[s.NodeID].owner
 			}
 
 			out.Body.Names = append(out.Body.Names, n)
@@ -605,14 +612,20 @@ func trafficCountsFrom(c types.TrafficCounts) TrafficCounts {
 	}
 }
 
-// nodeNames maps every node to its name, for the rows that carry only an
-// ID.
-func nodeNames(b Backend) map[types.NodeID]string {
+// trafficMachine is how a traffic row names its node.
+type trafficMachine struct {
+	name  string
+	owner *MachineOwner
+}
+
+// nodeNames maps every node to its name and owner, for the rows that
+// carry only an ID.
+func nodeNames(b Backend) map[types.NodeID]trafficMachine {
 	nodes := b.State.ListNodes()
-	out := make(map[types.NodeID]string, nodes.Len())
+	out := make(map[types.NodeID]trafficMachine, nodes.Len())
 
 	for _, n := range nodes.All() {
-		out[n.ID()] = n.GivenName()
+		out[n.ID()] = trafficMachine{name: n.GivenName(), owner: machineOwnerFrom(n)}
 	}
 
 	return out
@@ -673,12 +686,13 @@ func trafficSeries(f types.TrafficFilter, points []types.TrafficPoint) []Traffic
 	return out
 }
 
-func trafficNodes(names map[types.NodeID]string, sums []types.TrafficNodeSum) []TrafficNode {
+func trafficNodes(names map[types.NodeID]trafficMachine, sums []types.TrafficNodeSum) []TrafficNode {
 	out := make([]TrafficNode, 0, len(sums))
 	for _, s := range sums {
 		out = append(out, TrafficNode{
 			NodeID:        formatID(s.NodeID.Uint64()),
-			NodeName:      names[s.NodeID],
+			NodeName:      names[s.NodeID].name,
+			NodeOwner:     names[s.NodeID].owner,
 			TrafficCounts: trafficCountsFrom(s.TrafficCounts),
 		})
 	}
@@ -688,7 +702,7 @@ func trafficNodes(names map[types.NodeID]string, sums []types.TrafficNodeSum) []
 
 func trafficDestinationFrom(
 	b Backend,
-	names map[types.NodeID]string,
+	names map[types.NodeID]trafficMachine,
 	s types.TrafficDestinationSum,
 ) TrafficDestination {
 	d := TrafficDestination{
@@ -705,7 +719,8 @@ func trafficDestinationFrom(
 	}
 
 	if s.NodeID != 0 {
-		d.NodeID, d.NodeName = formatID(s.NodeID.Uint64()), names[s.NodeID]
+		d.NodeID = formatID(s.NodeID.Uint64())
+		d.NodeName, d.NodeOwner = names[s.NodeID].name, names[s.NodeID].owner
 	}
 
 	return d
@@ -764,7 +779,7 @@ func trafficReporterFrom(
 	}
 
 	if node, ok := b.State.GetNodeByID(r.NodeID); ok {
-		out.NodeName = node.GivenName()
+		out.NodeName, out.NodeOwner = node.GivenName(), machineOwnerFrom(node)
 		out.Online = node.IsOnline().Valid() && node.IsOnline().Get()
 		out.Refused = b.State.TrafficGatewayRefusal(node)
 	}
