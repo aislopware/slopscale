@@ -2872,6 +2872,7 @@ export interface components {
             /** Format: uint64 */
             nodeId: string;
             online: boolean;
+            owner: components["schemas"]["MachineOwner"];
             /**
              * Format: int64
              * @description Advertised routes that are not approved yet.
@@ -2898,6 +2899,7 @@ export interface components {
             actorKind: string;
             /** @description The actor's user name, or the credential's prefix. */
             actorName: string;
+            actorOwner?: components["schemas"]["MachineOwner"];
             /** @description The user behind the actor; empty for a credential without one. */
             actorUserId: string;
             /** Format: date-time */
@@ -2917,6 +2919,7 @@ export interface components {
             targetId: string;
             targetKind: string;
             targetName: string;
+            targetOwner?: components["schemas"]["MachineOwner"];
         };
         AuthApproveOutputBody: Record<string, unknown>;
         AuthApproveRequestBody: {
@@ -3114,6 +3117,7 @@ export interface components {
             /** Format: uint64 */
             nodeId: string;
             online: boolean;
+            owner: components["schemas"]["MachineOwner"];
             /** Format: int64 */
             preferredDerp: number;
         };
@@ -3414,6 +3418,7 @@ export interface components {
             name: string;
             /** Format: uint64 */
             nodeId: string;
+            owner: components["schemas"]["MachineOwner"];
             /** @description The protocol and ports the node serves it on. */
             ports: string[];
             /** @description true when clients route to this node for it now. */
@@ -3563,6 +3568,15 @@ export interface components {
             /** @description HTTP status or the error text. */
             status: string;
         };
+        MachineOwner: {
+            displayName: string;
+            profilePicUrl: string;
+            /** @description A tagged machine belongs to its tags, not to a user. */
+            tags: string[];
+            /** @description The owning user; empty on a tagged machine. */
+            userId: string;
+            userName: string;
+        };
         Network: {
             /** Format: date-time */
             createdAt: string;
@@ -3614,6 +3628,7 @@ export interface components {
             /** Format: uint64 */
             nodeId: string;
             online: boolean;
+            owner?: components["schemas"]["MachineOwner"];
             primaryPrefixes: string[];
         };
         Node: {
@@ -4257,6 +4272,7 @@ export interface components {
             dstNode: string;
             /** Format: uint64 */
             dstNodeId: string;
+            dstOwner?: components["schemas"]["MachineOwner"];
             /** Format: date-time */
             endedAt: string | null;
             /** Format: uint64 */
@@ -4266,6 +4282,7 @@ export interface components {
             size: number;
             srcNode: string;
             srcNodeId: string;
+            srcOwner?: components["schemas"]["MachineOwner"];
             srcUser: string;
             sshUser: string;
             /** Format: date-time */
@@ -4297,6 +4314,7 @@ export interface components {
             /** Format: uint64 */
             nodeId: string;
             online: boolean;
+            owner: components["schemas"]["MachineOwner"];
             /** @description true while the target runs Tailscale SSH (tailscale set --ssh). */
             sshServer: boolean;
             /** @description A suggested login name. */
@@ -4398,6 +4416,7 @@ export interface components {
              */
             nodeId: string;
             nodeName: string;
+            nodeOwner?: components["schemas"]["MachineOwner"];
             /**
              * Format: int64
              * @description How many nodes the group covers.
@@ -4459,6 +4478,7 @@ export interface components {
              */
             nodeId: string;
             nodeName: string;
+            nodeOwner?: components["schemas"]["MachineOwner"];
             /**
              * Format: int64
              * @description How many nodes asked.
@@ -4477,6 +4497,8 @@ export interface components {
             nodeId: string;
             /** @description Empty when the node no longer exists. */
             nodeName: string;
+            /** @description Absent when the node no longer exists. */
+            nodeOwner?: components["schemas"]["MachineOwner"];
             /** Format: int64 */
             rxBytes: number;
             /** Format: int64 */
@@ -4518,6 +4540,7 @@ export interface components {
             /** Format: uint64 */
             nodeId: string;
             nodeName: string;
+            nodeOwner?: components["schemas"]["MachineOwner"];
             online: boolean;
             refused: string;
             resolverActive: boolean;
@@ -4843,6 +4866,7 @@ export type LogStream = components['schemas']['LogStream'];
 export type LogStreamOutputBody = components['schemas']['LogStreamOutputBody'];
 export type LogStreamRequestBody = components['schemas']['LogStreamRequestBody'];
 export type LogStreamTestOutputBody = components['schemas']['LogStreamTestOutputBody'];
+export type MachineOwner = components['schemas']['MachineOwner'];
 export type Network = components['schemas']['Network'];
 export type NetworkEnabledInputBody = components['schemas']['NetworkEnabledInputBody'];
 export type NetworkOutputBody = components['schemas']['NetworkOutputBody'];
