@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.54.0](https://github.com/aislopware/slopscale/compare/v0.53.0...v0.54.0) (2026-09-27)
+
+
+### Changes
+
+* **traffic:** count internet and LAN traffic apart and show the internet by default ([#46](https://github.com/aislopware/slopscale/issues/46)) ([cbe0e0f](https://github.com/aislopware/slopscale/commit/cbe0e0ffa7d0e978d448248070ac9596afc1e581))
+
 ## [0.53.0](https://github.com/aislopware/slopscale/compare/v0.52.0...v0.53.0) (2026-09-27)
 
 
