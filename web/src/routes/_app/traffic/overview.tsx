@@ -12,6 +12,7 @@ import type { DestinationGrouping, TrafficNode, TrafficScope } from "~/api/traff
 import { plural } from "~/components/overview/plural.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { DestinationsSection } from "~/components/traffic/destinations-section.tsx";
+import { GatewayTrafficTable, gatewayRows } from "~/components/traffic/gateway-traffic-table.tsx";
 import { MachinesTable } from "~/components/traffic/machines-table.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
@@ -116,7 +117,21 @@ function OverviewPage(): ReactElement {
               void navigate({ search: (previous) => ({ ...previous, range: "custom", from, to }) });
             }}
           />
-          <TopMachinesSection nodes={data?.nodes ?? []} whole={whole} search={search} />
+          {search.gateway === "" && reporterList.length > 0 ? (
+            <GatewaysSection
+              gateways={gatewayRows(data?.reporters ?? [], reporterList)}
+              whole={whole}
+              onPick={(gateway) => {
+                void navigate({ search: (previous) => ({ ...previous, gateway }) });
+              }}
+            />
+          ) : null}
+          <TopMachinesSection
+            nodes={data?.nodes ?? []}
+            gateways={data?.reporters ?? []}
+            whole={whole}
+            search={search}
+          />
           <TopDestinationsSection search={search} whole={whole} />
         </>
       )}
@@ -124,12 +139,43 @@ function OverviewPage(): ReactElement {
   );
 }
 
+function GatewaysSection({
+  gateways,
+  whole,
+  onPick,
+}: {
+  readonly gateways: readonly TrafficNode[];
+  readonly whole: number;
+  readonly onPick: (gateway: string) => void;
+}): ReactElement {
+  return (
+    <Section
+      title="Gateways"
+      description="What went through each gateway. Pick one to see only its traffic."
+      panel={false}
+    >
+      <GatewayTrafficTable
+        gateways={gateways}
+        whole={whole}
+        onPick={onPick}
+        footer={
+          <TableFooter actions={<TextLink to="/traffic/gateways">Manage gateways</TextLink>}>
+            {`Showing ${plural(gateways.length, "gateway")}`}
+          </TableFooter>
+        }
+      />
+    </Section>
+  );
+}
+
 function TopMachinesSection({
   nodes,
+  gateways,
   whole,
   search,
 }: {
   readonly nodes: readonly TrafficNode[];
+  readonly gateways: readonly TrafficNode[];
   readonly whole: number;
   readonly search: OverviewSearch;
 }): ReactElement {
@@ -141,6 +187,7 @@ function TopMachinesSection({
     >
       <MachinesTable
         nodes={nodes}
+        gateways={gateways}
         whole={whole}
         search={search}
         footer={

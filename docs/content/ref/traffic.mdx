@@ -340,10 +340,20 @@ network's name is read from the current table.
 
 ## Reading the data
 
+### Console
+
+Logs › Traffic in the console. The overview lists every gateway with what
+it carried in the window, a gateway that carried nothing included at zero;
+picking one narrows the whole page, chart included, to that gateway, as the
+gateway filter beside the time range does on every traffic page. While
+more than one gateway carried traffic, the machine tables name the gateways
+each machine went through, busiest first.
+
 ### CLI
 
 ```console
 $ slopscale traffic summary --since 7d
+$ slopscale traffic summary --reporter 24
 $ slopscale traffic destinations --node 12 --group-by host
 $ slopscale traffic destinations --group-by asn --since 24h
 $ slopscale traffic dns --node 12 --search youtube
@@ -361,7 +371,7 @@ latter being the gateway's node ID. `destinations` groups by `destination`, `hos
 
 | Operation                                    | Scope               | Returns                                                                 |
 | -------------------------------------------- | ------------------- | ----------------------------------------------------------------------- |
-| `GET /api/v1/traffic/summary`                | `logs:network:read` | The total, a series with a point per bucket, the top machines, and each gateway's volume |
+| `GET /api/v1/traffic/summary`                | `logs:network:read` | The total, a series with a point per bucket, the top machines with the gateways each went through (`reporterIds`, busiest first), and each gateway's volume |
 | `GET /api/v1/traffic/destinations`           | `logs:network:read` | Destinations grouped by `groupBy`, with host, network, country and whether the address, or every address of the group, is private; private addresses have no network and group apart |
 | `GET /api/v1/traffic/dns`                    | `logs:network:read` | The names asked, by name or by machine                                  |
 | `GET /api/v1/traffic/reporters`              | `logs:network:read` | Each gateway's agent: version, last report, collectors and their errors, why it is refused, resolver approval and state, unattributed and dropped counts; the resolvers in use and the exit node nameservers the resolvers skip |
