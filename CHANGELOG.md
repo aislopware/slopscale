@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.50.1](https://github.com/aislopware/slopscale/compare/v0.50.0...v0.50.1) (2026-09-27)
+
+
+### Fixes
+
+* **api/v2:** carry a service's display name in the displayName field Tailscale's API uses ([8d820df](https://github.com/aislopware/slopscale/commit/8d820df3ec0144e2985b07bb448bb1b71dc94989))
+* **derp/server:** answer STUN from the address the client asked on multi-homed hosts ([8d820df](https://github.com/aislopware/slopscale/commit/8d820df3ec0144e2985b07bb448bb1b71dc94989))
+* refuse an oversized DERP map or ASN table instead of reading it cut short ([8d820df](https://github.com/aislopware/slopscale/commit/8d820df3ec0144e2985b07bb448bb1b71dc94989))
+* **types:** refuse DNS names from the config and records file that clients cannot parse ([8d820df](https://github.com/aislopware/slopscale/commit/8d820df3ec0144e2985b07bb448bb1b71dc94989))
+* **web:** keep the audit activity chart's axis on whole events ([8d820df](https://github.com/aislopware/slopscale/commit/8d820df3ec0144e2985b07bb448bb1b71dc94989))
+
 ## [0.50.0](https://github.com/aislopware/slopscale/compare/v0.49.0...v0.50.0) (2026-09-26)
 
 
