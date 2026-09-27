@@ -17,66 +17,20 @@ func mustRead(t *testing.T, path string) []byte {
 	return b
 }
 
-// The marker is the bot's only persistent state. If it does not survive a round
-// trip through a pull request body, every run looks like a first run.
-func TestMarkerRoundTrip(t *testing.T) {
+// The report is where the review starts, so a dropped area must say why and
+// the report must end by asking for the review rather than implying it is done.
+func TestReportNamesDropsAndAsksForReview(t *testing.T) {
 	results := []result{
 		{Area: "flake", State: stateApplied, Commit: "abc"},
 		{Area: "gomod", State: stateDropped, Reason: "`go build ./...` failed"},
 	}
 
-	want := markerOf(results, "tree-sha", "head-sha")
-	body := renderBody(results, want, gateFull)
+	got := renderReport(results, gateFull)
 
-	got, ok := parseMarker(body)
-	if !ok {
-		t.Fatalf("parseMarker found no marker in:\n%s", body)
-	}
-
-	if got.Tree != want.Tree || got.Head != want.Head {
-		t.Errorf("marker = %+v, want %+v", got, want)
-	}
-
-	if got.Areas["gomod"] != string(stateDropped) {
-		t.Errorf("gomod state = %q, want %q", got.Areas["gomod"], stateDropped)
-	}
-}
-
-func TestParseMarkerAbsent(t *testing.T) {
-	for _, body := range []string{"", "a human wrote this", markerPrefix + "not json -->"} {
-		if _, ok := parseMarker(body); ok {
-			t.Errorf("parseMarker(%q) reported a marker", body)
+	for _, want := range []string{"| `gomod` | dropped |", "`go build ./...` failed", "drop, change or adopt"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("report lacks %q:\n%s", want, got)
 		}
-	}
-}
-
-func TestChangedAreas(t *testing.T) {
-	base := marker{Areas: map[string]string{"flake": "applied", "gomod": "applied"}}
-
-	tests := []struct {
-		name string
-		now  marker
-		want bool
-	}{
-		{name: "identical", now: marker{Areas: map[string]string{"flake": "applied", "gomod": "applied"}}},
-		{
-			name: "state changed",
-			now:  marker{Areas: map[string]string{"flake": "applied", "gomod": "dropped"}},
-			want: true,
-		},
-		{
-			name: "area added",
-			now:  marker{Areas: map[string]string{"flake": "applied", "gomod": "applied", "generate": "applied"}},
-			want: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := changedAreas(base, test.now); got != test.want {
-				t.Errorf("changedAreas = %v, want %v", got, test.want)
-			}
-		})
 	}
 }
 

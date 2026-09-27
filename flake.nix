@@ -109,34 +109,9 @@
           golangci-lint-langserver = prev.golangci-lint-langserver.override {
             buildGoModule = buildGo;
           };
-
-          # web/bun.lock is written by bun 1.4 (lockfile version 2), which
-          # older bun cannot parse; pin the version the console is built with.
-          bun = prev.bun.overrideAttrs (
-            finalAttrs: _: {
-              version = "1.4.2";
-              __intentionallyOverridingVersion = true;
-              passthru = {
-                sources = {
-                  "aarch64-darwin" = prev.fetchurl {
-                    url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-darwin-aarch64.zip";
-                    hash = "sha256-kJh6OhbX21VtiGrD1VHnttPt8KHPQ6yu1iLoZ2vh0S8=";
-                  };
-                  "aarch64-linux" = prev.fetchurl {
-                    url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-aarch64.zip";
-                    hash = "sha256-VDKLvC2cjgyfiSxUTWbFeoO4QTnjSQnl7oF1jxrI/ac=";
-                  };
-                  "x86_64-linux" = prev.fetchurl {
-                    url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-x64-baseline.zip";
-                    hash = "sha256-xngEDxT+BEDrg503y9DOTAUaMtpygGrJfeamqra/co8=";
-                  };
-                };
-              };
-            }
-          );
         };
     }
-    # nixpkgs 26.11 dropped x86_64-darwin, and bun is pinned for these three only.
+    # nixpkgs 26.11 dropped x86_64-darwin.
     // flake-utils.lib.eachSystem [ "aarch64-darwin" "aarch64-linux" "x86_64-linux" ] (
       system:
       let

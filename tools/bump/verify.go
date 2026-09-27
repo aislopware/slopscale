@@ -30,6 +30,7 @@ func cmdVerify(ctx context.Context) error {
 	findings = append(findings, verifyBuilders(ctx, r)...)
 	findings = append(findings, verifyToolchain(ctx, r)...)
 	findings = append(findings, verifyVendorHash(ctx, r)...)
+	findings = append(findings, verifyActionVersions(r)...)
 
 	if len(findings) == 0 {
 		log.Print("all version pins agree")
@@ -42,6 +43,33 @@ func cmdVerify(ctx context.Context) error {
 	}
 
 	return fmt.Errorf("%w: %d finding(s)", errPinsDisagree, len(findings))
+}
+
+// verifyActionVersions checks that an action's version input names the
+// release its SHA pin is, so the binary it downloads is the one reviewed.
+func verifyActionVersions(r *repo) []finding {
+	files, err := workflowFiles(r)
+	if err != nil {
+		return []finding{finding(err.Error())}
+	}
+
+	var findings []finding
+
+	for _, file := range files {
+		content, err := r.readFile(file)
+		if err != nil {
+			return []finding{finding(err.Error())}
+		}
+
+		for _, m := range actionPin.FindAllStringSubmatch(content, -1) {
+			if selfVersioned[m[2]+"/"+m[3]] && m[9] != m[7] {
+				findings = append(findings, finding(fmt.Sprintf(
+					"%s: %s/%s is pinned at %s but its version input asks for %s", file, m[2], m[3], m[7], m[9])))
+			}
+		}
+	}
+
+	return findings
 }
 
 func verifyLockstep(ctx context.Context, r *repo) []finding {

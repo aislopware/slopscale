@@ -101,7 +101,7 @@ func TestAPIv2KubernetesOperatorPath(t *testing.T) {
 	t.Run("Services", func(t *testing.T) {
 		// An ingress the operator has not yet resolved ports for: it sends
 		// the do-not-validate sentinel rather than a port list.
-		require.NoError(t, op.Services().CreateOrUpdate(ctx, tsclient.VIPService{
+		require.NoError(t, op.Services().CreateOrUpdate(ctx, tsclient.Service{
 			Name:  "svc:foo",
 			Ports: []string{"do-not-validate"},
 		}))
@@ -113,14 +113,29 @@ func TestAPIv2KubernetesOperatorPath(t *testing.T) {
 
 		// Once the ingress is resolved the operator replaces the sentinel
 		// with the real ports.
-		require.NoError(t, op.Services().CreateOrUpdate(ctx, tsclient.VIPService{
-			Name:  "svc:foo",
-			Ports: []string{"tcp:443"},
+		require.NoError(t, op.Services().CreateOrUpdate(ctx, tsclient.Service{
+			Name:        "svc:foo",
+			DisplayName: "Foo ingress",
+			Ports:       []string{"tcp:443"},
 		}))
 
 		svc, err = op.Services().Get(ctx, "svc:foo")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"tcp:443"}, svc.Ports)
+		assert.Equal(t, "Foo ingress", svc.DisplayName, "the display name round-trips in its own field")
+		assert.Empty(t, svc.Annotations, "nothing the client did not set comes back as an annotation")
+
+		// A client written before the field existed sent the name as an
+		// annotation; it still lands.
+		require.NoError(t, op.Services().CreateOrUpdate(ctx, tsclient.Service{
+			Name:        "svc:foo",
+			Annotations: map[string]string{"displayName": "Foo legacy"},
+			Ports:       []string{"tcp:443"},
+		}))
+
+		svc, err = op.Services().Get(ctx, "svc:foo")
+		require.NoError(t, err)
+		assert.Equal(t, "Foo legacy", svc.DisplayName)
 
 		require.NoError(t, op.Services().Delete(ctx, "svc:foo"))
 

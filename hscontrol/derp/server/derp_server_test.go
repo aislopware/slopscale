@@ -559,7 +559,7 @@ func TestServerSTUNListenerAnswersIPv4Family(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		serverSTUNListener(ctx, serverConn)
+		serverSTUNListener(ctx, serverConn, false)
 	}()
 
 	t.Cleanup(func() {
@@ -605,7 +605,7 @@ func TestServerSTUNListener(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		serverSTUNListener(ctx, serverConn)
+		serverSTUNListener(ctx, serverConn, false)
 	}()
 
 	t.Cleanup(func() {

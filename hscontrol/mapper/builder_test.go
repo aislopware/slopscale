@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -365,11 +366,9 @@ func TestMapResponseBuilder_MultipleErrors(t *testing.T) {
 	assert.True(t, result.hasErrors())
 	assert.Len(t, result.errs, 2) // nil error should be ignored
 
-	// Build should return a multierr
+	// Build returns every collected error, joined.
 	data, err := result.Build()
 	require.Nil(t, data)
-	require.Error(t, err)
-
-	// The error should contain information about multiple errors
-	assert.Contains(t, err.Error(), "multiple errors")
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Equal(t, 2, strings.Count(err.Error(), assert.AnError.Error()))
 }

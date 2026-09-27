@@ -40,7 +40,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"tailscale.com/envknob"
 	"tailscale.com/util/mak"
-	"tailscale.com/util/multierr"
 	"tailscale.com/util/rands"
 )
 
@@ -1437,7 +1436,7 @@ func (s *Scenario) waitPeers(perUser func(*User) int, timeout, retryInterval tim
 	}
 
 	if len(allErrors) > 0 {
-		return multierr.New(allErrors...)
+		return errors.Join(allErrors...)
 	}
 
 	return nil

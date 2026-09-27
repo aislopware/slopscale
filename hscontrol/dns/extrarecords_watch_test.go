@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -51,4 +52,48 @@ func TestExtraRecordsFileIsReadOnceItSettles(t *testing.T) {
 		t.Fatalf("a second update for the same write: %v", records)
 	case <-time.After(3 * extraRecordsSettle):
 	}
+}
+
+// A records file is held to the settings API's rule: a bad file refuses to
+// start, and a bad edit to a running file keeps the records already served
+// rather than handing clients a name they panic on.
+func TestExtraRecordsFileRejectsInvalidRecords(t *testing.T) {
+	t.Parallel()
+
+	const bad = `[{"name":"evil.com\nnameserver 1.1.1.1","type":"A","value":"100.64.0.1"}]`
+
+	t.Run("at-start", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "extra.json")
+		require.NoError(t, os.WriteFile(path, []byte(bad), 0o600))
+
+		_, err := NewExtraRecordsManager(path)
+		require.ErrorIs(t, err, types.ErrDNSDomainInvalid)
+	})
+
+	t.Run("on-reload", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.TempDir(), "extra.json")
+		require.NoError(t, os.WriteFile(path,
+			[]byte(`[{"name":"a.example.com","type":"A","value":"100.64.0.1"}]`), 0o600))
+
+		er, err := NewExtraRecordsManager(path)
+		require.NoError(t, err)
+
+		t.Cleanup(er.Close)
+
+		go er.Run()
+
+		require.NoError(t, os.WriteFile(path, []byte(bad), 0o600))
+
+		select {
+		case records := <-er.UpdateCh():
+			t.Fatalf("an invalid file was served: %v", records)
+		case <-time.After(5 * extraRecordsSettle):
+		}
+
+		assert.Equal(t, []tailcfg.DNSRecord{{Name: "a.example.com", Type: "A", Value: "100.64.0.1"}}, er.Records())
+	})
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"net"
 	"net/netip"
 	"net/url"
@@ -1202,6 +1203,44 @@ func validateDNSSettings(v *configValidator) {
 	}
 }
 
+// validateDNSNames holds the DNS names of the config file to the rule the
+// settings API applies. A client drops a search domain or route it cannot
+// parse, and one older than the pinned client panics writing its OS DNS
+// configuration instead; a name with a newline would land in resolv.conf.
+func validateDNSNames(v *configValidator, dns DNSConfig) {
+	addErr := func(key, value string, err error) {
+		v.Add(&ConfigError{
+			Reason:  key + " holds an invalid entry",
+			Current: []KV{{key, value}},
+			Detail:  err.Error(),
+			Hint:    "a name takes letters, digits, '-' and '_' in dot-separated labels of at most 63 characters",
+			See:     docsURL + "ref/dns",
+			Cause:   err,
+		})
+	}
+
+	for _, domain := range dns.SearchDomains {
+		err := validateDomain(normalizeDomain(domain))
+		if err != nil {
+			addErr("dns.search_domains", domain, err)
+		}
+	}
+
+	for _, domain := range slices.Sorted(maps.Keys(dns.Nameservers.Split)) {
+		err := validateDomain(normalizeDomain(domain))
+		if err != nil {
+			addErr("dns.nameservers.split", domain, err)
+		}
+	}
+
+	for _, r := range dns.ExtraRecords {
+		err := validateRecord(r)
+		if err != nil {
+			addErr("dns.extra_records", r.Name, err)
+		}
+	}
+}
+
 // validateMagicDNSConfig checks that MagicDNS has a domain to name the
 // nodes under.
 func validateMagicDNSConfig(v *configValidator) {
@@ -1872,6 +1911,8 @@ func readServerSections(v *configValidator) serverSections {
 			Cause:   err,
 		})
 	}
+
+	validateDNSNames(v, s.dns)
 
 	// BaseDomain cannot be the same as the server URL.
 	// This is because Tailscale takes over the domain in BaseDomain,

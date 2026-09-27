@@ -22,7 +22,6 @@ import (
 	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/tailcfg/peercap"
 	"tailscale.com/types/views"
-	"tailscale.com/util/multierr"
 	"tailscale.com/util/set"
 	"tailscale.com/util/slicesx"
 )
@@ -332,6 +331,10 @@ func (a AliasWithPorts) MarshalJSON() ([]byte, error) {
 	return b, nil
 }
 
+// UnmarshalJSON has nothing to decode: the wildcard is the value. The
+// receiver is a value so the Wildcard constant is itself an [Alias].
+//
+//nolint:revive // marshal-receiver: see above
 func (a Asterix) UnmarshalJSON(_ []byte) error {
 	return nil
 }
@@ -399,8 +402,8 @@ func (u *Username) String() string {
 }
 
 // MarshalJSON marshals the Username to JSON.
-func (u *Username) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*u))
+func (u Username) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(u))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling username: %w", err)
 	}
@@ -411,7 +414,7 @@ func (u *Username) MarshalJSON() ([]byte, error) {
 type Prefix netip.Prefix
 
 // MarshalJSON marshals the Prefix to JSON.
-func (p *Prefix) MarshalJSON() ([]byte, error) {
+func (p Prefix) MarshalJSON() ([]byte, error) {
 	b, err := json.Marshal(p.String())
 	if err != nil {
 		return nil, fmt.Errorf("marshaling prefix: %w", err)
@@ -558,8 +561,8 @@ func (h *Host) String() string {
 }
 
 // MarshalJSON marshals the Host to JSON.
-func (h *Host) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*h))
+func (h Host) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(h))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling host: %w", err)
 	}
@@ -568,8 +571,8 @@ func (h *Host) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON marshals the Group to JSON.
-func (g *Group) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*g))
+func (g Group) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(g))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling group: %w", err)
 	}
@@ -653,8 +656,8 @@ func (t *Tag) String() string {
 }
 
 // MarshalJSON marshals the Tag to JSON.
-func (t *Tag) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*t))
+func (t Tag) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(t))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling tag: %w", err)
 	}
@@ -893,8 +896,8 @@ func (ag *AutoGroup) String() string {
 }
 
 // MarshalJSON marshals the AutoGroup to JSON.
-func (ag *AutoGroup) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*ag))
+func (ag AutoGroup) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(ag))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling autogroup: %w", err)
 	}
@@ -1313,13 +1316,13 @@ func (a *Aliases) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON marshals the Aliases to JSON.
-func (a *Aliases) MarshalJSON() ([]byte, error) {
-	if *a == nil {
+func (a Aliases) MarshalJSON() ([]byte, error) {
+	if a == nil {
 		return []byte("[]"), nil
 	}
 
-	aliases := make([]string, len(*a))
-	for i, alias := range *a {
+	aliases := make([]string, len(a))
+	for i, alias := range a {
 		aliases[i] = alias.String()
 	}
 
@@ -1352,7 +1355,7 @@ func (a *Aliases) Resolve(p *Policy, users types.Users, nodes views.Slice[types.
 func buildIPSetMultiErr(ipBuilder *netipx.IPSetBuilder, errs []error) (*netipx.IPSet, error) {
 	ips, err := ipBuilder.IPSet()
 
-	combinedErr := multierr.New(append(errs, err)...)
+	combinedErr := errors.Join(append(errs, err)...)
 	if combinedErr != nil {
 		return ips, fmt.Errorf("building IP set: %w", combinedErr)
 	}
@@ -1665,13 +1668,13 @@ func (h *Hosts) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON marshals the Hosts to JSON.
-func (h *Hosts) MarshalJSON() ([]byte, error) {
-	if *h == nil {
+func (h Hosts) MarshalJSON() ([]byte, error) {
+	if h == nil {
 		return []byte("{}"), nil
 	}
 
 	rawHosts := make(map[string]string)
-	for host, prefix := range *h {
+	for host, prefix := range h {
 		rawHosts[string(host)] = prefix.String()
 	}
 
@@ -1871,8 +1874,8 @@ func (a *Action) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON implements JSON marshaling for [Action].
-func (a *Action) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*a))
+func (a Action) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(a))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling action: %w", err)
 	}
@@ -1905,8 +1908,8 @@ func (a *SSHAction) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON implements JSON marshaling for [SSHAction].
-func (a *SSHAction) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*a))
+func (a SSHAction) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(a))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling ssh action: %w", err)
 	}
@@ -1971,8 +1974,8 @@ func (p *Protocol) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON implements JSON marshaling for [Protocol].
-func (p *Protocol) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*p))
+func (p Protocol) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(p))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling protocol: %w", err)
 	}
@@ -3204,7 +3207,7 @@ func (pol *Policy) validate() error {
 	errs = append(errs, pol.validatePostures()...)
 
 	if len(errs) > 0 {
-		return fmt.Errorf("validating policy: %w", multierr.New(errs...))
+		return fmt.Errorf("validating policy: %w", errors.Join(errs...))
 	}
 
 	pol.validated = true
@@ -3341,13 +3344,13 @@ func (a SSHRecorderAliases) MarshalJSON() ([]byte, error) {
 type SSHSrcAliases []Alias
 
 // MarshalJSON marshals the [Groups] to JSON.
-func (g *Groups) MarshalJSON() ([]byte, error) {
-	if *g == nil {
+func (g Groups) MarshalJSON() ([]byte, error) {
+	if g == nil {
 		return []byte("{}"), nil
 	}
 
 	raw := make(map[string][]string)
-	for group, usernames := range *g {
+	for group, usernames := range g {
 		users := make([]string, len(usernames))
 		for i, username := range usernames {
 			users[i] = string(username)
@@ -3436,13 +3439,13 @@ func (a SSHDstAliases) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON marshals the [SSHSrcAliases] to JSON.
-func (a *SSHSrcAliases) MarshalJSON() ([]byte, error) {
-	if a == nil || *a == nil {
+func (a SSHSrcAliases) MarshalJSON() ([]byte, error) {
+	if a == nil {
 		return []byte("[]"), nil
 	}
 
-	aliases := make([]string, len(*a))
-	for i, alias := range *a {
+	aliases := make([]string, len(a))
+	for i, alias := range a {
 		aliases[i] = alias.String()
 	}
 
@@ -3766,7 +3769,7 @@ func validateTests(pol *Policy, tests []PolicyTest) error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("%w:\n%w", errPolicyTestsFailed, multierr.New(errs...))
+		return fmt.Errorf("%w:\n%w", errPolicyTestsFailed, errors.Join(errs...))
 	}
 
 	return nil
@@ -3837,7 +3840,7 @@ func validateSSHTests(pol *Policy, tests []SSHPolicyTest) error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("%w:\n%w", errSSHPolicyTestsFailed, multierr.New(errs...))
+		return fmt.Errorf("%w:\n%w", errSSHPolicyTestsFailed, errors.Join(errs...))
 	}
 
 	return nil

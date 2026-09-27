@@ -375,7 +375,7 @@ func TestLoadDERPMapFromURL(t *testing.T) {
 		t.Cleanup(srv.Close)
 
 		_, err := loadDERPMapFromURL(t.Context(), *mustURL(t, srv.URL))
-		require.Error(t, err, "the truncated body is not a map")
+		require.ErrorIs(t, err, ErrMapTooLarge, "an oversized map is refused as such, not parsed truncated")
 	})
 
 	t.Run("refuses a blocked address", func(t *testing.T) {

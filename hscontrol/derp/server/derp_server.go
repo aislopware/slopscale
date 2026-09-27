@@ -23,6 +23,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"tailscale.com/derp"
 	"tailscale.com/derp/derpserver"
+	"tailscale.com/net/pktinfo"
 	"tailscale.com/net/stun"
 	"tailscale.com/net/wsconn"
 	"tailscale.com/tailcfg"
@@ -404,10 +405,12 @@ func (d *DERPServer) startSTUNLocked(conn *net.UDPConn, addr string) {
 
 	log.Info().Msgf("stun server started at %s", conn.LocalAddr())
 
+	pktInfo := enablePktInfo(conn)
+
 	go func() {
 		defer close(done)
 
-		serverSTUNListener(ctx, conn)
+		serverSTUNListener(ctx, conn, pktInfo)
 	}()
 }
 
@@ -428,11 +431,31 @@ func (d *DERPServer) stopSTUNLocked() {
 	d.stunDone = nil
 }
 
-func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
-	var buf [64 << 10]byte
+// enablePktInfo asks the kernel, on Linux, for the address each datagram
+// was sent to, so a reply leaves from it: a wildcard socket on a
+// multi-homed host otherwise replies from the default route's address,
+// which the client's NAT or conntrack does not match to its request
+// (tailscale/tailscale#21404). It must run before conn receives anything,
+// or those datagrams carry no address.
+func enablePktInfo(conn *net.UDPConn) bool {
+	err := pktinfo.Enable(conn)
+	if err != nil && !errors.Is(err, errors.ErrUnsupported) {
+		log.Warn().Err(err).Msg("stun replies use the kernel-chosen source address")
+	}
+
+	return err == nil
+}
+
+// serverSTUNListener answers binding requests on conn until ctx ends,
+// replying from the address each was sent to when pktInfo is on.
+func serverSTUNListener(ctx context.Context, conn *net.UDPConn, pktInfo bool) {
+	var (
+		buf         [64 << 10]byte
+		oob, oobOut [256]byte
+	)
 
 	for {
-		bytesRead, udpAddr, err := packetConn.ReadFromUDP(buf[:])
+		n, remote, local, err := readSTUN(conn, pktInfo, buf[:], oob[:])
 		if err != nil {
 			if ctx.Err() != nil {
 				return
@@ -450,9 +473,9 @@ func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 			continue
 		}
 
-		log.Trace().Caller().Msgf("stun request from %v", udpAddr)
+		log.Trace().Caller().Msgf("stun request from %v", remote)
 
-		pkt := buf[:bytesRead]
+		pkt := buf[:n]
 		if !stun.Is(pkt) {
 			log.Trace().Caller().Msgf("udp packet is not stun")
 
@@ -469,19 +492,56 @@ func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 		// A dual-stack socket reports an IPv4 client as a v4-mapped IPv6
 		// address; unmapped, the reply carries the IPv4 family the client
 		// sent from.
-		addr, _ := netip.AddrFromSlice(udpAddr.IP)
-		res := stun.Response(
-			txid,
-			netip.AddrPortFrom(addr.Unmap(), uint16(udpAddr.Port)), //nolint:gosec // port is always <=65535
-		)
+		remote = netip.AddrPortFrom(remote.Addr().Unmap(), remote.Port())
 
-		_, err = packetConn.WriteTo(res, udpAddr)
+		err = writeSTUN(conn, stun.Response(txid, remote), remote, local, oobOut[:0])
 		if err != nil {
 			log.Trace().Caller().Err(err).Msgf("issue writing to UDP")
 
 			continue
 		}
 	}
+}
+
+// readSTUN reads one datagram and, with pktInfo, the local address it was
+// sent to; the zero address when that is unknown.
+func readSTUN(conn *net.UDPConn, pktInfo bool, buf, oob []byte) (int, netip.AddrPort, netip.Addr, error) {
+	var (
+		n, oobn int
+		remote  netip.AddrPort
+		err     error
+	)
+
+	if pktInfo {
+		n, oobn, _, remote, err = conn.ReadMsgUDPAddrPort(buf, oob)
+	} else {
+		n, remote, err = conn.ReadFromUDPAddrPort(buf)
+	}
+
+	if err != nil {
+		return 0, remote, netip.Addr{}, fmt.Errorf("reading stun request: %w", err)
+	}
+
+	return n, remote, pktinfo.Dst(oob[:oobn]), nil
+}
+
+// writeSTUN sends b to remote from local when it is known, else from the
+// address the kernel picks.
+func writeSTUN(conn *net.UDPConn, b []byte, remote netip.AddrPort, local netip.Addr, oob []byte) error {
+	var err error
+
+	oob = pktinfo.AppendSrc(oob, local)
+	if len(oob) == 0 {
+		_, err = conn.WriteToUDPAddrPort(b, remote)
+	} else {
+		_, _, err = conn.WriteMsgUDPAddrPort(b, oob, remote)
+	}
+
+	if err != nil {
+		return fmt.Errorf("writing stun response: %w", err)
+	}
+
+	return nil
 }
 
 // verifyServers maps a relay's id to it, for the verify transport. The

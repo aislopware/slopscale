@@ -22,7 +22,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"tailscale.com/cmd/tsconnect/wasmbuild"
@@ -119,11 +118,9 @@ func run(out string) error {
 	return nil
 }
 
-// build compiles the client into a temporary file and returns its
-// bytes. Tailscale's own build sets the tailscale_go tag for its Go
-// fork; this one runs on the standard toolchain, so the tag is dropped
-// and the rest of its tag list, which strips every feature a browser
-// cannot use, is kept.
+// build compiles the client into a temporary file with Tailscale's own
+// production build, whose tags strip every feature a browser cannot use,
+// and returns its bytes.
 func build() ([]byte, error) {
 	tmp, err := os.CreateTemp("", "tsconnect-*.wasm")
 	if err != nil {
@@ -139,22 +136,12 @@ func build() ([]byte, error) {
 
 	defer os.Remove(tmpPath)
 
-	tags := slices.DeleteFunc(strings.Split(wasmbuild.Tags(), ","), func(t string) bool {
-		return t == "tailscale_go"
-	})
-
-	cmd := exec.CommandContext(context.Background(), "go", "build", //nolint:gosec // a build step's own arguments
-		"-tags", strings.Join(tags, ","),
-		"-trimpath",
-		"-ldflags", wasmbuild.ProdLDFlags(),
-		"-o", tmpPath,
-		"tailscale.com/cmd/tsconnect/wasm",
-	)
+	cmd := wasmbuild.ProdCommand("go", tmpPath)
 
 	// goreleaser vendors the module before make web, and the client's
 	// packages are not imported by the server, so they are not in vendor;
 	// build from the module cache instead.
-	cmd.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm", "CGO_ENABLED=0", "GOFLAGS=-mod=mod")
+	cmd.Env = append(cmd.Env, "CGO_ENABLED=0", "GOFLAGS=-mod=mod")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

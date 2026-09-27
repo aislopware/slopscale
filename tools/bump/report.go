@@ -1,72 +1,17 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
 
-// markerPrefix tags the machine-readable footer of a bot-authored pull request
-// body. It is the bot's only persistent state: everything else is rebuilt from
-// the base branch on every run.
-const markerPrefix = "<!-- versionbump:v1 "
-
-// marker records what a run produced, so the next run can tell "nothing new"
-// from "the same change, already rejected".
-type marker struct {
-	Tree  string            `json:"tree"`
-	Head  string            `json:"head"`
-	Areas map[string]string `json:"areas"`
-}
-
-func (m marker) render() string {
-	b, err := json.Marshal(m)
-	if err != nil {
-		return ""
-	}
-
-	return markerPrefix + string(b) + " -->"
-}
-
-// parseMarker recovers the marker from a pull request body. A body without one
-// was not written by this tool.
-func parseMarker(body string) (marker, bool) {
-	_, rest, ok := strings.Cut(body, markerPrefix)
-	if !ok {
-		return marker{}, false
-	}
-
-	payload, _, ok := strings.Cut(rest, " -->")
-	if !ok {
-		return marker{}, false
-	}
-
-	var m marker
-
-	err := json.Unmarshal([]byte(payload), &m)
-	if err != nil {
-		return marker{}, false
-	}
-
-	return m, true
-}
-
-func markerOf(results []result, tree, head string) marker {
-	areas := make(map[string]string, len(results))
-	for _, res := range results {
-		areas[res.Area] = string(res.State)
-	}
-
-	return marker{Tree: tree, Head: head, Areas: areas}
-}
-
-// renderBody writes the pull request body. It leads with what landed and what
-// did not, because the point of the bot is that the reader can decide from the
-// body plus the checks without reproducing the run.
-func renderBody(results []result, m marker, gate string) string {
+// renderReport writes what the run moved and dropped. It is the starting point
+// of the review, not its result: every moved item still has its changes read
+// for what slopscale should drop, change or adopt before a pull request opens.
+func renderReport(results []result, gate string) string {
 	var sb strings.Builder
 
-	sb.WriteString("Automated version bump.\n\n")
+	sb.WriteString("Version bump, applied locally.\n\n")
 	sb.WriteString("| Area | Result | Change |\n|---|---|---|\n")
 
 	for _, res := range results {
@@ -83,9 +28,8 @@ func renderBody(results []result, m marker, gate string) string {
 
 	sb.WriteString("\n")
 	sb.WriteString(gateNote(gate))
-	sb.WriteString("\n")
-	sb.WriteString(m.render())
-	sb.WriteString("\n")
+	sb.WriteString("\nBefore opening a pull request, read each moved item's release notes between the two " +
+		"versions and act on what slopscale should drop, change or adopt.\n")
 
 	return sb.String()
 }
@@ -158,19 +102,17 @@ func writeLog(sb *strings.Builder, log string) {
 	sb.WriteString("\n  ```\n")
 }
 
-// gateNote says what the bump job did and did not already run, so the reader
-// knows how much of the green tick below is new information.
+// gateNote says what the run already checked, so the reader knows what is
+// left to the pull request's CI.
 func gateNote(gate string) string {
 	switch gate {
 	case gateFull:
-		return "The nix checks, the console and docs checks and the tailscale builder images were already " +
-			"run in the bump job; the servertest, end-to-end and integration jobs are left to this pull " +
-			"request's own CI.\n"
+		return "The nix checks, the console and docs checks and the tailscale builder images passed; " +
+			"servertest, end-to-end and integration are left to the pull request's CI.\n"
 	case gateQuick:
-		return "Only `nix build .#checks.<system>.build` was run in the bump job; " +
-			"everything else is left to this pull request's own CI.\n"
+		return "Only `nix build .#checks.<system>.build` ran; everything else is left to the pull request's CI.\n"
 	default:
-		return "No gate was run in the bump job; every check below is the first one.\n"
+		return "No gate ran.\n"
 	}
 }
 
@@ -191,20 +133,4 @@ func cell(s string) string {
 	}
 
 	return s
-}
-
-// changedAreas reports whether the outcome differs from the last run, which is
-// what decides between silently updating the pull request and commenting on it.
-func changedAreas(prev, now marker) bool {
-	if len(prev.Areas) != len(now.Areas) {
-		return true
-	}
-
-	for name, st := range now.Areas {
-		if prev.Areas[name] != st {
-			return true
-		}
-	}
-
-	return false
 }

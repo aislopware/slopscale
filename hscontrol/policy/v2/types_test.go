@@ -6339,10 +6339,10 @@ func TestUnmarshalPolicySSHTests(t *testing.T) {
 		},
 		{
 			// Multiple shape failures in one entry must aggregate through
-			// multierr.New under errSSHPolicyTestsFailed so the surfaced
+			// errors.Join under errSSHPolicyTestsFailed so the surfaced
 			// body matches the SaaS body byte-for-byte and every
 			// individual sentinel remains reachable via errors.Is.
-			name: "multierr-wrap",
+			name: "joined-wrap",
 			input: `
 {
   "tagOwners": {"tag:server": ["admin@example.org"]},

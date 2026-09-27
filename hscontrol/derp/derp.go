@@ -38,6 +38,9 @@ var (
 	// ErrRedirected is returned when a DERP map URL redirects; the map is
 	// read from the URL the operator configured only.
 	ErrRedirected = errors.New("DERP map URL redirected")
+	// ErrMapTooLarge is returned when a DERP map URL answers with more than
+	// maxDERPMapBytes.
+	ErrMapTooLarge = errors.New("DERP map too large")
 )
 
 // noRedirect keeps the fetch at the configured URL instead of following it
@@ -91,9 +94,18 @@ func loadDERPMapFromURL(ctx context.Context, addr url.URL) (*tailcfg.DERPMap, er
 		return nil, fmt.Errorf("fetching DERP map from %s: %w: %s", addr.Redacted(), ErrFetchFailed, resp.Status)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDERPMapBytes))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDERPMapBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading DERP map response body: %w", err)
+	}
+
+	if len(body) > maxDERPMapBytes {
+		return nil, fmt.Errorf(
+			"fetching DERP map from %s: %w: over %d bytes",
+			addr.Redacted(),
+			ErrMapTooLarge,
+			maxDERPMapBytes,
+		)
 	}
 
 	var derpMap tailcfg.DERPMap

@@ -1,5 +1,6 @@
 ---
 title: "API"
+description: "Create and scope API keys, call the REST API, use the Tailscale-compatible API with OAuth clients, Terraform and Kubernetes, and run the CLI remotely."
 ---
 
 Slopscale provides a [HTTP REST API](#rest-api) which drives the built-in [admin console](/ref/console), may be used to
@@ -366,20 +367,25 @@ The `slopscale` binary can control a Slopscale instance from a remote machine ov
 1. Provide the connection parameters for the remote Slopscale server either via a minimal YAML configuration file or
    via environment variables:
 
-    === "Minimal YAML configuration file"
+    <Tabs>
+    <Tab title="Minimal YAML configuration file">
 
-        ```yaml title="config.yaml"
-        cli:
-            address: <SLOPSCALE_URL>
-            api_key: <API_KEY>
-        ```
+    ```yaml title="config.yaml"
+    cli:
+        address: <SLOPSCALE_URL>
+        api_key: <API_KEY>
+    ```
 
-    === "Environment variables"
+    </Tab>
+    <Tab title="Environment variables">
 
-        ```shell
-        export SLOPSCALE_CLI_ADDRESS="<SLOPSCALE_URL>"
-        export SLOPSCALE_CLI_API_KEY="<API_KEY>"
-        ```
+    ```shell
+    export SLOPSCALE_CLI_ADDRESS="<SLOPSCALE_URL>"
+    export SLOPSCALE_CLI_API_KEY="<API_KEY>"
+    ```
+
+    </Tab>
+    </Tabs>
 
     This instructs the `slopscale` binary to connect to a remote instance at `<SLOPSCALE_URL>` (e.g.
     `https://slopscale.example.com`), instead of connecting to the local instance. A bare host without a scheme is

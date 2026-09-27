@@ -395,6 +395,7 @@ type PostureIntegration struct {
 type PutVIPServiceRequest struct {
 	Annotations *map[string]string `json:"annotations,omitempty"`
 	Comment     *string            `json:"comment,omitempty"`
+	DisplayName *string            `json:"displayName,omitempty"`
 	Name        *string            `json:"name,omitempty"`
 	Ports       *[]string          `json:"ports,omitempty"`
 	Tags        *[]string          `json:"tags,omitempty"`
@@ -539,6 +540,7 @@ type VIPService struct {
 	Addrs       []string           `json:"addrs"`
 	Annotations *map[string]string `json:"annotations,omitempty"`
 	Comment     *string            `json:"comment,omitempty"`
+	DisplayName *string            `json:"displayName,omitempty"`
 	Name        string             `json:"name"`
 	Ports       []string           `json:"ports"`
 	Tags        []string           `json:"tags"`

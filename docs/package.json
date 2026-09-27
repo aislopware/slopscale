@@ -6,7 +6,8 @@
     "dev": "blume dev",
     "build": "blume build",
     "preview": "blume preview",
-    "validate": "blume validate"
+    "validate": "blume validate",
+    "audit": "blume audit --only=anchor_broken,link_to_broken,link_to_redirect,double_slash_url --fail-on=warning"
   },
   "dependencies": {
     "blume": "2.0.3"

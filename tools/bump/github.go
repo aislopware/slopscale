@@ -109,24 +109,3 @@ func commitOfRef(ctx context.Context, owner, name, ref string) (string, error) {
 
 	return commit.SHA, nil
 }
-
-// currentSlug is the repository the run is acting on. It defaults to whatever
-// the job is running in rather than a constant: a hardcoded upstream slug let a
-// fork push its branch and then try to open the pull request on someone else's
-// repository, which fails at the very last step of a long run.
-func currentSlug(ctx context.Context, r *repo, override string) (string, error) {
-	if override != "" {
-		return override, nil
-	}
-
-	if env := os.Getenv("GITHUB_REPOSITORY"); env != "" {
-		return env, nil
-	}
-
-	out, err := r.run(ctx, "gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(out), nil
-}

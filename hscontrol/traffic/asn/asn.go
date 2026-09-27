@@ -39,6 +39,7 @@ const DefaultMinRanges = 100000
 // Errors a load reports.
 var (
 	ErrTooSmall    = errors.New("ASN table holds too few ranges")
+	ErrTooLarge    = errors.New("ASN table download too large")
 	ErrBadLine     = errors.New("malformed ASN table line")
 	ErrHTTPStatus  = errors.New("unexpected HTTP status")
 	ErrNoCacheFile = errors.New("no cached ASN table")
@@ -270,6 +271,8 @@ type Source struct {
 	Client    *http.Client
 	// MinRanges overrides [DefaultMinRanges] when set.
 	MinRanges int
+	// MaxDownload overrides the download size bound when set.
+	MaxDownload int64
 }
 
 // LoadCache parses the cached copy.
@@ -326,9 +329,15 @@ func (s Source) Fetch(ctx context.Context) (*Table, error) {
 		return nil, fmt.Errorf("%w %d downloading the ASN table", ErrHTTPStatus, resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDownload))
+	limit := cmp.Or(s.MaxDownload, maxDownload)
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
 		return nil, fmt.Errorf("downloading the ASN table: %w", err)
+	}
+
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%w: over %d bytes", ErrTooLarge, limit)
 	}
 
 	t, err := Parse(bytes.NewReader(body))

@@ -11,9 +11,17 @@ import (
 
 // actionPin matches a SHA-pinned action reference together with the trailing
 // comment that says which version the SHA is. Both have to move, or the comment
-// starts lying about what is running.
+// starts lying about what is running. The "version:" input right below is
+// captured too, for [selfVersioned].
 var actionPin = regexp.MustCompile(
-	`(?m)(uses:\s+)([\w.-]+)/([\w.-]+)((?:/[\w./-]+)?)@([0-9a-f]{40})(\s+#\s*)(\S+)`)
+	`(?m)(uses:\s+)([\w.-]+)/([\w.-]+)((?:/[\w./-]+)?)@([0-9a-f]{40})(\s+#\s*)(\S+)` +
+		`(?:([ \t]*\n[ \t]+with:[ \t]*\n[ \t]+version:[ \t]+)(\S+))?`)
+
+// selfVersioned lists the actions whose version input is their own release:
+// they download that binary, the latest one unless told, so the input is
+// pinned beside the SHA and moves with it. Other actions' version inputs
+// name the tool they install and are left alone.
+var selfVersioned = map[string]bool{"Mic92/hestia": true}
 
 // isVersionRef reports whether a pin comment names a release rather than a
 // branch. A branch pin is deliberate and keeps following that branch.
@@ -151,6 +159,7 @@ func rewriteActions(
 	updated := actionPin.ReplaceAllStringFunc(content, func(match string) string {
 		m := actionPin.FindStringSubmatch(match)
 		owner, name, sub, sha, sep, ref := m[2], m[3], m[4], m[5], m[6], m[7]
+		withVersion, version := m[8], m[9]
 
 		key := owner + "/" + name + "@" + ref
 
@@ -182,7 +191,11 @@ func rewriteActions(
 			moved[owner+"/"+name] = fmt.Sprintf("%s/%s %s -> %s", owner, name, ref, target.Ref)
 		}
 
-		return m[1] + owner + "/" + name + sub + "@" + target.SHA + sep + target.Ref
+		if selfVersioned[owner+"/"+name] && version == ref {
+			version = target.Ref
+		}
+
+		return m[1] + owner + "/" + name + sub + "@" + target.SHA + sep + target.Ref + withVersion + version
 	})
 
 	if failure != nil && len(moved) == 0 {

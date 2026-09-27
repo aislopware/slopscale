@@ -11,7 +11,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -55,7 +54,6 @@ const (
 	defaultFlush    = 2 * time.Second
 	defaultBatch    = 100
 	queueSize       = 4096
-	maxResponseRead = 4 << 10
 	closeGrace      = 5 * time.Second
 )
 
@@ -456,8 +454,6 @@ func (s *Streamer) post(ctx context.Context, stream types.LogStream, batch []Ent
 		return 0, fmt.Errorf("posting log batch: %w", err)
 	}
 	defer resp.Body.Close()
-
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseRead))
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return resp.StatusCode, fmt.Errorf("%w: %s", ErrRejected, resp.Status)

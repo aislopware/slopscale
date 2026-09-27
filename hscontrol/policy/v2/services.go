@@ -45,8 +45,8 @@ func (s *Service) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON marshals the service alias to JSON.
-func (s *Service) MarshalJSON() ([]byte, error) {
-	b, err := json.Marshal(string(*s))
+func (s Service) MarshalJSON() ([]byte, error) {
+	b, err := json.Marshal(string(s))
 	if err != nil {
 		return nil, fmt.Errorf("marshaling service: %w", err)
 	}

@@ -853,7 +853,7 @@ func TestSetPolicyRejectsFailingSSHTests(t *testing.T) {
 		"live SSH policy must not change after a rejected SetPolicy")
 }
 
-// TestSetPolicyAggregatesACLAndSSHTestFailures exercises the multierr
+// TestSetPolicyAggregatesACLAndSSHTestFailures exercises the joined
 // aggregation: when both layers fail, the returned error wraps both
 // sentinels so operators see every failure in a single round trip.
 func TestSetPolicyAggregatesACLAndSSHTestFailures(t *testing.T) {

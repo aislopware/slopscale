@@ -101,6 +101,9 @@ describe(AccessMapView, () => {
 
     expect(cells).toHaveLength((maxTileClasses + 1) ** 2);
     expect(cells[1]?.textContent).toBe("");
+    // The readout follows a hovered cell before the focused one, and the page's pointer is
+    // wherever an earlier test file left it, possibly over this grid; park it on the heading.
+    await userEvent.hover(screen.getByRole("heading", { name: "Who reaches what" }));
     await expect.element(screen.getByText("One machine against itself")).toBeVisible();
 
     cells[0]?.focus();

@@ -3,6 +3,7 @@ package types
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/conf"
@@ -273,4 +274,83 @@ func TestDeprecatorReportsEachKeyOnce(t *testing.T) {
 	assert.Equal(t, "configuration key acl_policy_path has been removed; use policy.path instead", errs[0].Reason)
 	assert.Equal(t, "remove acl_policy_path and set policy.path", errs[0].Hint)
 	assert.Equal(t, []KV{{"acl_policy_path", "/etc/slopscale/acl.hujson"}}, errs[0].Current)
+}
+
+// A config-file DNS name is held to the settings API's rule: a client drops
+// or, before the pinned version, panics on a name it cannot parse, and a
+// newline reaches resolv.conf.
+func TestValidateDNSNames(t *testing.T) {
+	const head = `---
+server_url: https://example.com
+noise:
+  private_key_path: noise_private.key
+prefixes:
+  v4: 100.64.0.0/10
+database:
+  type: sqlite3
+dns:
+  magic_dns: false
+  override_local_dns: false
+`
+
+	long := strings.Repeat("a", 64) + ".example.com"
+
+	tests := []struct {
+		name    string
+		dns     string
+		wantErr string // empty: no error
+	}{
+		{
+			name: "valid-names",
+			dns: "  search_domains: [Corp.Example.com., svc.cluster.local]\n" +
+				"  nameservers:\n    split:\n      _msdcs.example.com: [10.0.0.1]\n" +
+				"  extra_records:\n    - {name: Printer.fritz.box, type: A, value: 100.64.0.9}\n",
+		},
+		{
+			name:    "search-domain-label-too-long",
+			dns:     "  search_domains: [" + long + "]\n",
+			wantErr: "dns.search_domains holds an invalid entry",
+		},
+		{
+			name:    "search-domain-with-space",
+			dns:     "  search_domains: [\"a b.com\"]\n",
+			wantErr: "dns.search_domains holds an invalid entry",
+		},
+		{
+			name:    "search-domain-with-newline",
+			dns:     "  search_domains: [\"evil.com\\nnameserver 1.1.1.1\"]\n",
+			wantErr: "dns.search_domains holds an invalid entry",
+		},
+		{
+			name:    "split-domain-with-space",
+			dns:     "  nameservers:\n    split:\n      \"a b.com\": [10.0.0.1]\n",
+			wantErr: "dns.nameservers.split holds an invalid entry",
+		},
+		{
+			name:    "record-name-with-newline",
+			dns:     "  extra_records:\n    - {name: \"evil.com\\nx\", type: A, value: 100.64.0.9}\n",
+			wantErr: "dns.extra_records holds an invalid entry",
+		},
+		{
+			name:    "record-value-wrong-family",
+			dns:     "  extra_records:\n    - {name: host.example.com, type: AAAA, value: 100.64.0.9}\n",
+			wantErr: "dns.extra_records holds an invalid entry",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loadTestConfig(t, head+tt.dns)
+
+			_, err := LoadServerConfig()
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+
+				return
+			}
+
+			require.ErrorIs(t, err, ErrDNSSettingsInvalid)
+			assert.Contains(t, reasons(ConfigErrors(err)), tt.wantErr)
+		})
+	}
 }

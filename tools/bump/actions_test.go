@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestActionPinMatch(t *testing.T) {
 	tests := []struct {
@@ -67,6 +70,34 @@ func TestActionPinRewrite(t *testing.T) {
 	const want = "uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # v7.0.0"
 	if got != want {
 		t.Errorf("rewrite = %q, want %q", got, want)
+	}
+}
+
+// hestia downloads the release its version input names, "latest" by
+// default, so the input is pinned next to the SHA and has to move with it.
+func TestActionPinMovesVersionInput(t *testing.T) {
+	const pinned = "    - uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0\n" +
+		"      with:\n" +
+		"        version: v3.1.0\n" +
+		"    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"
+
+	target := actionTarget{SHA: strings.Repeat("a", 40), Ref: "v3.2.0"}
+	resolved := map[string]actionTarget{
+		"Mic92/hestia@v3.1.0":     target,
+		"actions/checkout@v7.0.1": {SHA: "3d3c42e5aac5ba805825da76410c181273ba90b1", Ref: "v7.0.1"},
+	}
+
+	got, err := rewriteActions(t.Context(), pinned, resolved, map[string]string{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "    - uses: Mic92/hestia@" + target.SHA + " # v3.2.0\n" +
+		"      with:\n" +
+		"        version: v3.2.0\n" +
+		"    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"
+	if got != want {
+		t.Errorf("rewrite =\n%s\nwant\n%s", got, want)
 	}
 }
 

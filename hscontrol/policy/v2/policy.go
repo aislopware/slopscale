@@ -22,7 +22,6 @@ import (
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 	"tailscale.com/util/deephash"
-	"tailscale.com/util/multierr"
 )
 
 // ErrInvalidTagOwner is returned when a tag owner is not an [Alias] type.
@@ -256,7 +255,7 @@ func validateUserReferences(pol *Policy, users types.Users) error {
 	validateACLUserReferences(pol, users, &errs)
 	validateSSHUserReferences(pol, users, &errs)
 
-	err := multierr.New(errs...)
+	err := errors.Join(errs...)
 	if err != nil {
 		return fmt.Errorf("validating user references: %w", err)
 	}
@@ -496,10 +495,10 @@ func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
 	// they fail, return without mutating the live PolicyManager so the
 	// failed write does not knock the running config offline.
 	//
-	// Aggregate ACL and SSH test failures via multierr so operators
+	// Aggregate ACL and SSH test failures so operators
 	// see both classes in a single response instead of having to
 	// fix-and-retry to discover the second one.
-	testErr := multierr.New(
+	testErr := errors.Join(
 		evaluateTests(pol, pm.users, pm.nodes),
 		evaluateSSHTests(pol, pm.users, pm.nodes),
 	)

@@ -5,8 +5,8 @@ server at `/console/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ## Stack
 
-- React 19 with the React Compiler (`oxc-transform-react`, through
-  `@vitejs/plugin-react`), built by Vite 8.
+- React 19 through `@vitejs/plugin-react`, built by Vite 8. The React
+  Compiler is not enabled.
 - TanStack Router (file routes under `src/routes`, generated tree in
   `src/routeTree.gen.ts`), TanStack Query, TanStack Table v9 (`useTable` and
   `tableFeatures`; v8 examples do not apply), TanStack Form where a form has
