@@ -173,13 +173,22 @@ func sendReport(t *testing.T, client *http.Client, srvURL, token string, r traff
 	return resp
 }
 
+// selfNetmap waits for the node's first netmap: a client registers
+// before its map stream starts, so under load it can have none yet.
+func selfNetmap(t *testing.T, node *servertest.TestClient) *netmap.NetworkMap {
+	t.Helper()
+
+	node.WaitForCondition(t, "its own node", trafficWait, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid()
+	})
+
+	return node.Netmap()
+}
+
 func nodeIP4(t *testing.T, node *servertest.TestClient) netip.Addr {
 	t.Helper()
 
-	nm := node.Netmap()
-	require.NotNil(t, nm)
-
-	for _, p := range nm.SelfNode.Addresses().All() {
+	for _, p := range selfNetmap(t, node).SelfNode.Addresses().All() {
 		if p.Addr().Is4() {
 			return p.Addr()
 		}
@@ -239,7 +248,7 @@ func useExitNode(t *testing.T, c *servertest.TestClient, gw tailcfg.StableNodeID
 func nodeIP6(t *testing.T, node *servertest.TestClient) netip.Addr {
 	t.Helper()
 
-	for _, p := range node.Netmap().SelfNode.Addresses().All() {
+	for _, p := range selfNetmap(t, node).SelfNode.Addresses().All() {
 		if p.Addr().Is6() {
 			return p.Addr()
 		}
