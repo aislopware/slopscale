@@ -21,6 +21,7 @@ import { createAppColumnHelper, useAppTable } from "~/components/table/app-table
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
 
@@ -281,18 +282,23 @@ function MachineCell({
   readonly machine: LatencyMachineRow["machine"];
 }): ReactElement {
   return (
-    <span className="flex items-center gap-2">
-      <Link
-        to="/machines/$nodeId"
-        params={{ nodeId: machine.nodeId }}
-        className="truncate hover:underline"
-      >
-        {machine.name}
-      </Link>
-      {/* A disconnected machine keeps its last reading, which is the one thing about the row a
-          reader has to know; a connected one is the normal case and says nothing. */}
-      {machine.online ? null : <span className="text-xs text-kumo-subtle">offline</span>}
-    </span>
+    <MachineName
+      name={
+        <span className="flex max-w-full items-center gap-2">
+          <Link
+            to="/machines/$nodeId"
+            params={{ nodeId: machine.nodeId }}
+            className="truncate hover:underline"
+          >
+            {machine.name}
+          </Link>
+          {/* A disconnected machine keeps its last reading, which is the one thing about the row a
+              reader has to know; a connected one is the normal case and says nothing. */}
+          {machine.online ? null : <span className="text-xs text-kumo-subtle">offline</span>}
+        </span>
+      }
+      owner={machine.owner}
+    />
   );
 }
 

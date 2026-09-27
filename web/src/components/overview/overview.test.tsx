@@ -73,7 +73,7 @@ describe(MetricTiles, () => {
       ),
     );
 
-    await expect.element(screen.getByText("office first of 2 global")).toBeVisible();
+    await expect.element(screen.getByText("office (Alice) first of 2 global")).toBeVisible();
   });
 
   it("leaves out the tiles the caller may not read", async () => {

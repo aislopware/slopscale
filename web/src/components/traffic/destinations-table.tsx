@@ -1,3 +1,4 @@
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
 import type { DestinationGrouping, TrafficDestination } from "~/api/traffic.ts";
@@ -14,6 +15,7 @@ import {
 } from "~/components/traffic/format.ts";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import { useWidths } from "~/lib/breakpoint.ts";
 import type { Widths } from "~/lib/breakpoint.ts";
@@ -186,9 +188,19 @@ function PortCell({ row }: { readonly row: TrafficDestination }): ReactElement {
 
 function NodeCell({ row }: { readonly row: TrafficDestination }): ReactElement {
   return (
-    <span className={row.nodeName === "" ? "text-kumo-subtle" : "font-medium"}>
-      {trafficNodeName(row)}
-    </span>
+    <MachineName
+      name={
+        <span
+          className={cn(
+            "max-w-full truncate",
+            row.nodeName === "" ? "text-kumo-subtle" : "font-medium",
+          )}
+        >
+          {trafficNodeName(row)}
+        </span>
+      }
+      owner={row.nodeOwner}
+    />
   );
 }
 

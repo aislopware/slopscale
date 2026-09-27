@@ -1,4 +1,4 @@
-import type { AccessGraphEdge, AccessGraphNode } from "~/api/schema.gen.ts";
+import type { AccessGraphEdge, AccessGraphNode, MachineOwner } from "~/api/schema.gen.ts";
 
 /** What the policy writes for "every port", and for "any login" in an SSH rule. */
 export const everything = "*";
@@ -195,6 +195,16 @@ export function edgeListView(rows: readonly EdgeRow[], expanded: boolean): EdgeL
 
 export function nodesById(nodes: readonly AccessGraphNode[]): Map<string, AccessGraphNode> {
   return new Map(nodes.map((node) => [node.id, node]));
+}
+
+/** A machine as one line of text: its name and whose it is. */
+export function graphNodeLabel(node: AccessGraphNode): string {
+  return `${node.name} (${ownerLabel(node)})`;
+}
+
+/** The owner in the shape the other pages' machine names take; the graph knows only the login. */
+export function graphNodeOwner(node: AccessGraphNode): MachineOwner {
+  return { tags: node.tags, userId: "", userName: node.user, displayName: "", profilePicUrl: "" };
 }
 
 /** Who the machine belongs to: its tags, or its owner's login. Tags and users are exclusive. */

@@ -30,6 +30,7 @@ import {
   approvedSubnets,
   isExitNode,
   isTagged,
+  nodeLabel,
   nodeName,
   nodeStatus,
   ownerLabel,
@@ -53,7 +54,7 @@ const maxOwnerTags = 2;
 const selectColumn = helper.display({
   id: "select",
   header: () => <SelectAllCheckbox />,
-  cell: ({ row }) => <SelectRowCheckbox id={row.original.id} name={nodeName(row.original)} />,
+  cell: ({ row }) => <SelectRowCheckbox id={row.original.id} name={nodeLabel(row.original)} />,
   meta: { className: "w-10" },
 });
 

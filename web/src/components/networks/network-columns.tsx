@@ -15,8 +15,10 @@ import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { machineLabel } from "~/lib/node.ts";
 
 /** A network with its group names spelled out, so the global filter can match them. */
 export interface NetworkRow extends Network {
@@ -53,13 +55,16 @@ export const networkColumns = helper.columns([
     ),
     meta: { className: "min-w-36" },
   }),
-  helper.accessor((network) => network.routers.map((router) => router.name).join(" "), {
-    id: "routers",
-    header: "Routers",
-    enableSorting: false,
-    cell: ({ row }) => <RoutersCell network={row.original} />,
-    meta: { className: "min-w-36" },
-  }),
+  helper.accessor(
+    (network) => network.routers.map((router) => machineLabel(router.name, router.owner)).join(" "),
+    {
+      id: "routers",
+      header: "Routers",
+      enableSorting: false,
+      cell: ({ row }) => <RoutersCell network={row.original} />,
+      meta: { className: "min-w-36" },
+    },
+  ),
   helper.accessor((network) => network.groupNames, {
     id: "groups",
     header: "Groups",
@@ -155,35 +160,46 @@ function RoutersCell({ network }: { readonly network: Network }): ReactElement {
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      {network.routers.map((router) =>
-        router.missingPrefixes.length === 0 ? (
-          <span key={router.nodeId} className="flex max-w-full items-center gap-2">
-            <span className="truncate">{router.name}</span>
-            {router.online ? null : (
-              <Status tone="neutral" className="text-xs">
-                {statusLabel("offline")}
-              </Status>
-            )}
-          </span>
-        ) : (
-          <Flagged
-            key={router.nodeId}
-            title="Not advertising every prefix"
-            detail={
-              <>
-                <Code className="whitespace-normal">{router.missingPrefixes.join(", ")}</Code> is
-                approved for this network, but the machine stopped advertising it, so nothing
-                reaches it through this router.
-                {router.online ? "" : " The machine is disconnected."}
-              </>
-            }
-          >
-            {router.name}
-          </Flagged>
-        ),
-      )}
+    <div className="flex flex-col items-start gap-1.5">
+      {network.routers.map((router) => (
+        <MachineName
+          key={router.nodeId}
+          name={<RouterName router={router} />}
+          owner={router.owner}
+        />
+      ))}
     </div>
+  );
+}
+
+function RouterName({ router }: { readonly router: Network["routers"][number] }): ReactElement {
+  if (router.missingPrefixes.length === 0) {
+    return (
+      <span className="flex max-w-full items-center gap-2">
+        <span className="truncate">{router.name}</span>
+        {router.online ? null : (
+          <Status tone="neutral" className="text-xs">
+            {statusLabel("offline")}
+          </Status>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <Flagged
+      title="Not advertising every prefix"
+      detail={
+        <>
+          <Code className="whitespace-normal">{router.missingPrefixes.join(", ")}</Code> is approved
+          for this network, but the machine stopped advertising it, so nothing reaches it through
+          this router.
+          {router.online ? "" : " The machine is disconnected."}
+        </>
+      }
+    >
+      {router.name}
+    </Flagged>
   );
 }
 

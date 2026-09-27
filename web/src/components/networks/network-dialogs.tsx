@@ -21,7 +21,7 @@ import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.t
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import type { PickerItem } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { isExitRoute, nodeName } from "~/lib/node.ts";
+import { isExitRoute, nodeLabel, nodeName, ownerLabel } from "~/lib/node.ts";
 
 export interface NetworkDialogProps {
   /** The network to edit; absent when creating one. */
@@ -87,26 +87,28 @@ function draftIssue(draft: Draft): string | null {
   return prefixesError(prefixes) ?? (hasPorts(draft.protocol) ? portsError(draft.ports) : null);
 }
 
-/** Machines that advertise something come first, with what they advertise as the hint. */
+/** Machines that advertise something come first, with whose they are and what they advertise. */
 function routerItems(nodes: readonly Node[]): PickerItem[] {
   return nodes
+    .toSorted((left, right) => {
+      const advertising =
+        Number(right.availableRoutes.length > 0) - Number(left.availableRoutes.length > 0);
+
+      return advertising === 0 ? nodeName(left).localeCompare(nodeName(right)) : advertising;
+    })
     .map((node) => ({
       value: node.id,
       label: nodeName(node),
-      hint:
+      hint: `${ownerLabel(node)} · ${
         node.availableRoutes.length === 0
-          ? "Advertises nothing"
+          ? "advertises nothing"
           : node.availableRoutes
               .filter((route) => !isExitRoute(route) || route === "0.0.0.0/0")
               .map((route) => (isExitRoute(route) ? "exit node" : route))
-              .join(", "),
-    }))
-    .toSorted((left, right) => {
-      const advertising =
-        Number(right.hint !== "Advertises nothing") - Number(left.hint !== "Advertises nothing");
-
-      return advertising === 0 ? left.label.localeCompare(right.label) : advertising;
-    });
+              .join(", ")
+      }`,
+      chip: nodeLabel(node),
+    }));
 }
 
 /** The request body for the draft, trimmed the way the server stores it. */

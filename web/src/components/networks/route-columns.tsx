@@ -1,15 +1,12 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { cn } from "@cloudflare/kumo/utils";
 import { CaretDownIcon, CaretRightIcon, GlobeIcon, PathIcon } from "@phosphor-icons/react";
-import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { Node } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { statusLabel } from "~/components/machines/status-badge.tsx";
+import { MachineLink } from "~/components/networks/machine-link.tsx";
 import { withRouteApproved } from "~/components/networks/model.ts";
 import type { RouteStatus } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
@@ -27,7 +24,7 @@ import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { ValueList } from "~/components/ui/value-list.tsx";
-import { nodeName } from "~/lib/node.ts";
+import { nodeLabel } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<RoutesRow>();
 const iconSize = 14;
@@ -41,7 +38,7 @@ function advertisersOf(row: RoutesRow): readonly RouteAdvertiser[] {
 
 function machineNames(row: RoutesRow): string {
   return advertisersOf(row)
-    .map((advertiser) => nodeName(advertiser.node))
+    .map((advertiser) => nodeLabel(advertiser.node))
     .join(" ");
 }
 
@@ -179,29 +176,6 @@ function MachineCell({ row }: { readonly row: RoutesRow }): ReactElement {
   );
 }
 
-function MachineLink({
-  node,
-  className,
-}: {
-  readonly node: Node;
-  readonly className?: string;
-}): ReactElement {
-  return (
-    <span className={cn("flex min-w-0 items-center gap-2", className)}>
-      <Link
-        to="/machines/$nodeId"
-        params={{ nodeId: node.id }}
-        className="truncate hover:underline"
-      >
-        {nodeName(node)}
-      </Link>
-      <Status tone={node.online ? "success" : "neutral"} className="text-kumo-subtle">
-        {statusLabel(node.online ? "online" : "offline")}
-      </Status>
-    </span>
-  );
-}
-
 function NetworksCell({ row }: { readonly row: RoutesRow }): ReactElement | null {
   if (row.networks.length === 0) {
     // Only the group's row says so: repeating it under each machine it unfolds into fills the
@@ -284,7 +258,7 @@ function withdrawal(advertiser: RouteAdvertiser): {
   readonly description: string;
 } {
   const route = advertiser.exit ? "the exit routes" : advertiser.route;
-  const machine = nodeName(advertiser.node);
+  const machine = nodeLabel(advertiser.node);
 
   return advertiser.status === "stale"
     ? {
@@ -472,7 +446,7 @@ function GroupApproveCell({
         open={confirming}
         onOpenChange={setConfirming}
         title={`Approve ${plural(waiting.length, "machine")}?`}
-        description={`${group.exit ? "The exit routes" : group.route} start reaching the rest of the tailnet through ${waiting.map((advertiser) => nodeName(advertiser.node)).join(", ")}.`}
+        description={`${group.exit ? "The exit routes" : group.route} start reaching the rest of the tailnet through ${waiting.map((advertiser) => nodeLabel(advertiser.node)).join(", ")}.`}
         confirmLabel="Approve routes"
         destructive={false}
         loading={setRoutes.isPending}

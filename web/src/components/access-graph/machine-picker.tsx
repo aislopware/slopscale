@@ -2,7 +2,7 @@ import { Combobox } from "@cloudflare/kumo/components/combobox";
 import type { ReactElement } from "react";
 
 import type { AccessGraphNode } from "~/api/schema.gen.ts";
-import { ownerLabel } from "~/components/access-graph/model.ts";
+import { graphNodeLabel, ownerLabel } from "~/components/access-graph/model.ts";
 
 /**
  * The machine the page is about. Clearing it puts the whole tailnet back, so the placeholder says
@@ -26,7 +26,7 @@ export function MachinePicker({
       items={items}
       value={selected}
       isItemEqualToValue={(item, chosen) => item.id === chosen.id}
-      itemToStringLabel={(item) => item.name}
+      itemToStringLabel={(item) => graphNodeLabel(item)}
       onValueChange={(next) => {
         onValueChange(next === null ? "" : next.id);
       }}

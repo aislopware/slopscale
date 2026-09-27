@@ -36,6 +36,13 @@ function connector(id: string, pending: number): AppNode {
     name: `connector-${id}.example-tailnet.ts.net`,
     nodeId: id,
     online: true,
+    owner: {
+      tags: ["tag:connector"],
+      userId: "",
+      userName: "",
+      displayName: "",
+      profilePicUrl: "",
+    },
     pending,
   };
 }

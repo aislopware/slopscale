@@ -48,7 +48,9 @@ describe(AccessMapView, () => {
 
     expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(2);
     await expect
-      .element(screen.getByLabelText("ada (alpha +1) reaches beta: tcp:22 · SSH as any login"))
+      .element(
+        screen.getByLabelText("ada (alpha +1) reaches beta (tag:web): tcp:22 · SSH as any login"),
+      )
       .toHaveTextContent("tcp:22 · SSH");
     await expect
       .element(screen.getByLabelText("ada (alpha +1) reaches ada (alpha +1): Every port"))
@@ -118,7 +120,7 @@ describe(AccessMapView, () => {
     );
 
     await screen.getByText("tag:web").first().click();
-    await screen.getByRole("button", { name: "beta", exact: true }).click();
+    await screen.getByRole("dialog").getByRole("button", { name: /^beta/u }).click();
 
     expect(onPick).toHaveBeenCalledWith("3");
   });

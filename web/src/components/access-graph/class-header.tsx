@@ -2,7 +2,9 @@ import { Popover } from "@cloudflare/kumo/components/popover";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
+import { graphNodeOwner } from "~/components/access-graph/model.ts";
 import type { AccessClass } from "~/components/access-graph/model.ts";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { TagList, TagText, tagColours } from "~/components/ui/tag.tsx";
 
 export const openDelay = 150;
@@ -36,12 +38,19 @@ export function Members({
             <li key={node.id}>
               <button
                 type="button"
-                className="w-full truncate rounded-sm px-1 py-0.5 text-left text-sm hover:text-kumo-link hover:underline"
+                className="group w-full rounded-sm px-1 py-0.5 text-left text-sm"
                 onClick={() => {
                   onPick(node.id);
                 }}
               >
-                {node.name}
+                <MachineName
+                  name={
+                    <span className="max-w-full truncate group-hover:text-kumo-link group-hover:underline">
+                      {node.name}
+                    </span>
+                  }
+                  owner={graphNodeOwner(node)}
+                />
               </button>
             </li>
           ))}
@@ -124,7 +133,9 @@ export function ColumnLabel({
         style={tag === undefined ? undefined : { color: tagColours(tag).color }}
       >
         {tag === undefined ? (
-          <span className="block truncate">{group.label}</span>
+          <span className="block truncate">
+            {group.members.length === 1 ? `${group.label} (${group.detail})` : group.label}
+          </span>
         ) : (
           <TagText tag={tag} />
         )}

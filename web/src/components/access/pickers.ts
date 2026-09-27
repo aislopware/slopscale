@@ -1,11 +1,16 @@
 import type { Group, Node, Posture, User } from "~/api/queries.ts";
 import { isBuiltin, isSelf } from "~/components/access/model.ts";
 import type { PickerItem } from "~/components/ui/multi-picker.tsx";
-import { nodeName, ownerLabel, userLabel } from "~/lib/node.ts";
+import { nodeLabel, nodeName, ownerLabel, userLabel } from "~/lib/node.ts";
 
 export function nodeItems(nodes: readonly Node[]): PickerItem[] {
   return nodes
-    .map((node) => ({ value: node.id, label: nodeName(node), hint: ownerLabel(node) }))
+    .map((node) => ({
+      value: node.id,
+      label: nodeName(node),
+      hint: ownerLabel(node),
+      chip: nodeLabel(node),
+    }))
     .toSorted((left, right) => left.label.localeCompare(right.label));
 }
 

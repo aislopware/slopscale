@@ -1,11 +1,13 @@
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
 import type { NameGrouping, TrafficName } from "~/api/traffic.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { formatCount, shareLabel } from "~/components/traffic/format.ts";
-import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { trafficNodeLabel, trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { useWidths } from "~/lib/breakpoint.ts";
@@ -63,14 +65,24 @@ function columnsFor(
   const keyClass = "w-[45%] max-w-0 min-w-32 sm:min-w-48";
   const key =
     groupBy === "node"
-      ? helper.accessor((row) => trafficNodeName(row), {
+      ? helper.accessor((row) => trafficNodeLabel(row), {
           id: "key",
           header: "Machine",
           enableSorting: true,
           cell: ({ row }) => (
-            <span className={row.original.nodeName === "" ? "text-kumo-subtle" : "font-medium"}>
-              {trafficNodeName(row.original)}
-            </span>
+            <MachineName
+              name={
+                <span
+                  className={cn(
+                    "max-w-full truncate",
+                    row.original.nodeName === "" ? "text-kumo-subtle" : "font-medium",
+                  )}
+                >
+                  {trafficNodeName(row.original)}
+                </span>
+              }
+              owner={row.original.nodeOwner}
+            />
           ),
           meta: { className: `${keyClass} truncate` },
         })

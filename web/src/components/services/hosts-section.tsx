@@ -12,10 +12,11 @@ import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
+import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { isTagged } from "~/lib/node.ts";
+import { isTagged, machineLabel } from "~/lib/node.ts";
 
 /** Why a machine cannot be approved to host a service; the server refuses it as well. */
 export const untaggedReason = "Only tagged machines can host a service";
@@ -125,6 +126,7 @@ function HostRow({
         >
           <span className="truncate">{host.name}</span>
         </Link>
+        <MachineOwnerLine owner={host.owner} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-kumo-subtle">
           <AnnouncementStatus announced={host.announced} active={host.active} />
           {host.ports.length === 0 ? null : <Code>{host.ports.join(", ")}</Code>}
@@ -134,7 +136,7 @@ function HostRow({
       <DisabledReason reason={untagged ? untaggedReason : undefined}>
         <Switch
           size="sm"
-          aria-label={`${host.name} approved`}
+          aria-label={`${machineLabel(host.name, host.owner)} approved`}
           checked={host.approved}
           disabled={disabled || untagged}
           onCheckedChange={(approved) => {

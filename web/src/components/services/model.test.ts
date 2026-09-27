@@ -92,6 +92,7 @@ function host(nodeId: string, standing: Partial<ServiceHost> = {}): ServiceHost 
     approved: false,
     name: `machine-${nodeId}`,
     nodeId,
+    owner: { tags: ["tag:web"], userId: "", userName: "", displayName: "", profilePicUrl: "" },
     ports: [],
     primary: false,
     ...standing,
@@ -165,7 +166,7 @@ describe(toServiceRows, () => {
     ]);
 
     expect(rows.map((row) => [row.label, row.reach, row.primaryHost, row.hostNames])).toStrictEqual(
-      [["web", "reachable", "machine-1", "machine-1, machine-2"]],
+      [["web", "reachable", "machine-1 (tag:web)", "machine-1 (tag:web), machine-2 (tag:web)"]],
     );
   });
 });

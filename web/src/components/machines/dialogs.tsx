@@ -21,7 +21,7 @@ import {
 import { TagField } from "~/components/ui/tag-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { dnsLabelIssue } from "~/lib/dns-label.ts";
-import { nodeName } from "~/lib/node.ts";
+import { nodeLabel, nodeName } from "~/lib/node.ts";
 
 type Mutations = ReturnType<typeof useNodeMutations>;
 
@@ -197,7 +197,7 @@ export function ExpireDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Expire machine key?"
-      description={`${nodeName(node)} will be disconnected until someone signs in on it again.`}
+      description={`${nodeLabel(node)} will be disconnected until someone signs in on it again.`}
       confirmLabel="Expire key"
       loading={expire.isPending}
       error={expire.isError ? errorMessage(expire.error) : undefined}
@@ -233,7 +233,7 @@ export function SuspendDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Suspend machine?"
-      description={`${nodeName(node)} keeps its key but loses every peer until you lift the suspension. No sign-in needed afterwards.`}
+      description={`${nodeLabel(node)} keeps its key but loses every peer until you lift the suspension. No sign-in needed afterwards.`}
       confirmLabel="Suspend"
       loading={suspend.isPending}
       error={suspend.isError ? errorMessage(suspend.error) : undefined}
@@ -270,7 +270,7 @@ export function ResetAttestationDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Reset hardware attestation?"
-      description={`${nodeName(node)} keeps its key. The record of what it proved is cleared, and the next map request it signs starts it again.`}
+      description={`${nodeLabel(node)} keeps its key. The record of what it proved is cleared, and the next map request it signs starts it again.`}
       confirmLabel="Reset"
       loading={resetAttestation.isPending}
       error={resetAttestation.isError ? errorMessage(resetAttestation.error) : undefined}

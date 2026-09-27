@@ -15,8 +15,10 @@ import {
 } from "~/components/apps/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { DomainList } from "~/components/ui/domain.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
+import { machineLabel } from "~/lib/node.ts";
 
 /** An app with what its connectors have learned for it, asked of the machines themselves. */
 export type AppRow = App & { readonly learned: LearnedCount | null };
@@ -49,7 +51,7 @@ export const appColumns = helper.columns([
     cell: ({ row }) => <ConnectorsCell app={row.original} />,
     meta: { className: "hidden align-top md:table-cell" },
   }),
-  helper.accessor((app) => app.nodes.map((node) => node.name).join(" "), {
+  helper.accessor((app) => app.nodes.map((node) => machineLabel(node.name, node.owner)).join(" "), {
     id: "machines",
     header: "Machines",
     enableSorting: false,
@@ -136,7 +138,10 @@ function MachineRow({ node }: { readonly node: AppNode }): ReactElement {
   return (
     <li className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center justify-between gap-3">
-        <span className="truncate text-sm text-kumo-default">{node.name}</span>
+        <MachineName
+          name={<span className="max-w-full truncate text-sm text-kumo-default">{node.name}</span>}
+          owner={node.owner}
+        />
         <Status tone={node.online ? "success" : "neutral"} className="text-sm text-kumo-subtle">
           {node.online ? "Online" : "Offline"}
         </Status>

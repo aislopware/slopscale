@@ -18,7 +18,7 @@ import { TableFooter } from "~/components/table/toolbar.tsx";
 import { VolumeCell } from "~/components/traffic/cells.tsx";
 import { DestinationsSection, whereGrouping } from "~/components/traffic/destinations-section.tsx";
 import { DnsLoggingOff } from "~/components/traffic/dns-logging-off.tsx";
-import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { trafficNodeLabel } from "~/components/traffic/machines-table.tsx";
 import { NamesTable } from "~/components/traffic/names-table.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
@@ -95,7 +95,7 @@ function MachineTrafficPage(): ReactElement {
   const reporters = useQuery(trafficReportersQuery);
   const reporterList = reporters.data?.reporters ?? [];
   const self = data?.nodes.find((node) => node.nodeId === nodeId);
-  const name = self === undefined ? `Machine ${nodeId}` : trafficNodeName(self);
+  const name = self === undefined ? `Machine ${nodeId}` : trafficNodeLabel(self);
   const whole = data === undefined ? 0 : data.total.txBytes + data.total.rxBytes;
 
   useBreadcrumb(name);
@@ -221,7 +221,7 @@ function GatewaysSection({
       <DefinitionList
         items={gateways.map((gateway) => ({
           key: gateway.nodeId,
-          label: trafficNodeName(gateway),
+          label: trafficNodeLabel(gateway),
           value: (
             <VolumeCell bytes={gateway.txBytes + gateway.rxBytes} widest={widest} whole={whole} />
           ),

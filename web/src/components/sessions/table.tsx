@@ -27,9 +27,11 @@ import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
+import { machineLabel } from "~/lib/node.ts";
 
 const stateTones: Record<RecordingState, { tone: Tone; label: string }> = {
   recording: { tone: "warning", label: "Recording" },
@@ -61,9 +63,19 @@ function RecordingRow({
       <Table.Cell className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={recording.startedAt} />
       </Table.Cell>
-      <Table.Cell>{sessionSource(recording)}</Table.Cell>
-      <Table.Cell className="font-mono text-sm whitespace-nowrap">
-        {sessionTarget(recording)}
+      <Table.Cell>
+        {/* A user-owned source already reads "alice on laptop"; a tagged one needs its tags. */}
+        {recording.srcUser === "" ? (
+          <MachineName name={recording.srcNode} owner={recording.srcOwner} />
+        ) : (
+          sessionSource(recording)
+        )}
+      </Table.Cell>
+      <Table.Cell className="whitespace-nowrap">
+        <MachineName
+          name={<span className="font-mono text-sm">{sessionTarget(recording)}</span>}
+          owner={recording.dstOwner}
+        />
       </Table.Cell>
       <Table.Cell className="max-w-64 truncate font-mono text-sm text-kumo-subtle">
         {recording.command === "" ? "shell" : recording.command}
@@ -75,7 +87,9 @@ function RecordingRow({
         <StateBadge recording={recording} />
       </Table.Cell>
       <Table.Cell sticky="right" className={cn("w-12 text-right", overflowing && pinnedEdgeClass)}>
-        <RowMenu label={`Actions for the recording of ${sessionTarget(recording)}`}>
+        <RowMenu
+          label={`Actions for the recording of ${machineLabel(sessionTarget(recording), recording.dstOwner)}`}
+        >
           <DropdownMenu.Item
             // A rendered item drops the item's own icon and children, so the link carries both.
             render={

@@ -168,8 +168,13 @@ describe(summariseClientUpdates, () => {
 
     expect(outcome.started).toBe(1);
     expect(outcome.refused).toStrictEqual([
-      { nodeId: "3", name: "machine-3", message: "auto-update is not allowed" },
-      { nodeId: "42", name: "#42", message: "The client gave no reason." },
+      {
+        nodeId: "3",
+        name: "machine-3",
+        owner: { tags: [], userId: "1", userName: "ada", displayName: "Ada", profilePicUrl: "" },
+        message: "auto-update is not allowed",
+      },
+      { nodeId: "42", name: "#42", owner: undefined, message: "The client gave no reason." },
     ]);
   });
 });
@@ -181,15 +186,15 @@ describe(clientUpdateSummary, () => {
   });
 
   it("reports both sides of a mixed run", () => {
-    const refused = [{ nodeId: "3", name: "laptop", message: "no" }];
+    const refused = [{ nodeId: "3", name: "laptop", owner: undefined, message: "no" }];
 
     expect(clientUpdateSummary({ started: 2, refused })).toBe("Started on 2, 1 refused");
   });
 
   it("leaves the zero out when nothing started", () => {
     const refused = [
-      { nodeId: "3", name: "laptop", message: "no" },
-      { nodeId: "4", name: "desk", message: "no" },
+      { nodeId: "3", name: "laptop", owner: undefined, message: "no" },
+      { nodeId: "4", name: "desk", owner: undefined, message: "no" },
     ];
 
     expect(clientUpdateSummary({ started: 0, refused })).toBe("2 machines refused");

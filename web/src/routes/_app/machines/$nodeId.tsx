@@ -23,7 +23,7 @@ import { SharingSection } from "~/components/machines/sharing.tsx";
 import { ClientWarnings } from "~/components/machines/warnings.tsx";
 import { MachineTrafficSection } from "~/components/traffic/machine-section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
-import { nodeName } from "~/lib/node.ts";
+import { nodeLabel } from "~/lib/node.ts";
 
 const emptyUsers: readonly User[] = [];
 
@@ -65,7 +65,7 @@ function MachinePage(): ReactElement {
   const userList = users.data?.users ?? emptyUsers;
   const routes = can(me, "devices:routes");
 
-  useBreadcrumb(nodeName(node));
+  useBreadcrumb(nodeLabel(node));
 
   return (
     <>

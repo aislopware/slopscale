@@ -82,6 +82,8 @@ export function readTerminalTheme(wrapper: HTMLElement): ITheme {
 export interface SSHTerminalProps {
   readonly ipn: IPN;
   readonly host: string;
+  /** The machine as a screen reader names it, with its owner; the host alone may be "localhost". */
+  readonly hostLabel?: string;
   readonly username: string;
   readonly onConnectionProgress: (message: string) => void;
   readonly onConnected: () => void;
@@ -183,6 +185,7 @@ function openTerminal(
 export function SSHTerminal({
   ipn,
   host,
+  hostLabel,
   username,
   onConnectionProgress,
   onConnected,
@@ -255,7 +258,7 @@ export function SSHTerminal({
       {/* A named region so a screen reader says which machine the output belongs to. */}
       <section
         ref={containerRef}
-        aria-label={`Terminal on ${host}`}
+        aria-label={`Terminal on ${hostLabel ?? host}`}
         className="h-full w-full overflow-hidden"
       />
     </div>

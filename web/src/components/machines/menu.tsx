@@ -36,7 +36,7 @@ import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { advertisesExit, isTagged, nodeName } from "~/lib/node.ts";
+import { advertisesExit, isTagged, nodeLabel } from "~/lib/node.ts";
 
 type Dialog =
   | "rename"
@@ -100,7 +100,7 @@ export function MachineMenu({
           <DropdownMenu.Content align="end">{items}</DropdownMenu.Content>
         </DropdownMenu>
       ) : (
-        <RowMenu label={`Actions for ${nodeName(node)}`}>{items}</RowMenu>
+        <RowMenu label={`Actions for ${nodeLabel(node)}`}>{items}</RowMenu>
       )}
       <MachineDialogs
         dialog={dialog}
@@ -351,7 +351,7 @@ function MachineDialogs({
       <ShareDialog open={dialog === "share"} users={users} {...props} />
       <ResetAttestationDialog open={dialog === "attestation"} {...props} />
       <ClientUpdateDialog
-        name={nodeName(node)}
+        name={nodeLabel(node)}
         open={dialog === "update"}
         onOpenChange={onOpenChange}
         pending={mutations.updateClient.isPending}

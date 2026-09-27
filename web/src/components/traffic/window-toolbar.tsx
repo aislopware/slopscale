@@ -13,6 +13,7 @@ import { defaultTrafficRange, trafficWindow } from "~/components/traffic/range.t
 import type { TrafficRange, TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { WindowRefusal } from "~/components/traffic/window-refusal.tsx";
 import { DateTimeField } from "~/components/ui/date-time-field.tsx";
+import { machineLabel } from "~/lib/node.ts";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
 const presetTabs: TabsItem[] = [
@@ -65,7 +66,10 @@ function gatewayItems(reporters: readonly TrafficReporter[]): { value: string; l
     { value: "", label: "All gateways" },
     ...reporters.map((reporter) => ({
       value: reporter.nodeId,
-      label: reporter.nodeName === "" ? `Gateway ${reporter.nodeId}` : reporter.nodeName,
+      label:
+        reporter.nodeName === ""
+          ? `Gateway ${reporter.nodeId}`
+          : machineLabel(reporter.nodeName, reporter.nodeOwner),
     })),
   ];
 }

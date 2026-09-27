@@ -4,7 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { TrafficReporter } from "~/api/traffic.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { trafficNodeLabel } from "~/components/traffic/machines-table.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
@@ -39,7 +39,7 @@ export function windowLabel(start: string, end: string, now: Date = new Date()):
   return `${formatAbsolute(from)} – ${formatAbsolute(to > now ? now : to)}`;
 }
 
-type Gateway = Pick<TrafficReporter, "nodeId" | "nodeName">;
+type Gateway = Pick<TrafficReporter, "nodeId" | "nodeName" | "nodeOwner">;
 
 /**
  * The gateways that reported within the window: a gateway first seen after it ended, or silent
@@ -68,11 +68,11 @@ export function gatewayLabel(gateways: readonly Gateway[], gateway: string): str
   if (gateway !== "") {
     const reporter = gateways.find((candidate) => candidate.nodeId === gateway);
 
-    return `Through ${reporter === undefined ? `gateway ${gateway}` : trafficNodeName(reporter)}`;
+    return `Through ${reporter === undefined ? `gateway ${gateway}` : trafficNodeLabel(reporter)}`;
   }
 
   return gateways.length === 1
-    ? `Through ${trafficNodeName(gateways[0] ?? { nodeId: "", nodeName: "" })}`
+    ? `Through ${trafficNodeLabel(gateways[0] ?? { nodeId: "", nodeName: "" })}`
     : `Through ${plural(gateways.length, "gateway")}`;
 }
 

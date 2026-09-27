@@ -33,7 +33,7 @@ import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar, windowSearchClass } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
-import { nodeName } from "~/lib/node.ts";
+import { nodeLabel } from "~/lib/node.ts";
 
 /** The server's cap on one read. */
 const allRows = 1000;
@@ -73,7 +73,7 @@ function machineItems(nodes: readonly Node[]): { value: string; label: string }[
   return [
     { value: "", label: "All machines" },
     ...nodes
-      .map((node) => ({ value: node.id, label: nodeName(node) }))
+      .map((node) => ({ value: node.id, label: nodeLabel(node) }))
       .toSorted((left, right) => left.label.localeCompare(right.label)),
   ];
 }

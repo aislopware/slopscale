@@ -17,6 +17,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogClose, DialogContent, DialogFooter, DialogRoot } from "~/components/ui/dialog.tsx";
 import { FrameBand } from "~/components/ui/frame.tsx";
+import { MachineName } from "~/components/ui/machine-name.tsx";
 
 /**
  * What the band above the table says while machines are ticked: how many, and the things worth
@@ -184,7 +185,10 @@ function Refusals({
               said is the line under it. */}
           {refused.map((refusal) => (
             <li key={refusal.nodeId} className="flex flex-col gap-0.5">
-              <span className="font-medium text-kumo-default">{refusal.name}</span>
+              <MachineName
+                name={<span className="font-medium text-kumo-default">{refusal.name}</span>}
+                owner={refusal.owner}
+              />
               <span className="text-kumo-subtle">{refusal.message}</span>
             </li>
           ))}
