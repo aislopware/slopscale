@@ -26,6 +26,7 @@ type trafficTotalsTable struct {
 	TxPackets  sqlite.ColumnInteger
 	RxPackets  sqlite.ColumnInteger
 	Conns      sqlite.ColumnInteger
+	Private    sqlite.ColumnInteger
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -76,9 +77,10 @@ func newTrafficTotalsTableImpl(schemaName, tableName, alias string) trafficTotal
 		TxPacketsColumn  = sqlite.IntegerColumn("tx_packets")
 		RxPacketsColumn  = sqlite.IntegerColumn("rx_packets")
 		ConnsColumn      = sqlite.IntegerColumn("conns")
-		allColumns       = sqlite.ColumnList{ResolutionColumn, BucketColumn, NodeIDColumn, ReporterIDColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
+		PrivateColumn    = sqlite.IntegerColumn("private")
+		allColumns       = sqlite.ColumnList{ResolutionColumn, BucketColumn, NodeIDColumn, ReporterIDColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn, PrivateColumn}
 		mutableColumns   = sqlite.ColumnList{TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
-		defaultColumns   = sqlite.ColumnList{TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
+		defaultColumns   = sqlite.ColumnList{TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn, PrivateColumn}
 	)
 
 	return trafficTotalsTable{
@@ -94,6 +96,7 @@ func newTrafficTotalsTableImpl(schemaName, tableName, alias string) trafficTotal
 		TxPackets:  TxPacketsColumn,
 		RxPackets:  RxPacketsColumn,
 		Conns:      ConnsColumn,
+		Private:    PrivateColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

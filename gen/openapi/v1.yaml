@@ -9480,13 +9480,18 @@ paths:
           schema:
             description: Keep one destination address exactly.
             type: string
-        - description: Keep only destinations in private ranges (LAN).
+        - description: Where the traffic went.
           explode: false
           in: query
-          name: private
+          name: scope
           schema:
-            description: Keep only destinations in private ranges (LAN).
-            type: boolean
+            default: all
+            description: Where the traffic went.
+            enum:
+              - all
+              - internet
+              - private
+            type: string
         - description: Keep one network (AS number).
           explode: false
           in: query
@@ -9803,7 +9808,7 @@ paths:
   /api/v1/traffic/summary:
     get:
       description: |-
-        The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+        The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets. Private is traffic to private addresses, reached through a subnet route; internet is the rest.
 
         Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: getTrafficSummary
@@ -9839,6 +9844,18 @@ paths:
           schema:
             description: Keep the traffic through one gateway.
             format: uint64
+            type: string
+        - description: Where the traffic went.
+          explode: false
+          in: query
+          name: scope
+          schema:
+            default: all
+            description: Where the traffic went.
+            enum:
+              - all
+              - internet
+              - private
             type: string
         - description: How many top nodes, at most 100; default 10.
           explode: false

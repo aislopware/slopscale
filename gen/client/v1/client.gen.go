@@ -393,6 +393,27 @@ func (e ListTrafficDestinationsParamsGroupBy) Valid() bool {
 	}
 }
 
+// Defines values for ListTrafficDestinationsParamsScope.
+const (
+	ListTrafficDestinationsParamsScopeAll      ListTrafficDestinationsParamsScope = "all"
+	ListTrafficDestinationsParamsScopeInternet ListTrafficDestinationsParamsScope = "internet"
+	ListTrafficDestinationsParamsScopePrivate  ListTrafficDestinationsParamsScope = "private"
+)
+
+// Valid indicates whether the value is a known member of the ListTrafficDestinationsParamsScope enum.
+func (e ListTrafficDestinationsParamsScope) Valid() bool {
+	switch e {
+	case ListTrafficDestinationsParamsScopeAll:
+		return true
+	case ListTrafficDestinationsParamsScopeInternet:
+		return true
+	case ListTrafficDestinationsParamsScopePrivate:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListTrafficNamesParamsGroupBy.
 const (
 	ListTrafficNamesParamsGroupByName ListTrafficNamesParamsGroupBy = "name"
@@ -405,6 +426,27 @@ func (e ListTrafficNamesParamsGroupBy) Valid() bool {
 	case ListTrafficNamesParamsGroupByName:
 		return true
 	case ListTrafficNamesParamsGroupByNode:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetTrafficSummaryParamsScope.
+const (
+	GetTrafficSummaryParamsScopeAll      GetTrafficSummaryParamsScope = "all"
+	GetTrafficSummaryParamsScopeInternet GetTrafficSummaryParamsScope = "internet"
+	GetTrafficSummaryParamsScopePrivate  GetTrafficSummaryParamsScope = "private"
+)
+
+// Valid indicates whether the value is a known member of the GetTrafficSummaryParamsScope enum.
+func (e GetTrafficSummaryParamsScope) Valid() bool {
+	switch e {
+	case GetTrafficSummaryParamsScopeAll:
+		return true
+	case GetTrafficSummaryParamsScopeInternet:
+		return true
+	case GetTrafficSummaryParamsScopePrivate:
 		return true
 	default:
 		return false
@@ -2909,8 +2951,8 @@ type ListTrafficDestinationsParams struct {
 	// Dst Keep one destination address exactly.
 	Dst *string `form:"dst,omitempty" json:"dst,omitempty"`
 
-	// Private Keep only destinations in private ranges (LAN).
-	Private *bool `form:"private,omitempty" json:"private,omitempty"`
+	// Scope Where the traffic went.
+	Scope *ListTrafficDestinationsParamsScope `form:"scope,omitempty" json:"scope,omitempty"`
 
 	// Asn Keep one network (AS number).
 	Asn *int64 `form:"asn,omitempty" json:"asn,omitempty"`
@@ -2930,6 +2972,9 @@ type ListTrafficDestinationsParams struct {
 
 // ListTrafficDestinationsParamsGroupBy defines parameters for ListTrafficDestinations.
 type ListTrafficDestinationsParamsGroupBy string
+
+// ListTrafficDestinationsParamsScope defines parameters for ListTrafficDestinations.
+type ListTrafficDestinationsParamsScope string
 
 // ListTrafficNamesParams defines parameters for ListTrafficNames.
 type ListTrafficNamesParams struct {
@@ -2973,9 +3018,15 @@ type GetTrafficSummaryParams struct {
 	// ReporterId Keep the traffic through one gateway.
 	ReporterId *string `form:"reporterId,omitempty" json:"reporterId,omitempty"`
 
+	// Scope Where the traffic went.
+	Scope *GetTrafficSummaryParamsScope `form:"scope,omitempty" json:"scope,omitempty"`
+
 	// Limit How many top nodes, at most 100; default 10.
 	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
 }
+
+// GetTrafficSummaryParamsScope defines parameters for GetTrafficSummary.
+type GetTrafficSummaryParamsScope string
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
@@ -5201,7 +5252,7 @@ type ClientInterface interface {
 
 	// GetTrafficSummary Get traffic summary
 	//
-	// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+	// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets. Private is traffic to private addresses, reached through a subnet route; internet is the rest.
 	//
 	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -9486,7 +9537,7 @@ func (c *Client) UpdateTrafficSettings(ctx context.Context, body UpdateTrafficSe
 
 // GetTrafficSummary Get traffic summary
 //
-// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets. Private is traffic to private addresses, reached through a subnet route; internet is the rest.
 //
 // Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -15801,9 +15852,9 @@ func NewListTrafficDestinationsRequest(server string, params *ListTrafficDestina
 
 		}
 
-		if params.Private != nil {
+		if params.Scope != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "private", *params.Private, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "scope", *params.Scope, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -16267,6 +16318,18 @@ func NewGetTrafficSummaryRequest(server string, params *GetTrafficSummaryParams)
 		if params.ReporterId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "reporterId", *params.ReporterId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Scope != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "scope", *params.Scope, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -19179,7 +19242,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTrafficSummaryWithResponse Get traffic summary
 	//
-	// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+	// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets. Private is traffic to private addresses, reached through a subnet route; internet is the rest.
 	//
 	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -30974,7 +31037,7 @@ func (c *ClientWithResponses) UpdateTrafficSettingsWithResponse(ctx context.Cont
 
 // GetTrafficSummaryWithResponse Get traffic summary
 //
-// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+// The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets. Private is traffic to private addresses, reached through a subnet route; internet is the rest.
 //
 // Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
