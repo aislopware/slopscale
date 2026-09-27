@@ -137,21 +137,35 @@ function bucketLabel(resolution: number): string {
   return name === undefined ? `, ${resolution}-second buckets` : `, 1-${name} buckets`;
 }
 
+export interface TrafficSummaryProps {
+  readonly summary: TrafficSummary;
+  readonly loading?: boolean;
+  /** Called with the dragged-over stretch, as RFC 3339 bounds. */
+  readonly onZoom?: (start: string, end: string) => void;
+}
+
 /**
  * The window at a glance: what left the tailnet through its gateways, what came back, how many
  * connections that took, and the rate over time. Dragging across the chart asks for that stretch as
  * a custom window.
  */
-export function TrafficSummaryPanel({
+export function TrafficSummaryPanel(props: TrafficSummaryProps): ReactElement {
+  return (
+    <Frame className="grid grid-cols-3 gap-1">
+      <TrafficSummaryPanels {...props} />
+    </Frame>
+  );
+}
+
+/**
+ * The summary's panels without a Frame of their own, for a Frame that holds more: three stats and
+ * the chart under them, laid out by a three-column grid.
+ */
+export function TrafficSummaryPanels({
   summary,
   loading = false,
   onZoom,
-}: {
-  readonly summary: TrafficSummary;
-  readonly loading?: boolean;
-  /** Called with the dragged-over stretch, as RFC 3339 bounds. */
-  readonly onZoom?: (start: string, end: string) => void;
-}): ReactElement {
+}: TrafficSummaryProps): ReactElement {
   const dark = useDarkMode();
   const wide = useMinWidth("sm");
   const rates = ratesOf(summary.series, summary.resolution);
@@ -166,7 +180,7 @@ export function TrafficSummaryPanel({
   const end = parseTime(summary.end);
 
   return (
-    <Frame className="grid grid-cols-3 gap-1">
+    <>
       <Stat
         label="Upload"
         value={formatBytes(summary.total.txBytes)}
@@ -220,6 +234,6 @@ export function TrafficSummaryPanel({
           }
         />
       </div>
-    </Frame>
+    </>
   );
 }

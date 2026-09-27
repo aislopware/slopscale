@@ -10,7 +10,7 @@ export function DnsLoggingOff(): ReactElement {
     <SectionEmpty
       title="DNS logging is off"
       description="Turn on DNS logging and approve a gateway resolver to see what the machines using that gateway as their exit node look up."
-      contents={<TextLink to="/traffic/settings">Traffic settings</TextLink>}
+      contents={<TextLink to="/settings/traffic/collection">Traffic settings</TextLink>}
     />
   );
 }
@@ -23,7 +23,7 @@ export function DnsLoggingOffNote(): ReactElement {
       description={
         <>
           {"These lookups are from before it was turned off; new ones are not recorded. "}
-          <TextLink to="/traffic/settings">Traffic settings</TextLink>
+          <TextLink to="/settings/traffic/collection">Traffic settings</TextLink>
         </>
       }
     />

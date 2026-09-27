@@ -8,7 +8,7 @@ import { ResolverNotices } from "~/components/traffic/resolver-notices.tsx";
 import { TrafficSettingsSections } from "~/components/traffic/settings-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-export const Route = createFileRoute("/_app/traffic/settings")({
+export const Route = createFileRoute("/_app/settings/traffic/collection")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(trafficSettingsQuery),
@@ -26,7 +26,7 @@ function TrafficSettingsPage(): ReactElement {
   return (
     <>
       <PageHeader
-        title="Settings"
+        title="Collection"
         description="What the gateways collect and how long the server keeps it."
       />
       <ResolverNotices reporters={reporters} />

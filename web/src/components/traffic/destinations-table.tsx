@@ -88,7 +88,8 @@ function HostName({ name }: { readonly name: string }): ReactElement {
   );
 }
 
-function HostCell({ row }: { readonly row: TrafficDestination }): ReactElement {
+/** A host as a domain token, marked when it is on the LAN; the folded remainder by that name. */
+export function HostCell({ row }: { readonly row: TrafficDestination }): ReactElement {
   if (row.host === "") {
     return <Subtle>{remainderLabel}</Subtle>;
   }
