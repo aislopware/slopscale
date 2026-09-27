@@ -202,6 +202,8 @@ type (
 	trafficSummaryInput struct {
 		TrafficRange
 
+		Scope string `default:"all" doc:"Where the traffic went." enum:"all,internet,private" query:"scope"`
+
 		Limit int `doc:"How many top nodes, at most 100; default 10." maximum:"100" minimum:"1" query:"limit"`
 	}
 	trafficSummaryOutput struct {
@@ -227,7 +229,7 @@ type (
 
 		Dst string `doc:"Keep one destination address exactly." query:"dst"`
 
-		Private bool `doc:"Keep only destinations in private ranges (LAN)." query:"private"`
+		Scope string `default:"all" doc:"Where the traffic went." enum:"all,internet,private" query:"scope"`
 
 		ASN int64 `doc:"Keep one network (AS number)." maximum:"4294967295" minimum:"0" query:"asn"`
 
@@ -302,7 +304,8 @@ func registerTrafficReads(api huma.API, b Backend) {
 		Summary:     "Get traffic summary",
 		Description: "The volume the gateways saw over a range: the total, a series, the top nodes " +
 			"and the volume through each gateway. The resolution is the finest the retention " +
-			"still holds for the range, at most 1500 buckets.",
+			"still holds for the range, at most 1500 buckets. Private is traffic to private " +
+			"addresses, reached through a subnet route; internet is the rest.",
 		Tags:     []string{tagTraffic},
 		Security: bearerAuth,
 	}, scope.LogsNetworkRead), func(_ context.Context, in *trafficSummaryInput) (*trafficSummaryOutput, error) {
@@ -310,6 +313,8 @@ func registerTrafficReads(api huma.API, b Backend) {
 		if err != nil {
 			return nil, err
 		}
+
+		f.Scope = types.TrafficScope(in.Scope)
 
 		return trafficSummary(b, f, cmp0(in.Limit, trafficDefaultTopNodes))
 	})
@@ -332,7 +337,7 @@ func registerTrafficReads(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		f.Search, f.Country, f.Host, f.Private = in.Q, in.Country, in.Host, in.Private
+		f.Search, f.Country, f.Host, f.Scope = in.Q, in.Country, in.Host, types.TrafficScope(in.Scope)
 
 		if in.Dst != "" {
 			dst, parseErr := netip.ParseAddr(in.Dst)

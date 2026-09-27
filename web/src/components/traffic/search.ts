@@ -21,15 +21,8 @@ function toCount(value: unknown): number {
   return typeof number === "number" && Number.isInteger(number) && number > 0 ? number : 0;
 }
 
-/** A flag from the address: the router reads `lan=true` as a boolean, a hand-typed one as text. */
-function toFlag(value: unknown): boolean {
-  return value === true || value === "true";
-}
-
 const countValue = pipe(unknown(), transform(toCount));
 const optionalCount = fallback(optional(countValue, 0), 0);
-const flagValue = pipe(unknown(), transform(toFlag));
-const optionalFlag = fallback(optional(flagValue, false), false);
 const destinationGroupingValue = picklist(destinationGroupings);
 const nameGroupingValue = picklist(nameGroupings);
 
@@ -64,8 +57,6 @@ export interface DestinationSearch extends TrafficWindowSearch {
   readonly host: string;
   /** A picked address, exactly. */
   readonly dst: string;
-  /** Only private destinations: the picked LAN row. */
-  readonly lan: boolean;
   readonly asn: number;
   readonly country: string;
   readonly proto: number;
@@ -80,7 +71,6 @@ export const destinationSearchEntries = {
   q: optionalText,
   host: optionalText,
   dst: optionalText,
-  lan: optionalFlag,
   asn: optionalCount,
   country: optionalText,
   proto: optionalCount,
@@ -113,7 +103,6 @@ export function destinationFilters(search: DestinationSearch, limit: number): De
     q: search.q,
     host: search.host,
     dst: search.dst,
-    lan: search.lan,
     asn: search.asn,
     country: search.country,
     proto: search.proto,
@@ -132,7 +121,6 @@ export const noDestinationFilters = {
   q: "",
   host: "",
   dst: "",
-  lan: false,
   asn: 0,
   country: "",
   proto: 0,
@@ -147,7 +135,7 @@ function lanOr(
   row: TrafficDestination,
   pick: Partial<DestinationSearch>,
 ): Partial<DestinationSearch> {
-  return row.private ? { lan: true, by: "node" } : { ...pick, by: "node" };
+  return row.private ? { network: "lan", by: "node" } : { ...pick, by: "node" };
 }
 
 const picks: Record<DestinationGrouping, Pick> = {
@@ -207,10 +195,6 @@ export function destinationChips(
 
   if (search.dst !== "") {
     chips.push(chip("Address", search.dst, { dst: "" }));
-  }
-
-  if (search.lan) {
-    chips.push(chip("Network", "LAN", { lan: false }));
   }
 
   if (search.asn !== 0) {

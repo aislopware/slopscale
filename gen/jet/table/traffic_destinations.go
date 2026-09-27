@@ -93,7 +93,7 @@ func newTrafficDestinationsTableImpl(schemaName, tableName, alias string) traffi
 		RxPacketsColumn  = sqlite.IntegerColumn("rx_packets")
 		ConnsColumn      = sqlite.IntegerColumn("conns")
 		allColumns       = sqlite.ColumnList{ResolutionColumn, BucketColumn, NodeIDColumn, ReporterIDColumn, DstColumn, PortColumn, ProtoColumn, HostColumn, HostSourceColumn, AsnColumn, CountryColumn, PrivateColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
-		mutableColumns   = sqlite.ColumnList{HostSourceColumn, AsnColumn, CountryColumn, PrivateColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
+		mutableColumns   = sqlite.ColumnList{HostSourceColumn, AsnColumn, CountryColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
 		defaultColumns   = sqlite.ColumnList{AsnColumn, PrivateColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
 	)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/policy"
@@ -712,6 +713,15 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			// are gone.
 			id:  "202609261000-hash-legacy-pre-auth-keys",
 			run: migrateHashLegacyPreAuthKeys,
+		},
+		{
+			// Traffic to private networks is counted apart from the
+			// internet: traffic_totals gains private, and both it and
+			// traffic_destinations key on it, so a bucket holds one total
+			// and one folded remainder of each. The totals already
+			// written are split by their destinations.
+			id:  "202609271000-traffic-private-split",
+			run: migrateTrafficPrivateSplit,
 		},
 	}
 }
@@ -2372,6 +2382,140 @@ func migrateAPIKeyScopes(tx *Tx) error {
 	}
 
 	return nil
+}
+
+// migrateTrafficPrivateSplit (202609271000) keys traffic_totals and
+// traffic_destinations on private and splits the stored totals.
+func migrateTrafficPrivateSplit(tx *Tx) error {
+	var err error
+	if tx.ex.dialect == dialectPostgres {
+		err = tx.ex.execAll("keying traffic on private", []string{
+			`ALTER TABLE traffic_totals ADD COLUMN private bigint NOT NULL DEFAULT 0`,
+			`ALTER TABLE traffic_totals DROP CONSTRAINT traffic_totals_pkey`,
+			`ALTER TABLE traffic_totals ADD PRIMARY KEY(resolution, bucket, node_id, reporter_id, private)`,
+			`ALTER TABLE traffic_destinations DROP CONSTRAINT traffic_destinations_pkey`,
+			`ALTER TABLE traffic_destinations
+  ADD PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host, private)`,
+		})
+	} else {
+		err = rekeySQLiteTrafficTables(tx)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return splitTrafficTotals(tx)
+}
+
+// rekeySQLiteTrafficTables rebuilds the two tables, since SQLite cannot
+// change a primary key in place. Nothing references them, so they can be
+// renamed and dropped with foreign keys on.
+func rekeySQLiteTrafficTables(tx *Tx) error {
+	const counters = "tx_bytes, rx_bytes, tx_packets, rx_packets, conns"
+
+	return tx.ex.execAll("keying traffic on private", []string{
+		`DROP INDEX idx_traffic_totals_node`,
+		`DROP INDEX idx_traffic_totals_reporter`,
+		`ALTER TABLE traffic_totals RENAME TO traffic_totals_old`,
+		`CREATE TABLE traffic_totals(
+  resolution integer NOT NULL,
+  bucket integer NOT NULL,
+  node_id integer NOT NULL,
+  reporter_id integer NOT NULL,
+  tx_bytes integer NOT NULL DEFAULT 0,
+  rx_bytes integer NOT NULL DEFAULT 0,
+  tx_packets integer NOT NULL DEFAULT 0,
+  rx_packets integer NOT NULL DEFAULT 0,
+  conns integer NOT NULL DEFAULT 0,
+  private integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, private),
+  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_totals_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+		`INSERT INTO traffic_totals(resolution, bucket, node_id, reporter_id, ` + counters + `)
+  SELECT resolution, bucket, node_id, reporter_id, ` + counters + ` FROM traffic_totals_old`,
+		`DROP TABLE traffic_totals_old`,
+		`CREATE INDEX idx_traffic_totals_node ON traffic_totals(node_id, resolution, bucket)`,
+		`CREATE INDEX idx_traffic_totals_reporter ON traffic_totals(reporter_id)`,
+
+		`DROP INDEX idx_traffic_destinations_node`,
+		`DROP INDEX idx_traffic_destinations_reporter`,
+		`DROP INDEX idx_traffic_destinations_unnamed`,
+		`ALTER TABLE traffic_destinations RENAME TO traffic_destinations_old`,
+		`CREATE TABLE traffic_destinations(
+  resolution integer NOT NULL,
+  bucket integer NOT NULL,
+  node_id integer NOT NULL,
+  reporter_id integer NOT NULL,
+  dst text NOT NULL,
+  port integer NOT NULL,
+  proto integer NOT NULL,
+  host text NOT NULL,
+  host_source text,
+  asn integer NOT NULL DEFAULT 0,
+  country text,
+  private integer NOT NULL DEFAULT 0,
+  tx_bytes integer NOT NULL DEFAULT 0,
+  rx_bytes integer NOT NULL DEFAULT 0,
+  tx_packets integer NOT NULL DEFAULT 0,
+  rx_packets integer NOT NULL DEFAULT 0,
+  conns integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host, private),
+  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_destinations_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+		`INSERT INTO traffic_destinations SELECT * FROM traffic_destinations_old`,
+		`DROP TABLE traffic_destinations_old`,
+		`CREATE INDEX idx_traffic_destinations_node ON traffic_destinations(node_id, resolution, bucket)`,
+		`CREATE INDEX idx_traffic_destinations_reporter ON traffic_destinations(reporter_id)`,
+		`CREATE INDEX idx_traffic_destinations_unnamed ON traffic_destinations(dst) WHERE asn = 0 AND private = 0`,
+	})
+}
+
+// splitTrafficTotals moves each stored total's private share into a
+// private row, in the proportion of its destinations: those of the same
+// bucket for an hourly or daily total, those of the enclosing hour for a
+// per-minute one, which has no destinations of its own. The share of a
+// counter the destinations cannot tell (all zero) stays public. The
+// arithmetic is in decimals, since a byte count times another overflows
+// 64 bits.
+func splitTrafficTotals(tx *Tx) error {
+	counters := []string{"tx_bytes", "rx_bytes", "tx_packets", "rx_packets", "conns"}
+
+	sums := make([]string, 0, 2*len(counters))
+	shares := make([]string, 0, len(counters))
+	moves := make([]string, 0, len(counters))
+
+	for _, c := range counters {
+		sums = append(sums,
+			"SUM(CASE WHEN private = 1 THEN "+c+" ELSE 0 END) AS private_"+c,
+			"SUM("+c+") AS all_"+c)
+		shares = append(shares, "CAST(ROUND(CASE WHEN s.all_"+c+" = 0 THEN 0 "+
+			"ELSE t."+c+" * 1.0 * s.private_"+c+" / s.all_"+c+" END) AS BIGINT)")
+		moves = append(moves, c+" = traffic_totals."+c+" - p."+c)
+	}
+
+	return tx.ex.execAll("splitting the traffic totals", []string{
+		`INSERT INTO traffic_totals(resolution, bucket, node_id, reporter_id, ` +
+			strings.Join(counters, ", ") + `, private)
+WITH s AS (
+  SELECT resolution, bucket, node_id, reporter_id, ` + strings.Join(sums, ", ") + `
+  FROM traffic_destinations
+  GROUP BY resolution, bucket, node_id, reporter_id
+  HAVING SUM(private) > 0
+)
+SELECT t.resolution, t.bucket, t.node_id, t.reporter_id, ` + strings.Join(shares, ", ") + `, 1
+FROM traffic_totals t JOIN s
+  ON s.node_id = t.node_id AND s.reporter_id = t.reporter_id
+  AND s.resolution = CASE WHEN t.resolution = 60 THEN 3600 ELSE t.resolution END
+  AND s.bucket = t.bucket - t.bucket % s.resolution`,
+		`UPDATE traffic_totals SET ` + strings.Join(moves, ", ") + `
+FROM traffic_totals p
+WHERE traffic_totals.private = 0 AND p.private = 1
+  AND p.resolution = traffic_totals.resolution AND p.bucket = traffic_totals.bucket
+  AND p.node_id = traffic_totals.node_id AND p.reporter_id = traffic_totals.reporter_id`,
+	})
 }
 
 // migrateTraffic (202609251000) creates the traffic tables.

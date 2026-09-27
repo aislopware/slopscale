@@ -14,7 +14,7 @@ import type { TrafficNode } from "~/api/traffic.ts";
 import { GatewayTrafficTable, gatewayRows } from "~/components/traffic/gateway-traffic-table.tsx";
 import { MachinesTable } from "~/components/traffic/machines-table.tsx";
 
-const window = { range: "24h", from: "", to: "", gateway: "" } as const;
+const window = { range: "24h", from: "", to: "", gateway: "", network: "internet" } as const;
 
 const gatewayOwner = {
   tags: ["tag:gateway"],

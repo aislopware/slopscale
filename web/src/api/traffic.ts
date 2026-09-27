@@ -4,7 +4,7 @@ import type { MethodResponse } from "openapi-react-query";
 
 import { api, fetchClient } from "~/api/client.ts";
 import { isLive, trafficWindow } from "~/components/traffic/range.ts";
-import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
+import type { TrafficNetwork, TrafficWindowSearch } from "~/components/traffic/range.ts";
 
 export type TrafficSummary = MethodResponse<typeof api, "get", "/api/v1/traffic/summary">;
 export type TrafficPoint = TrafficSummary["series"][number];
@@ -62,6 +62,13 @@ function rangeQuery(scope: TrafficScope): {
   };
 }
 
+/** The server calls the LAN private: addresses in private ranges, reached through a subnet route. */
+const scopes = {
+  internet: "internet",
+  lan: "private",
+  all: "all",
+} as const satisfies Record<TrafficNetwork, string>;
+
 const emptyCounts = { conns: 0, rxBytes: 0, rxPackets: 0, txBytes: 0, txPackets: 0 };
 
 const emptySummary: TrafficSummary = {
@@ -90,7 +97,7 @@ export function trafficSummaryQuery(
     queryKey: ["get", "/api/v1/traffic/summary", scope, limit] as const,
     queryFn: async (): Promise<TrafficSummary> => {
       const { data } = await fetchClient.GET("/api/v1/traffic/summary", {
-        params: { query: { ...rangeQuery(scope), limit } },
+        params: { query: { ...rangeQuery(scope), scope: scopes[scope.network], limit } },
       });
 
       return data ?? emptySummary;
@@ -108,8 +115,6 @@ export interface DestinationFilters {
   readonly host: string;
   /** One address exactly. */
   readonly dst: string;
-  /** Only destinations inside private ranges. */
-  readonly lan: boolean;
   readonly asn: number;
   readonly country: string;
   readonly proto: number;
@@ -148,12 +153,12 @@ export function trafficDestinationsQuery(
         params: {
           query: {
             ...rangeQuery(scope),
+            scope: scopes[scope.network],
             groupBy: filters.groupBy,
             limit: filters.limit,
             ...(filters.q === "" ? {} : { q: filters.q }),
             ...(filters.host === "" ? {} : { host: filters.host }),
             ...(filters.dst === "" ? {} : { dst: filters.dst }),
-            ...(filters.lan ? { private: true } : {}),
             ...(filters.asn === 0 ? {} : { asn: filters.asn }),
             ...(filters.country === "" ? {} : { country: filters.country }),
             ...(filters.proto === 0 ? {} : { proto: filters.proto }),

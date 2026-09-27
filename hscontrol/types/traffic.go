@@ -232,14 +232,18 @@ type TrafficKey struct {
 	ReporterID NodeID
 }
 
-// TrafficTotal is a node's volume through a gateway in one bucket.
+// TrafficTotal is a node's volume through a gateway in one bucket, to
+// the internet or, when Private, to private networks behind the gateway.
 type TrafficTotal struct {
 	TrafficKey
 	TrafficCounts
+
+	Private bool
 }
 
 // TrafficDestination is a node's volume to one destination in one bucket.
-// An empty Dst is the folded remainder of the smaller destinations.
+// An empty Dst is the folded remainder of the smaller destinations, one
+// for the private ones and one for the rest.
 type TrafficDestination struct {
 	TrafficKey
 	TrafficCounts
@@ -301,6 +305,18 @@ const (
 	TrafficByName TrafficGroup = "name"
 )
 
+// TrafficScope is where traffic went: to the internet, through the
+// gateway as an exit node or app connector, or to a private network
+// behind it, through a subnet route.
+type TrafficScope string
+
+// The scopes.
+const (
+	TrafficScopeAll      TrafficScope = "all"
+	TrafficScopeInternet TrafficScope = "internet"
+	TrafficScopePrivate  TrafficScope = "private"
+)
+
 // TrafficFilter selects the rows a traffic query reads.
 type TrafficFilter struct {
 	// Resolution is the rollup read; Start and End bound the buckets,
@@ -320,8 +336,9 @@ type TrafficFilter struct {
 	Host string
 	Dst  string
 	Name string
-	// Private keeps only destinations inside private ranges.
-	Private bool
+	// Scope keeps the traffic to the internet or to private networks;
+	// the zero value keeps both.
+	Scope TrafficScope
 	// ASN, Country, Proto and Port keep one destination network,
 	// country or service when set (Port only with Proto).
 	ASN     uint32

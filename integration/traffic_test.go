@@ -270,6 +270,24 @@ func TestTrafficMonitor(t *testing.T) {
 		}
 	}, trafficReportWait, 2*time.Second, "the client should be attributed with the download")
 
+	// The web service sits on a private Docker network behind the subnet
+	// route, so the download is LAN traffic and stays out of the internet.
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		var lan, internet trafficSummaryOut
+
+		assert.NoError(c, api.get("/api/v1/traffic/summary?scope=private", &lan))
+		assert.NoError(c, api.get("/api/v1/traffic/summary?scope=internet", &internet))
+
+		node, ok := lan.findNode(clientID)
+		if assert.True(c, ok, "the client should lead the LAN: %+v", lan.Nodes) {
+			assert.GreaterOrEqual(c, node.RxBytes, uint64(trafficBlobBytes))
+		}
+
+		if node, ok := internet.findNode(clientID); ok {
+			assert.Less(c, node.RxBytes, uint64(trafficBlobBytes), "the download is not internet traffic")
+		}
+	}, trafficReportWait, 2*time.Second, "the download should count as LAN traffic")
+
 	// --- DNS logging points the client, which uses the gateway as its exit
 	// node, at the gateway's resolver once an operator approves it. The
 	// agent forwards to the gateway's own resolvers, Docker's, which answer

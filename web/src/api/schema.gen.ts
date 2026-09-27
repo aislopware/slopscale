@@ -2382,7 +2382,7 @@ export interface paths {
         };
         /**
          * Get traffic summary
-         * @description The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets.
+         * @description The volume the gateways saw over a range: the total, a series, the top nodes and the volume through each gateway. The resolution is the finest the retention still holds for the range, at most 1500 buckets. Private is traffic to private addresses, reached through a subnet route; internet is the rest.
          *
          *     Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -9621,14 +9621,14 @@ export interface operations {
                 nodeId?: string;
                 /** @description Keep one port; needs proto. */
                 port?: number;
-                /** @description Keep only destinations in private ranges (LAN). */
-                private?: boolean;
                 /** @description Keep one IP protocol. */
                 proto?: number;
                 /** @description Keep hosts or addresses containing this. */
                 q?: string;
                 /** @description Keep the traffic through one gateway. */
                 reporterId?: string;
+                /** @description Where the traffic went. */
+                scope?: "all" | "internet" | "private";
                 /** @description RFC 3339; defaults to a day before end. */
                 start?: string;
             };
@@ -9871,6 +9871,8 @@ export interface operations {
                 nodeId?: string;
                 /** @description Keep the traffic through one gateway. */
                 reporterId?: string;
+                /** @description Where the traffic went. */
+                scope?: "all" | "internet" | "private";
                 /** @description RFC 3339; defaults to a day before end. */
                 start?: string;
             };

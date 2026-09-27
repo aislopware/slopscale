@@ -33,12 +33,13 @@ const row: TrafficDestination = {
 };
 
 describe("the destinations address", () => {
-  it("reads a bare address as the last day grouped by host", () => {
+  it("reads a bare address as the last day to the internet grouped by host", () => {
     expect(parse(search, {})).toStrictEqual({
       range: "24h",
       from: "",
       to: "",
       gateway: "",
+      network: "internet",
       by: "host",
       ...noDestinationFilters,
     });
@@ -53,7 +54,7 @@ describe("the destinations address", () => {
 
 describe(trafficWindow, () => {
   const now = new Date("2026-09-25T10:30:45Z");
-  const base = { from: "", to: "", gateway: "" };
+  const base = { from: "", to: "", gateway: "", network: "internet" } as const;
 
   it("ends a preset on the last whole minute", () => {
     expect(trafficWindow({ ...base, range: "1h" }, now)).toStrictEqual({
@@ -96,16 +97,17 @@ describe(pickDestination, () => {
   it("opens a private network or country row as the LAN", () => {
     const lan = { ...row, private: true, asn: 0, country: "" };
 
-    expect(pickDestination(lan, "asn")).toStrictEqual({ lan: true, by: "node" });
-    expect(pickDestination(lan, "country")).toStrictEqual({ lan: true, by: "node" });
+    expect(pickDestination(lan, "asn")).toStrictEqual({ network: "lan", by: "node" });
+    expect(pickDestination(lan, "country")).toStrictEqual({ network: "lan", by: "node" });
   });
 });
 
-describe("the LAN flag in the address", () => {
-  it("reads the router's boolean and a hand-typed one, and nothing else", () => {
-    expect(parse(search, { lan: true }).lan).toBe(true);
-    expect(parse(search, { lan: "true" }).lan).toBe(true);
-    expect(parse(search, { lan: "yes" }).lan).toBe(false);
+describe("the network in the address", () => {
+  it("opens on the internet and falls back to it for a value it does not know", () => {
+    expect(parse(search, {}).network).toBe("internet");
+    expect(parse(search, { network: "lan" }).network).toBe("lan");
+    expect(parse(search, { network: "all" }).network).toBe("all");
+    expect(parse(search, { network: "wan" }).network).toBe("internet");
   });
 });
 

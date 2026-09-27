@@ -308,6 +308,7 @@ COL traffic_totals.rx_bytes bigint null=NO default=0
 COL traffic_totals.tx_packets bigint null=NO default=0
 COL traffic_totals.rx_packets bigint null=NO default=0
 COL traffic_totals.conns bigint null=NO default=0
+COL traffic_totals.private bigint null=NO default=0
 COL user_invites.id bigint null=NO default=nextval('user_invites_id_seq'::regclass)
 COL user_invites.token_hash bytea null=NO
 COL user_invites.email text null=NO
@@ -437,11 +438,11 @@ IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX ssh_recordings_pkey ON public.ssh_recordings USING btree (id)
 IDX CREATE UNIQUE INDEX tka_aums_pkey ON public.tka_aums USING btree (hash)
-IDX CREATE UNIQUE INDEX traffic_destinations_pkey ON public.traffic_destinations USING btree (resolution, bucket, node_id, reporter_id, dst, port, proto, host)
+IDX CREATE UNIQUE INDEX traffic_destinations_pkey ON public.traffic_destinations USING btree (resolution, bucket, node_id, reporter_id, dst, port, proto, host, private)
 IDX CREATE UNIQUE INDEX traffic_dns_pkey ON public.traffic_dns USING btree (resolution, bucket, node_id, reporter_id, name)
 IDX CREATE UNIQUE INDEX traffic_instances_pkey ON public.traffic_instances USING btree (node_id, instance)
 IDX CREATE UNIQUE INDEX traffic_reporters_pkey ON public.traffic_reporters USING btree (node_id)
-IDX CREATE UNIQUE INDEX traffic_totals_pkey ON public.traffic_totals USING btree (resolution, bucket, node_id, reporter_id)
+IDX CREATE UNIQUE INDEX traffic_totals_pkey ON public.traffic_totals USING btree (resolution, bucket, node_id, reporter_id, private)
 IDX CREATE UNIQUE INDEX user_invites_pkey ON public.user_invites USING btree (id)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
 IDX CREATE UNIQUE INDEX vip_services_pkey ON public.vip_services USING btree (id)
@@ -607,7 +608,7 @@ CON traffic_destinations traffic_destinations_conns_not_null NOT NULL conns
 CON traffic_destinations traffic_destinations_dst_not_null NOT NULL dst
 CON traffic_destinations traffic_destinations_host_not_null NOT NULL host
 CON traffic_destinations traffic_destinations_node_id_not_null NOT NULL node_id
-CON traffic_destinations traffic_destinations_pkey PRIMARY KEY (resolution, bucket, node_id, reporter_id, dst, port, proto, host)
+CON traffic_destinations traffic_destinations_pkey PRIMARY KEY (resolution, bucket, node_id, reporter_id, dst, port, proto, host, private)
 CON traffic_destinations traffic_destinations_port_not_null NOT NULL port
 CON traffic_destinations traffic_destinations_private_not_null NOT NULL private
 CON traffic_destinations traffic_destinations_proto_not_null NOT NULL proto
@@ -646,7 +647,8 @@ CON traffic_totals fk_traffic_totals_reporter FOREIGN KEY (reporter_id) REFERENC
 CON traffic_totals traffic_totals_bucket_not_null NOT NULL bucket
 CON traffic_totals traffic_totals_conns_not_null NOT NULL conns
 CON traffic_totals traffic_totals_node_id_not_null NOT NULL node_id
-CON traffic_totals traffic_totals_pkey PRIMARY KEY (resolution, bucket, node_id, reporter_id)
+CON traffic_totals traffic_totals_pkey PRIMARY KEY (resolution, bucket, node_id, reporter_id, private)
+CON traffic_totals traffic_totals_private_not_null NOT NULL private
 CON traffic_totals traffic_totals_reporter_id_not_null NOT NULL reporter_id
 CON traffic_totals traffic_totals_resolution_not_null NOT NULL resolution
 CON traffic_totals traffic_totals_rx_bytes_not_null NOT NULL rx_bytes

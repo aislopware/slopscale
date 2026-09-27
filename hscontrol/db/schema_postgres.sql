@@ -534,7 +534,8 @@ CREATE TABLE traffic_totals(
   tx_packets bigint NOT NULL DEFAULT 0,
   rx_packets bigint NOT NULL DEFAULT 0,
   conns bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY(resolution, bucket, node_id, reporter_id),
+  private bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, private),
   CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
   CONSTRAINT fk_traffic_totals_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 );
@@ -559,7 +560,7 @@ CREATE TABLE traffic_destinations(
   tx_packets bigint NOT NULL DEFAULT 0,
   rx_packets bigint NOT NULL DEFAULT 0,
   conns bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host),
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host, private),
   CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
   CONSTRAINT fk_traffic_destinations_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 );

@@ -708,9 +708,10 @@ CREATE TABLE traffic_instances(
 -- and bucket (the Unix time the bucket starts). node_id is the node that
 -- sent the traffic or asked; reporter_id the gateway. Deleting either
 -- node deletes the rows. An empty dst or name is the folded remainder of
--- the smaller rows of a bucket. private is 1 for a destination inside a
--- private network, reached through a subnet route, which has no network
--- name or country.
+-- the smaller rows of a bucket. private is 1 for traffic to a private
+-- network, reached through a subnet route; such a destination has no
+-- network name or country. A bucket keeps the private traffic apart from
+-- the rest, in its totals and in the remainder of its destinations.
 CREATE TABLE traffic_totals(
   resolution integer NOT NULL,
   bucket integer NOT NULL,
@@ -721,7 +722,8 @@ CREATE TABLE traffic_totals(
   tx_packets integer NOT NULL DEFAULT 0,
   rx_packets integer NOT NULL DEFAULT 0,
   conns integer NOT NULL DEFAULT 0,
-  PRIMARY KEY(resolution, bucket, node_id, reporter_id),
+  private integer NOT NULL DEFAULT 0,
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, private),
   CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
   CONSTRAINT fk_traffic_totals_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 );
@@ -746,7 +748,7 @@ CREATE TABLE traffic_destinations(
   tx_packets integer NOT NULL DEFAULT 0,
   rx_packets integer NOT NULL DEFAULT 0,
   conns integer NOT NULL DEFAULT 0,
-  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host),
+  PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host, private),
   CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
   CONSTRAINT fk_traffic_destinations_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 );

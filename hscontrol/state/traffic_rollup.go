@@ -27,6 +27,7 @@ func hostSourceRank(s string) int {
 type totalKey struct {
 	resolution, bucket int64
 	node               types.NodeID
+	private            bool
 }
 
 type destinationKey struct {
@@ -187,7 +188,7 @@ func (r *trafficRollup) addFlow(f traffic.Flow) {
 			continue
 		}
 
-		tk := totalKey{resolution: res, bucket: bucket, node: node}
+		tk := totalKey{resolution: res, bucket: bucket, node: node, private: private}
 		total := r.totals[tk]
 		total.Add(counts)
 		r.totals[tk] = total
@@ -282,12 +283,15 @@ func (r *trafficRollup) totalRows() []types.TrafficTotal {
 		out = append(out, types.TrafficTotal{
 			Resolution: k.resolution, Bucket: k.bucket, NodeID: k.node, ReporterID: r.reporter,
 			TrafficCounts: counts,
+			Private:       k.private,
 		})
 	}
 
 	// A stable order keeps the writes of concurrent reports from
 	// deadlocking on PostgreSQL row locks.
-	slices.SortFunc(out, func(a, b types.TrafficTotal) int { return compareTrafficKeys(a.TrafficKey, b.TrafficKey) })
+	slices.SortFunc(out, func(a, b types.TrafficTotal) int {
+		return cmp.Or(compareTrafficKeys(a.TrafficKey, b.TrafficKey), compareFlags(a.Private, b.Private))
+	})
 
 	return out
 }
@@ -320,6 +324,17 @@ func (r *trafficRollup) nameRows() []types.TrafficDNS {
 	})
 
 	return out
+}
+
+func compareFlags(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	default:
+		return -1
+	}
 }
 
 func compareTrafficKeys(a, b types.TrafficKey) int {
