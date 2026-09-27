@@ -185,6 +185,48 @@ func TestTrafficBatchAndQueries(t *testing.T) {
 	})
 }
 
+func TestTrafficNodeReporters(t *testing.T) {
+	t.Parallel()
+
+	forEachDialect(t, func(t *testing.T, db *HSDatabase) {
+		f := newTrafficFixture(t, db)
+		other := f
+		other.gateway = db.CreateNodeForTest(db.CreateUserForTest("second"), "second-gateway").ID
+
+		_, err := db.ApplyTrafficBatch(f.batch("a", 1))
+		require.NoError(t, err)
+
+		// Twice through the second gateway, so it carried more.
+		for seq := uint64(1); seq <= 2; seq++ {
+			_, err = db.ApplyTrafficBatch(other.batch("b", seq))
+			require.NoError(t, err)
+		}
+
+		filter := f.filter(types.TrafficHour)
+
+		routes, err := db.TrafficNodeReporters(filter, []types.NodeID{f.laptop, f.phone})
+		require.NoError(t, err)
+		assert.Equal(t, map[types.NodeID][]types.NodeID{
+			f.laptop: {other.gateway, f.gateway},
+			f.phone:  {other.gateway, f.gateway},
+		}, routes, "every gateway a node went through, the busiest first")
+
+		onlyLaptop, err := db.TrafficNodeReporters(filter, []types.NodeID{f.laptop})
+		require.NoError(t, err)
+		assert.Len(t, onlyLaptop, 1, "only the nodes asked for")
+
+		throughFirst := filter
+		throughFirst.ReporterID = f.gateway
+		narrowed, err := db.TrafficNodeReporters(throughFirst, []types.NodeID{f.laptop})
+		require.NoError(t, err)
+		assert.Equal(t, []types.NodeID{f.gateway}, narrowed[f.laptop], "the gateway filter narrows it")
+
+		none, err := db.TrafficNodeReporters(filter, nil)
+		require.NoError(t, err)
+		assert.Empty(t, none)
+	})
+}
+
 func TestTrafficDestinationGroupings(t *testing.T) {
 	t.Parallel()
 

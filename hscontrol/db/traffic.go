@@ -821,6 +821,52 @@ func (hsdb *HSDatabase) TrafficTopNodes(f types.TrafficFilter, byReporter bool) 
 	return out, nil
 }
 
+type trafficRouteRow struct {
+	NodeID     int64
+	ReporterID int64
+}
+
+// TrafficNodeReporters lists, for each of nodes, the gateways its traffic
+// in the filter went through, largest first.
+func (hsdb *HSDatabase) TrafficNodeReporters(
+	f types.TrafficFilter,
+	nodes []types.NodeID,
+) (map[types.NodeID][]types.NodeID, error) {
+	if len(nodes) == 0 {
+		return map[types.NodeID][]types.NodeID{}, nil
+	}
+
+	t := table.TrafficTotals
+
+	ids := make([]jet.Expression, 0, len(nodes))
+	for _, n := range nodes {
+		ids = append(ids, jet.Uint64(n.Uint64()))
+	}
+
+	var rows []trafficRouteRow
+
+	err := hsdb.ex.query(
+		jet.SELECT(t.NodeID.AS("traffic_route_row.node_id"), t.ReporterID.AS("traffic_route_row.reporter_id")).
+			FROM(t).
+			WHERE(totalsColumns.where(f).AND(t.NodeID.IN(ids...))).
+			GROUP_BY(t.NodeID, t.ReporterID).
+			ORDER_BY(t.NodeID.ASC(), byVolume(t.TxBytes, t.RxBytes), t.ReporterID.ASC()),
+		&rows,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("reading the gateways per node: %w", err)
+	}
+
+	out := make(map[types.NodeID][]types.NodeID, len(nodes))
+
+	for _, r := range rows {
+		node := types.NodeID(fromSQLInt(r.NodeID))
+		out[node] = append(out[node], types.NodeID(fromSQLInt(r.ReporterID)))
+	}
+
+	return out, nil
+}
+
 // TrafficSum sums every total in the filter.
 func (hsdb *HSDatabase) TrafficSum(f types.TrafficFilter) (types.TrafficCounts, error) {
 	projections := totalsCounts("counts_row")

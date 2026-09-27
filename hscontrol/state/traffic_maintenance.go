@@ -119,6 +119,15 @@ func (s *State) TrafficTopNodes(f types.TrafficFilter, byReporter bool) ([]types
 	return s.db.TrafficTopNodes(f, byReporter)
 }
 
+// TrafficNodeReporters lists the gateways each node's traffic went
+// through, largest first.
+func (s *State) TrafficNodeReporters(
+	f types.TrafficFilter,
+	nodes []types.NodeID,
+) (map[types.NodeID][]types.NodeID, error) {
+	return s.db.TrafficNodeReporters(f, nodes)
+}
+
 // TrafficSum sums the totals in the filter.
 func (s *State) TrafficSum(f types.TrafficFilter) (types.TrafficCounts, error) {
 	return s.db.TrafficSum(f)

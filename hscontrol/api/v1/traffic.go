@@ -65,6 +65,9 @@ type TrafficNode struct {
 	NodeID    string        `format:"uint64"                              json:"nodeId"`
 	NodeName  string        `doc:"Empty when the node no longer exists."  json:"nodeName"`
 	NodeOwner *MachineOwner `doc:"Absent when the node no longer exists." json:"nodeOwner,omitempty"`
+	// ReporterIDs names the gateways only on a node's row; a gateway's
+	// own row leaves it empty.
+	ReporterIDs []string `doc:"The gateways the node went through, busiest first." json:"reporterIds" nullable:"false"`
 }
 
 // TrafficDestination is a destination group's volume. Only the fields of
@@ -656,6 +659,16 @@ func trafficSummary(b Backend, f types.TrafficFilter, top int) (*trafficSummaryO
 		return nil, mapError("reading traffic", err)
 	}
 
+	ids := make([]types.NodeID, 0, len(nodes))
+	for _, n := range nodes {
+		ids = append(ids, n.NodeID)
+	}
+
+	routes, err := b.State.TrafficNodeReporters(f, ids)
+	if err != nil {
+		return nil, mapError("reading traffic", err)
+	}
+
 	names := nodeNames(b)
 	out := &trafficSummaryOutput{}
 	out.Body.TrafficWindow = trafficWindow(f)
@@ -663,6 +676,12 @@ func trafficSummary(b Backend, f types.TrafficFilter, top int) (*trafficSummaryO
 	out.Body.Series = trafficSeries(f, points)
 	out.Body.Nodes = trafficNodes(names, nodes)
 	out.Body.Reporters = trafficNodes(names, reporters)
+
+	for i := range out.Body.Nodes {
+		for _, r := range routes[nodes[i].NodeID] {
+			out.Body.Nodes[i].ReporterIDs = append(out.Body.Nodes[i].ReporterIDs, formatID(r.Uint64()))
+		}
+	}
 
 	return out, nil
 }
@@ -694,6 +713,7 @@ func trafficNodes(names map[types.NodeID]trafficMachine, sums []types.TrafficNod
 			NodeName:      names[s.NodeID].name,
 			NodeOwner:     names[s.NodeID].owner,
 			TrafficCounts: trafficCountsFrom(s.TrafficCounts),
+			ReporterIDs:   []string{},
 		})
 	}
 

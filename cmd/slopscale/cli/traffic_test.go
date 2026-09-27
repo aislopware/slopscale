@@ -33,7 +33,10 @@ func TestTrafficCommands(t *testing.T) {
 		End:        start.Add(24 * time.Hour),
 		Total:      clientv1.TrafficCounts{TxBytes: 3 << 30, RxBytes: 512, Conns: 7},
 		Nodes: []clientv1.TrafficNode{
-			{NodeId: "4", NodeName: "laptop", TxBytes: 3 << 30, RxBytes: 512, Conns: 7},
+			{
+				NodeId: "4", NodeName: "laptop", TxBytes: 3 << 30, RxBytes: 512, Conns: 7,
+				ReporterIds: []string{"1", "9"},
+			},
 		},
 		Reporters: []clientv1.TrafficNode{{NodeId: "1", NodeName: "exit-1", TxBytes: 3 << 30}},
 	}
@@ -56,7 +59,11 @@ func TestTrafficCommands(t *testing.T) {
 					writeJSON(t, w, summary)
 				},
 			},
-			wantIn: []string{"1h0m0s buckets", "Sent 3.0 GiB, received 512 B, 7 connections", "laptop", "exit-1"},
+			wantIn: []string{
+				"1h0m0s buckets", "Sent 3.0 GiB, received 512 B, 7 connections", "laptop", "exit-1",
+				// A gateway the summary does not name keeps its ID.
+				"exit-1, 9",
+			},
 		},
 		{
 			name:    "summary refuses a time it cannot read",
