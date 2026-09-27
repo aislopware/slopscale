@@ -91,7 +91,7 @@ export function TrafficSettingsSections({
   return (
     <>
       <Section
-        title="Collection"
+        title="Names and lookups"
         description="What the agents on the gateways look at besides the connections themselves."
         bodyClassName="p-0"
       >
@@ -224,8 +224,8 @@ function DnsLoggingDescription({
         they resolve through that gateway&apos;s approved resolver, so their lookups are logged and
         their destinations named exactly. Every other machine, and any on Tailscale older than 1.86,
         which does not say which exit node it uses, keeps its usual DNS and is never logged. Approve
-        resolvers on the <TextLink to="/traffic/gateways">Gateways</TextLink> page; one that stops
-        reporting is taken out within minutes.
+        resolvers on the <TextLink to="/settings/traffic/gateways">Gateways</TextLink> page; one
+        that stops reporting is taken out within minutes.
       </span>
       {canEdit ? null : (
         <Note tone="neutral">

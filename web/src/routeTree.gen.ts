@@ -56,10 +56,11 @@ import { Route as AppSettingsTailnetRouteImport } from './routes/_app/settings/t
 import { Route as AppTrafficIndexRouteImport } from './routes/_app/traffic/index'
 import { Route as AppTrafficDestinationsRouteImport } from './routes/_app/traffic/destinations'
 import { Route as AppTrafficDnsRouteImport } from './routes/_app/traffic/dns'
-import { Route as AppTrafficGatewaysRouteImport } from './routes/_app/traffic/gateways'
 import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/overview'
-import { Route as AppTrafficSettingsRouteImport } from './routes/_app/traffic/settings'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
+import { Route as AppSettingsTrafficIndexRouteImport } from './routes/_app/settings/traffic/index'
+import { Route as AppSettingsTrafficCollectionRouteImport } from './routes/_app/settings/traffic/collection'
+import { Route as AppSettingsTrafficGatewaysRouteImport } from './routes/_app/settings/traffic/gateways'
 import { Route as AppTrafficMachinesIndexRouteImport } from './routes/_app/traffic/machines/index'
 import { Route as AppTrafficMachinesNodeIdRouteImport } from './routes/_app/traffic/machines/$nodeId'
 
@@ -298,19 +299,9 @@ const AppTrafficDnsRoute = AppTrafficDnsRouteImport.update({
   path: '/traffic/dns',
   getParentRoute: () => AppRoute,
 } as any)
-const AppTrafficGatewaysRoute = AppTrafficGatewaysRouteImport.update({
-  id: '/traffic/gateways',
-  path: '/traffic/gateways',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppTrafficOverviewRoute = AppTrafficOverviewRouteImport.update({
   id: '/traffic/overview',
   path: '/traffic/overview',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppTrafficSettingsRoute = AppTrafficSettingsRouteImport.update({
-  id: '/traffic/settings',
-  path: '/traffic/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
@@ -318,6 +309,23 @@ const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
   path: '/machines/$nodeId/ssh',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSettingsTrafficIndexRoute = AppSettingsTrafficIndexRouteImport.update({
+  id: '/settings/traffic/',
+  path: '/settings/traffic/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsTrafficCollectionRoute =
+  AppSettingsTrafficCollectionRouteImport.update({
+    id: '/settings/traffic/collection',
+    path: '/settings/traffic/collection',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppSettingsTrafficGatewaysRoute =
+  AppSettingsTrafficGatewaysRouteImport.update({
+    id: '/settings/traffic/gateways',
+    path: '/settings/traffic/gateways',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppTrafficMachinesIndexRoute = AppTrafficMachinesIndexRouteImport.update({
   id: '/traffic/machines/',
   path: '/traffic/machines/',
@@ -368,9 +376,7 @@ export interface FileRoutesByFullPath {
   '/settings/tailnet': typeof AppSettingsTailnetRoute
   '/traffic/destinations': typeof AppTrafficDestinationsRoute
   '/traffic/dns': typeof AppTrafficDnsRoute
-  '/traffic/gateways': typeof AppTrafficGatewaysRoute
   '/traffic/overview': typeof AppTrafficOverviewRoute
-  '/traffic/settings': typeof AppTrafficSettingsRoute
   '/dns/': typeof AppDnsIndexRoute
   '/integrations/': typeof AppIntegrationsIndexRoute
   '/keys/': typeof AppKeysIndexRoute
@@ -381,7 +387,10 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AppSettingsIndexRoute
   '/traffic/': typeof AppTrafficIndexRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
+  '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
+  '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines/': typeof AppTrafficMachinesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -422,9 +431,7 @@ export interface FileRoutesByTo {
   '/settings/tailnet': typeof AppSettingsTailnetRoute
   '/traffic/destinations': typeof AppTrafficDestinationsRoute
   '/traffic/dns': typeof AppTrafficDnsRoute
-  '/traffic/gateways': typeof AppTrafficGatewaysRoute
   '/traffic/overview': typeof AppTrafficOverviewRoute
-  '/traffic/settings': typeof AppTrafficSettingsRoute
   '/dns': typeof AppDnsIndexRoute
   '/integrations': typeof AppIntegrationsIndexRoute
   '/keys': typeof AppKeysIndexRoute
@@ -435,7 +442,10 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsIndexRoute
   '/traffic': typeof AppTrafficIndexRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
+  '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
+  '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/settings/traffic': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines': typeof AppTrafficMachinesIndexRoute
 }
 export interface FileRoutesById {
@@ -478,9 +488,7 @@ export interface FileRoutesById {
   '/_app/settings/tailnet': typeof AppSettingsTailnetRoute
   '/_app/traffic/destinations': typeof AppTrafficDestinationsRoute
   '/_app/traffic/dns': typeof AppTrafficDnsRoute
-  '/_app/traffic/gateways': typeof AppTrafficGatewaysRoute
   '/_app/traffic/overview': typeof AppTrafficOverviewRoute
-  '/_app/traffic/settings': typeof AppTrafficSettingsRoute
   '/_app/dns/': typeof AppDnsIndexRoute
   '/_app/integrations/': typeof AppIntegrationsIndexRoute
   '/_app/keys/': typeof AppKeysIndexRoute
@@ -491,7 +499,10 @@ export interface FileRoutesById {
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/traffic/': typeof AppTrafficIndexRoute
   '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
+  '/_app/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
+  '/_app/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/_app/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/_app/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/_app/traffic/machines/': typeof AppTrafficMachinesIndexRoute
 }
 export interface FileRouteTypes {
@@ -534,9 +545,7 @@ export interface FileRouteTypes {
     | '/settings/tailnet'
     | '/traffic/destinations'
     | '/traffic/dns'
-    | '/traffic/gateways'
     | '/traffic/overview'
-    | '/traffic/settings'
     | '/dns/'
     | '/integrations/'
     | '/keys/'
@@ -547,7 +556,10 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/traffic/'
     | '/machines/$nodeId/ssh'
+    | '/settings/traffic/collection'
+    | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/settings/traffic/'
     | '/traffic/machines/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -588,9 +600,7 @@ export interface FileRouteTypes {
     | '/settings/tailnet'
     | '/traffic/destinations'
     | '/traffic/dns'
-    | '/traffic/gateways'
     | '/traffic/overview'
-    | '/traffic/settings'
     | '/dns'
     | '/integrations'
     | '/keys'
@@ -601,7 +611,10 @@ export interface FileRouteTypes {
     | '/settings'
     | '/traffic'
     | '/machines/$nodeId/ssh'
+    | '/settings/traffic/collection'
+    | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/settings/traffic'
     | '/traffic/machines'
   id:
     | '__root__'
@@ -643,9 +656,7 @@ export interface FileRouteTypes {
     | '/_app/settings/tailnet'
     | '/_app/traffic/destinations'
     | '/_app/traffic/dns'
-    | '/_app/traffic/gateways'
     | '/_app/traffic/overview'
-    | '/_app/traffic/settings'
     | '/_app/dns/'
     | '/_app/integrations/'
     | '/_app/keys/'
@@ -656,7 +667,10 @@ export interface FileRouteTypes {
     | '/_app/settings/'
     | '/_app/traffic/'
     | '/_app/machines/$nodeId_/ssh'
+    | '/_app/settings/traffic/collection'
+    | '/_app/settings/traffic/gateways'
     | '/_app/traffic/machines/$nodeId'
+    | '/_app/settings/traffic/'
     | '/_app/traffic/machines/'
   fileRoutesById: FileRoutesById
 }
@@ -996,13 +1010,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrafficDnsRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/traffic/gateways': {
-      id: '/_app/traffic/gateways'
-      path: '/traffic/gateways'
-      fullPath: '/traffic/gateways'
-      preLoaderRoute: typeof AppTrafficGatewaysRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/traffic/overview': {
       id: '/_app/traffic/overview'
       path: '/traffic/overview'
@@ -1010,18 +1017,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrafficOverviewRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/traffic/settings': {
-      id: '/_app/traffic/settings'
-      path: '/traffic/settings'
-      fullPath: '/traffic/settings'
-      preLoaderRoute: typeof AppTrafficSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/machines/$nodeId_/ssh': {
       id: '/_app/machines/$nodeId_/ssh'
       path: '/machines/$nodeId/ssh'
       fullPath: '/machines/$nodeId/ssh'
       preLoaderRoute: typeof AppMachinesNodeIdSshRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/traffic/': {
+      id: '/_app/settings/traffic/'
+      path: '/settings/traffic'
+      fullPath: '/settings/traffic/'
+      preLoaderRoute: typeof AppSettingsTrafficIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/traffic/collection': {
+      id: '/_app/settings/traffic/collection'
+      path: '/settings/traffic/collection'
+      fullPath: '/settings/traffic/collection'
+      preLoaderRoute: typeof AppSettingsTrafficCollectionRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings/traffic/gateways': {
+      id: '/_app/settings/traffic/gateways'
+      path: '/settings/traffic/gateways'
+      fullPath: '/settings/traffic/gateways'
+      preLoaderRoute: typeof AppSettingsTrafficGatewaysRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/traffic/machines/': {
@@ -1078,9 +1099,7 @@ interface AppRouteChildren {
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
   AppTrafficDestinationsRoute: typeof AppTrafficDestinationsRoute
   AppTrafficDnsRoute: typeof AppTrafficDnsRoute
-  AppTrafficGatewaysRoute: typeof AppTrafficGatewaysRoute
   AppTrafficOverviewRoute: typeof AppTrafficOverviewRoute
-  AppTrafficSettingsRoute: typeof AppTrafficSettingsRoute
   AppDnsIndexRoute: typeof AppDnsIndexRoute
   AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
   AppKeysIndexRoute: typeof AppKeysIndexRoute
@@ -1091,7 +1110,10 @@ interface AppRouteChildren {
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppTrafficIndexRoute: typeof AppTrafficIndexRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
+  AppSettingsTrafficCollectionRoute: typeof AppSettingsTrafficCollectionRoute
+  AppSettingsTrafficGatewaysRoute: typeof AppSettingsTrafficGatewaysRoute
   AppTrafficMachinesNodeIdRoute: typeof AppTrafficMachinesNodeIdRoute
+  AppSettingsTrafficIndexRoute: typeof AppSettingsTrafficIndexRoute
   AppTrafficMachinesIndexRoute: typeof AppTrafficMachinesIndexRoute
 }
 
@@ -1132,9 +1154,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
   AppTrafficDestinationsRoute: AppTrafficDestinationsRoute,
   AppTrafficDnsRoute: AppTrafficDnsRoute,
-  AppTrafficGatewaysRoute: AppTrafficGatewaysRoute,
   AppTrafficOverviewRoute: AppTrafficOverviewRoute,
-  AppTrafficSettingsRoute: AppTrafficSettingsRoute,
   AppDnsIndexRoute: AppDnsIndexRoute,
   AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,
   AppKeysIndexRoute: AppKeysIndexRoute,
@@ -1145,7 +1165,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppTrafficIndexRoute: AppTrafficIndexRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
+  AppSettingsTrafficCollectionRoute: AppSettingsTrafficCollectionRoute,
+  AppSettingsTrafficGatewaysRoute: AppSettingsTrafficGatewaysRoute,
   AppTrafficMachinesNodeIdRoute: AppTrafficMachinesNodeIdRoute,
+  AppSettingsTrafficIndexRoute: AppSettingsTrafficIndexRoute,
   AppTrafficMachinesIndexRoute: AppTrafficMachinesIndexRoute,
 }
 

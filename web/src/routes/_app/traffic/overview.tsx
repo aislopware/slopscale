@@ -95,7 +95,7 @@ function OverviewPage(): ReactElement {
           description={
             <>
               Traffic shows up once the agent runs on a tagged exit node, subnet router or app
-              connector. <TextLink to="/traffic/gateways">Set up a gateway</TextLink>.
+              connector. <TextLink to="/settings/traffic/gateways">Set up a gateway</TextLink>.
             </>
           }
         />
@@ -159,7 +159,9 @@ function GatewaysSection({
         whole={whole}
         onPick={onPick}
         footer={
-          <TableFooter actions={<TextLink to="/traffic/gateways">Manage gateways</TextLink>}>
+          <TableFooter
+            actions={<TextLink to="/settings/traffic/gateways">Manage gateways</TextLink>}
+          >
             {`Showing ${plural(gateways.length, "gateway")}`}
           </TableFooter>
         }

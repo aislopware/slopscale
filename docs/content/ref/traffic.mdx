@@ -120,9 +120,9 @@ no configuration:
   current key, so there is no secret to install or rotate, and a gateway
   that is removed, suspended or rekeyed stops being accepted at once.
 - **Settings.** Whether to read handshakes and whether to run the resolver
-  come from the server with every answer, so they are changed in one place
-  with `slopscale traffic settings set` or the
-  [API](#reading-the-data).
+  come from the server with every answer, so they are changed in one place:
+  Settings › Traffic monitor › Collection in the console,
+  `slopscale traffic settings set` or the [API](#reading-the-data).
 
 On start the agent writes `1` to `/proc/sys/net/netfilter/nf_conntrack_acct`
 and `nf_conntrack_timestamp`. Only connections opened after that carry
@@ -342,12 +342,15 @@ network's name is read from the current table.
 
 ### Console
 
-Logs › Traffic in the console. The overview lists every gateway with what
-it carried in the window, a gateway that carried nothing included at zero;
-picking one narrows the whole page, chart included, to that gateway, as the
-gateway filter beside the time range does on every traffic page. While
-more than one gateway carried traffic, the machine tables name the gateways
-each machine went through, busiest first.
+Logs › Traffic in the console, with the last 24 hours on the console's
+overview: the totals, the rate chart and the five busiest hosts and
+machines. The gateways, their resolvers and what they collect are set
+under Settings › Traffic monitor. The traffic overview lists every gateway
+with what it carried in the window, a gateway that carried nothing
+included at zero; picking one narrows the whole page, chart included, to
+that gateway, as the gateway filter beside the time range does on every
+traffic page. While more than one gateway carried traffic, the machine
+tables name the gateways each machine went through, busiest first.
 
 ### CLI
 

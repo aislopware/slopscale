@@ -13,6 +13,7 @@ import {
   KeyIcon,
   WebhooksLogoIcon,
   PathIcon,
+  GaugeIcon,
   ShieldCheckIcon,
   SignInIcon,
   SignpostIcon,
@@ -61,15 +62,16 @@ export type NavPath =
   | "/sign-ins"
   | "/settings/tailnet"
   | "/settings/server"
+  | "/settings/traffic"
+  | "/settings/traffic/gateways"
+  | "/settings/traffic/collection"
   | "/audit"
   | "/sessions"
   | "/traffic"
   | "/traffic/overview"
   | "/traffic/machines"
   | "/traffic/destinations"
-  | "/traffic/dns"
-  | "/traffic/gateways"
-  | "/traffic/settings";
+  | "/traffic/dns";
 
 /** The live counts the sidebar can show next to an item. */
 export type NavBadge = "pendingNodes" | "pendingUsers" | "pendingRoutes" | "pendingRequests";
@@ -117,9 +119,10 @@ export interface NavGroup {
  * may reach what and the credentials that let a machine, a program or a browser in, how packets and
  * names travel, what happened, and the switches and outbound integrations that only an
  * administrator sees. Keys and sign-ins sit under Access because every member has API keys and
- * console sessions of their own, which keeps Settings a group only an administrator sees. A page
- * with several parts of its own is a branch with a page per part, so every part has an address and
- * a place in the sidebar.
+ * console sessions of their own, which keeps Settings a group only an administrator sees. Logs only
+ * reads what happened; what is recorded and kept, such as the traffic gateways and their
+ * collection, is set under Settings. A page with several parts of its own is a branch with a page
+ * per part, so every part has an address and a place in the sidebar.
  */
 export const navGroups: readonly NavGroup[] = [
   { items: [{ to: "/", label: "Overview", icon: SquaresFourIcon, exact: true }] },
@@ -231,8 +234,6 @@ export const navGroups: readonly NavGroup[] = [
           { to: "/traffic/machines", label: "Machines" },
           { to: "/traffic/destinations", label: "Destinations" },
           { to: "/traffic/dns", label: "DNS lookups" },
-          { to: "/traffic/gateways", label: "Gateways" },
-          { to: "/traffic/settings", label: "Settings" },
         ],
       },
     ],
@@ -251,6 +252,16 @@ export const navGroups: readonly NavGroup[] = [
         label: "Server",
         icon: ComputerTowerIcon,
         scope: "feature_settings:read",
+      },
+      {
+        to: "/settings/traffic",
+        label: "Traffic monitor",
+        icon: GaugeIcon,
+        scope: "logs:network:read",
+        children: [
+          { to: "/settings/traffic/gateways", label: "Gateways" },
+          { to: "/settings/traffic/collection", label: "Collection" },
+        ],
       },
       {
         to: "/integrations",

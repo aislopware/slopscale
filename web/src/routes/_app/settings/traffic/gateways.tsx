@@ -13,7 +13,7 @@ import { ResolverNotices } from "~/components/traffic/resolver-notices.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-export const Route = createFileRoute("/_app/traffic/gateways")({
+export const Route = createFileRoute("/_app/settings/traffic/gateways")({
   loader: async ({ context }) => {
     await context.queryClient.query(trafficReportersQuery);
   },

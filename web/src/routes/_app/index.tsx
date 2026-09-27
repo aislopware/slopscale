@@ -1,10 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { accessRequestsQuery, groupsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { AccessRequest, Group, Node, User } from "~/api/queries.ts";
+import {
+  trafficDestinationsQuery,
+  trafficReportersQuery,
+  trafficSummaryQuery,
+} from "~/api/traffic.ts";
 import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
@@ -13,6 +18,8 @@ import { MetricTiles } from "~/components/overview/metric-tiles.tsx";
 import { NeedsAttention } from "~/components/overview/needs-attention.tsx";
 import { QuickActions } from "~/components/overview/quick-actions.tsx";
 import { RecentActivity } from "~/components/overview/recent-activity.tsx";
+import { TrafficGlance, glanceWindow } from "~/components/overview/traffic-glance.tsx";
+import { destinationFilters, noDestinationFilters } from "~/components/traffic/search.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RoleBadge } from "~/components/users/role-badge.tsx";
 
@@ -20,6 +27,14 @@ const noNodes: readonly Node[] = [];
 const noUsers: readonly User[] = [];
 const noRequests: readonly AccessRequest[] = [];
 const noGroups: readonly Group[] = [];
+
+// The traffic overview opens with the same ten rows, so following a link here reads from the cache.
+const trafficRows = 10;
+const trafficScope = { ...glanceWindow, node: "" };
+const topHosts = destinationFilters(
+  { ...glanceWindow, ...noDestinationFilters, by: "host" },
+  trafficRows,
+);
 
 export const Route = createFileRoute("/_app/")({
   loader: async ({ context }) => {
@@ -56,6 +71,18 @@ function OverviewPage(): ReactElement {
   const seesRequests = can(me, "policy_file:read");
   const requests = useQuery({ ...accessRequestsQuery, enabled: seesRequests });
   const groups = useQuery({ ...groupsQuery, enabled: seesRequests });
+  const seesTraffic = can(me, "logs:network:read");
+  const reporters = useQuery({ ...trafficReportersQuery, enabled: seesTraffic });
+  const hasGateways = (reporters.data?.reporters.length ?? 0) > 0;
+  const summary = useQuery({
+    ...trafficSummaryQuery(trafficScope, trafficRows),
+    enabled: hasGateways,
+  });
+  const destinations = useQuery({
+    ...trafficDestinationsQuery(trafficScope, topHosts),
+    enabled: hasGateways,
+  });
+  const navigate = useNavigate();
   const [addingMachine, setAddingMachine] = useState(false);
   const nodeList = nodes.data?.nodes;
   const userList = users.data?.users;
@@ -88,6 +115,19 @@ function OverviewPage(): ReactElement {
         groups={groupList ?? noGroups}
         me={me}
       />
+      {hasGateways ? (
+        <TrafficGlance
+          summary={summary.data}
+          destinations={destinations.data?.destinations}
+          error={summary.error ?? destinations.error}
+          onZoom={(from, to) => {
+            void navigate({
+              to: "/traffic/overview",
+              search: { ...glanceWindow, range: "custom", from, to },
+            });
+          }}
+        />
+      ) : null}
       <RecentActivity nodes={nodeList ?? noNodes} />
       <CreatePreAuthKeyDialog
         me={me}

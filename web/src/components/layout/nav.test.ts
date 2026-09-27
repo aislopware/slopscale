@@ -165,12 +165,24 @@ describe("the traffic pages", () => {
       "Machines",
       "Destinations",
       "DNS lookups",
-      "Gateways",
-      "Settings",
     ]);
     expect(pagesOf(visibleGroups(signedIn)).some((page) => page.to.startsWith("/traffic"))).toBe(
       false,
     );
+  });
+
+  it("keep the gateways and what they collect under Settings, not Logs", () => {
+    const groups = visibleGroups(network);
+    const settings = groups.find((group) => group.label === "Settings");
+    const traffic = settings?.items.find((item) => item.to === "/settings/traffic");
+
+    expect(traffic?.children?.map((child) => child.label)).toStrictEqual([
+      "Gateways",
+      "Collection",
+    ]);
+    expect(redirectFor(network, "/settings/traffic")).toBe("/settings/traffic/gateways");
+    expect(redirectFor(network, "/settings/traffic/collection")).toBeNull();
+    expect(redirectFor(signedIn, "/settings/traffic/gateways")).toBe("/");
   });
 
   it("keep one machine's traffic under Machines, so the guard lets it through", () => {
