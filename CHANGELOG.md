@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.53.0](https://github.com/aislopware/slopscale/compare/v0.52.0...v0.53.0) (2026-09-27)
+
+
+### Changes
+
+* **traffic:** show the last day of traffic on the overview and set the gateways and collection under Settings ([#44](https://github.com/aislopware/slopscale/issues/44)) ([fa2bdcf](https://github.com/aislopware/slopscale/commit/fa2bdcf66966b59b36253476ecf727c26853724f))
+
 ## [0.52.0](https://github.com/aislopware/slopscale/compare/v0.51.0...v0.52.0) (2026-09-27)
 
 
