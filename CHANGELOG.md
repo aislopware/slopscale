@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.52.0](https://github.com/aislopware/slopscale/compare/v0.51.0...v0.52.0) (2026-09-27)
+
+
+### Changes
+
+* **traffic:** name the gateways each machine's traffic went through in the API, the CLI and the console's machine tables ([89f8dca](https://github.com/aislopware/slopscale/commit/89f8dcad09e04bbfd61d596041a7d44ce3015ef2))
+* **web:** see what each gateway carried on the traffic overview, and pick one to narrow the page to it ([89f8dca](https://github.com/aislopware/slopscale/commit/89f8dcad09e04bbfd61d596041a7d44ce3015ef2))
+
 ## [0.51.0](https://github.com/aislopware/slopscale/compare/v0.50.1...v0.51.0) (2026-09-27)
 
 
