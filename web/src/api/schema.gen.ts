@@ -4499,6 +4499,8 @@ export interface components {
             nodeName: string;
             /** @description Absent when the node no longer exists. */
             nodeOwner?: components["schemas"]["MachineOwner"];
+            /** @description The gateways the node went through, busiest first. */
+            reporterIds: string[];
             /** Format: int64 */
             rxBytes: number;
             /** Format: int64 */
