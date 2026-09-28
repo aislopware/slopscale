@@ -1,4 +1,5 @@
 import type { ITheme } from "@xterm/xterm";
+import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
@@ -105,6 +106,32 @@ describe(SSHTerminal, () => {
       .element(screen.getByRole("region", { name: "Terminal on build-box" }))
       .toBeVisible();
     expect(document.querySelector(".xterm-accessibility")).not.toBeNull();
+  });
+
+  it("keeps the session across new callbacks and reports through the latest", async () => {
+    const dial = vi.fn<IPN["ssh"]>(() => sshSession);
+    const dialling: IPN = { ...ipn, ssh: dial };
+    const first = vi.fn<() => void>();
+    const latest = vi.fn<() => void>();
+    const terminal = (onConnected: () => void): ReactElement => (
+      <SSHTerminal
+        ipn={dialling}
+        host="build-box"
+        username="root"
+        onConnectionProgress={noop}
+        onConnected={onConnected}
+        onDone={noop}
+        registerSession={noop}
+      />
+    );
+    const screen = await render(terminal(first));
+
+    await screen.rerender(terminal(latest));
+    dial.mock.calls[0]?.[2].onConnected();
+
+    expect(dial).toHaveBeenCalledOnce();
+    expect(first).not.toHaveBeenCalled();
+    expect(latest).toHaveBeenCalledOnce();
   });
 
   it("repaints when the console switches mode", async () => {

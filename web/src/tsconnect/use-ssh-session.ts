@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useReducer, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import { fetchClient } from "~/api/client.ts";
@@ -118,11 +118,7 @@ export function useSSHSession(nodeId: string, baseUrl?: string): UseSSHSessionRe
   const restartRef = useRef<(() => void) | null>(null);
   // The draft as it stands, readable from the async start: the session is fetched while the page is
   // already on screen, so by the time the server's guess arrives the field may not be empty.
-  const draftRef = useRef("");
-
-  useEffect(() => {
-    draftRef.current = username;
-  }, [username]);
+  const readDraft = useEffectEvent((): string => username);
 
   const closeActiveSession = useCallback((): void => {
     if (activeSshSessionRef.current === null) {
@@ -165,10 +161,8 @@ export function useSSHSession(nodeId: string, baseUrl?: string): UseSSHSessionRe
 
         // Whatever is already in the field wins: the machine's own suggestion may have arrived
         // first, or the operator may have typed while the client was still loading.
-        const offered =
-          draftRef.current === ""
-            ? result.session.target.username || fallbackUsername
-            : draftRef.current;
+        const draft = readDraft();
+        const offered = draft === "" ? result.session.target.username || fallbackUsername : draft;
 
         setUsername(offered);
         setConnectionUsername(offered);
@@ -219,22 +213,22 @@ export function useSSHSession(nodeId: string, baseUrl?: string): UseSSHSessionRe
     restartRef.current?.();
   }, [closeActiveSession, state.ipnState, username]);
 
-  const onConnectionProgress = useCallback((message: string): void => {
+  const onConnectionProgress = (message: string): void => {
     dispatch({ type: "CONNECTION_PROGRESS", message });
-  }, []);
+  };
 
-  const onConnected = useCallback((): void => {
+  const onConnected = (): void => {
     dispatch({ type: "CONNECTED" });
-  }, []);
+  };
 
-  const onDone = useCallback((): void => {
+  const onDone = (): void => {
     activeSshSessionRef.current = null;
     dispatch({ type: "DONE" });
-  }, []);
+  };
 
-  const registerSession = useCallback((sshSession: IPNSSHSession | null): void => {
+  const registerSession = (sshSession: IPNSSHSession | null): void => {
     activeSshSessionRef.current = sshSession;
-  }, []);
+  };
 
   return {
     state,
