@@ -5,8 +5,14 @@ server at `/console/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ## Stack
 
-- React 19 through `@vitejs/plugin-react`, built by Vite 8. The React
-  Compiler is not enabled.
+- React 19 through `@vitejs/plugin-react`, built by Vite 8, with the React
+  Compiler (`babel-plugin-react-compiler`, pinned exactly, through
+  `@rolldown/plugin-babel`). Keep `@babel/core` on 7: under Babel 8 the
+  compiler 1.0 silently skips every component that destructures a prop with
+  a default. Oxc's native compiler (`react({ compiler: true })`) is still
+  experimental. `DataTable` takes the table as a prop, never through
+  context: the compiler memoizes on identity, and a context provider created
+  once would keep the rows from ever seeing a sort or a new page.
 - TanStack Router (file routes under `src/routes`, generated tree in
   `src/routeTree.gen.ts`), TanStack Query, TanStack Table v9 (`useTable` and
   `tableFeatures`; v8 examples do not apply), TanStack Form where a form has
