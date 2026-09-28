@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.54.1](https://github.com/aislopware/slopscale/compare/v0.54.0...v0.54.1) (2026-09-28)
+
+
+### Performance
+
+* **web:** compile the console with the React Compiler, so a change re-renders only what depends on it ([002b846](https://github.com/aislopware/slopscale/commit/002b8468880b9995749b821e9c587ff4df5cd40a))
+
+
+### Dependencies
+
+* update tailscale.com, miekg/dns, prometheus/common, zitadel/oidc and the console's router, linter and formatter ([002b846](https://github.com/aislopware/slopscale/commit/002b8468880b9995749b821e9c587ff4df5cd40a))
+
 ## [0.54.0](https://github.com/aislopware/slopscale/compare/v0.53.0...v0.54.0) (2026-09-27)
 
 
