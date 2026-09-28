@@ -157,21 +157,20 @@ function RegionsSection({
       description="What the machines measured, region by region. A round trip is the best of the client's recent probes."
       panel={false}
     >
-      <table.AppTable>
-        <DataTable
-          empty={
-            <SectionEmpty
-              title="No measurements yet"
-              description="Machines report their relay latency once they connect."
-            />
-          }
-          footer={
-            regions.length === 0 ? undefined : (
-              <TableFooter>{`Showing ${plural(regions.length, "region")}`}</TableFooter>
-            )
-          }
-        />
-      </table.AppTable>
+      <DataTable
+        table={table}
+        empty={
+          <SectionEmpty
+            title="No measurements yet"
+            description="Machines report their relay latency once they connect."
+          />
+        }
+        footer={
+          regions.length === 0 ? undefined : (
+            <TableFooter>{`Showing ${plural(regions.length, "region")}`}</TableFooter>
+          )
+        }
+      />
     </Section>
   );
 }
@@ -257,21 +256,20 @@ function MachinesSection({ report }: { readonly report: DerpLatencyReport }): Re
       description="Machines whose round trip to their own relay region is the worst, first."
       panel={false}
     >
-      <table.AppTable>
-        <DataTable
-          empty={
-            <SectionEmpty
-              title="No machines reporting"
-              description="A machine appears here once its client sends a network report."
-            />
-          }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>{`Showing ${plural(rows.length, "machine")}`}</TableFooter>
-            )
-          }
-        />
-      </table.AppTable>
+      <DataTable
+        table={table}
+        empty={
+          <SectionEmpty
+            title="No machines reporting"
+            description="A machine appears here once its client sends a network report."
+          />
+        }
+        footer={
+          rows.length === 0 ? undefined : (
+            <TableFooter>{`Showing ${plural(rows.length, "machine")}`}</TableFooter>
+          )
+        }
+      />
     </Section>
   );
 }

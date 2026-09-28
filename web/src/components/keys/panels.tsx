@@ -30,6 +30,7 @@ import type { KindFilter } from "~/components/keys/search.ts";
 import { apiKeyStatus, preAuthKeyStatus } from "~/components/keys/status.ts";
 import type { StatusFilter } from "~/components/keys/status.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
+import type { AppTableInstance, RowData } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
@@ -99,22 +100,21 @@ export function PreAuthPanel({
         </Button>
       }
     >
-      <table.AppTable>
-        <PanelTable
-          controls={controls}
-          total={keys.data.preAuthKeys.length}
-          shown={table.getRowModel().rows.length}
-          noun="pre-auth key"
-          firstEmpty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              title="No pre-auth keys"
-              description="A pre-auth key lets a machine register without anyone signing in on it."
-            />
-          }
-        />
-      </table.AppTable>
+      <PanelTable
+        table={table}
+        controls={controls}
+        total={keys.data.preAuthKeys.length}
+        shown={table.getRowModel().rows.length}
+        noun="pre-auth key"
+        firstEmpty={
+          <Empty
+            className={tableEmptyClass}
+            size="sm"
+            title="No pre-auth keys"
+            description="A pre-auth key lets a machine register without anyone signing in on it."
+          />
+        }
+      />
       <CreatePreAuthKeyDialog me={me} open={creating} onOpenChange={setCreating} />
     </KeyPanel>
   );
@@ -160,22 +160,21 @@ export function ApiPanel({
         </Button>
       }
     >
-      <table.AppTable>
-        <PanelTable
-          controls={controls}
-          total={keys.data.apiKeys.length}
-          shown={table.getRowModel().rows.length}
-          noun="API key"
-          firstEmpty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              title="No API keys"
-              description="An API key authenticates scripts and other tools against the v1 API."
-            />
-          }
-        />
-      </table.AppTable>
+      <PanelTable
+        table={table}
+        controls={controls}
+        total={keys.data.apiKeys.length}
+        shown={table.getRowModel().rows.length}
+        noun="API key"
+        firstEmpty={
+          <Empty
+            className={tableEmptyClass}
+            size="sm"
+            title="No API keys"
+            description="An API key authenticates scripts and other tools against the v1 API."
+          />
+        }
+      />
       <CreateApiKeyDialog me={me} open={creating} onOpenChange={setCreating} />
     </KeyPanel>
   );
@@ -247,22 +246,21 @@ export function OAuthPanel({
         </div>
       }
     >
-      <table.AppTable>
-        <PanelTable
-          controls={controls}
-          total={clients.data.oauthClients.length}
-          shown={table.getRowModel().rows.length}
-          noun="OAuth client"
-          firstEmpty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              title="No OAuth clients"
-              description="An OAuth client or federated identity lets automation get short-lived v2 API tokens."
-            />
-          }
-        />
-      </table.AppTable>
+      <PanelTable
+        table={table}
+        controls={controls}
+        total={clients.data.oauthClients.length}
+        shown={table.getRowModel().rows.length}
+        noun="OAuth client"
+        firstEmpty={
+          <Empty
+            className={tableEmptyClass}
+            size="sm"
+            title="No OAuth clients"
+            description="An OAuth client or federated identity lets automation get short-lived v2 API tokens."
+          />
+        }
+      />
       <CreateOAuthClientDialog me={me} open={creatingClient} onOpenChange={setCreatingClient} />
       <CreateFederatedIdentityDialog
         me={me}
@@ -317,13 +315,15 @@ function count(total: number, noun: string): string {
   return total === 1 ? `1 ${noun}` : `${total} ${noun}s`;
 }
 
-function PanelTable({
+function PanelTable<TData extends RowData>({
+  table,
   controls,
   total,
   shown,
   noun,
   firstEmpty,
 }: {
+  readonly table: AppTableInstance<TData>;
   readonly controls: PanelControls;
   readonly total: number;
   readonly shown: number;
@@ -332,6 +332,7 @@ function PanelTable({
 }): ReactElement {
   return (
     <DataTable
+      table={table}
       empty={
         total === 0 ? (
           firstEmpty

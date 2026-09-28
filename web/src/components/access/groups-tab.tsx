@@ -86,34 +86,33 @@ export function GroupsTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
-                title="No groups match"
-                contents={
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      onSearchChange("");
-                    }}
-                  >
-                    Clear search
-                  </Button>
-                }
-              />
-            }
-            footer={
-              <TableFooter>
-                {own === 0
-                  ? "Only the built-in groups."
-                  : `Showing ${shown} of ${plural(groups.length, "group")}`}
-              </TableFooter>
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            <Empty
+              className={tableEmptyClass}
+              size="sm"
+              title="No groups match"
+              contents={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    onSearchChange("");
+                  }}
+                >
+                  Clear search
+                </Button>
+              }
+            />
+          }
+          footer={
+            <TableFooter>
+              {own === 0
+                ? "Only the built-in groups."
+                : `Showing ${shown} of ${plural(groups.length, "group")}`}
+            </TableFooter>
+          }
+        />
       </Frame>
       <GroupDialog
         nodes={nodes ?? []}

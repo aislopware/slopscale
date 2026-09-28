@@ -12,7 +12,7 @@ import { groupName, isBuiltinRule, protocolSummary } from "~/components/access/m
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureName } from "~/components/access/posture-model.ts";
 import { RuleMenu } from "~/components/access/rule-menu.tsx";
-import { createAppColumnHelper, useTableContext } from "~/components/table/app-table.tsx";
+import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -59,7 +59,9 @@ export const ruleColumns = helper.columns([
     id: "sources",
     header: "Sources",
     enableSorting: false,
-    cell: ({ row }) => <SourcesCell rule={row.original} />,
+    cell: ({ row, table }) => (
+      <SourcesCell rule={row.original} groups={table.options.meta?.groups ?? []} />
+    ),
     meta: { className: "min-w-32 align-top" },
   }),
   helper.accessor((rule) => (rule.bidirectional ? "both ways" : "one way"), {
@@ -100,7 +102,14 @@ export const ruleColumns = helper.columns([
     cell: ({ row, table }) => {
       const { me } = table.options.meta ?? {};
 
-      return me === undefined ? null : <EnabledCell rule={row.original} me={me} />;
+      return me === undefined ? null : (
+        <EnabledCell
+          rule={row.original}
+          me={me}
+          rules={table.options.meta?.rules ?? []}
+          policyFileEnforces={table.options.meta?.policyFileEnforces === true}
+        />
+      );
     },
     meta: { className: "whitespace-nowrap" },
   }),
@@ -149,12 +158,16 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
 }
 
 /** The source groups, and under them the postures a source must satisfy. */
-function SourcesCell({ rule }: { readonly rule: RuleRow }): ReactElement {
-  const { groups } = useTableContext().options.meta ?? {};
-
+function SourcesCell({
+  rule,
+  groups,
+}: {
+  readonly rule: RuleRow;
+  readonly groups: readonly Group[];
+}): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <GroupNames ids={rule.sourceGroupIds} groups={groups ?? []} />
+      <GroupNames ids={rule.sourceGroupIds} groups={groups} />
       {rule.postureIds.length === 0 ? null : (
         <span className="text-xs whitespace-normal text-kumo-subtle" title={rule.postureNames}>
           Requires {rule.postureNames}
@@ -210,13 +223,21 @@ function ProtocolCell({ rule }: { readonly rule: AccessRule }): ReactElement {
  * overwritten. Disabling the last enabled rule opens the tailnet when no policy file restricts it,
  * and that asks first.
  */
-function EnabledCell({ rule, me }: { readonly rule: AccessRule; readonly me: Me }): ReactElement {
+function EnabledCell({
+  rule,
+  me,
+  rules,
+  policyFileEnforces,
+}: {
+  readonly rule: AccessRule;
+  readonly me: Me;
+  readonly rules: readonly AccessRule[];
+  readonly policyFileEnforces: boolean;
+}): ReactElement {
   const { setRuleEnabled } = useAccessMutations();
-  const { rules, policyFileEnforces } = useTableContext().options.meta ?? {};
   const [confirming, setConfirming] = useState(false);
-  const lastEnabled =
-    rule.enabled && (rules ?? []).filter((candidate) => candidate.enabled).length === 1;
-  const opensTailnet = lastEnabled && policyFileEnforces !== true;
+  const lastEnabled = rule.enabled && rules.filter((candidate) => candidate.enabled).length === 1;
+  const opensTailnet = lastEnabled && !policyFileEnforces;
 
   const apply = (enabled: boolean): void => {
     setRuleEnabled.mutate(

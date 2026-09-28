@@ -310,20 +310,19 @@ export function GatewaysTable({
   });
 
   return (
-    <table.AppTable>
-      <DataTable
-        empty={
-          <SectionEmpty
-            title="No gateway reports yet"
-            description="A gateway shows up here with its first report, a minute after the agent starts."
-          />
-        }
-        footer={
-          reporters.length === 0 ? undefined : (
-            <TableFooter>{`Showing ${plural(reporters.length, "gateway")}`}</TableFooter>
-          )
-        }
-      />
-    </table.AppTable>
+    <DataTable
+      table={table}
+      empty={
+        <SectionEmpty
+          title="No gateway reports yet"
+          description="A gateway shows up here with its first report, a minute after the agent starts."
+        />
+      }
+      footer={
+        reporters.length === 0 ? undefined : (
+          <TableFooter>{`Showing ${plural(reporters.length, "gateway")}`}</TableFooter>
+        )
+      }
+    />
   );
 }

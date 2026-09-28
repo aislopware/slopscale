@@ -70,12 +70,11 @@ function Machines({ count = total }: { readonly count?: number }): ReactElement 
       >
         Narrow
       </button>
-      <table.AppTable>
-        <DataTable
-          empty={<p>No machines</p>}
-          footer={<TableFooter>{`Showing ${table.getRowModel().rows.length}`}</TableFooter>}
-        />
-      </table.AppTable>
+      <DataTable
+        table={table}
+        empty={<p>No machines</p>}
+        footer={<TableFooter>{`Showing ${table.getRowModel().rows.length}`}</TableFooter>}
+      />
     </>
   );
 }
@@ -129,6 +128,52 @@ describe("a paged table", () => {
 
     await expect.element(screen.getByText("Showing 20")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+  });
+});
+
+const labelled = helper.columns([
+  helper.accessor((machine) => machine.name, { id: "name", header: "Machine" }),
+  helper.display({
+    id: "label",
+    header: "Label",
+    cell: ({ table }) => table.options.meta?.eventTypes?.join(", ") ?? "unlabelled",
+  }),
+]);
+
+/** Rows that never change while the table's meta does, the way a page's lookups arrive late. */
+function Labelled(): ReactElement {
+  const [labels, setLabels] = useState<readonly string[] | null>(null);
+  const table = useAppTable({
+    data: machines.slice(0, 1),
+    columns: labelled,
+    getRowId: (machine) => machine.id,
+    meta: labels === null ? {} : { eventTypes: labels },
+  });
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setLabels(["gateway"]);
+        }}
+      >
+        Label
+      </button>
+      <DataTable table={table} empty={null} />
+    </>
+  );
+}
+
+describe("a table's meta", () => {
+  it("reaches the cells when it changes under the same rows", async () => {
+    const screen = await render(<Labelled />);
+
+    await expect.element(screen.getByRole("cell", { name: "unlabelled" })).toBeVisible();
+
+    await screen.getByRole("button", { name: "Label" }).click();
+
+    await expect.element(screen.getByRole("cell", { name: "gateway" })).toBeVisible();
   });
 });
 

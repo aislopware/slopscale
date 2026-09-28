@@ -162,30 +162,29 @@ export function NamesTable({
   });
 
   return (
-    <table.AppTable>
-      <DataTable
-        empty={
-          empty ?? (
-            <SectionEmpty
-              title="No lookups in this window"
-              description="Names show up here once machines resolve them through a gateway's resolver."
-            />
-          )
-        }
-        footer={footer}
-        onRowClick={
-          onPick === undefined
-            ? undefined
-            : (id) => {
-                const row = pickable(id);
+    <DataTable
+      table={table}
+      empty={
+        empty ?? (
+          <SectionEmpty
+            title="No lookups in this window"
+            description="Names show up here once machines resolve them through a gateway's resolver."
+          />
+        )
+      }
+      footer={footer}
+      onRowClick={
+        onPick === undefined
+          ? undefined
+          : (id) => {
+              const row = pickable(id);
 
-                if (row !== undefined) {
-                  onPick(row);
-                }
+              if (row !== undefined) {
+                onPick(row);
               }
-        }
-        isRowClickable={(id) => pickable(id) !== undefined}
-      />
-    </table.AppTable>
+            }
+      }
+      isRowClickable={(id) => pickable(id) !== undefined}
+    />
   );
 }

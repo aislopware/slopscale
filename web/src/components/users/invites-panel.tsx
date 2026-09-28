@@ -51,23 +51,22 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
           An invitation becomes a user the first time its link is opened.
         </p>
       </FrameBand>
-      <table.AppTable>
-        <DataTable
-          empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              title="No invitations waiting"
-              description="An invitation stays here until it is used, revoked or expired."
-            />
-          }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>{`Showing ${plural(rows.length, "invitation")}`}</TableFooter>
-            )
-          }
-        />
-      </table.AppTable>
+      <DataTable
+        table={table}
+        empty={
+          <Empty
+            className={tableEmptyClass}
+            size="sm"
+            title="No invitations waiting"
+            description="An invitation stays here until it is used, revoked or expired."
+          />
+        }
+        footer={
+          rows.length === 0 ? undefined : (
+            <TableFooter>{`Showing ${plural(rows.length, "invitation")}`}</TableFooter>
+          )
+        }
+      />
     </Frame>
   );
 }

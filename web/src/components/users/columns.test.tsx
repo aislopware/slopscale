@@ -41,11 +41,7 @@ function UsersTable({ users }: { readonly users: readonly User[] }): ReactElemen
     getRowId: (user) => user.id,
   });
 
-  return (
-    <table.AppTable>
-      <DataTable empty={null} />
-    </table.AppTable>
-  );
+  return <DataTable table={table} empty={null} />;
 }
 
 describe("the users table", () => {

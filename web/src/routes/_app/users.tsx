@@ -147,31 +147,30 @@ function UsersPage(): ReactElement {
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <FirstUserEmpty />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No users match"
-                  contents={
-                    <Button variant="secondary" onClick={handleClear}>
-                      Clear filters
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countUsers(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <FirstUserEmpty />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No users match"
+                contents={
+                  <Button variant="secondary" onClick={handleClear}>
+                    Clear filters
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countUsers(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <PendingInvites me={me} />
     </>

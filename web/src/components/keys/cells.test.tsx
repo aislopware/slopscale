@@ -86,11 +86,7 @@ function PreAuthTable({ keys }: { readonly keys: readonly PreAuthKey[] }): React
     getRowId: (authKey) => authKey.id,
   });
 
-  return (
-    <table.AppTable>
-      <DataTable empty={null} />
-    </table.AppTable>
-  );
+  return <DataTable table={table} empty={null} />;
 }
 
 const previewLength = 24;

@@ -123,25 +123,24 @@ function LearnedRoutesSection({ node }: { readonly node: Node }): ReactElement {
       }
       panel={false}
     >
-      <table.AppTable>
-        <DataTable
-          empty={
-            <LearnedRoutesEmpty
-              online={node.online}
-              loading={routes.isPending}
-              error={routes.isError ? errorMessage(routes.error) : undefined}
-              onRetry={() => {
-                void routes.refetch();
-              }}
-            />
-          }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>{`Showing ${plural(rows.length, "domain")}`}</TableFooter>
-            )
-          }
-        />
-      </table.AppTable>
+      <DataTable
+        table={table}
+        empty={
+          <LearnedRoutesEmpty
+            online={node.online}
+            loading={routes.isPending}
+            error={routes.isError ? errorMessage(routes.error) : undefined}
+            onRetry={() => {
+              void routes.refetch();
+            }}
+          />
+        }
+        footer={
+          rows.length === 0 ? undefined : (
+            <TableFooter>{`Showing ${plural(rows.length, "domain")}`}</TableFooter>
+          )
+        }
+      />
     </Section>
   );
 }
