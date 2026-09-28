@@ -260,16 +260,13 @@ export function useClientUpdateBulk(): ClientUpdateRunner {
     run: async (nodes, ids) => {
       setRunning(true);
 
-      // No `finally`: the catch swallows the failure, so the last lines always run, and the React
-      // Compiler cannot lower a try statement that has one.
+      // No `finally`, and the request lives outside the hook: the React Compiler lowers neither a
+      // try statement with a finally nor a conditional expression inside a try. The catch swallows
+      // the failure, so the last lines always run.
       let results: NodeClientUpdateResult[] | null = null;
 
       try {
-        const { data } = await fetchClient.POST("/api/v1/nodes/client-update", {
-          body: { nodeIds: [...ids] },
-        });
-
-        results = data?.results ?? [];
+        results = await startClientUpdates(ids);
       } catch (error: unknown) {
         toast.error("Could not start the updates", error);
       }
@@ -282,6 +279,14 @@ export function useClientUpdateBulk(): ClientUpdateRunner {
       }
     },
   };
+}
+
+async function startClientUpdates(ids: readonly string[]): Promise<NodeClientUpdateResult[]> {
+  const { data } = await fetchClient.POST("/api/v1/nodes/client-update", {
+    body: { nodeIds: [...ids] },
+  });
+
+  return data?.results ?? [];
 }
 
 /** The run in one line, and the refusals kept for the details dialog. */

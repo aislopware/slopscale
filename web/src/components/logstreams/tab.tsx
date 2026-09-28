@@ -68,41 +68,40 @@ export function LogStreamsTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No log streams yet"
-                  description="Ship the audit log to Splunk, Elasticsearch, Datadog, Axiom, Loki or any HTTP collector."
-                />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No log streams match"
-                  contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countStreams(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No log streams yet"
+                description="Ship the audit log to Splunk, Elasticsearch, Datadog, Axiom, Loki or any HTTP collector."
+              />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No log streams match"
+                contents={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countStreams(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <LogStreamDialog open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>

@@ -156,17 +156,16 @@ export function GatewayTrafficTable({
   });
 
   return (
-    <table.AppTable>
-      <DataTable
-        empty={
-          <SectionEmpty
-            title="No gateway reports yet"
-            description="Gateways show up here once their agent reports."
-          />
-        }
-        footer={footer}
-        onRowClick={onPick}
-      />
-    </table.AppTable>
+    <DataTable
+      table={table}
+      empty={
+        <SectionEmpty
+          title="No gateway reports yet"
+          description="Gateways show up here once their agent reports."
+        />
+      }
+      footer={footer}
+      onRowClick={onPick}
+    />
   );
 }

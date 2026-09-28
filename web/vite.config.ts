@@ -1,8 +1,7 @@
-import { fileURLToPath } from "node:url";
-
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // The console is served by slopscale under /console/, so every asset URL is
@@ -13,10 +12,13 @@ const backend = process.env["SLOPSCALE_URL"] ?? "http://127.0.0.1:8080";
 
 export default defineConfig({
   base: "/console/",
-  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
-  resolve: {
-    alias: { "~": fileURLToPath(new URL("src", import.meta.url)) },
-  },
+  plugins: [
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
+  ],
+  resolve: { tsconfigPaths: true },
   // Kumo is imported per component; pre-bundling every subpath up front keeps
   // the dev server from re-optimising (and briefly serving two React copies)
   // the first time a page pulls in a new one.

@@ -3,7 +3,7 @@ module github.com/aislopware/slopscale
 go 1.27.1
 
 require (
-	codeberg.org/miekg/dns v0.6.115
+	codeberg.org/miekg/dns v0.6.117
 	github.com/arl/statsviz v0.8.2
 	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/chasefleming/elem-go v0.36.0
@@ -36,7 +36,7 @@ require (
 	github.com/ory/dockertest/v4 v4.0.0
 	github.com/oschwald/maxminddb-golang/v2 v2.6.0
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/common v0.71.0
+	github.com/prometheus/common v0.72.0
 	github.com/pterm/pterm v0.12.83
 	github.com/puzpuzpuz/xsync/v4 v4.5.0
 	github.com/realclientip/realclientip-go v1.0.1-0.20260615104152-545b12e0e8c7
@@ -50,7 +50,7 @@ require (
 	github.com/tailscale/tailsql v0.0.0-20260831145903-795321974573
 	github.com/ti-mo/conntrack v0.6.0
 	github.com/ti-mo/netfilter v0.5.3
-	github.com/zitadel/oidc/v3 v3.51.6
+	github.com/zitadel/oidc/v3 v3.51.8
 	go.yaml.in/yaml/v3 v3.0.5
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/crypto v0.57.0
@@ -62,7 +62,7 @@ require (
 	golang.org/x/term v0.46.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
-	tailscale.com v1.103.0-pre.0.20260925230348-6b3a45f14ef6
+	tailscale.com v1.103.0-pre.0.20260928140705-48c7fbcc56db
 	tailscale.com/client/tailscale/v2 v2.11.0
 )
 

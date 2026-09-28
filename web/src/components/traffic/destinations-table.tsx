@@ -397,30 +397,29 @@ export function DestinationsTable({
   });
 
   return (
-    <table.AppTable>
-      <DataTable
-        empty={
-          empty ?? (
-            <SectionEmpty
-              title="No destinations in this window"
-              description="Gateways report where machines connect once traffic passes through them."
-            />
-          )
-        }
-        footer={footer}
-        onRowClick={
-          onPick === undefined
-            ? undefined
-            : (id) => {
-                const row = pickable(id);
+    <DataTable
+      table={table}
+      empty={
+        empty ?? (
+          <SectionEmpty
+            title="No destinations in this window"
+            description="Gateways report where machines connect once traffic passes through them."
+          />
+        )
+      }
+      footer={footer}
+      onRowClick={
+        onPick === undefined
+          ? undefined
+          : (id) => {
+              const row = pickable(id);
 
-                if (row !== undefined) {
-                  onPick(row);
-                }
+              if (row !== undefined) {
+                onPick(row);
               }
-        }
-        isRowClickable={(id) => pickable(id) !== undefined}
-      />
-    </table.AppTable>
+            }
+      }
+      isRowClickable={(id) => pickable(id) !== undefined}
+    />
   );
 }

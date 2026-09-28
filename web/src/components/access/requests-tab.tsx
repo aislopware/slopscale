@@ -126,37 +126,36 @@ export function RequestsTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
-                title={emptyFor(filter, search !== "").title}
-                description={emptyFor(filter, search !== "").description}
-                contents={
-                  search === "" ? undefined : (
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  )
-                }
-              />
-            }
-            footer={
-              rows.length === 0 ? undefined : (
-                <TableFooter>
-                  {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`}`}
-                </TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            <Empty
+              className={tableEmptyClass}
+              size="sm"
+              title={emptyFor(filter, search !== "").title}
+              description={emptyFor(filter, search !== "").description}
+              contents={
+                search === "" ? undefined : (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                )
+              }
+            />
+          }
+          footer={
+            rows.length === 0 ? undefined : (
+              <TableFooter>
+                {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`}`}
+              </TableFooter>
+            )
+          }
+        />
       </Frame>
     </>
   );

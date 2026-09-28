@@ -1,10 +1,7 @@
 // Copyright (c) Tailscale Inc & contributors
 // SPDX-License-Identifier: BSD-3-Clause
 
-/**
- * @file Type definitions for types exported by the wasm_js.go Go
- * module.
- */
+/** @file Type definitions for types exported by the wasm_js.go Go module. */
 
 export interface Go {
   importObject: WebAssembly.Imports;

@@ -1,7 +1,7 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import type { ITheme } from "@xterm/xterm";
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent, useRef } from "react";
 import type { ReactElement } from "react";
 
 import "@xterm/xterm/css/xterm.css";
@@ -179,8 +179,6 @@ function openTerminal(
  * An xterm bound to one SSH session over the in-browser Tailscale client. The session starts when
  * the terminal mounts and closes when it unmounts, so a caller asks for a new one by remounting
  * this component with a fresh `key`.
- *
- * The callbacks must be stable: any change to them tears the session down and dials again.
  */
 export function SSHTerminal({
   ipn,
@@ -195,6 +193,12 @@ export function SSHTerminal({
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLElement | null>(null);
   const termRef = useRef<Terminal | null>(null);
+  // The session reports back through the latest callbacks without the effect depending on them, so a
+  // re-render of the page never hangs up and dials again.
+  const progress = useEffectEvent(onConnectionProgress);
+  const connected = useEffectEvent(onConnected);
+  const done = useEffectEvent(onDone);
+  const register = useEffectEvent(registerSession);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -209,10 +213,10 @@ export function SSHTerminal({
       ipn,
       host,
       username,
-      onConnectionProgress,
-      onConnected,
-      onDone,
-      registerSession,
+      onConnectionProgress: progress,
+      onConnected: connected,
+      onDone: done,
+      registerSession: register,
     });
     termRef.current = opened.term;
 
@@ -220,7 +224,7 @@ export function SSHTerminal({
       termRef.current = null;
       opened.close();
     };
-  }, [ipn, host, username, onConnectionProgress, onConnected, onDone, registerSession]);
+  }, [ipn, host, username]);
 
   // Repainting is deliberately out of the session effect: switching the theme must recolour the
   // terminal, never hang up on it.

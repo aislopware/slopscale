@@ -109,12 +109,13 @@ function Activity({ events }: { readonly events: readonly AuditEvent[] }): React
   const dark = useDarkMode();
   const buckets = bucketEvents(events);
   const tallest = Math.max(...buckets.map((bucket) => bucket.total));
+  const [first] = buckets;
 
-  if (buckets.length === 0 || tallest === 0) {
+  if (first === undefined || tallest === 0) {
     return null;
   }
 
-  const from = buckets[0]?.start ?? new Date();
+  const from = first.start;
   const last = buckets.at(-1)?.start ?? from;
   const withinDay = last.getTime() - from.getTime() < dayMs;
   const series: TimeseriesData[] = [

@@ -79,41 +79,40 @@ export function NetworksTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No networks"
-                  description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick."
-                />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No networks match"
-                  contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countNetworks(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No networks"
+                description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick."
+              />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No networks match"
+                contents={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countNetworks(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <NetworkDialog
         groups={groups}

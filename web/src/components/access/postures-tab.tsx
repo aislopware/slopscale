@@ -75,41 +75,40 @@ export function PosturesTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No postures yet"
-                  description="A posture names conditions a machine must meet. Attach it to a rule to require it of the sources."
-                />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No postures match"
-                  contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${total === 1 ? "1 posture" : `${total} postures`}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No postures yet"
+                description="A posture names conditions a machine must meet. Attach it to a rule to require it of the sources."
+              />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No postures match"
+                contents={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${total === 1 ? "1 posture" : `${total} postures`}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <PostureDialog
         geoIpAvailable={geoIpAvailable}

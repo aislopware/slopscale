@@ -168,34 +168,33 @@ function MachinesPage(): ReactElement {
         />
         <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
         <SelectionProvider selection={selection}>
-          <table.AppTable>
-            <DataTable
-              onRowClick={(nodeId) => {
-                void navigate({ to: "/machines/$nodeId", params: { nodeId } });
-              }}
-              empty={
-                <MachinesEmpty
-                  total={machines.length}
-                  status={view.status}
-                  narrowed={
-                    view.query !== "" ||
-                    view.user !== "" ||
-                    view.tag !== "" ||
-                    view.attestation !== defaultAttestation
-                  }
-                  ownOnly={!can(me, "devices:core:read")}
-                  onClearFilters={clearFilters}
-                />
-              }
-              footer={
-                machines.length === 0 ? undefined : (
-                  <TableFooter>
-                    {`Showing ${shown} of ${plural(machines.length, "machine")}`}
-                  </TableFooter>
-                )
-              }
-            />
-          </table.AppTable>
+          <DataTable
+            table={table}
+            onRowClick={(nodeId) => {
+              void navigate({ to: "/machines/$nodeId", params: { nodeId } });
+            }}
+            empty={
+              <MachinesEmpty
+                total={machines.length}
+                status={view.status}
+                narrowed={
+                  view.query !== "" ||
+                  view.user !== "" ||
+                  view.tag !== "" ||
+                  view.attestation !== defaultAttestation
+                }
+                ownOnly={!can(me, "devices:core:read")}
+                onClearFilters={clearFilters}
+              />
+            }
+            footer={
+              machines.length === 0 ? undefined : (
+                <TableFooter>
+                  {`Showing ${shown} of ${plural(machines.length, "machine")}`}
+                </TableFooter>
+              )
+            }
+          />
         </SelectionProvider>
       </Frame>
       <CreatePreAuthKeyDialog

@@ -20,6 +20,7 @@ import {
 } from "@tanstack/react-table";
 import type {
   CellData,
+  ReactTable,
   RowData,
   TableFeatures,
   TableOptions,
@@ -69,11 +70,7 @@ export const appTableFeatures = tableFeatures({
 /** How many rows one page holds. Fewer rows than this and a table never pages at all. */
 export const tablePageSize = 50;
 
-const {
-  createAppColumnHelper,
-  useAppTable: usePagedTable,
-  useTableContext,
-} = createTableHook({
+const { createAppColumnHelper, useAppTable: usePagedTable } = createTableHook({
   features: appTableFeatures,
   globalFilterFn: "includesString",
   enableSortingRemoval: false,
@@ -84,7 +81,12 @@ const {
   autoResetPageIndex: false,
 });
 
-export { createAppColumnHelper, useTableContext };
+export { createAppColumnHelper };
+
+/** A table built by {@link useAppTable}, as `DataTable` and the components around it take it. */
+export type AppTableInstance<TData extends RowData> = ReactTable<typeof appTableFeatures, TData>;
+
+export type { RowData } from "@tanstack/react-table";
 
 /**
  * A table of one collection. Every table pages at {@link tablePageSize}, because the console renders

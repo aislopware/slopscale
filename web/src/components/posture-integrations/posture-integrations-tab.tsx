@@ -71,41 +71,40 @@ export function PostureIntegrationsTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No posture integrations yet"
-                  description="Connect endpoint security or device management services to check machine attributes in postures."
-                />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No posture integrations match"
-                  contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countIntegrations(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No posture integrations yet"
+                description="Connect endpoint security or device management services to check machine attributes in postures."
+              />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No posture integrations match"
+                contents={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countIntegrations(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <PostureIntegrationDialog
         providers={providers}

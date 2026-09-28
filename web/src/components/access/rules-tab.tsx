@@ -82,45 +82,44 @@ export function RulesTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No rules yet"
-                  description={
-                    policyFileEnforces
-                      ? "The policy file decides who reaches what. A rule adds to it."
-                      : "Every machine can reach every other machine. The first enabled rule blocks everything it does not allow."
-                  }
-                />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No rules match"
-                  contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countRules(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No rules yet"
+                description={
+                  policyFileEnforces
+                    ? "The policy file decides who reaches what. A rule adds to it."
+                    : "Every machine can reach every other machine. The first enabled rule blocks everything it does not allow."
+                }
+              />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No rules match"
+                contents={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countRules(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <RuleDialog
         groups={groups}

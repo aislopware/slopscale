@@ -76,39 +76,38 @@ export function ServicesTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            onRowClick={(label) => {
-              void navigate({ to: "/services/$label", params: { label } });
-            }}
-            empty={
-              total === 0 ? (
-                <ServicesEmpty />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No services match"
-                  contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countServices(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          onRowClick={(label) => {
+            void navigate({ to: "/services/$label", params: { label } });
+          }}
+          empty={
+            total === 0 ? (
+              <ServicesEmpty />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No services match"
+                contents={
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onSearchChange("");
+                    }}
+                  >
+                    Clear search
+                  </Button>
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countServices(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
       <ServiceDialog
         open={creating}

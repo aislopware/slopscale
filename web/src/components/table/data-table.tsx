@@ -1,16 +1,21 @@
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
 import { ArrowDownIcon, ArrowsDownUpIcon, ArrowUpIcon } from "@phosphor-icons/react";
-import type { SortDirection } from "@tanstack/react-table";
+import type { RowData, SortDirection } from "@tanstack/react-table";
 import { useEffect, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 
-import { useTableContext } from "~/components/table/app-table.tsx";
+import type { AppTableInstance } from "~/components/table/app-table.tsx";
 import { PagingBand, smallestPageSize } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 
-export interface DataTableProps {
+export interface DataTableProps<TData extends RowData> {
+  /**
+   * The table from `useAppTable`. It comes as a prop, not through context, so a re-render of the
+   * page that owns it (a sort, a new page, new data or meta) always reaches the rows.
+   */
+  readonly table: AppTableInstance<TData>;
   /** Rendered in place of the body when the (filtered) model is empty. */
   readonly empty: ReactNode;
   /**
@@ -28,19 +33,18 @@ export interface DataTableProps {
 }
 
 /**
- * Renders the table from the nearest `AppTable` provider with Kumo's table parts, as the panel of
- * the Frame it sits in, with the footer on the band below. Columns declare `meta.className` for
- * cell widths and alignment, `meta.numeric` for a column of figures, `meta.sticky` to pin a column
- * to an edge and `enableSorting` for a sortable header; everything else is the column's `cell`
- * renderer.
+ * Renders the table with Kumo's table parts, as the panel of the Frame it sits in, with the footer
+ * on the band below. Columns declare `meta.className` for cell widths and alignment, `meta.numeric`
+ * for a column of figures, `meta.sticky` to pin a column to an edge and `enableSorting` for a
+ * sortable header; everything else is the column's `cell` renderer.
  */
-export function DataTable({
+export function DataTable<TData extends RowData>({
+  table,
   empty,
   footer,
   onRowClick,
   isRowClickable,
-}: DataTableProps): ReactElement {
-  const table = useTableContext();
+}: DataTableProps<TData>): ReactElement {
   const { rows } = table.getRowModel();
   const pinnedRight = table
     .getAllColumns()
@@ -143,7 +147,7 @@ export function DataTable({
           </Table>
         )}
       </TableScroll>
-      <PageBand fallback={footer} />
+      <PageBand table={table} fallback={footer} />
     </>
   );
 }
@@ -168,8 +172,13 @@ function cellClass(
  * The band under the panel: the page's own count while the rows fit the smallest page, and the
  * range with the page size and the paging controls once there are enough rows to page.
  */
-function PageBand({ fallback }: { readonly fallback: ReactNode }): ReactNode {
-  const table = useTableContext();
+function PageBand<TData extends RowData>({
+  table,
+  fallback,
+}: {
+  readonly table: AppTableInstance<TData>;
+  readonly fallback: ReactNode;
+}): ReactNode {
   const total = table.getRowCount();
 
   if (total <= smallestPageSize) {

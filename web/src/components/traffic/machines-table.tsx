@@ -184,30 +184,29 @@ export function MachinesTable({
   });
 
   return (
-    <table.AppTable>
-      <DataTable
-        empty={
-          empty ?? (
-            <SectionEmpty
-              title="No traffic in this window"
-              description="Machines show up here once a gateway reports traffic they sent through it."
-            />
-          )
-        }
-        footer={
-          footer ??
-          (nodes.length === 0 ? undefined : (
-            <TableFooter>{`Showing ${plural(nodes.length, "machine")}`}</TableFooter>
-          ))
-        }
-        onRowClick={(nodeId) => {
-          void navigate({
-            to: "/traffic/machines/$nodeId",
-            params: { nodeId },
-            search: { ...windowOf(search), by: "host" },
-          });
-        }}
-      />
-    </table.AppTable>
+    <DataTable
+      table={table}
+      empty={
+        empty ?? (
+          <SectionEmpty
+            title="No traffic in this window"
+            description="Machines show up here once a gateway reports traffic they sent through it."
+          />
+        )
+      }
+      footer={
+        footer ??
+        (nodes.length === 0 ? undefined : (
+          <TableFooter>{`Showing ${plural(nodes.length, "machine")}`}</TableFooter>
+        ))
+      }
+      onRowClick={(nodeId) => {
+        void navigate({
+          to: "/traffic/machines/$nodeId",
+          params: { nodeId },
+          search: { ...windowOf(search), by: "host" },
+        });
+      }}
+    />
   );
 }

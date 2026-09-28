@@ -101,25 +101,24 @@ function MyAccessPage(): ReactElement {
         }
       />
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
-                title="No requests"
-                description={emptyText(me.user !== undefined, options.groups.length > 0)}
-              />
-            }
-            footer={
-              rows.length === 0 ? undefined : (
-                <TableFooter>
-                  {rows.length === 1 ? "1 request" : `${rows.length} requests`}
-                </TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            <Empty
+              className={tableEmptyClass}
+              size="sm"
+              title="No requests"
+              description={emptyText(me.user !== undefined, options.groups.length > 0)}
+            />
+          }
+          footer={
+            rows.length === 0 ? undefined : (
+              <TableFooter>
+                {rows.length === 1 ? "1 request" : `${rows.length} requests`}
+              </TableFooter>
+            )
+          }
+        />
       </Frame>
       <RequestAccessDialog
         options={options}

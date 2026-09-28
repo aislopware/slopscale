@@ -88,50 +88,49 @@ export function RoutesTab({
         />
       </TableToolbar>
       <Frame>
-        <table.AppTable>
-          <DataTable
-            empty={
-              total === 0 ? (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="Nothing advertised"
-                  contents={
-                    <p className="max-w-140 text-center text-kumo-subtle">
-                      No machine advertises a subnet or offers itself as an exit node. Run{" "}
-                      <Code>tailscale set --advertise-routes</Code> or{" "}
-                      <Code>--advertise-exit-node</Code> on one.
-                    </p>
-                  }
-                />
-              ) : (
-                <Empty
-                  className={tableEmptyClass}
-                  size="sm"
-                  title="No routes match"
-                  contents={
-                    narrowed ? (
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          onSearchChange("");
-                          onFiltersChange(noRouteFilters);
-                        }}
-                      >
-                        Clear filters
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              )
-            }
-            footer={
-              total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countRoutes(total)}`}</TableFooter>
-              )
-            }
-          />
-        </table.AppTable>
+        <DataTable
+          table={table}
+          empty={
+            total === 0 ? (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="Nothing advertised"
+                contents={
+                  <p className="max-w-140 text-center text-kumo-subtle">
+                    No machine advertises a subnet or offers itself as an exit node. Run{" "}
+                    <Code>tailscale set --advertise-routes</Code> or{" "}
+                    <Code>--advertise-exit-node</Code> on one.
+                  </p>
+                }
+              />
+            ) : (
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                title="No routes match"
+                contents={
+                  narrowed ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        onSearchChange("");
+                        onFiltersChange(noRouteFilters);
+                      }}
+                    >
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
+          }
+          footer={
+            total === 0 ? undefined : (
+              <TableFooter>{`Showing ${shown} of ${countRoutes(total)}`}</TableFooter>
+            )
+          }
+        />
       </Frame>
     </>
   );
