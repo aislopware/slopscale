@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.54.2](https://github.com/aislopware/slopscale/compare/v0.54.1...v0.54.2) (2026-09-29)
+
+
+### Fixes
+
+* **web:** keep the machines table in place when rows are ticked ([#50](https://github.com/aislopware/slopscale/issues/50)) ([d2abe8f](https://github.com/aislopware/slopscale/commit/d2abe8fd4ba827f663ee6af7b347edaa7e73e113))
+
 ## [0.54.1](https://github.com/aislopware/slopscale/compare/v0.54.0...v0.54.1) (2026-09-28)
 
 
