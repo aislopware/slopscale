@@ -1,5 +1,13 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { ArrowsClockwiseIcon, CheckIcon, SignOutIcon, TrashIcon } from "@phosphor-icons/react";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import {
+  ArrowsClockwiseIcon,
+  CheckIcon,
+  SignOutIcon,
+  TrashIcon,
+  XIcon,
+} from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -16,12 +24,11 @@ import type { MachineSelection } from "~/components/machines/selection.tsx";
 import { plural } from "~/components/overview/plural.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogClose, DialogContent, DialogFooter, DialogRoot } from "~/components/ui/dialog.tsx";
-import { FrameBand } from "~/components/ui/frame.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 
 /**
- * What the band above the table says while machines are ticked: how many, and the things worth
- * doing to a group of them. Deleting asks first, because it cannot be undone; updating the clients
+ * What the table's header row says while machines are ticked: how many, and the things worth doing
+ * to a group of them. Deleting asks first, because it cannot be undone; updating the clients
  * reaches only the ticked machines that are connected and behind, since the rest would refuse.
  */
 export function MachineBulkBar({
@@ -56,75 +63,67 @@ export function MachineBulkBar({
     selection.clear();
   }
 
-  // The band goes when the last tick does, but the two dialogs keep their place in the tree: a run
+  // The toolbar goes when the last tick does, but the two dialogs keep their place in the tree: a run
   // clears the selection, and a dialog that moved would be torn down as it opened or closed.
   return (
     <>
       {ids.length === 0 ? null : (
         <>
-          {/* px-5 lines the count up with the first column of the table below. */}
-          <FrameBand className="flex flex-wrap items-center gap-2 px-5">
-            <span className="mr-1 font-medium text-kumo-default">
-              {`${plural(ids.length, "machine")} selected`}
+          {/* pl-3 starts the count where the machine names start in the column below. */}
+          <div
+            role="toolbar"
+            aria-label="Actions for the selected machines"
+            className="flex items-center gap-2 pl-3 font-normal text-kumo-default"
+          >
+            <span className="mr-1 font-medium">
+              <span className="@3xl:hidden">{`${ids.length} selected`}</span>
+              <span className="hidden @3xl:inline">{`${plural(ids.length, "machine")} selected`}</span>
             </span>
-            <Button
-              variant="secondary"
-              size="sm"
+            <BulkButton
               icon={CheckIcon}
+              label="Approve"
               disabled={busy}
               loading={bulk.running === "approve"}
               onClick={() => {
                 void run("approve");
               }}
-            >
-              Approve
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
+            />
+            <BulkButton
               icon={ArrowsClockwiseIcon}
+              label="Update clients…"
               disabled={busy || plan.eligible.length === 0}
               loading={updates.running}
               onClick={() => {
                 setUpdating(true);
               }}
-            >
-              Update clients…
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
+            />
+            <BulkButton
               icon={SignOutIcon}
+              label="Expire"
               disabled={busy}
               loading={bulk.running === "expire"}
               onClick={() => {
                 void run("expire");
               }}
-            >
-              Expire
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
+            />
+            <BulkButton
               icon={TrashIcon}
+              label="Remove…"
               disabled={busy}
               onClick={() => {
                 setConfirming(true);
               }}
-            >
-              Remove…
-            </Button>
-            <Button
+            />
+            <BulkButton
               variant="ghost"
-              size="sm"
+              icon={XIcon}
+              label="Clear selection"
               disabled={busy}
               onClick={() => {
                 selection.clear();
               }}
-            >
-              Clear selection
-            </Button>
-          </FrameBand>
+            />
+          </div>
           <ConfirmDialog
             open={confirming}
             onOpenChange={setConfirming}
@@ -148,6 +147,40 @@ export function MachineBulkBar({
         }}
       />
       <Refusals outcome={updates.outcome} onDismiss={dismissRefusals} />
+    </>
+  );
+}
+
+/**
+ * One action on the header row, which must stay one line or the rows under it would move: labelled
+ * where the frame has room, the icon alone with its label as a tooltip where it does not.
+ */
+function BulkButton({
+  icon,
+  label,
+  variant = "secondary",
+  disabled,
+  loading = false,
+  onClick,
+}: {
+  readonly icon: Icon;
+  readonly label: string;
+  readonly variant?: "secondary" | "ghost";
+  readonly disabled: boolean;
+  readonly loading?: boolean;
+  readonly onClick: () => void;
+}): ReactElement {
+  const shared = { variant, size: "sm", icon, disabled, loading, onClick } as const;
+
+  return (
+    <>
+      <Button {...shared} className="hidden @3xl:inline-flex">
+        {label}
+      </Button>
+      <Tooltip
+        content={label}
+        render={<Button {...shared} shape="square" aria-label={label} className="@3xl:hidden" />}
+      />
     </>
   );
 }
