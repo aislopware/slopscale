@@ -161,15 +161,18 @@ function MachinesPage(): ReactElement {
           setFilters({ ...view, attestation: value });
         }}
       />
-      <Frame>
+      <Frame className="@container">
         <FilterChips
           chips={machineChips(view, mayFilterByUser ? users.data?.users : undefined, setFilters)}
           onClearAll={clearFilters}
         />
-        <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
         <SelectionProvider selection={selection}>
           <DataTable
             table={table}
+            headerOverlay={
+              <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
+            }
+            overlayShown={selection.selected.size > 0}
             onRowClick={(nodeId) => {
               void navigate({ to: "/machines/$nodeId", params: { nodeId } });
             }}

@@ -30,6 +30,16 @@ export interface DataTableProps<TData extends RowData> {
    * the plain cursor, so it does not promise a click that does nothing.
    */
   readonly isRowClickable?: ((rowId: string) => boolean) | undefined;
+  /**
+   * Drawn on the header row after the first column, such as the actions for the ticked rows next to
+   * the select-all box. It stays mounted, so a dialog inside it outlives the selection it acts on.
+   */
+  readonly headerOverlay?: ReactNode;
+  /**
+   * Whether the overlay stands in for the other headings. They keep their room, invisible, so no
+   * column changes width and no row moves when the overlay comes and goes.
+   */
+  readonly overlayShown?: boolean;
 }
 
 /**
@@ -44,6 +54,8 @@ export function DataTable<TData extends RowData>({
   footer,
   onRowClick,
   isRowClickable,
+  headerOverlay,
+  overlayShown = false,
 }: DataTableProps<TData>): ReactElement {
   const { rows } = table.getRowModel();
   const pinnedRight = table
@@ -74,7 +86,7 @@ export function DataTable<TData extends RowData>({
             <Table.Header variant="compact">
               {table.getHeaderGroups().map((group) => (
                 <Table.Row key={group.id}>
-                  {group.headers.map((header) => {
+                  {group.headers.map((header, index) => {
                     const { meta } = header.column.columnDef;
 
                     return (
@@ -83,7 +95,11 @@ export function DataTable<TData extends RowData>({
                         {...(meta?.sticky === undefined ? {} : { sticky: meta.sticky })}
                         // A column whose cells sit at the top still has its heading on the
                         // header row's line, so `align-top` in the meta reaches the cells alone.
-                        className={cn(cellClass(meta, overflowing), "align-middle")}
+                        className={cn(
+                          cellClass(meta, overflowing),
+                          "align-middle",
+                          overlayShown && index > 0 && "invisible",
+                        )}
                       >
                         {header.isPlaceholder ? null : (
                           <HeaderContent
@@ -95,6 +111,13 @@ export function DataTable<TData extends RowData>({
                             <table.FlexRender header={header} />
                           </HeaderContent>
                         )}
+                        {index === 0 && headerOverlay !== undefined ? (
+                          // w-max, because an absolute box left at the cell's edge would otherwise
+                          // shrink to the room left inside the cell, which is none.
+                          <div className="absolute inset-y-0 left-full flex w-max items-center">
+                            {headerOverlay}
+                          </div>
+                        ) : null}
                       </Table.Head>
                     );
                   })}
