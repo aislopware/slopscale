@@ -135,6 +135,14 @@ func (h *Slopscale) debugHTTPServer() *http.Server {
 		writeDebug(w, r, func() any { return h.state.DebugDERPJSON() }, h.state.DebugDERPMap)
 	}))
 
+	if h.DERPServer != nil {
+		debug.Handle(
+			"derp-clients/",
+			"Clients connected to the embedded DERP relay",
+			http.HandlerFunc(h.DERPServer.ServeDebugClients),
+		)
+	}
+
 	// [state.NodeStore] endpoint
 	debug.Handle("nodestore", "NodeStore information", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeDebug(w, r, func() any { return h.state.DebugNodeStoreJSON() }, h.state.DebugNodeStore)

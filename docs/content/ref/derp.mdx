@@ -259,7 +259,9 @@ Any Tailscale client may be used to introspect the DERP map and to check for con
 - Check connectivity with the embedded DERP[^1]:`tailscale debug derp slopscale`
 
 Additional DERP related metrics and information is available via the [metrics and debug
-endpoint](/ref/debug#metrics-and-debug-endpoint).
+endpoint](/ref/debug#metrics-and-debug-endpoint). While the embedded relay is on, `/debug/derp-clients/` there lists
+the machines connected to it, with their remote address, connection age, home flag and traffic, filtered by address,
+prefix or node key and sortable; add `format=json` for the same page as JSON.
 
 ## Latency
 
