@@ -185,10 +185,8 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 			return
 		}
 
-		policyChanged, deleteErr := app.state.DeleteNode(node)
-		if !policyChanged.IsEmpty() {
-			app.Change(policyChanged)
-		}
+		changes, deleteErr := app.state.DeleteNode(node)
+		app.Change(changes...)
 
 		if deleteErr != nil {
 			log.Error().Err(deleteErr).EmbedObject(node).Msg("ephemeral node deletion failed")

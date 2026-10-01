@@ -717,10 +717,10 @@ func (s *State) SaveNode(node types.NodeView) (types.NodeView, change.Change, er
 
 // DeleteNode permanently removes a node and cleans up associated resources.
 // This operation is irreversible. Once the database deletion commits, the
-// returned change always carries the node removal, even if a later policy
-// refresh fails, so callers must publish a non-empty change before handling
-// the error and let the deleted node's live sessions be torn down.
-func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
+// returned changes always start with the node removal, even if a later policy
+// refresh fails, so callers must publish the changes before handling the
+// error and let the deleted node's live sessions be torn down.
+func (s *State) DeleteNode(node types.NodeView) ([]change.Change, error) {
 	genBefore := s.polMan.NodesGeneration()
 
 	s.persistMu.Lock()
@@ -729,7 +729,7 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 	if err != nil {
 		s.persistMu.Unlock()
 
-		return change.Change{}, err
+		return nil, err
 	}
 
 	// The database is the durable source of truth. Only remove the in-memory
@@ -742,28 +742,26 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 
 	s.ipAlloc.FreeIPs(node.IPs())
 
-	c := change.NodeRemoved(node.ID()).Merge(s.trafficForgetNode(node.ID()))
+	// An explicit removal of its own, ahead of the policy refresh, so peers
+	// learn of the deletion without depending on their sent-peers tracking.
+	removed := change.NodeRemoved(node.ID())
+	traffic := s.trafficForgetNode(node.ID())
 
 	// The database dropped the node's group memberships by cascade; the
 	// policy manager's copy follows.
 	_, err = s.loadAccessModel()
 	if err != nil {
-		return c, fmt.Errorf("reloading access model after node deletion: %w", err)
+		return []change.Change{removed, traffic, s.policyChangeSince(genBefore)},
+			fmt.Errorf("reloading access model after node deletion: %w", err)
 	}
 
-	// Check if policy manager needs updating after node deletion
 	policyChange, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
-		return c.Merge(policyChange), fmt.Errorf("updating policy manager after node deletion: %w", err)
+		return []change.Change{removed, traffic, policyChange},
+			fmt.Errorf("updating policy manager after node deletion: %w", err)
 	}
 
-	if !policyChange.IsEmpty() {
-		// Merge policy change with NodeRemoved to preserve PeersRemoved info
-		// This ensures the batcher cleans up the deleted node from its state
-		c = c.Merge(policyChange)
-	}
-
-	return c, nil
+	return []change.Change{removed, traffic, policyChange}, nil
 }
 
 // Connect acquires a control session and returns the resulting changes

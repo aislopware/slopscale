@@ -211,7 +211,7 @@ func TestRaceConcurrentServerMutations(t *testing.T) {
 		wg.Go(func() {
 			delChange, err := srv.State().DeleteNode(nv2)
 			if err == nil {
-				srv.App.Change(delChange)
+				srv.App.Change(delChange...)
 			}
 		})
 

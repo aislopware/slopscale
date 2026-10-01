@@ -364,10 +364,8 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 
 		audit.Target(ctx, "", "", node.GivenName())
 
-		nodeChange, err := b.State.DeleteNode(node)
-		if !nodeChange.IsEmpty() {
-			b.Change(nodeChange)
-		}
+		changes, err := b.State.DeleteNode(node)
+		b.Change(changes...)
 
 		if err != nil {
 			return nil, huma.Error500InternalServerError("deleting node", err)

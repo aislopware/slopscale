@@ -589,7 +589,7 @@ func TestIssuesServerMutations(t *testing.T) {
 
 		deleteChange, err := srv.State().DeleteNode(node2View)
 		require.NoError(t, err)
-		srv.App.Change(deleteChange)
+		srv.App.Change(deleteChange...)
 
 		c1.WaitForCondition(t, "deleted peer gone", 10*time.Second,
 			func(nm *netmap.NetworkMap) bool {
@@ -1077,7 +1077,7 @@ func TestPeerRemovedAsDelta(t *testing.T) {
 
 		changes, err := srv.State().DeleteNode(node2)
 		require.NoError(t, err)
-		srv.App.Change(changes)
+		srv.App.Change(changes...)
 
 		assertRemovedAsDelta(t, c1, nodeID2)
 	})
@@ -1096,7 +1096,7 @@ func TestPeerRemovedAsDelta(t *testing.T) {
 
 		changes, err := srv.State().DeleteNode(node2)
 		require.NoError(t, err)
-		srv.App.Change(changes)
+		srv.App.Change(changes...)
 
 		c1.Reconnect(t)
 

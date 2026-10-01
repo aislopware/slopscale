@@ -31,7 +31,7 @@ func TestDeletedNodeIsToldToLogInAgain(t *testing.T) {
 
 	ch, err := srv.State().DeleteNode(nv)
 	require.NoError(t, err)
-	srv.App.Change(ch)
+	srv.App.Change(ch...)
 
 	selfExpired := func(nm *netmap.NetworkMap) bool {
 		return nm.SelfNode.Valid() && nm.SelfNode.KeyExpiry().Before(time.Now())
