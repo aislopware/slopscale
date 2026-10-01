@@ -85,6 +85,23 @@ homeparams:
 	assert.Equal(t, map[tailcfg.DERPRegionID]float64{900: 0.5, 1: 3}, dm.HomeParams.RegionScore)
 }
 
+// TestMergeDERPMapsNullRemovesRegion pins the docs' recipe: a later map
+// setting a region to null drops it from the result.
+func TestMergeDERPMapsNullRemovesRegion(t *testing.T) {
+	base := &tailcfg.DERPMap{
+		Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
+			1: {RegionID: 1, RegionCode: "nyc"},
+			2: {RegionID: 2, RegionCode: "sfo"},
+		},
+	}
+	drop := &tailcfg.DERPMap{Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{1: nil}}
+
+	merged := mergeDERPMaps([]*tailcfg.DERPMap{base, drop})
+
+	assert.NotContains(t, merged.Regions, tailcfg.DERPRegionID(1))
+	assert.Contains(t, merged.Regions, tailcfg.DERPRegionID(2))
+}
+
 // TestLoadDERPMapFromPath covers each file format and the silent-empty trap:
 // keys the decoder doesn't know decode to nothing.
 func TestLoadDERPMapFromPath(t *testing.T) {
