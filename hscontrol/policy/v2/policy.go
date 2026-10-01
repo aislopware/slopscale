@@ -427,12 +427,20 @@ func (pm *PolicyManager) SetSSHRecording(recording SSHRecording) (bool, error) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
+	prev := pm.sshRecording
 	pm.sshRecording = recording
 	pm.sshPolicyMap.Clear()
 
 	// The filter changes too: every node may reach a recorder on its
 	// port, so the recorders' grant is part of the compile.
-	return pm.updateLocked()
+	changed, err := pm.updateLocked()
+	if err != nil {
+		pm.sshRecording = prev
+
+		return false, err
+	}
+
+	return changed, nil
 }
 
 // SSHRecordingFor returns the recorders and failure action for the
@@ -518,9 +526,18 @@ func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
 		Int("tests.count", len(pol.Tests)).
 		Msg("Policy parsed successfully")
 
+	prev := pm.pol
 	pm.pol = pol
 
-	return pm.updateLocked()
+	changed, err := pm.updateLocked()
+	if err != nil {
+		// pm still holds what prev compiled to.
+		pm.pol = prev
+
+		return false, err
+	}
+
+	return changed, nil
 }
 
 // SetAccessModel replaces the database's groups and rules and recompiles.
@@ -533,9 +550,17 @@ func (pm *PolicyManager) SetAccessModel(model types.AccessModel) (bool, error) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
+	prev := pm.access
 	pm.access = model
 
-	return pm.updateLocked()
+	changed, err := pm.updateLocked()
+	if err != nil {
+		pm.access = prev
+
+		return false, err
+	}
+
+	return changed, nil
 }
 
 // SetCountryLookup installs the GeoIP lookup postures read ip:country
@@ -548,9 +573,17 @@ func (pm *PolicyManager) SetCountryLookup(lookup func(netip.Addr) string) (bool,
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
+	prev := pm.country
 	pm.country = lookup
 
-	return pm.updateLocked()
+	changed, err := pm.updateLocked()
+	if err != nil {
+		pm.country = prev
+
+		return false, err
+	}
+
+	return changed, nil
 }
 
 // UsesSourceAddress reports whether a posture in use reads where a node
@@ -836,8 +869,9 @@ func (pm *PolicyManager) SetUsers(users []types.User) (bool, bool, error) {
 
 	policyChanged, err := pm.updateLocked()
 	if err != nil {
-		// Keep the old list so a retry with the same input recompiles
-		// instead of being treated as unchanged.
+		// Keep the old list, which pm is still compiled from, so a retry
+		// with the same input recompiles instead of being treated as
+		// unchanged.
 		pm.users = prev
 
 		return false, false, err
@@ -881,6 +915,7 @@ func (pm *PolicyManager) SetNodes(nodes views.Slice[types.NodeView]) (bool, erro
 	// For global policies: invalidate only nodes whose properties changed (IPs, routes).
 	pm.invalidateNodeCache(nodes)
 
+	prevNodes := pm.nodes
 	pm.nodes = nodes
 
 	// When policy-affecting node properties change, we must recompile filters because:
@@ -897,6 +932,10 @@ func (pm *PolicyManager) SetNodes(nodes views.Slice[types.NodeView]) (bool, erro
 		// Recompile filter with the new node list
 		needsUpdate, err := pm.updateLocked()
 		if err != nil {
+			// Keep the old list, which pm is still compiled from, so a
+			// retry with the same input recompiles, as in SetUsers.
+			pm.nodes = prevNodes
+
 			return false, err
 		}
 
@@ -1832,19 +1871,68 @@ func (pm *PolicyManager) matchersForNodeLocked(node types.NodeView) []matcher.Ma
 	return matchers
 }
 
-// refreshAutoApproversLocked recomputes the route and service auto-approver
-// maps and the exit node set, updating pm's cached hashes in place, and
-// reports whether each changed since the last call. The lock must be held.
-func (pm *PolicyManager) refreshAutoApproversLocked() (bool, bool, error) {
-	autoMap, exitSet, err := resolveAutoApprovers(pm.pol, pm.users, pm.nodes)
-	if err != nil {
-		return false, false, fmt.Errorf("resolving auto approvers map: %w", err)
+// policyWithInputsLocked returns the policy updateLocked compiles: a copy
+// of pm.pol carrying the inputs that live outside the file (the access
+// model, services, ...), so attaching them leaves pm.pol untouched when
+// the compile fails. The access model compiles next to the file's grants,
+// so rules or services without a file still get a policy to hang off.
+//
+// Caller must hold pm.mu.
+func (pm *PolicyManager) policyWithInputsLocked() *Policy {
+	var pol *Policy
+
+	switch {
+	case pm.pol != nil:
+		pol = new(*pm.pol)
+	case hasAccessGrants(pm.access) || len(pm.vipServices) > 0:
+		pol = &Policy{}
+	default:
+		return nil
 	}
 
-	pm.autoApproveServices, err = resolveServiceAutoApprovers(pm.pol, pm.users, pm.nodes)
+	pol.access = pm.access
+	pol.country = pm.country
+	pol.recording = pm.sshRecording
+	pol.trafficResolvers = pm.trafficResolvers
+	pol.services = servicesByName(pm.vipServices)
+
+	return pol
+}
+
+// autoApprovers is what [resolveAllAutoApprovers] resolves for
+// [PolicyManager.installAutoApproversLocked].
+type autoApprovers struct {
+	routes   map[netip.Prefix]*netipx.IPSet
+	exitSet  *netipx.IPSet
+	services map[tailcfg.ServiceName]*netipx.IPSet
+}
+
+// resolveAllAutoApprovers resolves the route and service auto-approver
+// maps and the exit node set.
+func resolveAllAutoApprovers(
+	pol *Policy,
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+) (autoApprovers, error) {
+	autoMap, exitSet, err := resolveAutoApprovers(pol, users, nodes)
 	if err != nil {
-		return false, false, fmt.Errorf("resolving service auto approvers: %w", err)
+		return autoApprovers{}, fmt.Errorf("resolving auto approvers map: %w", err)
 	}
+
+	services, err := resolveServiceAutoApprovers(pol, users, nodes)
+	if err != nil {
+		return autoApprovers{}, fmt.Errorf("resolving service auto approvers: %w", err)
+	}
+
+	return autoApprovers{routes: autoMap, exitSet: exitSet, services: services}, nil
+}
+
+// installAutoApproversLocked installs resolved auto-approvers, updating
+// pm's cached hashes in place, and reports whether the route map and the
+// exit node set changed since the last call. The lock must be held.
+func (pm *PolicyManager) installAutoApproversLocked(a autoApprovers) (bool, bool) {
+	autoMap, exitSet := a.routes, a.exitSet
+	pm.autoApproveServices = a.services
 
 	autoApproveMapHash := deephash.Hash(&autoMap)
 
@@ -1874,47 +1962,57 @@ func (pm *PolicyManager) refreshAutoApproversLocked() (bool, bool, error) {
 	pm.exitSet = exitSet
 	pm.exitSetHash = exitSetHash
 
-	return autoApproveChanged, exitSetChanged, nil
+	return autoApproveChanged, exitSetChanged
 }
 
 // updateLocked updates the filter rules based on the current policy and nodes.
 // It must be called with the lock held.
 func (pm *PolicyManager) updateLocked() (bool, error) {
-	// The access model compiles next to the file's grants, so it is
-	// attached before every compile; rules without a file still need a
-	// policy to hang off.
-	if pm.pol == nil && hasAccessGrants(pm.access) {
-		pm.pol = &Policy{}
-	}
-
-	if pm.pol == nil && len(pm.vipServices) > 0 {
-		pm.pol = &Policy{}
-	}
-
-	if pm.pol != nil {
-		pm.pol.access = pm.access
-		pm.pol.country = pm.country
-		pm.pol.recording = pm.sshRecording
-		pm.pol.trafficResolvers = pm.trafficResolvers
-		pm.pol.services = servicesByName(pm.vipServices)
-	}
-
-	pm.usesSourceAddress = pm.pol.usesSourceAddress()
-	pm.usesPostures = pm.pol.usesPostures()
+	pol := pm.policyWithInputsLocked()
 
 	// Compile all grants once. Both global and per-node filter
 	// rules are derived from these compiled grants.
-	pm.compiledGrants = pm.pol.compileGrants(pm.users, pm.nodes)
-	pm.userNodeIdx = buildUserNodeIndex(pm.nodes)
-	pm.viaGrants, pm.hasViaGrants = resolveViaGrants(pm.pol, pm.users, pm.nodes)
-	pm.needsPerNodeFilter = hasPerNodeGrants(pm.compiledGrants)
-	pm.viaTargetTags = collectViaTargetTags(pm.compiledGrants)
+	grants := pol.compileGrants(pm.users, pm.nodes)
 
-	relayTargetIPs, err := collectRelayTargetIPs(pm.compiledGrants)
+	relayTargetIPs, err := collectRelayTargetIPs(grants)
 	if err != nil {
 		return false, fmt.Errorf("collecting relay target IPs: %w", err)
 	}
 
+	// Order matters, tags might be used in autoapprovers, so we need to ensure
+	// that the map for tag owners is resolved before resolving autoapprovers.
+	// TODO(kradalby): Order might not matter after #2417
+	tagMap, err := resolveTagOwners(pol, pm.users, pm.nodes)
+	if err != nil {
+		return false, fmt.Errorf("resolving tag owners map: %w", err)
+	}
+
+	approvers, err := resolveAllAutoApprovers(pol, pm.users, pm.nodes)
+	if err != nil {
+		return false, err
+	}
+
+	refreshNodeAttrs := pm.nodeAttrsGateOpenLocked(pol)
+
+	var nodeAttrs map[types.NodeID]tailcfg.NodeCapMap
+	if refreshNodeAttrs {
+		nodeAttrs, err = pol.compileNodeAttrs(pm.users, pm.nodes)
+		if err != nil {
+			return false, fmt.Errorf("compiling nodeAttrs: %w", err)
+		}
+	}
+
+	// Every step that can fail ran above, so pm still holds what its
+	// previous inputs compiled to when this returns an error, and a
+	// caller that restores its own input leaves pm as it was.
+	pm.pol = pol
+	pm.usesSourceAddress = pol.usesSourceAddress()
+	pm.usesPostures = pol.usesPostures()
+	pm.compiledGrants = grants
+	pm.userNodeIdx = buildUserNodeIndex(pm.nodes)
+	pm.viaGrants, pm.hasViaGrants = resolveViaGrants(pol, pm.users, pm.nodes)
+	pm.needsPerNodeFilter = hasPerNodeGrants(pm.compiledGrants)
+	pm.viaTargetTags = collectViaTargetTags(pm.compiledGrants)
 	pm.relayTargetIPs = relayTargetIPs
 
 	var filter []tailcfg.FilterRule
@@ -1959,14 +2057,6 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 		pm.matchers = matcher.MatchesFromFilterRules(pm.filter)
 	}
 
-	// Order matters, tags might be used in autoapprovers, so we need to ensure
-	// that the map for tag owners is resolved before resolving autoapprovers.
-	// TODO(kradalby): Order might not matter after #2417
-	tagMap, err := resolveTagOwners(pm.pol, pm.users, pm.nodes)
-	if err != nil {
-		return false, fmt.Errorf("resolving tag owners map: %w", err)
-	}
-
 	tagOwnerMapHash := deephash.Hash(&tagMap)
 
 	tagOwnerChanged := tagOwnerMapHash != pm.tagOwnerMapHash
@@ -1982,19 +2072,15 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	pm.tagOwnerMap = tagMap
 	pm.tagOwnerMapHash = tagOwnerMapHash
 
-	autoApproveChanged, exitSetChanged, err := pm.refreshAutoApproversLocked()
-	if err != nil {
-		return false, err
-	}
+	autoApproveChanged, exitSetChanged := pm.installAutoApproversLocked(approvers)
 
-	// Recompile per-node nodeAttrs CapMap and append the diff to
+	// Install the per-node nodeAttrs CapMap and append the diff to
 	// pm.nodeAttrsChanged. The drain (NodesWithChangedCapMap) returns
 	// the accumulated union of every change since the last drain;
 	// SetUsers/SetNodes appending between SetPolicy and the drain
 	// cannot lose the policy-reload diff.
-	err = pm.refreshNodeAttrsLocked()
-	if err != nil {
-		return false, err
+	if refreshNodeAttrs {
+		pm.refreshNodeAttrsLocked(nodeAttrs)
 	}
 
 	// Determine if we need to send updates to nodes
@@ -2365,37 +2451,36 @@ func (pm *PolicyManager) invalidateGlobalPolicyCache(newNodes views.Slice[types.
 	})
 }
 
-// refreshNodeAttrsLocked recompiles the per-node nodeAttrs CapMap and
-// appends the IDs whose CapMap differs from the previous snapshot
-// (including newly-targeted nodes and nodes that lost all attrs) to
+// nodeAttrsGateOpenLocked reports whether pol's per-node nodeAttrs CapMap
+// must be compiled. Fast path for the common steady-state shape: tailnet
+// has no nodeAttrs entries and never had any. Skip the compile + per-node
+// hash walk entirely. As soon as the operator adds a nodeAttrs entry
+// pm.nodeAttrsHashes becomes non-empty and the gate opens. Role caps
+// (is-admin, is-owner) ride on the same map, so the gate also stays shut
+// only while no user holds a role that stamps them.
+//
+// Caller must hold pm.mu.
+func (pm *PolicyManager) nodeAttrsGateOpenLocked(pol *Policy) bool {
+	return pol == nil ||
+		len(pol.NodeAttrs) > 0 ||
+		pol.RandomizeClientPort ||
+		len(pm.nodeAttrsHashes) > 0 ||
+		usersHaveAdmin(pm.users) ||
+		NodesHaveGlobalExitNode(pm.nodes) ||
+		len(pm.vipServices) > 0 ||
+		len(pm.appConnectors) > 0
+}
+
+// refreshNodeAttrsLocked installs a compiled per-node nodeAttrs CapMap,
+// stamps the caps the policy file does not name, and appends the IDs
+// whose CapMap differs from the previous snapshot (including
+// newly-targeted nodes and nodes that lost all attrs) to
 // pm.nodeAttrsChanged. Append, not overwrite: a concurrent
 // SetUsers/SetNodes between SetPolicy and a NodesWithChangedCapMap
 // drain cannot clobber the policy-reload diff.
 //
 // Caller must hold pm.mu.
-func (pm *PolicyManager) refreshNodeAttrsLocked() error {
-	// Fast path for the common steady-state shape: tailnet has no
-	// nodeAttrs entries and never had any. Skip the compile + per-node
-	// hash walk entirely. As soon as the operator adds a nodeAttrs
-	// entry pm.nodeAttrsHashes becomes non-empty and the gate opens.
-	// Role caps (is-admin, is-owner) ride on the same map, so the gate
-	// also stays shut only while no user holds a role that stamps them.
-	if pm.pol != nil &&
-		len(pm.pol.NodeAttrs) == 0 &&
-		!pm.pol.RandomizeClientPort &&
-		len(pm.nodeAttrsHashes) == 0 &&
-		!usersHaveAdmin(pm.users) &&
-		!NodesHaveGlobalExitNode(pm.nodes) &&
-		len(pm.vipServices) == 0 &&
-		len(pm.appConnectors) == 0 {
-		return nil
-	}
-
-	newMap, err := pm.pol.compileNodeAttrs(pm.users, pm.nodes)
-	if err != nil {
-		return fmt.Errorf("compiling nodeAttrs: %w", err)
-	}
-
+func (pm *PolicyManager) refreshNodeAttrsLocked(newMap map[types.NodeID]tailcfg.NodeCapMap) {
 	stampRoleCaps(pm.users, pm.nodes, newMap)
 	stampServiceCaps(pm.vipServices, pm.nodes, serviceReachable(pm.pol.enforces(), pm.matchers), newMap)
 	stampAppConnectorCaps(pm.appConnectors, pm.nodes, newMap)
@@ -2428,8 +2513,6 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 	pm.nodeAttrsMap = newMap
 	pm.nodeAttrsHashes = newHashes
 	pm.nodeAttrsChanged = append(pm.nodeAttrsChanged, changed...)
-
-	return nil
 }
 
 // findNodePairLocked looks up the node views for srcNodeID and dstNodeID

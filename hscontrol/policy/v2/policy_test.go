@@ -2340,6 +2340,13 @@ func TestValidateUserReferences_AllSites(t *testing.T) {
 }`,
 		},
 		{
+			name: "nodeAttrs.target",
+			pol: `{
+  "acls":      [{"action":"accept","src":["*"],"dst":["*:*"]}],
+  "nodeAttrs": [{"target":["dup@"],"attr":["randomize-client-port"]}]
+}`,
+		},
+		{
 			// ErrSSHUserDestRequiresSameUser forces src==dst when dst is a user.
 			name: "ssh.dst",
 			pol: `{
@@ -2837,4 +2844,193 @@ func TestAutogroupSelfRulesReachExitNodes(t *testing.T) {
 		"tagged node without exit routes gets no self rules")
 	require.ElementsMatch(t, []string{"100.64.0.1"}, dsts(alice),
 		"user device gets only its own user's self rule")
+}
+
+// TestSetPolicyRejectedKeepsLiveFilter pins that a policy SetPolicy rejects
+// does not take effect. A nodeAttrs target naming no user passes validation
+// but fails to compile after the filter is already compiled; keeping that
+// filter would run the rejected policy while the stored one is unchanged.
+func TestSetPolicyRejectedKeepsLiveFilter(t *testing.T) {
+	// IDs are assigned after construction so the test also builds where
+	// types.User embeds gorm.Model.
+	users := types.Users{{Name: "user1"}, {Name: "user2"}}
+	users[0].ID, users[1].ID = 1, 2
+	nodes := types.Nodes{
+		node("n1", "100.64.0.1", "fd7a:115c:a1e0::1", users[0]),
+		node("n2", "100.64.0.2", "fd7a:115c:a1e0::2", users[1]),
+	}
+	nodes[0].ID, nodes[1].ID = 1, 2
+
+	pm, err := NewPolicyManager([]byte(`{
+		"acls": [{"action": "accept", "src": ["user1@"], "dst": ["user1@:*"]}]
+	}`), users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	before, _ := pm.Filter()
+	beforeRules, err := pm.FilterForNode(nodes[1].View())
+	require.NoError(t, err)
+
+	_, err = pm.SetPolicy([]byte(`{
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+		"nodeAttrs": [{"target": ["ghost@"], "attr": ["randomize-client-port"]}]
+	}`))
+	require.Error(t, err)
+
+	after, _ := pm.Filter()
+	require.Equal(t, before, after, "a rejected policy must not replace the live filter")
+
+	afterRules, err := pm.FilterForNode(nodes[1].View())
+	require.NoError(t, err)
+	require.Equal(t, beforeRules, afterRules)
+}
+
+// TestFailedSetUsersKeepsCompiledPolicy renames alice to charlie while
+// nodeAttrs still names alice, so the recompile resolves charlie's grant
+// and then fails. A failed Set* must leave every compiled result as it was:
+// a partial compile would hand alice's nodes charlie's port 22, and the
+// reverse rename, which SetUsers sees as no change, would not clear it.
+func TestFailedSetUsersKeepsCompiledPolicy(t *testing.T) {
+	users := types.Users{{ID: 1, Name: "alice"}, {ID: 2, Name: "bob"}}
+	nodes := types.Nodes{
+		node("a1", "100.64.0.1", "fd7a:115c:a1e0::1", users[0]),
+		node("a2", "100.64.0.2", "fd7a:115c:a1e0::2", users[0]),
+		node("b1", "100.64.0.3", "fd7a:115c:a1e0::3", users[1]),
+	}
+
+	for i, n := range nodes {
+		n.ID = types.NodeID(i + 1)
+	}
+
+	pol := []byte(`{
+		"acls": [
+			{"action": "accept", "src": ["charlie@"], "dst": ["autogroup:self:22"]},
+			{"action": "accept", "src": ["bob@"], "dst": ["bob@:*"]}
+		],
+		"ssh": [{"action": "accept", "src": ["charlie@"], "dst": ["autogroup:self"], "users": ["root"]}],
+		"nodeAttrs": [{"target": ["alice@"], "attr": ["randomize-client-port"]}]
+	}`)
+
+	pm, err := NewPolicyManager(pol, users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	type view struct {
+		filter []tailcfg.FilterRule
+		ssh    *tailcfg.SSHPolicy
+	}
+
+	read := func(pm *PolicyManager, n *types.Node) view {
+		t.Helper()
+
+		f, filterErr := pm.FilterForNode(n.View())
+		require.NoError(t, filterErr)
+
+		ssh, sshErr := pm.SSHPolicy("", n.View())
+		require.NoError(t, sshErr)
+
+		return view{filter: f, ssh: ssh}
+	}
+
+	before := read(pm, nodes[0])
+
+	renamed := slices.Clone(users)
+	renamed[0].Name = "charlie"
+
+	_, _, err = pm.SetUsers(renamed)
+	require.Error(t, err)
+	require.Equal(t, before, read(pm, nodes[0]), "a failed SetUsers must not change compiled results")
+
+	_, _, err = pm.SetUsers(users)
+	require.NoError(t, err)
+	require.Equal(t, before, read(pm, nodes[0]), "reversing the rename must serve the original results")
+
+	b2 := node("b2", "100.64.0.4", "fd7a:115c:a1e0::4", users[1])
+	b2.ID = 4
+	grown := append(slices.Clone(nodes), b2)
+
+	_, err = pm.SetNodes(grown.ViewSlice())
+	require.NoError(t, err)
+
+	fresh, err := NewPolicyManager(pol, users, grown.ViewSlice())
+	require.NoError(t, err)
+
+	for _, n := range grown {
+		require.Equal(t, read(fresh, n), read(pm, n),
+			"node %s after a later write must match a fresh compile", n.Hostname)
+	}
+}
+
+// TestFailedSetNodesKeepsCompiledPolicy fails a SetNodes that retags a
+// node, then retries it once the failure is gone. The failed write must
+// leave the compiled filter as it was, and the retry must compile the new
+// owners.
+func TestFailedSetNodesKeepsCompiledPolicy(t *testing.T) {
+	users := types.Users{{ID: 1, Name: "alice"}, {ID: 2, Name: "bob"}}
+	nodes := types.Nodes{
+		node("a1", "100.64.0.1", "fd7a:115c:a1e0::1", users[0]),
+		node("a2", "100.64.0.2", "fd7a:115c:a1e0::2", users[0]),
+		node("b1", "100.64.0.3", "fd7a:115c:a1e0::3", users[1]),
+	}
+
+	for i, n := range nodes {
+		n.ID = types.NodeID(i + 1)
+	}
+
+	pol := []byte(`{
+		"tagOwners": {"tag:srv": ["alice@"]},
+		"acls": [{"action": "accept", "src": ["alice@"], "dst": ["alice@:*"]}],
+		"ssh": [{"action": "accept", "src": ["alice@"], "dst": ["alice@"], "users": ["root"]}]
+	}`)
+
+	pm, err := NewPolicyManager(pol, users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	read := func(pm *PolicyManager, n *types.Node) ([]tailcfg.FilterRule, *tailcfg.SSHPolicy) {
+		t.Helper()
+
+		f, filterErr := pm.FilterForNode(n.View())
+		require.NoError(t, filterErr)
+
+		ssh, sshErr := pm.SSHPolicy("", n.View())
+		require.NoError(t, sshErr)
+
+		return f, ssh
+	}
+
+	beforeFilter, beforeSSH := read(pm, nodes[0])
+	beforeGlobal, _ := pm.Filter()
+
+	retagged := slices.Clone(nodes)
+	tagged := nodes[1].Clone()
+	tagged.Tags = []string{"tag:srv"}
+	tagged.UserID, tagged.User = nil, nil
+	retagged[1] = tagged
+
+	good := pm.pol.TagOwners
+	missing := Tag("tag:missing")
+	pm.pol.TagOwners = TagOwners{"tag:srv": Owners{&missing}}
+
+	_, err = pm.SetNodes(retagged.ViewSlice())
+	require.Error(t, err)
+
+	pm.pol.TagOwners = good
+
+	gotFilter, gotSSH := read(pm, nodes[0])
+	require.Equal(t, beforeFilter, gotFilter, "a failed SetNodes must not change compiled results")
+	require.Equal(t, beforeSSH, gotSSH, "a failed SetNodes must not change compiled results")
+
+	gotGlobal, _ := pm.Filter()
+	require.Equal(t, beforeGlobal, gotGlobal, "a failed SetNodes must not change compiled results")
+
+	_, err = pm.SetNodes(retagged.ViewSlice())
+	require.NoError(t, err)
+
+	fresh, err := NewPolicyManager(pol, users, retagged.ViewSlice())
+	require.NoError(t, err)
+
+	for _, n := range retagged {
+		wantFilter, wantSSH := read(fresh, n)
+		gotFilter, gotSSH := read(pm, n)
+		require.Equal(t, wantFilter, gotFilter, "node %s filter after the retry", n.Hostname)
+		require.Equal(t, wantSSH, gotSSH, "node %s SSH after the retry", n.Hostname)
+	}
 }
