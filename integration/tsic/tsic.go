@@ -1604,10 +1604,13 @@ func (t *TailscaleInContainer) buildEntrypoint() []string {
 	commands = append(commands, "while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done")
 
 	// If CA certs are configured, wait for them to be written by the Go code
-	// (certs are written after container start via [TailscaleInContainer.WriteFile])
+	// (certs are written after container start via [TailscaleInContainer.WriteFile]).
+	// They are written in order, so waiting for the last one waits for all;
+	// the test CAs share a subject, and a missing one fails verification
+	// against the other.
 	if len(t.caCerts) > 0 {
 		commands = append(commands,
-			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
+			fmt.Sprintf("while [ ! -f %s/user-%d.crt ]; do sleep 0.1; done", caCertRoot, len(t.caCerts)-1))
 	}
 
 	// Install packages if requested (requires internet access)
