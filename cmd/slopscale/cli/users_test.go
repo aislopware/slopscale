@@ -613,3 +613,45 @@ func TestUserSignOutCommand(t *testing.T) {
 
 	runCommandCases(t, userFlags, cases)
 }
+
+func TestUserIDFromArg(t *testing.T) {
+	alice := clientv1.User{Id: "3", Name: "alice"}
+	digits := clientv1.User{Id: "7", Name: "42"}
+	aliceDup := clientv1.User{Id: "8", Name: "alice"}
+
+	tests := []struct {
+		name    string
+		users   []clientv1.User
+		arg     string
+		wantID  string
+		wantErr bool
+	}{
+		{name: "unset stays unset", arg: "", wantID: ""},
+		{name: "number is an ID", users: []clientv1.User{alice}, arg: "3", wantID: "3"},
+		// Numbers never hit the name lookup, so user "42" needs its ID.
+		{name: "digit-only name is an ID", users: []clientv1.User{digits}, arg: "42", wantID: "42"},
+		{name: "name resolves to its ID", users: []clientv1.User{alice, digits}, arg: "alice", wantID: "3"},
+		{name: "unknown name is an error", users: []clientv1.User{alice}, arg: "bob", wantErr: true},
+		{name: "ambiguous name is an error", users: []clientv1.User{alice, aliceDup}, arg: "alice", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := filterUsersServer(t, tt.users)
+			defer server.Close()
+
+			client, err := clientv1.NewClientWithResponses(server.URL)
+			require.NoError(t, err)
+
+			id, err := userIDFromArg(t.Context(), client, tt.arg)
+			if tt.wantErr {
+				require.Error(t, err)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantID, id)
+		})
+	}
+}
