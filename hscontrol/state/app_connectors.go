@@ -9,6 +9,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
+	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/dnstype"
 	"tailscale.com/types/views"
@@ -197,16 +198,16 @@ func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver
 
 	peers := s.ListPeers(node.ID())
 	tags := node.Tags().AsSlice()
-	runsConnector := node.Hostinfo().Valid() && node.Hostinfo().AppConnector().EqualBool(true)
+	egress := egressAddrs(node)
 
 	var routes map[string][]*dnstype.Resolver
 
 	for _, app := range apps {
-		if app.Selects(tags, runsConnector) {
+		if app.Selects(tags, runsAppConnector(node)) {
 			continue
 		}
 
-		resolvers := connectorResolvers(app, node, peers)
+		resolvers := connectorResolvers(app, node, egress, peers)
 		if len(resolvers) == 0 {
 			continue
 		}
@@ -226,18 +227,19 @@ func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver
 }
 
 // connectorResolvers lists the app's connectors among the peers as
-// PeerAPI DNS resolvers, chosen for the address family the node has.
+// PeerAPI DNS resolvers, chosen for the address family the node has,
+// leaving out the connectors the node skips (see [State.bypassedApps]).
 func connectorResolvers(
-	app types.AppConnector, node types.NodeView, peers views.Slice[types.NodeView],
+	app types.AppConnector, node types.NodeView, egress []netip.Addr, peers views.Slice[types.NodeView],
 ) []*dnstype.Resolver {
 	var online, offline []*dnstype.Resolver
 
 	for _, peer := range peers.All() {
-		if !peer.Hostinfo().Valid() || !peer.Hostinfo().AppConnector().EqualBool(true) {
+		if !runsAppConnector(peer) || !app.Selects(peer.Tags().AsSlice(), true) {
 			continue
 		}
 
-		if !app.Selects(peer.Tags().AsSlice(), true) {
+		if sharesEgress(egress, egressAddrs(peer)) {
 			continue
 		}
 
@@ -255,6 +257,147 @@ func connectorResolvers(
 	}
 
 	return append(online, offline...)
+}
+
+// A machine that reaches the internet from the same public address as a
+// connector skips it: the apps already see the address they allow, so the
+// detour only costs a hop. A laptop carried into the office goes straight
+// out while everyone at home still goes through the office connector. Its
+// view of the connector carries none of the app routes and its app DNS
+// does not point there. The match is the NAT address the client reports
+// among its endpoints, so nothing is configured and it follows the machine.
+
+// runsAppConnector reports whether the node advertises the connector
+// service.
+func runsAppConnector(node types.NodeView) bool {
+	return node.Hostinfo().Valid() && node.Hostinfo().AppConnector().EqualBool(true)
+}
+
+// egressAddrs returns the public IPv4 addresses among a node's endpoints,
+// sorted: the addresses its NAT shows the internet. IPv6 is left out
+// because an unNATed address belongs to one host, so two machines never
+// share one. A node using an exit node goes out from the exit node's
+// address, so it has none of its own.
+func egressAddrs(node types.NodeView) []netip.Addr {
+	if node.Hostinfo().Valid() && node.Hostinfo().ExitNodeID() != "" {
+		return nil
+	}
+
+	var out []netip.Addr
+
+	for _, ep := range node.Endpoints().All() {
+		addr := ep.Addr().Unmap()
+		if addr.Is4() && isPublicAddr(addr) {
+			out = append(out, addr)
+		}
+	}
+
+	slices.SortFunc(out, netip.Addr.Compare)
+
+	return slices.Compact(out)
+}
+
+// isPublicAddr reports whether addr is on the internet rather than a
+// private, carrier-grade NAT or tailnet range.
+func isPublicAddr(addr netip.Addr) bool {
+	return addr.IsGlobalUnicast() && !addr.IsPrivate() && !tsaddr.IsTailscaleIP(addr)
+}
+
+// sharesEgress reports whether two sets of public addresses meet.
+func sharesEgress(a, b []netip.Addr) bool {
+	return slices.ContainsFunc(a, func(addr netip.Addr) bool {
+		return slices.Contains(b, addr)
+	})
+}
+
+// servesApps reports whether the node runs the connector service for one
+// of the apps.
+func servesApps(apps []types.AppConnector, node types.NodeView) bool {
+	if !runsAppConnector(node) {
+		return false
+	}
+
+	tags := node.Tags().AsSlice()
+
+	return slices.ContainsFunc(apps, func(app types.AppConnector) bool {
+		return app.Selects(tags, true)
+	})
+}
+
+// bypassedApps returns the apps the peer connects when the viewer skips
+// it as a connector, nil otherwise. It runs per viewer and peer pair on
+// the map path, so the cheap connector check comes first.
+func (s *State) bypassedApps(viewer, peer types.NodeView) []types.AppConnector {
+	apps := s.appConnectors.Load()
+	if apps == nil || viewer.ID() == peer.ID() || !runsAppConnector(peer) {
+		return nil
+	}
+
+	mine := make([]types.AppConnector, 0, len(*apps))
+	tags := peer.Tags().AsSlice()
+
+	for _, app := range *apps {
+		if app.Selects(tags, true) {
+			mine = append(mine, app)
+		}
+	}
+
+	if len(mine) == 0 || !sharesEgress(egressAddrs(viewer), egressAddrs(peer)) {
+		return nil
+	}
+
+	return mine
+}
+
+// withoutAppRoutes drops a connector's app routes: the public host routes
+// it learned from the domains and the public prefixes inside its apps'
+// static routes. A private prefix stays, since a shared public address
+// says nothing about reaching it, and so do exit routes.
+func withoutAppRoutes(apps []types.AppConnector, routes []netip.Prefix) []netip.Prefix {
+	return slices.DeleteFunc(routes, func(route netip.Prefix) bool {
+		if !isPublicAddr(route.Addr()) {
+			return false
+		}
+
+		if route.IsSingleIP() {
+			return true
+		}
+
+		return slices.ContainsFunc(apps, func(app types.AppConnector) bool {
+			return slices.ContainsFunc(app.Routes, func(r netip.Prefix) bool {
+				return r.Bits() <= route.Bits() && r.Overlaps(route)
+			})
+		})
+	})
+}
+
+// egressMoveMatters reports whether a node's public addresses moving from
+// old to its current ones changes which connector anyone skips: the node
+// is a connector, or a connector goes out from an old or a new address.
+func (s *State) egressMoveMatters(node types.NodeView, old []netip.Addr) bool {
+	apps := s.appConnectors.Load()
+	if apps == nil || len(*apps) == 0 {
+		return false
+	}
+
+	if servesApps(*apps, node) {
+		return true
+	}
+
+	current := egressAddrs(node)
+
+	for _, peer := range s.nodeStore.ListNodes().All() {
+		if peer.ID() == node.ID() || !servesApps(*apps, peer) {
+			continue
+		}
+
+		egress := egressAddrs(peer)
+		if sharesEgress(egress, old) || sharesEgress(egress, current) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // peerAPIDNS is the peer's PeerAPI DNS endpoint reachable from the node:

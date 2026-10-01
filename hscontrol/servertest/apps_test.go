@@ -2,12 +2,15 @@ package servertest_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -136,4 +139,143 @@ func TestApps(t *testing.T) {
 
 	status, _ = apiCall(t, client, ownerKey, http.MethodGet, v1+"/app/"+appID, nil)
 	assert.Equal(t, http.StatusNotFound, status)
+}
+
+// setEndpoints reports the client's endpoints to the server the way
+// magicsock does after a netcheck: the NAT address STUN saw first, then
+// the LAN address.
+func setEndpoints(t *testing.T, c *servertest.TestClient, stun, lan string) {
+	t.Helper()
+
+	c.Direct().SetEndpoints([]tailcfg.Endpoint{
+		{Addr: netip.MustParseAddrPort(stun), Type: tailcfg.EndpointSTUN},
+		{Addr: netip.MustParseAddrPort(lan), Type: tailcfg.EndpointLocal},
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	_ = c.Direct().SendUpdate(ctx)
+}
+
+// TestAppConnectorBypassSameEgress covers a machine behind the same public
+// address as a connector: it goes straight out, so its view of the
+// connector carries no public app routes and its app DNS skips the
+// connector, while a machine elsewhere still routes through it. The
+// choice follows the machine and the connector when either moves.
+func TestAppConnectorBypassSameEgress(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithDNS(types.DNSConfig{
+		MagicDNS:    true,
+		BaseDomain:  "ts.example",
+		Nameservers: types.Nameservers{Global: []string{"1.1.1.1"}},
+	}))
+	user := srv.CreateUser(t, "bypass-user")
+
+	learned := netip.MustParsePrefix("198.51.100.1/32")
+	static := netip.MustParsePrefix("203.0.113.0/24")
+	private := netip.MustParsePrefix("10.9.0.0/24")
+
+	connector := servertest.NewClient(t, srv, "bypass-connector", servertest.WithTags("tag:connector"))
+	office := servertest.NewClient(t, srv, "bypass-office", servertest.WithUser(user))
+	home := servertest.NewClient(t, srv, "bypass-home", servertest.WithUser(user))
+
+	for _, c := range []*servertest.TestClient{connector, office, home} {
+		c.WaitForPeers(t, 2, 10*time.Second)
+	}
+
+	setEndpoints(t, connector, "192.0.2.10:41641", "192.168.1.5:41641")
+	setEndpoints(t, office, "192.0.2.10:50123", "192.168.1.20:41641")
+	setEndpoints(t, home, "192.0.2.99:41641", "192.168.1.20:41641")
+
+	_, c, err := srv.State().CreateAppConnector(types.AppConnector{
+		Name:       "office-apps",
+		Domains:    []string{"example.com"},
+		Connectors: []string{"tag:connector"},
+		Routes:     []netip.Prefix{static, private},
+	})
+	require.NoError(t, err)
+	srv.App.Change(c)
+
+	connector.Direct().SetHostinfo(&tailcfg.Hostinfo{
+		BackendLogID: "servertest-" + connector.Name,
+		Hostname:     connector.Name,
+		AppConnector: opt.NewBool(true),
+		RoutableIPs:  []netip.Prefix{learned, static, private},
+		Services:     []tailcfg.Service{{Proto: tailcfg.PeerAPI4, Port: 41000}},
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	_ = connector.Direct().SendUpdate(ctx)
+
+	all := []netip.Prefix{learned, static, private}
+
+	routesThrough := func(c *servertest.TestClient, want []netip.Prefix, dns bool) {
+		t.Helper()
+
+		c.WaitForCondition(t, fmt.Sprintf("%s routes %v through the connector, app DNS %t", c.Name, want, dns),
+			10*time.Second, func(nm *netmap.NetworkMap) bool {
+				var primary []netip.Prefix
+
+				for _, p := range nm.Peers {
+					if p.Hostinfo().Valid() && p.Hostinfo().Hostname() == connector.Name {
+						primary = p.PrimaryRoutes().AsSlice()
+					}
+				}
+
+				allowed := peerAllowedIPs(nm, connector.Name)
+
+				for _, r := range all {
+					if slices.Contains(want, r) != slices.Contains(primary, r) ||
+						slices.Contains(want, r) != slices.Contains(allowed, r) {
+						return false
+					}
+				}
+
+				return (len(nm.DNS.Routes["example.com"]) > 0) == dns
+			})
+	}
+
+	// The office machine shares the connector's NAT address: it keeps
+	// only the private prefix, which that address says nothing about.
+	routesThrough(office, []netip.Prefix{private}, false)
+	routesThrough(home, all, true)
+
+	// Taken to a café, it goes through the connector again.
+	setEndpoints(t, office, "192.0.2.50:50123", "10.0.0.7:41641")
+	routesThrough(office, all, true)
+
+	// Back at the office, it goes straight out again.
+	setEndpoints(t, office, "192.0.2.10:50123", "192.168.1.20:41641")
+	routesThrough(office, []netip.Prefix{private}, false)
+
+	// With an exit node it goes out from the exit node's address, so it
+	// needs the connector even in the office.
+	useExitNode := func(id tailcfg.StableNodeID) {
+		office.Direct().SetHostinfo(&tailcfg.Hostinfo{
+			BackendLogID: "servertest-" + office.Name,
+			Hostname:     office.Name,
+			ExitNodeID:   id,
+		})
+
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		_ = office.Direct().SendUpdate(ctx)
+	}
+
+	useExitNode("exit-elsewhere")
+	routesThrough(office, all, true)
+
+	useExitNode("")
+	routesThrough(office, []netip.Prefix{private}, false)
+
+	// The connector moves behind the home machine's address: now the
+	// home machine skips it and the office machine needs it.
+	setEndpoints(t, connector, "192.0.2.99:41641", "192.168.1.5:41641")
+	routesThrough(home, []netip.Prefix{private}, false)
+	routesThrough(office, all, true)
 }

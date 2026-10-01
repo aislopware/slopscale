@@ -5,6 +5,8 @@
 package state
 
 import (
+	"net/netip"
+
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -57,6 +59,13 @@ type mapRequestDelta struct {
 	// happens regardless; this gates only broadcast.
 	endpointBroadcast bool
 
+	// egressMoved reports whether the public addresses the node goes out
+	// from changed, by moving or by picking or dropping an exit node;
+	// oldEgress holds the previous ones. They decide which app connectors
+	// the node skips (see [State.bypassedApps]).
+	egressMoved bool
+	oldEgress   []netip.Addr
+
 	// keyChanged and discoKeyChanged report whether the node's wire keys
 	// changed. Key patches already carry the resulting endpoints/expiry,
 	// so a key change subsumes endpoint/DERP patches.
@@ -90,6 +99,7 @@ func (d mapRequestDelta) MarshalZerologObject(e *zerolog.Event) {
 		Bool("posture.changed", d.postureChanged).
 		Bool("routes.changed", d.routesChanged).
 		Bool("derp.changed", d.derpChanged).
+		Bool("egress.moved", d.egressMoved).
 		Int("derp.old", int(d.oldDERP)).
 		Int("derp.new", int(d.newDERP)).
 		Bool("endpoint.broadcast", d.endpointBroadcast).
