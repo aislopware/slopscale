@@ -93,6 +93,16 @@ func TestDERPSettingsValidate(t *testing.T) {
 			ErrDERPNodeHostEmpty,
 		},
 		{
+			"relay host with a line break",
+			func(s *DERPSettings) { s.Regions[0].Nodes[0].HostName = "sgp.derp.example\r\nX-Injected: 1" },
+			ErrDERPNodeHostInvalid,
+		},
+		{
+			"relay host as an IP literal",
+			func(s *DERPSettings) { s.Regions[0].Nodes[0].HostName = "192.0.2.10" },
+			nil,
+		},
+		{
 			"two relays share a name",
 			func(s *DERPSettings) {
 				s.Regions[0].Nodes = append(s.Regions[0].Nodes, DERPCustomNode{HostName: "sgp.derp.example"})
