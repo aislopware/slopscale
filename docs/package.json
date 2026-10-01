@@ -10,6 +10,6 @@
     "audit": "blume audit --only=anchor_broken,link_to_broken,link_to_redirect,double_slash_url --fail-on=warning"
   },
   "dependencies": {
-    "blume": "2.0.3"
+    "blume": "2.1.0"
   }
 }
