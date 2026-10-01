@@ -5,7 +5,7 @@ go 1.27.1
 require (
 	codeberg.org/miekg/dns v0.6.117
 	github.com/arl/statsviz v0.8.2
-	github.com/cenkalti/backoff/v7 v7.0.0
+	github.com/cenkalti/backoff/v7 v7.0.1
 	github.com/chasefleming/elem-go v0.36.0
 	github.com/coder/websocket v1.8.15
 	github.com/containerd/errdefs v1.0.0
@@ -34,7 +34,7 @@ require (
 	github.com/moby/patternmatcher v0.6.1
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/ory/dockertest/v4 v4.0.0
-	github.com/oschwald/maxminddb-golang/v2 v2.6.0
+	github.com/oschwald/maxminddb-golang/v2 v2.7.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/common v0.72.0
 	github.com/pterm/pterm v0.12.83
@@ -50,7 +50,7 @@ require (
 	github.com/tailscale/tailsql v0.0.0-20260831145903-795321974573
 	github.com/ti-mo/conntrack v0.6.0
 	github.com/ti-mo/netfilter v0.5.3
-	github.com/zitadel/oidc/v3 v3.51.8
+	github.com/zitadel/oidc/v3 v3.51.10
 	go.yaml.in/yaml/v3 v3.0.5
 	go4.org/netipx v0.0.0-20260823151212-3075585bcbeb
 	golang.org/x/crypto v0.57.0
@@ -62,7 +62,7 @@ require (
 	golang.org/x/term v0.46.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
-	tailscale.com v1.103.0-pre.0.20260928140705-48c7fbcc56db
+	tailscale.com v1.105.0-pre.0.20260930225347-654c105f8bf0
 	tailscale.com/client/tailscale/v2 v2.11.0
 )
 
@@ -88,7 +88,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.10.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssm v1.78.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.79.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.38.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.51.1 // indirect
@@ -168,9 +168,9 @@ require (
 	github.com/tailscale/certstore v0.1.1-0.20260409135935-3638fb84b77d // indirect
 	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55 // indirect
 	github.com/tailscale/peercred v0.0.0-20250107143737-35a0c7bd7edc // indirect
-	github.com/tailscale/setec v0.0.0-20260824224040-f8d7a936837c // indirect
+	github.com/tailscale/setec v0.0.0-20260930204522-1ef5b44191cf // indirect
 	github.com/tailscale/web-client-prebuilt v0.0.0-20260917222731-e0ed2d0d0fea // indirect
-	github.com/tailscale/wireguard-go v0.0.0-20260924224943-0a83b87f7908 // indirect
+	github.com/tailscale/wireguard-go v0.0.0-20260928213032-417aef361226 // indirect
 	github.com/toqueteos/webbrowser v1.2.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xo/terminfo v1.2.0 // indirect

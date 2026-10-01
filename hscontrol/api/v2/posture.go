@@ -120,11 +120,11 @@ func registerPosture(api huma.API, b Backend) {
 		audit.Detail(ctx, "value", value.Any())
 
 		_, c, err := b.State.SetNodeAttribute(node.ID(), attr)
+		b.Change(c)
+
 		if err != nil {
 			return nil, mapAttributeError(err)
 		}
-
-		b.Change(c)
 
 		return &emptyOutput{}, nil
 	})
@@ -150,11 +150,11 @@ func registerPosture(api huma.API, b Backend) {
 		audit.Detail(ctx, "key", in.Key)
 
 		_, c, err := b.State.DeleteNodeAttribute(node.ID(), in.Key)
+		b.Change(c)
+
 		if err != nil {
 			return nil, mapAttributeError(err)
 		}
-
-		b.Change(c)
 
 		return &emptyOutput{}, nil
 	})

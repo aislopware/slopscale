@@ -21,7 +21,7 @@ A key created this way is all-access. To hand out less, create the key for a use
 [role](/ref/roles):
 
 ```shell
-slopscale apikeys create --user <USER_ID>
+slopscale apikeys create --user <USER>
 ```
 
 A key can also be limited to some operations with scopes, the same vocabulary the OAuth clients use, and carry a
@@ -32,7 +32,7 @@ case the new key inherits the caller's scopes. An OAuth access token cannot mint
 bounded by tags as well as scopes, and an API key has no tags to be bounded by.
 
 ```shell
-slopscale apikeys create --user <USER_ID> --scope dns --scope devices:core:read --description "Resolver sync"
+slopscale apikeys create --user <USER> --scope dns --scope devices:core:read --description "Resolver sync"
 ```
 
 The console's _Keys_ page offers the same when creating an API key, and lists each key's scopes and description.

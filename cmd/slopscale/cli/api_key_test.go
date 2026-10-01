@@ -17,7 +17,7 @@ func apiKeyFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("expiration", "e", DefaultAPIKeyExpiry, "")
 	cmd.Flags().StringP("prefix", "p", "", "")
 	cmd.Flags().Uint64P("id", "i", 0, "")
-	cmd.Flags().Uint64P("user", "u", 0, "")
+	cmd.Flags().StringP("user", "u", "", "")
 }
 
 func apiKeys() []clientv1.ApiKey {

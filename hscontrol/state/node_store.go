@@ -1023,6 +1023,21 @@ func (s *NodeStore) ListPeers(id types.NodeID) views.Slice[types.NodeView] {
 	return views.SliceOf(s.data.Load().peersOf(id))
 }
 
+// ListPeerIDs returns the sorted IDs of id's peers as a copy the caller
+// may keep across later writes.
+func (s *NodeStore) ListPeerIDs(id types.NodeID) []types.NodeID {
+	peers := s.data.Load().peersOf(id)
+
+	ids := make([]types.NodeID, len(peers))
+	for i, p := range peers {
+		ids[i] = p.ID()
+	}
+
+	slices.Sort(ids)
+
+	return ids
+}
+
 // ListPeersAmong returns the peers of id that are in ids, in peer map
 // order.
 func (s *NodeStore) ListPeersAmong(id types.NodeID, ids []types.NodeID) views.Slice[types.NodeView] {

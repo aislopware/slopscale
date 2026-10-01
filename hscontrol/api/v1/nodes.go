@@ -364,10 +364,8 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 
 		audit.Target(ctx, "", "", node.GivenName())
 
-		nodeChange, err := b.State.DeleteNode(node)
-		if !nodeChange.IsEmpty() {
-			b.Change(nodeChange)
-		}
+		changes, err := b.State.DeleteNode(node)
+		b.Change(changes...)
 
 		if err != nil {
 			return nil, huma.Error500InternalServerError("deleting node", err)
@@ -412,13 +410,13 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		audit.Detail(ctx, "newName", in.NewName)
 
 		node, nodeChange, err := b.State.RenameNode(owned.ID(), in.NewName)
+		b.Change(nodeChange)
+
 		if err != nil {
 			return nil, mapError("renaming node", err)
 		}
 
 		audit.Target(ctx, "", "", node.GivenName())
-
-		b.Change(nodeChange)
 
 		out := &nodeOutput{}
 		out.Body.Node = b.nodeFromView(node)
@@ -457,13 +455,13 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		}
 
 		node, nodeChange, err := b.State.ResetHardwareAttestation(nodeID)
+		b.Change(nodeChange)
+
 		if err != nil {
 			return nil, mapError("resetting hardware attestation", err)
 		}
 
 		audit.Target(ctx, "", "", node.GivenName())
-
-		b.Change(nodeChange)
 
 		out := &nodeOutput{}
 		out.Body.Node = b.nodeFromView(node)
@@ -501,13 +499,13 @@ func handleExpireNode(ctx context.Context, b Backend, in *expireNodeInput) (*nod
 		audit.Detail(ctx, "disableExpiry", true)
 
 		node, nodeChange, expErr := b.State.SetNodeExpiry(nodeID, nil)
+		b.Change(nodeChange)
+
 		if expErr != nil {
 			return nil, mapError("expiring node", expErr)
 		}
 
 		audit.Target(ctx, "", "", node.GivenName())
-
-		b.Change(nodeChange)
 
 		out := &nodeOutput{}
 		out.Body.Node = b.nodeFromView(node)
@@ -523,13 +521,13 @@ func handleExpireNode(ctx context.Context, b Backend, in *expireNodeInput) (*nod
 	}
 
 	node, nodeChange, err := b.State.SetNodeExpiry(nodeID, &expiry)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("expiring node", err)
 	}
 
 	audit.Target(ctx, "", "", node.GivenName())
-
-	b.Change(nodeChange)
 
 	out := &nodeOutput{}
 	out.Body.Node = b.nodeFromView(node)
@@ -574,13 +572,13 @@ func handleSetTags(ctx context.Context, b Backend, in *setTagsInput) (*nodeOutpu
 	audit.Detail(ctx, "tags", in.Body.Tags)
 
 	node, nodeChange, err := b.State.SetNodeTags(nodeID, in.Body.Tags)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, huma.Error400BadRequest("setting tags", err)
 	}
 
 	audit.Target(ctx, "", "", node.GivenName())
-
-	b.Change(nodeChange)
 
 	out := &nodeOutput{}
 	out.Body.Node = b.nodeFromView(node)
@@ -640,11 +638,15 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 			util.RegisterMethodCLI,
 		)
 		if err != nil {
+			b.Change(nodeChange)
+
 			return nil, mapError("registering node", err)
 		}
 
 		routeChange, err := b.State.AutoApproveRoutes(node)
 		if err != nil {
+			b.Change(nodeChange, routeChange)
+
 			return nil, huma.Error500InternalServerError("auto approving routes", err)
 		}
 
@@ -673,7 +675,9 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 			return nil, huma.Error400BadRequest("backfilling node IPs", errBackfillNotConfirmed)
 		}
 
-		changes, err := b.State.BackfillNodeIPs()
+		changes, cs, err := b.State.BackfillNodeIPs()
+		b.Change(cs...)
+
 		if err != nil {
 			return nil, huma.Error500InternalServerError("backfilling node IPs", err)
 		}
@@ -760,13 +764,13 @@ func handleSetApprovedRoutes(ctx context.Context, b Backend, in *setApprovedRout
 	audit.Detail(ctx, "routes", nonNilStrings(util.PrefixesToString(newApproved)))
 
 	node, nodeChange, err := b.State.SetApprovedRoutes(nodeID, newApproved)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("setting approved routes", err)
 	}
 
 	audit.Target(ctx, "", "", node.GivenName())
-
-	b.Change(nodeChange)
 
 	out := &nodeOutput{}
 	out.Body.Node = b.nodeFromView(node)

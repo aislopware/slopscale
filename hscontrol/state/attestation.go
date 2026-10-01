@@ -182,6 +182,8 @@ func (s *State) auditAttestation(node types.NodeView, action string) {
 func (s *State) ResetHardwareAttestation(nodeID types.NodeID) (types.NodeView, change.Change, error) {
 	var had bool
 
+	genBefore := s.polMan.NodesGeneration()
+
 	node, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		had = node.HardwareAttestation != nil
 		node.HardwareAttestation = nil
@@ -199,9 +201,9 @@ func (s *State) ResetHardwareAttestation(nodeID types.NodeID) (types.NodeView, c
 		return types.NodeView{}, change.Change{}, fmt.Errorf("clearing hardware attestation: %w", err)
 	}
 
-	c, err := s.updatePolicyManagerNodes()
+	c, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
-		return types.NodeView{}, change.Change{}, err
+		return types.NodeView{}, nodeWriteFailed(nodeID, c), err
 	}
 
 	return node, c, nil

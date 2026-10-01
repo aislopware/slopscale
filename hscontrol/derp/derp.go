@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"slices"
 	"strconv"
@@ -22,8 +21,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
-	"go.yaml.in/yaml/v3"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
 )
@@ -41,6 +40,10 @@ var (
 	// ErrMapTooLarge is returned when a DERP map URL answers with more than
 	// maxDERPMapBytes.
 	ErrMapTooLarge = errors.New("DERP map too large")
+
+	errEmptyDERPMapFile = errors.New(
+		"DERP map file has no regions or homeparams (YAML keys are lowercased Go field names, e.g. regionid)",
+	)
 )
 
 // noRedirect keeps the fetch at the configured URL instead of following it
@@ -50,17 +53,18 @@ func noRedirect(*http.Request, []*http.Request) error {
 	return ErrRedirected
 }
 
+// loadDERPMapFromPath reads a DERP map file in the format its extension names
+// (see [util.UnmarshalByExt]).
 func loadDERPMapFromPath(path string) (*tailcfg.DERPMap, error) {
-	b, err := os.ReadFile(path)
+	derpMap, err := util.ReadFileByExt[tailcfg.DERPMap](path)
 	if err != nil {
-		return nil, fmt.Errorf("reading DERP map file %q: %w", path, err)
+		return nil, fmt.Errorf("reading DERP map: %w", err)
 	}
 
-	var derpMap tailcfg.DERPMap
-
-	err = yaml.Unmarshal(b, &derpMap)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshaling DERP map YAML: %w", err)
+	// Keys the decoder does not know decode to nothing, so YAML written with
+	// JSON's field names would otherwise load as a map that changes nothing.
+	if len(derpMap.Regions) == 0 && derpMap.HomeParams == nil {
+		return nil, fmt.Errorf("%w: %s", errEmptyDERPMapFile, path)
 	}
 
 	return &derpMap, nil
@@ -134,9 +138,15 @@ func mergeDERPMaps(derpMaps []*tailcfg.DERPMap) *tailcfg.DERPMap {
 		// shuffle alias regions shared with the source map or a previously
 		// served map, racing concurrent readers.
 		for id, region := range derpMap.Regions {
-			if cloned := sanitizeRegion(id, region); cloned != nil {
-				result.Regions[id] = cloned
+			// A null region removes one an earlier map added, the documented
+			// way to drop a region from derp.urls via derp.paths.
+			if region == nil {
+				delete(result.Regions, id)
+
+				continue
 			}
+
+			result.Regions[id] = sanitizeRegion(id, region)
 		}
 
 		if derpMap.HomeParams == nil {

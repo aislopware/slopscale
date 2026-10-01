@@ -17,7 +17,7 @@ func preAuthKeyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("ephemeral", false, "")
 	cmd.Flags().StringP("expiration", "e", DefaultPreAuthKeyExpiry, "")
 	cmd.Flags().StringSlice("tags", []string{}, "")
-	cmd.Flags().Uint64P("user", "u", 0, "")
+	cmd.Flags().StringP("user", "u", "", "")
 	cmd.Flags().Uint64P("id", "i", 0, "")
 	cmd.Flags().Bool("preauthorized", true, "")
 }
@@ -147,7 +147,7 @@ func TestPreAuthKeyCommands(t *testing.T) {
 					var body clientv1.CreatePreAuthKeyRequestBody
 
 					decodeBody(t, r, &body)
-					assert.Equal(t, "0", ptrStr(body.User))
+					assert.Empty(t, ptrStr(body.User))
 					assert.Empty(t, ptrStrs(body.AclTags))
 
 					if assert.NotNil(t, body.Reusable) {
@@ -166,6 +166,40 @@ func TestPreAuthKeyCommands(t *testing.T) {
 				},
 			},
 			want: "hskey-auth-userkey\n",
+		},
+		{
+			name:  "create resolves a user name to its id",
+			src:   createPreAuthKeyCmd,
+			flags: map[string]string{"user": "alice"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "alice", r.URL.Query().Get("name"))
+					writeJSON(t, w, clientv1.ListUsersOutputBody{Users: []clientv1.User{{Id: "3", Name: "alice"}}})
+				},
+				"POST /api/v1/preauthkey": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.CreatePreAuthKeyRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, "3", ptrStr(body.User))
+					writeJSON(t, w, clientv1.PreAuthKeyOutputBody{PreAuthKey: keys[0]})
+				},
+			},
+			want: "hskey-auth-userkey\n",
+		},
+		{
+			name:  "create refuses an unknown user name before creating a key",
+			src:   createPreAuthKeyCmd,
+			flags: map[string]string{"user": "bob"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, clientv1.ListUsersOutputBody{Users: []clientv1.User{}})
+				},
+			},
+			wantErr: `--user "bob"`,
 		},
 		{
 			name:   "create prints the key as json",

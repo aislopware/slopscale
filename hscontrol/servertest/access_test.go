@@ -162,11 +162,15 @@ func TestAccessRulesEndToEnd(t *testing.T) {
 
 		// Alice reaches bob's machine on port 22; bob's machine admits
 		// only her; carol is nobody's peer any more.
-		aliceNode.WaitForCondition(t, "one peer", accessWait, func(nm *netmap.NetworkMap) bool {
-			return len(nm.Peers) == 1 && nm.Peers[0].ID() == bobNode.Netmap().SelfNode.ID()
+		// Carol's removal arrives before the new filter, so each wait
+		// covers both; the rule is one way, so alice's filter empties.
+		aliceNode.WaitForCondition(t, "one peer and no filter", accessWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1 && nm.Peers[0].ID() == bobNode.Netmap().SelfNode.ID() &&
+				len(nm.PacketFilter) == 0
 		})
 		bobNode.WaitForCondition(t, "filter admitting alice", accessWait, func(nm *netmap.NetworkMap) bool {
-			return len(nm.Peers) == 1 && len(nm.PacketFilter) == 1
+			return len(nm.Peers) == 1 && len(nm.PacketFilter) == 1 &&
+				len(nm.PacketFilter[0].Dsts) > 0 && nm.PacketFilter[0].Dsts[0].Ports.First == 22
 		})
 		carolNode.WaitForCondition(t, "no peers", accessWait, func(nm *netmap.NetworkMap) bool {
 			return len(nm.Peers) == 0
@@ -180,8 +184,6 @@ func TestAccessRulesEndToEnd(t *testing.T) {
 			assert.Equal(t, uint16(22), dst.Ports.First)
 			assert.Equal(t, uint16(22), dst.Ports.Last)
 		}
-
-		assert.Empty(t, aliceNode.Netmap().PacketFilter, "the rule is one way")
 
 		// A group a rule names cannot be deleted.
 		status, body = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/group/"+serversID, nil)

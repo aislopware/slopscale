@@ -120,10 +120,10 @@ A personal node is always assigned to a Slopscale user. Use the `slopscale users
 slopscale users create <USER>
 ```
 
-Use the `slopscale user list` command to learn its `<USER_ID>` and create a new pre authenticated key for your user:
+Create a new pre authenticated key for your user, by name or by the ID that `slopscale user list` shows:
 
 ```console
-slopscale preauthkeys create --user <USER_ID>
+slopscale preauthkeys create --user <USER>
 ```
 
 The above prints a pre authenticated key with the default settings (can be used once and is valid for one hour). Use

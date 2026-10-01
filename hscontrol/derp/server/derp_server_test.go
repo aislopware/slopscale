@@ -508,6 +508,48 @@ func TestDERPHandlerVerifyClients(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestDERPServerDebugClients(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
+	defer cancel()
+
+	srv, baseURL := startDERPServer(t, testServerSettings())
+
+	alicePriv := key.NewNode()
+	alice := newDERPClient(ctx, t, alicePriv, baseURL)
+
+	// The pong proves the server has registered the connection.
+	require.NoError(t, alice.SendPing([8]byte{1}))
+	recvOf[derp.PongMessage](t, alice.Recv)
+
+	debugClients := func() *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		target := "/debug/derp-clients/?format=json&key=" + alicePriv.Public().String()
+		srv.ServeDebugClients(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil))
+
+		return rec
+	}
+
+	rec := debugClients()
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var page struct {
+		Conns   int `json:"conns"`
+		Clients []struct {
+			Key key.NodePublic `json:"key"`
+		} `json:"clients"`
+	}
+
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &page))
+	assert.Equal(t, 1, page.Conns)
+	require.Len(t, page.Clients, 1)
+	assert.Equal(t, alicePriv.Public(), page.Clients[0].Key)
+
+	require.NoError(t, srv.Apply(types.DERPServerSettings{Enabled: false}))
+	assert.Equal(t, http.StatusNotFound, debugClients().Code)
+}
+
 func TestDERPProbeHandler(t *testing.T) {
 	t.Parallel()
 

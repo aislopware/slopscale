@@ -23,8 +23,8 @@ func init() {
 
 	createAPIKeyCmd.Flags().
 		StringP("expiration", "e", DefaultAPIKeyExpiry, "Human-readable expiration of the key (e.g. 30m, 24h)")
-	createAPIKeyCmd.Flags().
-		Uint64P("user", "u", 0, "Owning user ID; the key is bounded by the user's role (0: all-access key)")
+	createAPIKeyCmd.Flags().StringP("user", "u", "",
+		"Owning user ID, or name if not a number; the key is bounded by the user's role (unset: all-access key)")
 	createAPIKeyCmd.Flags().
 		StringSlice("scope", []string{}, "Scope to limit the key to, such as dns or devices:core:read (repeatable)")
 	createAPIKeyCmd.Flags().String("description", "", "What the key is for")
@@ -121,8 +121,14 @@ retrieved again. If you lose it, create a new one and expire the old one.`,
 
 			body := clientv1.CreateApiKeyJSONRequestBody{Expiration: &expiryTime}
 
-			if user, _ := cmd.Flags().GetUint64("user"); user != 0 {
-				userID := strconv.FormatUint(user, util.Base10)
+			userArg, _ := cmd.Flags().GetString("user")
+
+			userID, err := userIDFromArg(ctx, client, userArg)
+			if err != nil {
+				return err
+			}
+
+			if userID != "" && userID != "0" {
 				body.UserId = &userID
 			}
 

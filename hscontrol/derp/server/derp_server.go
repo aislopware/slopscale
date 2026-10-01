@@ -199,6 +199,19 @@ func (d *DERPServer) STUNAddr() string {
 	return d.stunConn.LocalAddr().String()
 }
 
+// ServeDebugClients serves derper's /debug/clients/ page for the relay:
+// the connected clients, filtered by ?all, ?ip=, ?cidr=, ?key= or ?app=,
+// sortable and paged, as HTML or with format=json.
+func (d *DERPServer) ServeDebugClients(writer http.ResponseWriter, req *http.Request) {
+	if !d.enabled.Load() {
+		http.Error(writer, "embedded DERP server is off", http.StatusNotFound)
+
+		return
+	}
+
+	d.server().ServeDebugClients(writer, req)
+}
+
 func (d *DERPServer) DERPHandler(
 	writer http.ResponseWriter,
 	req *http.Request,

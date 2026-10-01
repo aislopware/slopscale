@@ -30,7 +30,7 @@ func ReduceFilterRules(
 		node:            node,
 		subnetRoutes:    node.SubnetRoutes(),
 		servicePrefixes: servicePrefixes,
-		hasExitRoutes:   node.IsExitNode(),
+		exitRoutes:      node.ExitRoutes(),
 	}
 	runsConnector := node.Hostinfo().Valid() && node.Hostinfo().AppConnector().EqualBool(true)
 
@@ -93,7 +93,7 @@ type destKeeper struct {
 	node            types.NodeView
 	subnetRoutes    []netip.Prefix
 	servicePrefixes []netip.Prefix
-	hasExitRoutes   bool
+	exitRoutes      []netip.Prefix
 }
 
 // dest reports whether the node answers for any address in the set.
@@ -107,10 +107,7 @@ func (k destKeeper) dest(expanded *netipx.IPSet) bool {
 	// [types.NodeView.SubnetRoutes] returns only approved,
 	// non-exit routes — matching Tailscale SaaS behavior,
 	// which does not generate filter rules for
-	// advertised-but-unapproved routes. Exit routes
-	// (0.0.0.0/0, ::/0) are excluded by
-	// [types.NodeView.SubnetRoutes] and handled separately
-	// via AllowedIPs/routing.
+	// advertised-but-unapproved routes.
 	if slices.ContainsFunc(k.subnetRoutes, expanded.OverlapsPrefix) {
 		return true
 	}
@@ -122,10 +119,10 @@ func (k destKeeper) dest(expanded *netipx.IPSet) bool {
 		return true
 	}
 
-	// Exit-route advertisers need rules targeting the
-	// public internet so the kernel filter accepts
-	// traffic forwarded by autogroup:internet sources.
-	return k.hasExitRoutes && util.IPSetSubsetOf(expanded, util.TheInternet())
+	// Approved exit routes count like subnet routes. They
+	// contain every destination, so Tailscale SaaS sends an
+	// exit node every rule, not only internet ones.
+	return slices.ContainsFunc(k.exitRoutes, expanded.OverlapsPrefix)
 }
 
 // connectorDNSDests are the destinations an app connector's client checks

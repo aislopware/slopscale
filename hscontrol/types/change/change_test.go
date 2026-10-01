@@ -484,6 +484,7 @@ func TestSelfUpdate(t *testing.T) {
 	assert.Equal(t, "self update", r.Reason)
 	assert.Equal(t, types.NodeID(42), r.TargetNode)
 	assert.True(t, r.IncludeSelf)
+	assert.True(t, r.IncludeDNS)
 	assert.True(t, r.IsSelfOnly())
 }
 

@@ -31,9 +31,17 @@ func (pm *PolicyManager) SetAppConnectors(apps []types.AppConnector) (bool, erro
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
+	prev := pm.appConnectors
 	pm.appConnectors = slices.Clone(apps)
 
-	return pm.updateLocked()
+	changed, err := pm.updateLocked()
+	if err != nil {
+		pm.appConnectors = prev
+
+		return false, err
+	}
+
+	return changed, nil
 }
 
 // appsForNode returns the apps whose connectors include the node: a

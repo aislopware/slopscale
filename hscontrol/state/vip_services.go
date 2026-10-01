@@ -255,7 +255,8 @@ func (s *State) SetApprovedServices(nodeID types.NodeID, names []string) (types.
 
 	n, _ := s.nodeStore.GetNode(nodeID)
 
-	_, err = s.updatePolicyManagerNodes()
+	// The change is a service change whatever the refresh reports.
+	_, err = s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	if err != nil {
 		return types.NodeView{}, change.Change{}, fmt.Errorf("updating policy manager after service approval: %w", err)
 	}
@@ -379,6 +380,8 @@ func (s *State) CollectVIPServices(
 func (s *State) setNodeServices(nodeID types.NodeID, services *types.NodeServices) (change.Change, error) {
 	var before types.Node
 
+	genBefore := s.polMan.NodesGeneration()
+
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		before = *node
 		node.Services = services
@@ -395,9 +398,9 @@ func (s *State) setNodeServices(nodeID types.NodeID, services *types.NodeService
 	log.Debug().Uint64(zf.NodeID, nodeID.Uint64()).Int("services.count", len(services.Services)).
 		Msg("services reported")
 
-	c, err := s.updatePolicyManagerNodes()
+	c, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
-		return change.Change{}, err
+		return nodeWriteFailed(nodeID, c), err
 	}
 
 	approval, err := s.AutoApproveServices(n)

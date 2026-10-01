@@ -92,7 +92,9 @@ func (s *State) UnshareNode(nodeID types.NodeID, userID types.UserID) (types.Nod
 // the node, and the policy manager only notices when the policy names
 // autogroup:shared.
 func (s *State) policyChangeAfterShare() (change.Change, error) {
-	_, err := s.updatePolicyManagerNodes()
+	// The change is a PolicyChange whatever the refresh reports, so the
+	// generation it is measured from does not matter.
+	_, err := s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	if err != nil {
 		return change.Change{}, fmt.Errorf("updating policy manager after share change: %w", err)
 	}

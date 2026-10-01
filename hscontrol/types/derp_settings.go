@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/egress"
+	"golang.org/x/net/http/httpguts"
 	"tailscale.com/tailcfg"
 )
 
@@ -143,6 +144,9 @@ var (
 	)
 	ErrDERPNodeHostEmpty = fmt.Errorf(
 		"%w: a relay needs a host name", ErrDERPSettingsInvalid,
+	)
+	ErrDERPNodeHostInvalid = fmt.Errorf(
+		"%w: a relay host name must be a valid HTTP host", ErrDERPSettingsInvalid,
 	)
 	ErrDERPNodeNameTaken = fmt.Errorf(
 		"%w: two relays of a region share a name", ErrDERPSettingsInvalid,
@@ -434,6 +438,12 @@ func (r DERPCustomRegion) validate() error {
 	for _, n := range r.Nodes {
 		if n.HostName == "" {
 			return fmt.Errorf("%w: region %s", ErrDERPNodeHostEmpty, r.Code)
+		}
+
+		// Clients refuse to reach a relay through an HTTP proxy when its
+		// name could smuggle bytes into the CONNECT request they write.
+		if !httpguts.ValidHostHeader(n.HostName) {
+			return fmt.Errorf("%w: %q in region %s", ErrDERPNodeHostInvalid, n.HostName, r.Code)
 		}
 
 		if _, dup := names[n.Name]; dup {

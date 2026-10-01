@@ -10,11 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	derpServer "github.com/aislopware/slopscale/hscontrol/derp/server"
 	"github.com/aislopware/slopscale/hscontrol/state"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
+	"tailscale.com/types/key"
 )
 
 const (
@@ -191,6 +193,29 @@ func TestDebugIndexListsEndpoints(t *testing.T) {
 	}
 
 	assert.Contains(t, body, `href="/metrics"`)
+	assert.NotContains(t, body, "derp-clients", "listed without an embedded relay")
+}
+
+func TestDebugDERPClients(t *testing.T) {
+	t.Parallel()
+
+	env := newDebugTestEnv(t)
+
+	relay := derpServer.NewDERPServer(key.NewNode(), nil)
+
+	t.Cleanup(func() { _ = relay.Close() })
+
+	env.app.DERPServer = relay
+	env.handler = env.app.debugHTTPServer().Handler
+
+	assert.Contains(t, env.debugRequest(t, "/debug/", "").Body.String(), `href="/debug/derp-clients/"`)
+	assert.Equal(t, http.StatusNotFound, env.debugRequest(t, "/debug/derp-clients/?all", "").Code)
+
+	require.NoError(t, relay.Apply(types.DERPServerSettings{Enabled: true, RegionID: 999, RegionCode: "test"}))
+
+	rec := env.debugRequest(t, "/debug/derp-clients/?all&format=json", "")
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.JSONEq(t, `{"query":"all clients","conns":0,"keys":0,"remaining":0,"clients":[]}`, rec.Body.String())
 }
 
 func TestDebugOverview(t *testing.T) {

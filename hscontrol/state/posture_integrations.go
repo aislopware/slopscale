@@ -257,9 +257,11 @@ func (s *State) dropPostureAttributes(provider types.PostureProvider) (change.Ch
 		}
 	}
 
+	genBefore := s.polMan.NodesGeneration()
+
 	s.nodeStore.UpdateNodes(updates)
 
-	return s.updatePolicyManagerNodes()
+	return s.updatePolicyManagerNodes(genBefore)
 }
 
 // CheckPostureIntegration verifies that the credentials reach the
@@ -497,7 +499,9 @@ func (s *State) applyPostureAttributes(
 		}
 	}
 
+	genBefore := s.polMan.NodesGeneration()
+
 	s.nodeStore.UpdateNodes(updates)
 
-	return s.updatePolicyManagerNodes()
+	return s.updatePolicyManagerNodes(genBefore)
 }

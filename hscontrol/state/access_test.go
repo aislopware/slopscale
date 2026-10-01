@@ -23,7 +23,7 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	bobNode := s.CreateRegisteredNodeForTest(bob, "bob-1")
 	s.PutNodeInStoreForTest(*bobNode)
 
-	_, err := s.updatePolicyManagerNodes()
+	_, err := s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	// The builtin groups exist from the start and are fixed.

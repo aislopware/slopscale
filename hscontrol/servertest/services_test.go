@@ -3,6 +3,7 @@ package servertest_test
 import (
 	"net/http"
 	"net/netip"
+	"slices"
 	"testing"
 	"time"
 
@@ -182,13 +183,15 @@ func TestVIPServices(t *testing.T) {
 		})
 		assert.Empty(t, host.Netmap().SelfNode.PrimaryRoutes().AsSlice(), "a service address is not a subnet route")
 
+		// The record and the service ride the laptop's self refresh, the
+		// route its policy response, so the wait covers all three.
 		laptop.WaitForCondition(t, "peer routes the service", servicesWait, func(nm *netmap.NetworkMap) bool {
 			ips := peerAllowedIPs(nm, "web1")
 
-			return len(ips) > 0 && hasRecord(nm, "web.svc.test", addrs[0].Addr().String()) &&
+			return slices.Contains(ips, addrs[0]) && slices.Contains(ips, addrs[1]) &&
+				hasRecord(nm, "web.svc.test", addrs[0].Addr().String()) &&
 				nm.Services()["svc:web"].Name == "svc:web"
 		})
-		assert.Subset(t, peerAllowedIPs(laptop.Netmap(), "web1"), addrs)
 		assert.Equal(t, "Web", laptop.Netmap().Services()["svc:web"].DisplayName)
 		assert.Equal(t, webPorts, laptop.Netmap().Services()["svc:web"].Ports)
 		assert.True(t, laptop.Netmap().SelfNode.CapMap().Contains(nodecap.ServicesInDesktopClients))

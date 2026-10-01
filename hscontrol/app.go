@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -185,10 +186,8 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 			return
 		}
 
-		policyChanged, deleteErr := app.state.DeleteNode(node)
-		if !policyChanged.IsEmpty() {
-			app.Change(policyChanged)
-		}
+		changes, deleteErr := app.state.DeleteNode(node)
+		app.Change(changes...)
 
 		if deleteErr != nil {
 			log.Error().Err(deleteErr).EmbedObject(node).Msg("ephemeral node deletion failed")
@@ -601,12 +600,11 @@ func (h *Slopscale) Serve() error {
 				}
 
 				changes, reloadErr := h.state.ReloadPolicy()
+				h.Change(changes...)
+
 				if reloadErr != nil {
 					log.Error().Err(reloadErr).Msgf("reloading policy")
-					continue
 				}
-
-				h.Change(changes...)
 
 			default:
 				info := func(msg string) { log.Info().Msg(msg) }
@@ -761,7 +759,7 @@ func readOrCreatePrivateKey(path string) (*key.MachinePrivate, error) {
 // All change should be enqueued here and empty will be automatically
 // ignored.
 func (h *Slopscale) Change(cs ...change.Change) {
-	h.mapBatcher.AddWork(cs...)
+	h.mapBatcher.AddWork(slices.Concat(cs, h.state.DrainSelfRefreshes())...)
 }
 
 // HTTPHandler returns an [http.Handler] for the [Slopscale] control server.
@@ -1093,14 +1091,12 @@ func (h *Slopscale) expireAccess(since, now time.Time) {
 // and publishes the recompute.
 func (h *Slopscale) expireNodeAttributes() {
 	c, err := h.state.ExpireNodeAttributes(time.Now())
-	if err != nil {
-		log.Error().Err(err).Msg("expiring node attributes")
-
-		return
-	}
-
 	if !c.IsEmpty() {
 		h.Change(c)
+	}
+
+	if err != nil {
+		log.Error().Err(err).Msg("expiring node attributes")
 	}
 }
 
