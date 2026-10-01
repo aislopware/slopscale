@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.55.0](https://github.com/aislopware/slopscale/compare/v0.54.2...v0.55.0) (2026-10-01)
+
+
+### Changes
+
+* **state:** let machines behind a connector's public address skip it ([#52](https://github.com/aislopware/slopscale/issues/52)) ([c878db0](https://github.com/aislopware/slopscale/commit/c878db00dabe641500036eaa3c6461b7d7ad781f))
+
 ## [0.54.2](https://github.com/aislopware/slopscale/compare/v0.54.1...v0.54.2) (2026-09-29)
 
 
