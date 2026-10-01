@@ -1,5 +1,38 @@
 # CHANGELOG
 
+## [0.56.0](https://github.com/aislopware/slopscale/compare/v0.55.0...v0.56.0) (2026-10-01)
+
+
+### Changes
+
+* **cli:** accept a user name in preauthkeys create and apikeys create --user ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **derp:** list the embedded relay's connected clients on the debug server ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **derp:** read derp.paths and extra_records_path files as YAML, JSON or HuJSON by extension ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+
+
+### Fixes
+
+* **derp:** drop a region set to null in a derp.paths file ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **mapper:** send a removed peer in a response clients apply as a delta ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **nix:** write split DNS where slopscale reads it and drop the deprecated ephemeral key ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **policy/v2:** keep via exit steering when an unrelated rule matches the viewer ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **policy/v2:** leave the live policy in place when a recompile fails ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **policy/v2:** send machines their new autogroup:self rules when a user changes ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **policy:** send approved exit nodes every filter rule, as Tailscale does ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **state:** send a deleted node's removal on its own, apart from the policy refresh ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **state:** update a node's NextDNS device name when its hostname changes ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+* **types:** refuse a relay host name that clients behind a proxy would reject ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+
+
+### Performance
+
+* **state:** build the peer map once per node write instead of twice ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+
+
+### Dependencies
+
+* update tailscale main, zitadel/oidc, maxminddb, the console and docs pins and nixpkgs ([6cb53b3](https://github.com/aislopware/slopscale/commit/6cb53b346b8f313e331d2f5697640f83b3dc778d))
+
 ## [0.55.0](https://github.com/aislopware/slopscale/compare/v0.54.2...v0.55.0) (2026-10-01)
 
 
