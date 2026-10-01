@@ -308,12 +308,13 @@ func registerServiceApprovals(api huma.API, b Backend) {
 		audit.Detail(ctx, "services", in.Body.Services)
 
 		node, c, err := b.State.SetApprovedServices(nodeID, in.Body.Services)
+		b.Change(c)
+
 		if err != nil {
 			return nil, mapError("approving services", err)
 		}
 
 		audit.Target(ctx, "node", node.StringID(), node.GivenName())
-		b.Change(c)
 
 		out := &nodeOutput{}
 		out.Body.Node = b.nodeFromView(node)

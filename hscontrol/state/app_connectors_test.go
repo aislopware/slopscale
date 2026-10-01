@@ -115,7 +115,7 @@ func TestAppDNSRoutes(t *testing.T) {
 	_, err := s.SetPolicy([]byte(pol))
 	require.NoError(t, err)
 
-	_, err = s.updatePolicyManagerNodes()
+	_, err = s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	// No apps -> nil

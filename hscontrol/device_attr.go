@@ -69,13 +69,13 @@ func (ns *noiseServer) SetDeviceAttrHandler(writer http.ResponseWriter, req *htt
 	}
 
 	changes, err := ns.applyDeviceAttrs(node, ops, req.RemoteAddr)
+	ns.slopscale.Change(changes...)
+
 	if err != nil {
 		httpError(writer, NewHTTPError(http.StatusInternalServerError, "storing the device attributes", err))
 
 		return
 	}
-
-	ns.slopscale.Change(changes...)
 
 	writeJSON(writer, struct{}{})
 }
@@ -142,11 +142,13 @@ func (ns *noiseServer) applyDeviceAttrs(
 			_, c, err = ns.slopscale.state.SetNodeAttribute(node.ID(), *op.attr)
 		}
 
+		// A write that reached the NodeStore returns its change with the
+		// error, so it is kept for the caller to publish.
+		changes = append(changes, c)
+
 		if err != nil {
 			return changes, err
 		}
-
-		changes = append(changes, c)
 
 		ns.recordDeviceAttr(node, action, detail, remoteAddr)
 	}

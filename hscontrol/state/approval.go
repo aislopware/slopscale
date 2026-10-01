@@ -9,6 +9,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/rs/zerolog/log"
 	"tailscale.com/types/views"
 )
 
@@ -211,7 +212,9 @@ func (s *State) SetNodeApproval(nodeID types.NodeID, approved bool) (types.NodeV
 // [change.Change.OriginNode] because one change carries a single origin
 // while an approval switch can admit many nodes at once.
 func (s *State) policyChangeAfterApproval() (change.Change, error) {
-	_, err := s.updatePolicyManagerNodes()
+	// The change is a PolicyChange whatever the refresh reports, so the
+	// generation it is measured from does not matter.
+	_, err := s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	if err != nil {
 		return change.Change{}, fmt.Errorf("updating policy manager after approval change: %w", err)
 	}
@@ -298,8 +301,23 @@ func requireApprovedUser(user *types.User) error {
 // pair scan over the admitted nodes, mapped back to positions in the
 // full list. A node waiting for approval, or suspended, has no peers and
 // is nobody's peer.
+//
+// It feeds the nodes being built to the policy manager first, so the
+// build already uses the matchers they imply; building with the old
+// matchers would serve stale adjacency until a second full rebuild.
+// [policy.PolicyManager.NodesGeneration] tells the writing caller the
+// SetNodes happened here. It runs on the NodeStore writer goroutine and
+// takes the policy manager's lock, which is safe only while the policy
+// manager never waits on a NodeStore write while holding it.
 func peerPositionsFunc(polMan policy.PolicyManager) PeerPositionsFunc {
 	return func(nodes []types.NodeView) [][]int32 {
+		// A failed recompile keeps the old nodes, so a caller that
+		// refreshes the policy retries it and returns the error.
+		_, err := polMan.SetNodes(views.SliceOf(nodes))
+		if err != nil {
+			log.Error().Err(err).Msg("refreshing policy nodes before peer map build")
+		}
+
 		admitted := make([]types.NodeView, 0, len(nodes))
 		fullPos := make([]int32, 0, len(nodes))
 

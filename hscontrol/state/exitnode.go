@@ -78,7 +78,8 @@ func (s *State) SetGlobalExitNode(nodeID types.NodeID, on bool, priority *int) (
 		return types.NodeView{}, change.Change{}, fmt.Errorf("setting global exit node in database: %w", err)
 	}
 
-	_, err = s.updatePolicyManagerNodes()
+	// The change is a PolicyChange whatever the refresh reports.
+	_, err = s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	if err != nil {
 		return types.NodeView{}, change.Change{}, fmt.Errorf(
 			"updating policy manager after global exit node change: %w",

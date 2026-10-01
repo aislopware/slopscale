@@ -162,6 +162,7 @@ func (s *State) NoteNodeSourceAddr(id types.NodeID, addr netip.Addr) change.Chan
 	}
 
 	changed := false
+	genBefore := s.polMan.NodesGeneration()
 
 	_, ok = s.nodeStore.UpdateNode(id, func(node *types.Node) {
 		if node.SourceAddr != addr {
@@ -170,14 +171,14 @@ func (s *State) NoteNodeSourceAddr(id types.NodeID, addr netip.Addr) change.Chan
 		}
 	})
 	if !ok || !changed || !s.polMan.UsesSourceAddress() {
-		return change.Change{}
+		return s.policyChangeSince(genBefore)
 	}
 
-	c, err := s.updatePolicyManagerNodes()
+	c, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
 		log.Error().Err(err).Uint64("node.id", id.Uint64()).Msg("recompiling policy after source address change")
 
-		return change.Change{}
+		return c
 	}
 
 	if !c.IsEmpty() {

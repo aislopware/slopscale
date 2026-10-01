@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
@@ -35,6 +36,8 @@ type PolicyManager struct {
 	pol   *Policy
 	users []types.User
 	nodes views.Slice[types.NodeView]
+	// nodesByID indexes nodes; see [PolicyManager.cacheableLocked].
+	nodesByID map[types.NodeID]types.NodeView
 
 	// access is the database's groups and rules; see [Policy.access].
 	access types.AccessModel
@@ -131,6 +134,11 @@ type PolicyManager struct {
 	nodeAttrsMap     map[types.NodeID]tailcfg.NodeCapMap
 	nodeAttrsHashes  map[types.NodeID]deephash.Sum
 	nodeAttrsChanged []types.NodeID
+
+	// nodesGen counts SetNodes calls that reported a change, so a caller
+	// can tell the policy moved even when another goroutine (the
+	// NodeStore writer) applied the SetNodes.
+	nodesGen atomic.Uint64
 }
 
 // filterAndPolicy combines the compiled filter rules with policy content for hashing.
@@ -281,6 +289,7 @@ func NewPolicyManager(b []byte, users []types.User, nodes views.Slice[types.Node
 		pol:                policy,
 		users:              users,
 		nodes:              nodes,
+		nodesByID:          nodeIDViewMap(nodes),
 		sshPolicyMap:       xsync.NewMap[types.NodeID, *tailcfg.SSHPolicy](),
 		filterRulesMap:     xsync.NewMap[types.NodeID, []tailcfg.FilterRule](),
 		matchersForNodeMap: xsync.NewMap[types.NodeID, []matcher.Match](),
@@ -379,7 +388,9 @@ func (pm *PolicyManager) SSHPolicy(baseURL string, node types.NodeView) (*tailcf
 		return nil, fmt.Errorf("compiling SSH policy: %w", err)
 	}
 
-	pm.sshPolicyMap.Store(node.ID(), sshPol)
+	if pm.cacheableLocked(node) {
+		pm.sshPolicyMap.Store(node.ID(), sshPol)
+	}
 
 	return sshPol, nil
 }
@@ -918,8 +929,9 @@ func (pm *PolicyManager) SetNodes(nodes views.Slice[types.NodeView]) (bool, erro
 	// For global policies: invalidate only nodes whose properties changed (IPs, routes).
 	pm.invalidateNodeCache(nodes)
 
-	prevNodes := pm.nodes
+	prevNodes, prevByID := pm.nodes, pm.nodesByID
 	pm.nodes = nodes
+	pm.nodesByID = nodeIDViewMap(nodes)
 
 	// When policy-affecting node properties change, we must recompile filters because:
 	// 1. User/group aliases (like "user1@") resolve to node IPs
@@ -937,7 +949,7 @@ func (pm *PolicyManager) SetNodes(nodes views.Slice[types.NodeView]) (bool, erro
 		if err != nil {
 			// Keep the old list, which pm is still compiled from, so a
 			// retry with the same input recompiles, as in SetUsers.
-			pm.nodes = prevNodes
+			pm.nodes, pm.nodesByID = prevNodes, prevByID
 
 			return false, err
 		}
@@ -949,11 +961,26 @@ func (pm *PolicyManager) SetNodes(nodes views.Slice[types.NodeView]) (bool, erro
 			pm.matchersForNodeMap.Clear()
 		}
 		// Always return true when nodes changed, even if filter hash didn't change
-		// (can happen with autogroup:self or when nodes are added but don't affect rules)
+		// (can happen with autogroup:self or when nodes are added but don't affect rules).
+		// A SetNodes that moves pm back to an older snapshot counts too; the
+		// extra PolicyChange it causes is deduplicated downstream.
+		pm.nodesGen.Add(1)
+
 		return true, nil
 	}
 
 	return false, nil
+}
+
+// NodesGeneration returns how many SetNodes calls have reported a change.
+// A value past the last one a caller acted on means some SetNodes since
+// then, possibly run on another goroutine, moved the policy.
+func (pm *PolicyManager) NodesGeneration() uint64 {
+	if pm == nil {
+		return 0
+	}
+
+	return pm.nodesGen.Load()
 }
 
 // nodeIDViewMap indexes a slice of node views by node ID. On duplicate IDs the
@@ -1778,6 +1805,17 @@ func (pm *PolicyManager) NodesWithChangedCapMap() []types.NodeID {
 	return out
 }
 
+// cacheableLocked reports whether a per-node result computed from node may
+// be cached under its ID. SetNodes invalidates those caches by diffing its
+// own copies of each node, so a result computed from any other view, such
+// as a mapper's pre-write snapshot read while the NodeStore writer builds,
+// would outlive the invalidation meant to remove it.
+func (pm *PolicyManager) cacheableLocked(node types.NodeView) bool {
+	own, ok := pm.nodesByID[node.ID()]
+
+	return ok && !node.HasPolicyChange(own) && !node.HasNetworkChanges(own)
+}
+
 // peerPositionsLocked runs the pair scan that fits the policy: the global
 // filter serves every node unless via grants or autogroup:self need a
 // filter per node (compileFilterRules skips via grants).
@@ -1869,7 +1907,10 @@ func (pm *PolicyManager) matchersForNodeLocked(node types.NodeView) []matcher.Ma
 	// the stored compiled grants for this specific node.
 	unreduced := pm.filterRulesForNodeLocked(node)
 	matchers := matcher.MatchesFromFilterRules(unreduced)
-	pm.matchersForNodeMap.Store(node.ID(), matchers)
+
+	if pm.cacheableLocked(node) {
+		pm.matchersForNodeMap.Store(node.ID(), matchers)
+	}
 
 	return matchers
 }
@@ -2169,7 +2210,9 @@ func (pm *PolicyManager) filterForNodeLocked(
 	reduced := policyutil.ReduceFilterRules(
 		node, unreduced, ServicePrefixes(pm.vipServices, node.HostedServices()),
 	)
-	pm.filterRulesMap.Store(node.ID(), reduced)
+	if pm.cacheableLocked(node) {
+		pm.filterRulesMap.Store(node.ID(), reduced)
+	}
 
 	return reduced
 }

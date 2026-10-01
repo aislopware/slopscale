@@ -66,7 +66,7 @@ func TestPeerMapFollowsSetPolicy(t *testing.T) {
 	b := s.CreateRegisteredNodeForTest(bob, "bob-1")
 	s.PutNodeInStoreForTest(*b)
 
-	_, err := s.updatePolicyManagerNodes()
+	_, err := s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	// A fresh tailnet only reaches its own machines.
@@ -138,7 +138,7 @@ func TestPeerMapFollowsTrafficResolvers(t *testing.T) {
 	b := s.CreateRegisteredNodeForTest(bob, "bob-1")
 	s.PutNodeInStoreForTest(*b)
 
-	_, err = s.updatePolicyManagerNodes()
+	_, err = s.updatePolicyManagerNodes(s.polMan.NodesGeneration())
 	require.NoError(t, err)
 	require.Empty(t, peerIDs(s, b.ID), "bob has no grant to the gateway")
 

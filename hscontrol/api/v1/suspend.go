@@ -49,13 +49,13 @@ func switchNode(
 	audit.Detail(ctx, detail, on)
 
 	node, nodeChange, err := op(nodeID, on)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError(what, err)
 	}
 
 	audit.Target(ctx, "", "", node.GivenName())
-
-	b.Change(nodeChange)
 
 	out := &nodeOutput{}
 	out.Body.Node = b.nodeFromView(node)

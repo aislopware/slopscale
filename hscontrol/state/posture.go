@@ -71,6 +71,8 @@ func (s *State) setPosture(nodeID types.NodeID, posture types.PostureIdentity) (
 ) {
 	var previous []string
 
+	genBefore := s.polMan.NodesGeneration()
+
 	_, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		if node.Posture != nil {
 			previous = node.Posture.SerialNumbers
@@ -88,12 +90,12 @@ func (s *State) setPosture(nodeID types.NodeID, posture types.PostureIdentity) (
 	}
 
 	if slices.Equal(previous, posture.SerialNumbers) {
-		return posture, change.Change{}, nil
+		return posture, s.policyChangeSince(genBefore), nil
 	}
 
-	c, err := s.updatePolicyManagerNodes()
+	c, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
-		return posture, change.Change{}, err
+		return posture, c, err
 	}
 
 	return posture, c, nil
@@ -175,6 +177,8 @@ func (s *State) SetNodeAttribute(nodeID types.NodeID, attr types.NodeAttribute) 
 		return types.NodeView{}, change.Change{}, err
 	}
 
+	genBefore := s.polMan.NodesGeneration()
+
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		node.Attributes = slices.DeleteFunc(
 			node.Attributes,
@@ -187,9 +191,9 @@ func (s *State) SetNodeAttribute(nodeID types.NodeID, attr types.NodeAttribute) 
 		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
 	}
 
-	c, err := s.updatePolicyManagerNodes()
+	c, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
-		return n, change.Change{}, err
+		return n, nodeWriteFailed(nodeID, c), err
 	}
 
 	return n, c, nil
@@ -203,6 +207,8 @@ func (s *State) DeleteNodeAttribute(nodeID types.NodeID, key string) (types.Node
 		return types.NodeView{}, change.Change{}, err
 	}
 
+	genBefore := s.polMan.NodesGeneration()
+
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		node.Attributes = slices.DeleteFunc(node.Attributes, func(a types.NodeAttribute) bool { return a.Key == key })
 	})
@@ -210,9 +216,9 @@ func (s *State) DeleteNodeAttribute(nodeID types.NodeID, key string) (types.Node
 		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
 	}
 
-	c, err := s.updatePolicyManagerNodes()
+	c, err := s.updatePolicyManagerNodes(genBefore)
 	if err != nil {
-		return n, change.Change{}, err
+		return n, nodeWriteFailed(nodeID, c), err
 	}
 
 	return n, c, nil
@@ -231,6 +237,8 @@ func (s *State) ExpireNodeAttributes(now time.Time) (change.Change, error) {
 		return change.Change{}, nil
 	}
 
+	genBefore := s.polMan.NodesGeneration()
+
 	for _, id := range ids {
 		s.nodeStore.UpdateNode(id, func(node *types.Node) {
 			node.Attributes = slices.DeleteFunc(node.Attributes, func(a types.NodeAttribute) bool {
@@ -239,7 +247,7 @@ func (s *State) ExpireNodeAttributes(now time.Time) (change.Change, error) {
 		})
 	}
 
-	return s.updatePolicyManagerNodes()
+	return s.updatePolicyManagerNodes(genBefore)
 }
 
 // NextAttributeExpiry returns the earliest expiry among every node's

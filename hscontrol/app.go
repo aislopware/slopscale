@@ -601,12 +601,11 @@ func (h *Slopscale) Serve() error {
 				}
 
 				changes, reloadErr := h.state.ReloadPolicy()
+				h.Change(changes...)
+
 				if reloadErr != nil {
 					log.Error().Err(reloadErr).Msgf("reloading policy")
-					continue
 				}
-
-				h.Change(changes...)
 
 			default:
 				info := func(msg string) { log.Info().Msg(msg) }
@@ -1093,14 +1092,12 @@ func (h *Slopscale) expireAccess(since, now time.Time) {
 // and publishes the recompute.
 func (h *Slopscale) expireNodeAttributes() {
 	c, err := h.state.ExpireNodeAttributes(time.Now())
-	if err != nil {
-		log.Error().Err(err).Msg("expiring node attributes")
-
-		return
-	}
-
 	if !c.IsEmpty() {
 		h.Change(c)
+	}
+
+	if err != nil {
+		log.Error().Err(err).Msg("expiring node attributes")
 	}
 }
 

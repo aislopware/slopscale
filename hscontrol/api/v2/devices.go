@@ -331,11 +331,11 @@ func handleAuthorizeDevice(ctx context.Context, b Backend, in *setAuthorizedInpu
 	}
 
 	_, nodeChange, err := b.State.SetNodeApproval(node.ID(), in.Body.Authorized)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("authorizing device", err)
 	}
-
-	b.Change(nodeChange)
 
 	return &emptyOutput{}, nil
 }
@@ -350,11 +350,11 @@ func handleSetDeviceName(ctx context.Context, b Backend, in *setNameInput) (*emp
 	audit.Detail(ctx, "newName", in.Body.Name)
 
 	_, nodeChange, err := b.State.RenameNode(node.ID(), in.Body.Name)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("renaming device", err)
 	}
-
-	b.Change(nodeChange)
 
 	return &emptyOutput{}, nil
 }
@@ -388,11 +388,11 @@ func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emp
 	}
 
 	_, nodeChange, err := b.State.SetNodeTags(node.ID(), in.Body.Tags)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("setting device tags", err)
 	}
-
-	b.Change(nodeChange)
 
 	return &emptyOutput{}, nil
 }
@@ -415,11 +415,11 @@ func handleSetDeviceKey(ctx context.Context, b Backend, in *setKeyInput) (*empty
 	}
 
 	_, nodeChange, err := b.State.SetNodeExpiry(node.ID(), nil)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("setting device key expiry", err)
 	}
-
-	b.Change(nodeChange)
 
 	return &emptyOutput{}, nil
 }
@@ -440,11 +440,11 @@ func handleSetDeviceRoutes(ctx context.Context, b Backend, in *setSubnetRoutesIn
 	audit.Detail(ctx, "routes", emptyIfNil(util.PrefixesToString(approved)))
 
 	updated, nodeChange, err := b.State.SetApprovedRoutes(node.ID(), approved)
+	b.Change(nodeChange)
+
 	if err != nil {
 		return nil, mapError("setting device routes", err)
 	}
-
-	b.Change(nodeChange)
 
 	return &deviceRoutesOutput{Body: routesFromView(updated)}, nil
 }

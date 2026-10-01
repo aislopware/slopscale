@@ -142,7 +142,7 @@ func TestPersistEmptyTags(t *testing.T) {
 	seeded, ok := s.nodeStore.GetNode(nodeID)
 	require.True(t, ok)
 
-	_, _, err := s.persistNodeToDB(seeded)
+	_, _, err := s.persistNodeToDB(seeded, s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	gotAfterSeed, err := s.DB().GetNodeByID(nodeID)
@@ -155,7 +155,7 @@ func TestPersistEmptyTags(t *testing.T) {
 	})
 	require.True(t, ok)
 
-	_, _, err = s.persistNodeToDB(cleared)
+	_, _, err = s.persistNodeToDB(cleared, s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	gotAfterClear, err := s.DB().GetNodeByID(nodeID)
@@ -192,7 +192,7 @@ func TestPersistEmptyEndpoints(t *testing.T) {
 	seeded, ok := s.nodeStore.GetNode(nodeID)
 	require.True(t, ok)
 
-	_, _, err := s.persistNodeToDB(seeded)
+	_, _, err := s.persistNodeToDB(seeded, s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	gotAfterSeed, err := s.DB().GetNodeByID(nodeID)
@@ -205,7 +205,7 @@ func TestPersistEmptyEndpoints(t *testing.T) {
 	})
 	require.True(t, ok)
 
-	_, _, err = s.persistNodeToDB(cleared)
+	_, _, err = s.persistNodeToDB(cleared, s.polMan.NodesGeneration())
 	require.NoError(t, err)
 
 	gotAfterClear, err := s.DB().GetNodeByID(nodeID)
