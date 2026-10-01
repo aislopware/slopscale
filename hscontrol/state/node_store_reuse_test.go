@@ -2,6 +2,7 @@ package state
 
 import (
 	"net/netip"
+	"reflect"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -293,5 +294,115 @@ func TestRebuildPeerMapsAfterStopReturns(t *testing.T) {
 	case <-done:
 	case <-time.After(5 * time.Second):
 		t.Fatal("RebuildPeerMaps hung after Stop")
+	}
+}
+
+// TestPeerInputsChangedClassifiesEveryNodeField makes every exported
+// [types.Node] field carry a decision about whether a write to it must
+// rebuild the peer map, checked against peerInputsChanged with a real
+// before/after pair. A new field fails here until someone decides; left
+// undecided, a relation input is exactly what goes silently unrebuilt.
+func TestPeerInputsChangedClassifiesEveryNodeField(t *testing.T) {
+	t.Parallel()
+
+	ip := netip.MustParseAddr("100.64.9.9")
+	subnet := netip.MustParsePrefix("10.44.0.0/24")
+
+	fields := map[string]struct {
+		// mutate is nil for a field no NodeStore write changes.
+		mutate        func(*types.Node)
+		wantRecompute bool
+	}{
+		"ID":         {},
+		"MachineKey": {mutate: func(n *types.Node) { n.MachineKey = key.NewMachine().Public() }},
+		"NodeKey":    {mutate: func(n *types.Node) { n.NodeKey = key.NewNode().Public() }},
+		"DiscoKey":   {mutate: func(n *types.Node) { n.DiscoKey = key.NewDisco().Public() }},
+		"Endpoints": {mutate: func(n *types.Node) {
+			n.Endpoints = []netip.AddrPort{netip.MustParseAddrPort("192.0.2.1:1")}
+		}},
+		"Hostinfo":       {mutate: func(n *types.Node) { n.Hostinfo.OS = "linux" }, wantRecompute: true},
+		"IPv4":           {mutate: func(n *types.Node) { n.IPv4 = &ip }, wantRecompute: true},
+		"IPv6":           {mutate: func(n *types.Node) { n.IPv6 = nil }, wantRecompute: true},
+		"Hostname":       {mutate: func(n *types.Node) { n.Hostname = "other" }},
+		"GivenName":      {mutate: func(n *types.Node) { n.GivenName = "other" }},
+		"UserID":         {mutate: func(n *types.Node) { n.UserID = new(uint(99)) }, wantRecompute: true},
+		"User":           {mutate: func(n *types.Node) { n.User.Name = "renamed" }, wantRecompute: true},
+		"RegisterMethod": {mutate: func(n *types.Node) { n.RegisterMethod = "oidc" }},
+		"Tags":           {mutate: func(n *types.Node) { n.Tags = []string{"tag:x"} }, wantRecompute: true},
+		"AuthKeyID":      {mutate: func(n *types.Node) { n.AuthKeyID = new(uint64(5)) }},
+		"AuthKey":        {mutate: func(n *types.Node) { n.AuthKey = &types.PreAuthKey{ID: 5} }},
+		"Expiry":         {mutate: func(n *types.Node) { n.Expiry = new(time.Now()) }},
+		"LastSeen":       {mutate: func(n *types.Node) { n.LastSeen = new(time.Now()) }},
+		"ApprovedRoutes": {
+			mutate:        func(n *types.Node) { n.ApprovedRoutes = []netip.Prefix{subnet} },
+			wantRecompute: true,
+		},
+		"ApprovedAt":  {mutate: func(n *types.Node) { n.ApprovedAt = nil }, wantRecompute: true},
+		"SuspendedAt": {mutate: func(n *types.Node) { n.SuspendedAt = new(time.Now()) }, wantRecompute: true},
+		"Posture": {mutate: func(n *types.Node) {
+			n.Posture = &types.PostureIdentity{SerialNumbers: []string{"S1"}}
+		}, wantRecompute: true},
+		"HardwareAttestation": {mutate: func(n *types.Node) {
+			n.HardwareAttestation = &types.HardwareAttestation{Attested: true}
+		}, wantRecompute: true},
+		"Attributes": {mutate: func(n *types.Node) {
+			n.Attributes = []types.NodeAttribute{
+				{Key: "custom:x", Value: types.AttributeValue{Kind: types.AttributeBool, Bool: true}},
+			}
+		}, wantRecompute: true},
+		"Services": {mutate: func(n *types.Node) {
+			n.Services = &types.NodeServices{Services: []tailcfg.VIPService{{Name: "svc:web"}}}
+		}, wantRecompute: true},
+		"ApprovedServices": {
+			mutate:        func(n *types.Node) { n.ApprovedServices = []string{"svc:web"} },
+			wantRecompute: true,
+		},
+		"KeySignature":     {mutate: func(n *types.Node) { n.KeySignature = []byte{1} }},
+		"NLKey":            {mutate: func(n *types.Node) { n.NLKey = key.NewNLPrivate().Public() }},
+		"SourceAddr":       {mutate: func(n *types.Node) { n.SourceAddr = netip.MustParseAddr("192.0.2.7") }},
+		"SharedWith":       {mutate: func(n *types.Node) { n.SharedWith = []types.UserID{9} }, wantRecompute: true},
+		"GlobalExitNode":   {mutate: func(n *types.Node) { n.GlobalExitNode = true }, wantRecompute: true},
+		"ExitNodePriority": {mutate: func(n *types.Node) { n.ExitNodePriority = 10 }, wantRecompute: true},
+		"Ephemeral":        {mutate: func(n *types.Node) { n.Ephemeral = true }},
+		"CreatedAt":        {mutate: func(n *types.Node) { n.CreatedAt = n.CreatedAt.Add(time.Hour) }},
+		"UpdatedAt":        {mutate: func(n *types.Node) { n.UpdatedAt = n.UpdatedAt.Add(time.Hour) }},
+		"DeletedAt":        {mutate: func(n *types.Node) { n.DeletedAt = new(time.Now()) }},
+		"IsOnline":         {mutate: func(n *types.Node) { n.IsOnline = new(true) }},
+		"Unhealthy":        {mutate: func(n *types.Node) { n.Unhealthy = true }},
+		"ActiveSessions":   {mutate: func(n *types.Node) { n.ActiveSessions = 2 }},
+		"SessionEpoch":     {mutate: func(n *types.Node) { n.SessionEpoch = 3 }},
+		"CapVer":           {mutate: func(n *types.Node) { n.CapVer = 1 }},
+		"ClientWarnings":   {mutate: func(n *types.Node) { n.ClientWarnings = []string{"w"} }},
+	}
+
+	for f := range reflect.TypeFor[types.Node]().Fields() {
+		if !f.IsExported() {
+			continue
+		}
+
+		tt, ok := fields[f.Name]
+		if !ok {
+			t.Errorf("types.Node.%s has no peer input decision here", f.Name)
+
+			continue
+		}
+
+		if tt.mutate == nil {
+			continue
+		}
+
+		t.Run(f.Name, func(t *testing.T) {
+			t.Parallel()
+
+			pre := createTestNode(1, 1, "u", "n")
+			pre.User.ID = 1
+			pre.Hostinfo = &tailcfg.Hostinfo{OS: "macOS"}
+			pre.ApprovedAt = new(time.Now())
+
+			post := *pre.Clone()
+			tt.mutate(&post)
+
+			assert.Equal(t, tt.wantRecompute, peerInputsChanged(&pre, &post))
+		})
 	}
 }
