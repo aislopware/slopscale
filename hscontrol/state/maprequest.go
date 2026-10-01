@@ -37,6 +37,10 @@ type mapRequestDelta struct {
 	// changed (see [peerHostinfo]). Only that forces a whole-node resend.
 	peerHostinfoChanged bool
 
+	// dnsMetadataChanged reports whether a Hostinfo field feeding the
+	// node's NextDNS device metadata (Hostname, OS) changed.
+	dnsMetadataChanged bool
+
 	// postureChanged reports whether a Hostinfo field the policy's
 	// postures read changed (see [types.HostinfoPostureEqual]). Peers
 	// never see those fields, but the filter may move on them.

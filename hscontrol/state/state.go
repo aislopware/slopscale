@@ -265,6 +265,11 @@ type State struct {
 	// caller snapshot or resurrected by an update racing with deletion.
 	persistMu sync.Mutex
 
+	// selfRefresh holds nodes whose NextDNS device metadata changed, drained
+	// by [State.DrainSelfRefreshes].
+	selfRefresh   []types.NodeID
+	selfRefreshMu sync.Mutex
+
 	// settingsMu serialises the read-modify-write of the settings cache
 	// so that two setters cannot publish each other's stale copy.
 	settingsMu sync.Mutex
@@ -475,6 +480,29 @@ func (s *State) SharedDERPMap() *tailcfg.DERPMap {
 	return s.derpMap.Load()
 }
 
+// DrainSelfRefreshes returns a [change.SelfUpdate] for every node whose own
+// entry or DNS config changed since the last call: its policy CapMap, from
+// any policy, user or node update, or its NextDNS device metadata. Drained
+// where changes are dispatched, so no path has to return the refresh itself.
+func (s *State) DrainSelfRefreshes() []change.Change {
+	ids := s.polMan.NodesWithChangedCapMap()
+
+	s.selfRefreshMu.Lock()
+	ids = append(ids, s.selfRefresh...)
+	s.selfRefresh = nil
+	s.selfRefreshMu.Unlock()
+
+	slices.Sort(ids)
+	ids = slices.Compact(ids)
+
+	cs := make([]change.Change, 0, len(ids))
+	for _, id := range ids {
+		cs = append(cs, change.SelfUpdate(id))
+	}
+
+	return cs
+}
+
 // ReloadPolicy reloads the access control policy and triggers auto-approval if changed.
 // Returns the resulting [change.Change] slice when the policy or routes changed,
 // also alongside an error once the policy is swapped.
@@ -503,19 +531,9 @@ func (s *State) ReloadPolicy() ([]change.Change, error) {
 	// policies to not propagate correctly when switching between policy types.
 	s.nodeStore.RebuildPeerMaps()
 
+	// Nodes whose CapMap shifted get their self refresh from
+	// [State.DrainSelfRefreshes] when these changes are dispatched.
 	cs := []change.Change{change.PolicyChange()}
-
-	// Per-node selective self refresh for nodeAttrs. A broadcast
-	// [change.PolicyChange] re-renders peer lists and packet filters
-	// but never repopulates a node's own [tailcfg.Node.CapMap]; that
-	// lives on the self entry only. The drain returns every node ID
-	// whose cap output shifted across recent updateLocked calls —
-	// refreshNodeAttrsLocked appends rather than overwrites so a
-	// concurrent SetUsers/SetNodes between SetPolicy and the drain
-	// cannot silently lose the policy-reload diff.
-	for _, id := range s.polMan.NodesWithChangedCapMap() {
-		cs = append(cs, change.SelfUpdate(id))
-	}
 
 	// Always call autoApproveNodes during policy reload, regardless of whether
 	// the policy content has changed. This ensures that routes are re-evaluated
@@ -2938,6 +2956,10 @@ func (s *State) UpdateNodeFromMapRequest(
 			!hostinfoEqual(currentNode.Hostinfo, newHostinfo)
 		delta.peerHostinfoChanged = newHostinfo != nil &&
 			!peerHostinfoEqual(currentNode.Hostinfo, newHostinfo)
+		delta.dnsMetadataChanged = newHostinfo != nil &&
+			(currentNode.Hostinfo == nil ||
+				currentNode.Hostinfo.Hostname != newHostinfo.Hostname ||
+				currentNode.Hostinfo.OS != newHostinfo.OS)
 		delta.postureChanged = newHostinfo != nil &&
 			!types.HostinfoPostureEqual(currentNode.Hostinfo, newHostinfo)
 
@@ -3062,6 +3084,12 @@ func (s *State) UpdateNodeFromMapRequest(
 
 	if !ok {
 		return change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, id)
+	}
+
+	if delta.dnsMetadataChanged {
+		s.selfRefreshMu.Lock()
+		s.selfRefresh = append(s.selfRefresh, id)
+		s.selfRefreshMu.Unlock()
 	}
 
 	if delta.oldExitNode != delta.newExitNode {
