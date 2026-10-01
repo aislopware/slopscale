@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/cenkalti/backoff/v7"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
@@ -290,8 +290,9 @@ func (e *ExtraRecordsMan) updateRecords() {
 	}
 }
 
-// readExtraRecordsFromPath reads a JSON file of [tailcfg.DNSRecord]
-// and returns the records and the hash of the file.
+// readExtraRecordsFromPath reads a file of [tailcfg.DNSRecord] in the format its
+// extension names (see [util.UnmarshalByExt]) and returns the records and the
+// hash of the file.
 func readExtraRecordsFromPath(path string) ([]tailcfg.DNSRecord, [32]byte, error) {
 	var zero [32]byte
 
@@ -306,9 +307,10 @@ func readExtraRecordsFromPath(path string) ([]tailcfg.DNSRecord, [32]byte, error
 		return nil, zero, nil
 	}
 
-	var records []tailcfg.DNSRecord
+	// Hash first: decoding HuJSON rewrites comments in b.
+	hash := sha256.Sum256(b)
 
-	err = json.Unmarshal(b, &records)
+	records, err := util.UnmarshalByExt[[]tailcfg.DNSRecord](path, b)
 	if err != nil {
 		return nil, zero, fmt.Errorf("unmarshalling records, content: %q: %w", string(b), err)
 	}
@@ -320,5 +322,5 @@ func readExtraRecordsFromPath(path string) ([]tailcfg.DNSRecord, [32]byte, error
 		return nil, zero, fmt.Errorf("validating records in %s: %w", path, err)
 	}
 
-	return records, sha256.Sum256(b), nil
+	return records, hash, nil
 }
