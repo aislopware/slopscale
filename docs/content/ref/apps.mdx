@@ -98,6 +98,29 @@ peer needs for the addresses the connector learns: a rule with
 `autogroup:internet` or the addresses themselves as the destination and
 the peer as the source.
 
+## Machines at the connector's site
+
+A machine that reaches the internet from the same public address as a
+connector skips that connector. The app already sees the address it
+allows, so going through the connector would only add a hop. Say the
+connector sits in the office: a laptop in the office goes out directly,
+while the same laptop at home still goes through the office connector.
+
+The server compares the public IPv4 address each client reports among its
+endpoints, the address its NAT shows the internet, so nothing has to be
+configured. When a machine or a connector moves, its peers get a new
+netmap. A machine that skips a connector does not get these from it:
+
+- the host routes the connector learned from the app's domains
+- the public prefixes inside the app's static routes
+- the split DNS for the app's domains
+
+Private prefixes such as `10.0.0.0/8` in an app's static routes stay
+routed through the connector, since sharing a public address says nothing
+about reaching a private network. If an app has connectors at several
+sites, a machine skips only the connector behind its own address and
+still uses the others.
+
 ## Console and API
 
 The admin console has an _Apps_ page under _Connectivity_ (`Connectivity › Apps`),

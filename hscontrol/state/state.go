@@ -1530,6 +1530,10 @@ func (s *State) RoutesForPeer(
 		}
 	}
 
+	if apps := s.bypassedApps(viewer, peer); apps != nil {
+		reduced = withoutAppRoutes(apps, reduced)
+	}
+
 	// Co-router visibility: when the viewer advertises the same prefix
 	// that the peer is HA primary for, the viewer must see that route
 	// regardless of matcher authorization. HA secondaries need this to
@@ -2922,11 +2926,15 @@ func (s *State) UpdateNodeFromMapRequest(
 			}
 		}
 
+		delta.oldEgress = egressAddrs(currentNode.View())
+
 		currentNode.ApplyPeerChange(&delta.peerChange)
 
 		if hostinfoToStore {
 			currentNode.Hostinfo = newHostinfo
 		}
+
+		delta.egressMoved = !slices.Equal(delta.oldEgress, egressAddrs(currentNode.View()))
 
 		// Only a real hostname change may re-derive GivenName: it is peer
 		// visible, so the whole node is resent and peers learn the name.
@@ -3041,8 +3049,12 @@ func (s *State) UpdateNodeFromMapRequest(
 	// A node that moved to another DERP region may be steered to other
 	// subnet routers under regional routing; its own peers must then be
 	// rebuilt, which only a policy change from the node does (a plain
-	// node-added change sends the origin its self node alone).
-	if delta.derpChanged && s.nodeStore.RegionalRoutesDiffer(delta.oldDERP, viewerDERPRegion(updatedNode)) {
+	// node-added change sends the origin its self node alone). A node
+	// whose public address moved may start or stop skipping a connector,
+	// or, being one, be skipped by others; that needs the same rebuild.
+	regionMoved := delta.derpChanged &&
+		s.nodeStore.RegionalRoutesDiffer(delta.oldDERP, viewerDERPRegion(updatedNode))
+	if regionMoved || (delta.egressMoved && s.egressMoveMatters(updatedNode, delta.oldEgress)) {
 		c := change.PolicyChange()
 		c.OriginNode = id
 
