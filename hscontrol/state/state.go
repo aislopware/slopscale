@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"slices"
 	"strconv"
@@ -1587,7 +1588,7 @@ func (s *State) RoutesForPeer(
 	matchers []matcher.Match,
 ) []netip.Prefix {
 	viaResult := s.polMan.ViaRoutesForPeer(viewer, peer)
-	globalPrimaries := s.nodeStore.PrimaryRoutesForNodeAs(peer.ID(), viewerDERPRegion(viewer))
+	globalPrimaries := s.nodeStore.PrimaryRoutesForNodeFrom(peer.ID(), viewerSiteOf(viewer))
 	exitRoutes := peer.ExitRoutes()
 
 	var reduced []netip.Prefix
@@ -1652,6 +1653,23 @@ func (s *State) RoutesForPeer(
 	// groups and routers. This comes last so that the co-router exception
 	// cannot hand a network's prefix to a router outside it.
 	return s.networkRoutesFor(viewer, peer, reduced)
+}
+
+// ExitNodePrioritiesFor returns the priority each global exit node carries
+// in the viewer's map where steering lifts it above the operator's order:
+// the exit nodes nearest the viewer come first (see steering.go). Nil when
+// steering changes nothing for the viewer.
+func (s *State) ExitNodePrioritiesFor(viewer types.NodeView) map[types.NodeID]int {
+	return s.nodeStore.ExitNodePrioritiesFor(viewerSiteOf(viewer))
+}
+
+// derpLatency returns the round trips a NetInfo carries, nil without one.
+func derpLatency(ni *tailcfg.NetInfo) map[string]float64 {
+	if ni == nil {
+		return nil
+	}
+
+	return ni.DERPLatency
 }
 
 // viewerDERPRegion returns the DERP region a viewer is homed in, or 0.
@@ -3044,6 +3062,15 @@ func (s *State) UpdateNodeFromMapRequest(
 
 		delta.oldEgress = egressAddrs(currentNode.View())
 
+		if hostinfoToStore {
+			if currentNode.Hostinfo != nil {
+				delta.oldNetInfo = currentNode.Hostinfo.NetInfo
+			}
+
+			delta.netInfoMoved = delta.derpChanged ||
+				!maps.Equal(derpLatency(delta.oldNetInfo), derpLatency(newHostinfo.NetInfo))
+		}
+
 		currentNode.ApplyPeerChange(&delta.peerChange)
 
 		if hostinfoToStore {
@@ -3160,15 +3187,15 @@ func (s *State) UpdateNodeFromMapRequest(
 		traffic = s.trafficRecheck()
 	}
 
-	// A node that moved to another DERP region may be steered to other
-	// subnet routers under regional routing; its own peers must then be
-	// rebuilt, which only a policy change from the node does (a plain
+	// A node whose home region or round trips moved may be steered to
+	// other routers or exit nodes (steering.go); its own peers must then
+	// be rebuilt, which only a policy change from the node does (a plain
 	// node-added change sends the origin its self node alone). A node
 	// whose public address moved may start or stop skipping a connector,
 	// or, being one, be skipped by others; that needs the same rebuild.
-	regionMoved := delta.derpChanged &&
-		s.nodeStore.RegionalRoutesDiffer(delta.oldDERP, viewerDERPRegion(updatedNode))
-	if regionMoved || (delta.egressMoved && s.egressMoveMatters(updatedNode, delta.oldEgress)) {
+	steeringMoved := delta.netInfoMoved &&
+		s.nodeStore.SteeringDiffers(viewerSiteFrom(id, delta.oldNetInfo), viewerSiteOf(updatedNode))
+	if steeringMoved || (delta.egressMoved && s.egressMoveMatters(updatedNode, delta.oldEgress)) {
 		c := change.PolicyChange()
 		c.OriginNode = id
 

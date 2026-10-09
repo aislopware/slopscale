@@ -41,7 +41,7 @@ func TestElectRegionalRoutes(t *testing.T) {
 		4: router(4, 2, false, shared),
 	}
 
-	got := electRegionalRoutes(nodes, nil)
+	got := electRegionalRoutes(nodes, onlineAdvertisers(nodes), nil)
 	assert.Equal(t, map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID{
 		1: {shared: 1},
 		2: {shared: 3},
@@ -50,26 +50,26 @@ func TestElectRegionalRoutes(t *testing.T) {
 	// Region 2 keeps its choice while it is healthy, even when a lower
 	// ID is available.
 	prev := map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID{2: {shared: 4}}
-	got = electRegionalRoutes(nodes, prev)
+	got = electRegionalRoutes(nodes, onlineAdvertisers(nodes), prev)
 	assert.Equal(t, types.NodeID(4), got[2][shared])
 
 	// An unhealthy router leaves its region; the region's other router
 	// takes over rather than the previous choice.
 	nodes[4] = router(4, 2, true, shared)
-	got = electRegionalRoutes(nodes, prev)
+	got = electRegionalRoutes(nodes, onlineAdvertisers(nodes), prev)
 	assert.Equal(t, types.NodeID(3), got[2][shared])
 
 	// With region 2 entirely unhealthy the prefix has one region left and
 	// no regional entry at all: viewers fall back to the tailnet-wide
 	// primary.
 	nodes[3] = router(3, 2, true, shared)
-	assert.Nil(t, electRegionalRoutes(nodes, prev))
+	assert.Nil(t, electRegionalRoutes(nodes, onlineAdvertisers(nodes), prev))
 }
 
-// TestPrimaryRoutesForNodeAs checks the viewer-side lookup: a region with
-// its own primary overrides the tailnet-wide one, and other regions and
-// region 0 see the tailnet-wide assignment.
-func TestPrimaryRoutesForNodeAs(t *testing.T) {
+// TestPrimaryRoutesForNodeFrom checks the viewer-side lookup without
+// round trips: a region with its own primary overrides the tailnet-wide
+// one, and other regions and region 0 see the tailnet-wide assignment.
+func TestPrimaryRoutesForNodeFrom(t *testing.T) {
 	t.Parallel()
 
 	shared := netip.MustParsePrefix("10.1.0.0/24")
@@ -86,21 +86,25 @@ func TestPrimaryRoutesForNodeAs(t *testing.T) {
 
 	store := NewNodeStore(nodes, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
-	assert.Equal(t, []netip.Prefix{shared}, store.PrimaryRoutesForNodeAs(1, 0))
-	assert.Empty(t, store.PrimaryRoutesForNodeAs(2, 0))
-	assert.Equal(t, []netip.Prefix{shared}, store.PrimaryRoutesForNodeAs(1, 1))
-	assert.Empty(t, store.PrimaryRoutesForNodeAs(2, 1))
-	assert.Equal(t, []netip.Prefix{shared}, store.PrimaryRoutesForNodeAs(2, 2))
-	assert.Empty(t, store.PrimaryRoutesForNodeAs(1, 2))
+	in := func(region tailcfg.DERPRegionID) viewerSite {
+		return viewerSiteFrom(99, &tailcfg.NetInfo{PreferredDERP: region})
+	}
+
+	assert.Equal(t, []netip.Prefix{shared}, store.PrimaryRoutesForNodeFrom(1, in(0)))
+	assert.Empty(t, store.PrimaryRoutesForNodeFrom(2, in(0)))
+	assert.Equal(t, []netip.Prefix{shared}, store.PrimaryRoutesForNodeFrom(1, in(1)))
+	assert.Empty(t, store.PrimaryRoutesForNodeFrom(2, in(1)))
+	assert.Equal(t, []netip.Prefix{shared}, store.PrimaryRoutesForNodeFrom(2, in(2)))
+	assert.Empty(t, store.PrimaryRoutesForNodeFrom(1, in(2)))
 	assert.Equal(
 		t,
 		[]netip.Prefix{shared},
-		store.PrimaryRoutesForNodeAs(1, 3),
+		store.PrimaryRoutesForNodeFrom(1, in(3)),
 		"an unknown region sees the tailnet-wide primary",
 	)
 
-	assert.True(t, store.RegionalRoutesDiffer(1, 2))
-	assert.True(t, store.RegionalRoutesDiffer(0, 2))
-	assert.False(t, store.RegionalRoutesDiffer(0, 1), "region 1 agrees with the tailnet-wide primary")
-	assert.False(t, store.RegionalRoutesDiffer(2, 2))
+	assert.True(t, store.SteeringDiffers(in(1), in(2)))
+	assert.True(t, store.SteeringDiffers(in(0), in(2)))
+	assert.False(t, store.SteeringDiffers(in(0), in(1)), "region 1 agrees with the tailnet-wide primary")
+	assert.False(t, store.SteeringDiffers(in(2), in(2)))
 }

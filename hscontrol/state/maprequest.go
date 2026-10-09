@@ -70,6 +70,12 @@ type mapRequestDelta struct {
 	egressMoved bool
 	oldEgress   []netip.Addr
 
+	// netInfoMoved reports whether the stored NetInfo, the home region
+	// and round trips steering reads, changed; oldNetInfo holds the
+	// previous one.
+	netInfoMoved bool
+	oldNetInfo   *tailcfg.NetInfo
+
 	// keyChanged and discoKeyChanged report whether the node's wire keys
 	// changed. Key patches already carry the resulting endpoints/expiry,
 	// so a key change subsumes endpoint/DERP patches.

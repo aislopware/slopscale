@@ -427,6 +427,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	allCapMaps := b.mapper.state.NodeCapMaps()
 	globalExitNodes := b.mapper.state.HasGlobalExitNode()
 	serviceHosts := b.mapper.state.ServiceHosts()
+	exitPriorities := b.mapper.state.ExitNodePrioritiesFor(node)
 
 	// Build tail nodes with per-peer via-aware route function.
 	tailPeers := make([]*tailcfg.Node, 0, peers.Len())
@@ -477,6 +478,10 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		// peers. [policyv2.PeerCapMap] encodes those conditions.
 		tn.CapMap = policyv2.PeerCapMap(peer, allCapMaps[peer.ID()], globalExitNodes)
 
+		if priority, ok := exitPriorities[peer.ID()]; ok {
+			setExitNodePriority(tn, priority)
+		}
+
 		tailPeers = append(tailPeers, tn)
 	}
 
@@ -486,6 +491,22 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	})
 
 	return tailPeers, nil
+}
+
+// setExitNodePriority replaces the priority a global exit node's peer view
+// carries with the one steering gives it for this viewer.
+func setExitNodePriority(tn *tailcfg.Node, priority int) {
+	hi := tn.Hostinfo.AsStruct()
+	if hi == nil {
+		hi = &tailcfg.Hostinfo{}
+	}
+
+	if hi.Location == nil {
+		hi.Location = &tailcfg.Location{}
+	}
+
+	hi.Location.Priority = priority
+	tn.Hostinfo = hi.View()
 }
 
 // markShared stamps [tailcfg.Node.Sharer] on a peer that has been shared

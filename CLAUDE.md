@@ -199,7 +199,12 @@ traffic: while any marked node has one, `stampGlobalExitNodes` puts
 puts the value on the marked node's peer view as
 `Hostinfo.Location.Priority`, where the client's `net/traffic` scorer reads
 it (highest wins). The peer view's `Location.Priority` is always the
-server's value, never the client's, and is 0 on an unmarked node. A client
+server's value, never the client's, and is 0 on an unmarked node; the
+mapper lifts it per viewer for the marked nodes nearest that viewer
+(`state/steering.go`), never in the stored row. A prefix several healthy
+routers serve is likewise picked per viewer from the round trips in the
+viewer's `NetInfo.DERPLatency`, which the server stores only with a NetInfo
+change the client reports, so steering moves with the machine. A client
 only re-resolves its automatic exit node on a full netmap, not on the
 online patch, so `NodeNeedsPeerRecompute` is true for every global exit
 node: its reconnect sends peers a full map and they take it up again.
