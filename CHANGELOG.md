@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.57.0](https://github.com/aislopware/slopscale/compare/v0.56.0...v0.57.0) (2026-10-09)
+
+
+### Changes
+
+* **state:** route each machine through the nearest connector, subnet router and exit node ([#56](https://github.com/aislopware/slopscale/issues/56)) ([78f6d1d](https://github.com/aislopware/slopscale/commit/78f6d1da96abf28e5bcaa3f6792a1303f99d6be9))
+
 ## [0.56.0](https://github.com/aislopware/slopscale/compare/v0.55.0...v0.56.0) (2026-10-01)
 
 
