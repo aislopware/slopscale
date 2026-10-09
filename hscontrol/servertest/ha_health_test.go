@@ -145,9 +145,13 @@ func TestHAHealthProbe_RecoveryNoFlap(t *testing.T) {
 	primaries := srv.State().GetNodePrimaryRoutes(nodeID2)
 	require.Contains(t, primaries, route, "node 2 should be primary")
 
-	// Recovery: node 1 healthy again. Node 2 should STAY primary.
+	// Recovery: node 1 healthy again. Node 2 should STAY the tailnet-wide
+	// primary. The recovery is still reported as a change: node 1 is a
+	// candidate for steering again, so viewers nearer to it go back.
 	changed := srv.State().SetNodeHealth(nodeID1, true)
-	assert.False(t, changed, "recovery should not change primaries (no flap)")
+	assert.True(t, changed, "the recovered router is a steering candidate again")
+	assert.NotContains(t, srv.State().GetNodePrimaryRoutes(nodeID1), route,
+		"recovery should not move the tailnet-wide primary (no flap)")
 
 	primaries = srv.State().GetNodePrimaryRoutes(nodeID2)
 	assert.Contains(t, primaries, route, "node 2 should remain primary after recovery")

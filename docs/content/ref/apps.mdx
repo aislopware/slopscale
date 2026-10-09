@@ -121,6 +121,28 @@ about reaching a private network. If an app has connectors at several
 sites, a machine skips only the connector behind its own address and
 still uses the others.
 
+## Connectors at several sites
+
+An app can list connectors at several sites, for example
+`tag:office-gateway` and `tag:eu-gateway`. The client sends each DNS query
+for the app's domains to every connector it can reach at once, so each
+connector learns the addresses and advertises them. Each machine then goes
+through the connector nearest it by the round trips it measured, and
+machines equally near several connectors are spread over them; see
+[regional routing](/ref/routes#regional-routing). A machine without
+measurements goes through the tailnet-wide primary.
+
+Two things follow from routing by address:
+
+- A service that only lets in the address of one site, an office IP on an
+  allowlist for instance, refuses machines steered to the other site. Keep
+  such a service in an app whose connectors share that address.
+- Hosts behind a CDN often share addresses: every proxied hostname in one
+  Cloudflare zone may resolve to the same two. A connector that learned
+  them for one app routes every hostname on them, including hosts in no
+  app. List the CDN's hostnames in an app whose connectors suit all of them,
+  or keep them out of apps.
+
 ## Console and API
 
 The admin console has an _Apps_ page under _Connectivity_ (`Connectivity › Apps`),

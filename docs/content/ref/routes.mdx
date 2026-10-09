@@ -183,7 +183,7 @@ $ sudo tailscale set --exit-node=auto:any
 
 The control server cannot switch a client's exit-node use on by itself; that
 stays with the device (or its MDM policy). Several nodes may be marked, in
-which case each client picks the closest by DERP region. The same operation is
+which case each client picks the closest by DERP region on its own. The same operation is
 `POST /api/v1/node/{id}/global-exit-node` with an optional `{"enabled": false}` body, and a node's `globalExitNode` field reports the mark. Clearing
 the mark keeps the approved routes, so the node stays a suggested exit node
 like any other.
@@ -209,6 +209,17 @@ each client on its own (a stable hash of the two node ids, not DERP
 latency), so give every node its own value when the order matters. Nodes
 with priority 0 come last. Clients older than Tailscale 1.86 ignore the
 priority and keep picking by DERP region.
+
+The priority orders the exit nodes for clients that are equally near them.
+A client that measured a shorter round trip to the DERP region some of the
+marked nodes are homed in sees those nodes lifted above the others, still in
+your order among themselves, so a laptop in Amsterdam takes a node in
+Frankfurt (priority 5) over the office in Hanoi (priority 30) while every
+laptop in Hanoi keeps the office first. Nodes count as equally near when
+their regions are within 20ms of the nearest, or 10% beyond 200ms; a region
+the client did not measure counts as far, and a client that measured none
+of them gets your order unchanged. The stored priority does not change,
+only what each client is sent.
 
 The priority is part of the mark: marking without `--priority` keeps the
 current one, clearing the mark resets it to 0, and the same field is
@@ -365,12 +376,37 @@ This feature is enabled by default when at least two nodes advertise the same pr
 
 ### Regional routing
 
-When the routers for a prefix sit in different DERP regions, slopscale steers each client to the router that shares
-its region, as Tailscale's [regional routing](https://tailscale.com/blog/regional-routing) does. A region is the DERP
-region a node reports as its home, so it needs no configuration beyond a [DERP map](/ref/derp) with more than one
-region. A client whose region has no healthy router for the prefix, or that has not reported a region, uses the
-tailnet-wide primary, which is the lowest node ID among the healthy routers. A client that changes region is steered
-again. The `/debug/routes` endpoint lists the per-region primaries next to the tailnet-wide ones.
+When several healthy routers serve the same prefix, slopscale steers each
+client to the router nearest it, the idea behind Tailscale's
+[regional routing](https://tailscale.com/blog/regional-routing). Nearness is
+the round trip the client measured to the DERP region each router is homed
+in, which every client reports after its netcheck, so it needs no
+configuration beyond a [DERP map](/ref/derp) with more than one region. A
+laptop in Amsterdam reaches a prefix that routers in Hanoi and Frankfurt
+both serve through Frankfurt, although neither router shares its region.
+
+Routers within 20ms of the nearest one, or within 10% of it past 200ms,
+count as equally near. A region the client did not measure counts as far:
+a client's later netchecks report only its nearest few regions.
+
+- For an internet prefix, such as the host routes [app connectors](/ref/apps)
+  learn, each client takes one of the equally near routers by a stable hash
+  of the two node IDs. That spreads clients over the routers, one router per
+  client; a single client's connections are never split between routers.
+  When a router joins or leaves, only the clients it wins or held move.
+- For a private prefix, clients keep the tailnet-wide primary when it is
+  among the equally near routers, because a LAN without SNAT returns traffic
+  through one router; otherwise they take the first near router by node ID.
+
+A client without measurements uses the primary of its own DERP region where
+that region has a healthy router for the prefix, else the tailnet-wide
+primary, which is the lowest node ID among the healthy routers. A router
+never steers itself away from a prefix it serves. Clients report their round
+trips only with a change worth reporting, such as a new home region, so a
+client is steered again when it moves, not with every measurement. Moving a
+client to another router changes the address its traffic leaves from, which
+ends its open connections through the old one. The `/debug/routes` endpoint
+lists the per-region primaries next to the tailnet-wide ones.
 
 ## Troubleshooting
 

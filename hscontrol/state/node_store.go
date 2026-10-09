@@ -250,6 +250,18 @@ type Snapshot struct {
 	// primary, as Tailscale's regional routing does; a region without a
 	// healthy advertiser for a prefix has no entry and falls back.
 	regionalRoutes map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+
+	// contested maps each prefix with two or more online, healthy
+	// advertisers to them and their regions, in ID order; prefixes with
+	// the same advertisers share one slice. Steering picks among them per
+	// viewer (see steering.go).
+	contested map[netip.Prefix][]site
+	// steerable holds every node in contested.
+	steerable map[types.NodeID]bool
+
+	// steeredExits are the global exit nodes with a priority, in ID
+	// order, whose priority steering lifts per viewer.
+	steeredExits []exitSite
 }
 
 // machineKeyNode is one node of the machine key index together with the
@@ -290,13 +302,20 @@ func (m machineKeyNodes) add(userID types.UserID, node types.NodeView) machineKe
 type PrimaryRouteLedger struct {
 	Global   map[netip.Prefix]types.NodeID
 	Regional map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+
+	// contested and exits are steering's inputs: a router or exit node
+	// moving region steers viewers elsewhere without moving a primary.
+	contested map[netip.Prefix][]site
+	exits     []exitSite
 }
 
 // Equal reports whether both ledgers assign every prefix, tailnet-wide and
-// per region, to the same node.
+// per region, to the same node, and steer every viewer the same way.
 func (l PrimaryRouteLedger) Equal(o PrimaryRouteLedger) bool {
 	return maps.Equal(l.Global, o.Global) &&
-		maps.EqualFunc(l.Regional, o.Regional, maps.Equal)
+		maps.EqualFunc(l.Regional, o.Regional, maps.Equal) &&
+		maps.EqualFunc(l.contested, o.contested, slices.Equal) &&
+		slices.Equal(l.exits, o.exits)
 }
 
 // PeersFunc is a function that takes a list of nodes and returns a map
@@ -667,8 +686,10 @@ func snapshotFromNodes(
 		posByID[n.ID()] = int32(i)
 	}
 
-	routes, isPrimaryRoute := electPrimaryRoutes(nodes, prev.Global)
-	regionalRoutes := electRegionalRoutes(nodes, prev.Regional)
+	advertisers := onlineAdvertisers(nodes)
+	routes, isPrimaryRoute := electPrimaryRoutes(nodes, advertisers, prev.Global)
+	regionalRoutes := electRegionalRoutes(nodes, advertisers, prev.Regional)
+	contested := contestedRoutes(nodes, advertisers)
 
 	// The peer relationship is the expensive part: every pair of nodes
 	// through the policy. It is only recomputed when a batch changed an
@@ -694,6 +715,8 @@ func snapshotFromNodes(
 		routes:         routes,
 		isPrimaryRoute: isPrimaryRoute,
 		regionalRoutes: regionalRoutes,
+		contested:      contested,
+		steerable:      steerableNodes(contested),
 	}
 
 	// Build nodesByUser, nodesByNodeKey, and nodesByMachineKey maps
@@ -711,7 +734,16 @@ func snapshotFromNodes(
 
 		// Build machine key index
 		newSnap.nodesByMachineKey[n.MachineKey] = newSnap.nodesByMachineKey[n.MachineKey].add(userID, nodeView)
+
+		if n.GlobalExitNode && n.ExitNodePriority > 0 {
+			newSnap.steeredExits = append(newSnap.steeredExits, exitSite{
+				id: n.ID, region: n.DERPRegion(),
+				priority: n.ExitNodePriority,
+			})
+		}
 	}
+
+	slices.SortFunc(newSnap.steeredExits, func(a, b exitSite) int { return cmp.Compare(a.id, b.id) })
 
 	return newSnap
 }
@@ -764,9 +796,9 @@ func onlineAdvertisers(nodes map[types.NodeID]types.Node) map[netip.Prefix][]typ
 // preferred until a probe cycle finds one that responds.
 func electPrimaryRoutes(
 	nodes map[types.NodeID]types.Node,
+	advertisers map[netip.Prefix][]types.NodeID,
 	prev map[netip.Prefix]types.NodeID,
 ) (map[netip.Prefix]types.NodeID, map[types.NodeID]bool) {
-	advertisers := onlineAdvertisers(nodes)
 	if len(advertisers) == 0 {
 		// Nothing is advertised, so nothing is elected. Returning early
 		// keeps a tailnet without subnet routers off the election path
@@ -844,9 +876,9 @@ func electPrefixes(
 // belong to no region.
 func electRegionalRoutes(
 	nodes map[types.NodeID]types.Node,
+	advertisers map[netip.Prefix][]types.NodeID,
 	prev map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID,
 ) map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID {
-	advertisers := onlineAdvertisers(nodes)
 	if len(advertisers) == 0 {
 		return nil
 	}
@@ -893,6 +925,90 @@ func electRegionalRoutes(
 	}
 
 	return regional
+}
+
+// contestedRoutes maps each prefix two or more online, healthy nodes
+// advertise to those nodes and their DERP regions, in ID order. Prefixes
+// with the same advertisers in the same regions share one slice, so a
+// viewer's steering is worked out once per set rather than per prefix.
+func contestedRoutes(
+	nodes map[types.NodeID]types.Node,
+	advertisers map[netip.Prefix][]types.NodeID,
+) map[netip.Prefix][]site {
+	var (
+		out    map[netip.Prefix][]site
+		shared map[string][]site
+		setKey []byte
+	)
+
+	for prefix, ids := range advertisers {
+		if len(ids) < 2 {
+			continue
+		}
+
+		setKey = setKey[:0]
+
+		healthy := 0
+
+		for _, id := range ids {
+			n := nodes[id]
+			if n.Unhealthy {
+				continue
+			}
+
+			setKey = strconv.AppendUint(setKey, id.Uint64(), 10)
+			setKey = append(setKey, '@')
+			setKey = strconv.AppendInt(setKey, int64(n.DERPRegion()), 10)
+			setKey = append(setKey, ',')
+			healthy++
+		}
+
+		if healthy < 2 {
+			continue
+		}
+
+		sites, ok := shared[string(setKey)]
+		if !ok {
+			sites = make([]site, 0, healthy)
+
+			for _, id := range ids {
+				if n := nodes[id]; !n.Unhealthy {
+					sites = append(sites, site{id: id, region: n.DERPRegion()})
+				}
+			}
+
+			if shared == nil {
+				shared = make(map[string][]site)
+			}
+
+			shared[string(setKey)] = sites
+		}
+
+		if out == nil {
+			out = make(map[netip.Prefix][]site)
+		}
+
+		out[prefix] = sites
+	}
+
+	return out
+}
+
+// steerableNodes returns the nodes contested lists.
+func steerableNodes(contested map[netip.Prefix][]site) map[types.NodeID]bool {
+	if len(contested) == 0 {
+		return nil
+	}
+
+	out := make(map[types.NodeID]bool)
+
+	for _, sites := range contested {
+		for _, s := range sites {
+			out[s.id] = true
+		}
+	}
+
+	return out
 }
 
 // GetNode retrieves a node by its ID.
@@ -1175,26 +1291,25 @@ func (s *NodeStore) IsNodeHealthy(id types.NodeID) bool {
 	return !n.Unhealthy()
 }
 
-// PrimaryRoutesForNodeAs returns the prefixes for which id is the primary
-// advertiser as seen from a viewer homed in the given DERP region: the
-// region's own primary where the region has one, the tailnet-wide primary
-// elsewhere. Region 0 (unknown) sees the tailnet-wide assignment.
-func (s *NodeStore) PrimaryRoutesForNodeAs(id types.NodeID, region tailcfg.DERPRegionID) []netip.Prefix {
+// PrimaryRoutesForNodeFrom returns the prefixes for which id is the
+// primary advertiser as seen from the viewer: where several routers serve
+// a prefix, the one steering picks for the viewer (see steering.go); else
+// the primary of the viewer's DERP region where the region has one, the
+// tailnet-wide primary elsewhere.
+func (s *NodeStore) PrimaryRoutesForNodeFrom(id types.NodeID, viewer viewerSite) []netip.Prefix {
 	snap := s.data.Load()
 
-	regional := snap.regionalRoutes[region]
-	if len(regional) == 0 {
+	// Only a contested router can be steered to; regional primaries are
+	// among them.
+	if !snap.steerable[id] {
 		return s.PrimaryRoutesForNode(id)
 	}
 
+	near := make(map[*site][]site)
 	out := make([]netip.Prefix, 0)
 
-	for prefix, nodeID := range snap.routes {
-		if local, ok := regional[prefix]; ok {
-			nodeID = local
-		}
-
-		if nodeID == id {
+	for prefix, global := range snap.routes {
+		if snap.primaryFrom(prefix, global, viewer, near) == id {
 			out = append(out, prefix)
 		}
 	}
@@ -1202,28 +1317,52 @@ func (s *NodeStore) PrimaryRoutesForNodeAs(id types.NodeID, region tailcfg.DERPR
 	return out
 }
 
-// RegionalRoutesDiffer reports whether a viewer moving from one DERP
-// region to another would be steered to a different router for any
-// prefix, so the caller knows when the move needs the viewer's peers
-// rebuilt.
-func (s *NodeStore) RegionalRoutesDiffer(from, to tailcfg.DERPRegionID) bool {
+// primaryFrom is the router the viewer uses for prefix, whose tailnet-wide
+// primary is global. near caches [nearest] per shared set of advertisers.
+func (snap *Snapshot) primaryFrom(
+	prefix netip.Prefix,
+	global types.NodeID,
+	viewer viewerSite,
+	near map[*site][]site,
+) types.NodeID {
+	primary := global
+	if local, ok := snap.regionalRoutes[viewer.region()][prefix]; ok {
+		primary = local
+	}
+
+	sites := snap.contested[prefix]
+	if len(sites) == 0 {
+		return primary
+	}
+
+	nearSites, ok := near[&sites[0]]
+	if !ok {
+		nearSites = nearest(sites, viewer)
+		near[&sites[0]] = nearSites
+	}
+
+	return steer(prefix, sites, nearSites, viewer, primary)
+}
+
+// SteeringDiffers reports whether a viewer whose home region or round
+// trips moved from before to after is now steered to another router for
+// any prefix or sees another exit node order, so the caller knows when
+// the viewer's peers need rebuilding.
+func (s *NodeStore) SteeringDiffers(before, after viewerSite) bool {
 	snap := s.data.Load()
-	if len(snap.regionalRoutes) == 0 || from == to {
+
+	if !maps.Equal(exitPriorities(snap.steeredExits, before), exitPriorities(snap.steeredExits, after)) {
+		return true
+	}
+
+	if len(snap.contested) == 0 && len(snap.regionalRoutes) == 0 {
 		return false
 	}
 
+	nearBefore, nearAfter := make(map[*site][]site), make(map[*site][]site)
+
 	for prefix, global := range snap.routes {
-		before, ok := snap.regionalRoutes[from][prefix]
-		if !ok {
-			before = global
-		}
-
-		after, ok := snap.regionalRoutes[to][prefix]
-		if !ok {
-			after = global
-		}
-
-		if before != after {
+		if snap.primaryFrom(prefix, global, before, nearBefore) != snap.primaryFrom(prefix, global, after, nearAfter) {
 			return true
 		}
 	}
@@ -1231,9 +1370,20 @@ func (s *NodeStore) RegionalRoutesDiffer(from, to tailcfg.DERPRegionID) bool {
 	return false
 }
 
+// ExitNodePrioritiesFor returns the priorities steering gives the global
+// exit nodes in the viewer's map, by node, or nil when it gives none.
+func (s *NodeStore) ExitNodePrioritiesFor(viewer viewerSite) map[types.NodeID]int {
+	return exitPriorities(s.data.Load().steeredExits, viewer)
+}
+
 // ledger returns the snapshot's primary assignment.
 func (snap *Snapshot) ledger() PrimaryRouteLedger {
-	return PrimaryRouteLedger{Global: snap.routes, Regional: snap.regionalRoutes}
+	return PrimaryRouteLedger{
+		Global:    snap.routes,
+		Regional:  snap.regionalRoutes,
+		contested: snap.contested,
+		exits:     snap.steeredExits,
+	}
 }
 
 // PrimaryRoutes returns the snapshot's primary assignment, tailnet-wide

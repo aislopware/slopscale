@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )
 
@@ -130,5 +131,39 @@ func BenchmarkApplyBatchPuts(b *testing.B) {
 
 		b.StartTimer()
 		store.applyBatch(batch)
+	}
+}
+
+// BenchmarkSnapshotFromNodesRouters is [BenchmarkSnapshotFromNodes] with
+// two online app connectors in different regions that both learned the
+// same 3000 host routes, the shape of a tailnet whose apps are served
+// from two sites.
+func BenchmarkSnapshotFromNodesRouters(b *testing.B) {
+	nodes := benchNodes(benchNodeCount)
+
+	routes := make([]netip.Prefix, 3000)
+	for i := range routes {
+		routes[i] = netip.PrefixFrom(netip.AddrFrom4([4]byte{3, byte(i / 256), byte(i % 256), 1}), 32)
+	}
+
+	online := true
+
+	for id, region := range map[types.NodeID]tailcfg.DERPRegionID{1: 900, 2: 4} {
+		n := nodes[id]
+		n.IsOnline = &online
+		n.ApprovedRoutes = routes
+		n.Hostinfo = &tailcfg.Hostinfo{RoutableIPs: routes, NetInfo: &tailcfg.NetInfo{PreferredDERP: region}}
+		nodes[id] = n
+	}
+
+	first := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), PrimaryRouteLedger{}, nil)
+	prev := first.ledger()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		snap := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), prev, nil)
+		_ = snap.allNodes
 	}
 }
