@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.57.1](https://github.com/aislopware/slopscale/compare/v0.57.0...v0.57.1) (2026-10-10)
+
+
+### Fixes
+
+* **state:** stop sending app DNS toward connectors that refuse the machine ([#58](https://github.com/aislopware/slopscale/issues/58)) ([22ec434](https://github.com/aislopware/slopscale/commit/22ec434fee9831575d1473d1a21d19513cfa43f8))
+
 ## [0.57.0](https://github.com/aislopware/slopscale/compare/v0.56.0...v0.57.0) (2026-10-09)
 
 
