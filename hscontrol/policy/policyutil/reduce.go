@@ -8,6 +8,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"go4.org/netipx"
 	"tailscale.com/tailcfg"
+	"tailscale.com/types/ipproto"
 )
 
 // ReduceFilterRules takes a node and a set of global filter rules and removes all rules
@@ -133,6 +134,64 @@ var connectorDNSDests = []tailcfg.NetPortRange{
 }
 
 const dnsPort = 53
+
+// AnswersPeerDNS reports whether a node holding these packet filter rules
+// answers a DNS query src sends to its PeerAPI. It is the check the
+// client makes (offersExitNodeOrAppConnectorAndPeerHasAutogroupInternet
+// in ipn/ipnlocal/peerapi.go) and otherwise answers 403: the filter must
+// accept TCP from the peer to port 53 of 0.0.0.0, or of 2000:: for a peer
+// asking over IPv6. A connector has only :: among its local addresses, so
+// over IPv6 it answers as an exit node or not at all.
+//
+// The client also answers a peer of its own user when neither is tagged,
+// and before 1.104 any peer of its own user, which every tagged node is to
+// another. Neither says the policy lets the peer through the node, so
+// neither counts here.
+func AnswersPeerDNS(rules []tailcfg.FilterRule, src netip.Addr) bool {
+	probe := netip.IPv4Unspecified()
+	if src.Is6() {
+		probe = peerDNSProbe6
+	}
+
+	for _, rule := range rules {
+		// No protocol means the client's defaults, TCP among them.
+		if len(rule.IPProto) > 0 && !slices.Contains(rule.IPProto, int(ipproto.TCP)) {
+			continue
+		}
+
+		reaches := slices.ContainsFunc(rule.DstPorts, func(dest tailcfg.NetPortRange) bool {
+			return dest.Ports.Contains(dnsPort) && setContains(dest.IP, probe)
+		})
+		if !reaches {
+			continue
+		}
+
+		if slices.ContainsFunc(rule.SrcIPs, func(ip string) bool { return setContains(ip, src) }) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// peerDNSProbe6 is the address the client takes for the internet when the
+// peer asks over IPv6.
+var peerDNSProbe6 = netip.MustParseAddr("2000::")
+
+// setContains reports whether a filter rule's address set holds addr. A
+// set that does not parse holds nothing, as in [ReduceFilterRules].
+func setContains(set string, addr netip.Addr) bool {
+	// Nearly every set is one prefix, which needs no IP set built: this
+	// runs for each machine and connector pair on the map path.
+	pfx, err := netip.ParsePrefix(set)
+	if err == nil && pfx == pfx.Masked() {
+		return pfx.Contains(addr)
+	}
+
+	expanded, err := util.ParseIPSet(set, nil)
+
+	return err == nil && expanded.Contains(addr)
+}
 
 // overlapsInternet reports whether the set reaches any public address.
 func overlapsInternet(set *netipx.IPSet) bool {

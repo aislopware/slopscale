@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/policyutil"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
@@ -188,17 +189,21 @@ func (s *State) AppConnectorNodes(app types.AppConnector) []types.NodeView {
 // app domain resolved through a connector's PeerAPI, which is how
 // Tailscale's clients send the app's queries to the connector so it can
 // learn the addresses (dnstype.Resolver's http:// form). Only connectors
-// the node sees as peers are offered, online ones first; a connector
-// gets no routes for its own apps. A wildcard domain covers its base.
+// that are the node's peers and answer it are offered (see
+// [State.dnsConnectors]), online ones first; a connector gets no routes
+// for its own apps. A wildcard domain covers its base.
 func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver {
 	apps := s.AppConnectors()
 	if len(apps) == 0 {
 		return nil
 	}
 
-	peers := s.ListPeers(node.ID())
+	connectors := s.dnsConnectors(node, s.ListPeers(node.ID()))
+	if len(connectors) == 0 {
+		return nil
+	}
+
 	tags := node.Tags().AsSlice()
-	egress := egressAddrs(node)
 
 	var routes map[string][]*dnstype.Resolver
 
@@ -207,7 +212,14 @@ func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver
 			continue
 		}
 
-		resolvers := connectorResolvers(app, node, egress, peers)
+		var resolvers []*dnstype.Resolver
+
+		for _, c := range connectors {
+			if app.Selects(c.tags, true) {
+				resolvers = append(resolvers, c.resolver)
+			}
+		}
+
 		if len(resolvers) == 0 {
 			continue
 		}
@@ -226,33 +238,49 @@ func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver
 	return routes
 }
 
-// connectorResolvers lists the app's connectors among the peers as
-// PeerAPI DNS resolvers, chosen for the address family the node has,
-// leaving out the connectors the node skips (see [State.bypassedApps]).
-func connectorResolvers(
-	app types.AppConnector, node types.NodeView, egress []netip.Addr, peers views.Slice[types.NodeView],
-) []*dnstype.Resolver {
-	var online, offline []*dnstype.Resolver
+// dnsConnector is a connector a node may ask for app names: its tags,
+// which pick its apps, and its PeerAPI as a resolver.
+type dnsConnector struct {
+	tags     []string
+	resolver *dnstype.Resolver
+}
+
+// dnsConnectors lists the connectors among the peers whose PeerAPI
+// resolves app names for the node, online ones first, with the resolver
+// chosen for the address family the node has. It leaves out the
+// connectors the node skips (see [State.bypassedApps]) and those that
+// would refuse it: a connector answers a peer only when its own packet
+// filter lets the peer reach the internet through it, so being its peer is
+// not enough. A gateway that sees a connector through a node-to-node
+// grant would get 403 for every query and, with the route in place, no
+// answer for the app's names at all; without the route they go to its
+// global resolvers. The verdict is read from the filter the connector is
+// sent, so the two cannot disagree.
+func (s *State) dnsConnectors(node types.NodeView, peers views.Slice[types.NodeView]) []dnsConnector {
+	egress := egressAddrs(node)
+
+	var online, offline []dnsConnector
 
 	for _, peer := range peers.All() {
-		if !runsAppConnector(peer) || !app.Selects(peer.Tags().AsSlice(), true) {
+		if !runsAppConnector(peer) || sharesEgress(egress, egressAddrs(peer)) {
 			continue
 		}
 
-		if sharesEgress(egress, egressAddrs(peer)) {
-			continue
-		}
-
-		addr := peerAPIDNS(node, peer)
+		addr, src := peerAPIDNS(node, peer)
 		if addr == "" {
 			continue
 		}
 
-		r := &dnstype.Resolver{Addr: addr}
+		rules, err := s.FilterForNode(peer)
+		if err != nil || !policyutil.AnswersPeerDNS(rules, src) {
+			continue
+		}
+
+		c := dnsConnector{tags: peer.Tags().AsSlice(), resolver: &dnstype.Resolver{Addr: addr}}
 		if peer.IsOnline().Valid() && peer.IsOnline().Get() {
-			online = append(online, r)
+			online = append(online, c)
 		} else {
-			offline = append(offline, r)
+			offline = append(offline, c)
 		}
 	}
 
@@ -400,17 +428,17 @@ func (s *State) egressMoveMatters(node types.NodeView, old []netip.Addr) bool {
 	return false
 }
 
-// peerAPIDNS is the peer's PeerAPI DNS endpoint reachable from the node:
-// its IPv4 one when both have IPv4, else IPv6; empty when the peer
-// reports no PeerAPI.
-func peerAPIDNS(node, peer types.NodeView) string {
-	var have4, have6 bool
+// peerAPIDNS is the peer's PeerAPI DNS endpoint reachable from the node
+// and the node's address that asks it: the IPv4 ones when both have IPv4,
+// else IPv6; empty when the peer reports no PeerAPI.
+func peerAPIDNS(node, peer types.NodeView) (string, netip.Addr) {
+	var src4, src6 netip.Addr
 
 	for _, ip := range node.IPs() {
 		if ip.Is4() {
-			have4 = true
+			src4 = ip
 		} else {
-			have6 = true
+			src6 = ip
 		}
 	}
 
@@ -428,14 +456,14 @@ func peerAPIDNS(node, peer types.NodeView) string {
 	}
 
 	for _, ip := range peer.IPs() {
-		if have4 && port4 != 0 && ip.Is4() {
-			return "http://" + netip.AddrPortFrom(ip, port4).String() + "/dns-query"
+		if src4.IsValid() && port4 != 0 && ip.Is4() {
+			return "http://" + netip.AddrPortFrom(ip, port4).String() + "/dns-query", src4
 		}
 
-		if have6 && port6 != 0 && ip.Is6() {
-			return "http://" + netip.AddrPortFrom(ip, port6).String() + "/dns-query"
+		if src6.IsValid() && port6 != 0 && ip.Is6() {
+			return "http://" + netip.AddrPortFrom(ip, port6).String() + "/dns-query", src6
 		}
 	}
 
-	return ""
+	return "", netip.Addr{}
 }
