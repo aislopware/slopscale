@@ -19,9 +19,9 @@ through designated connector nodes in your network.
 3. **Route learning and approval.** The connector resolves the app's domains,
    advertises single-address host routes for the learned IPs, and the server
    approves them automatically.
-4. **DNS.** The server sends every machine split DNS for the app's domains
-   that points at the connectors, so queries reach a connector and it
-   learns the addresses.
+4. **DNS.** The server sends each machine the policy lets through a
+   connector split DNS for the app's domains that points at that connector,
+   so queries reach it and it learns the addresses.
 
 ## Setting up a connector node
 
@@ -82,21 +82,45 @@ advertising a route, as before.
 
 ## DNS
 
-The server sends every machine split DNS for the app's domains, pointing
-at the connectors' DNS endpoints over the tailnet, the way Tailscale's
-control plane does: a query for `example.com` goes to a connector, the
-connector answers it and learns the addresses in the answer. A machine
-sees only the connectors it has as peers, online ones first, and a
+The server sends machines split DNS for the app's domains, pointing at
+the connectors' DNS endpoints over the tailnet, the way Tailscale's
+control plane does. A query for `example.com` goes to a connector, and
+the connector answers it and learns the addresses in the answer. A
 connector is never sent its own apps. A wildcard domain (`*.example.com`)
 routes the base domain too. Nothing has to be configured under
 [DNS](/ref/dns); a split DNS rule for the same domain, if one exists,
 comes first.
 
 A connector answers a peer's query only when the policy lets that peer
-send traffic to the internet through it, which is the same access the
-peer needs for the addresses the connector learns: a rule with
-`autogroup:internet` or the addresses themselves as the destination and
-the peer as the source.
+send traffic to the internet through it. That is the access the peer
+needs for the addresses the connector learns: a rule with the peer as the
+source and `autogroup:internet`, or the addresses themselves, as the
+destination. The connector refuses every other peer with a 403, and a
+machine whose only resolver for a name refuses it gets no answer at all.
+
+So a machine gets the split DNS toward a connector only when that
+connector will answer it. The server reads this from the packet filter it
+sends the connector, which is where the connector's client looks. Seeing
+a connector as a peer is not enough. A gateway that reaches a connector
+through a rule from one node to the other, with nothing through it, gets
+no split DNS for the app, and the app's names go to its global
+nameservers like any other name. Among the connectors that answer a
+machine, online ones come first.
+
+The client checks TCP port 53, so:
+
+- A rule to `autogroup:internet` limited to `tcp:53` is enough for the app's
+  DNS. The machine then resolves the app's names through the connector, and
+  the connector drops the machine's traffic on other ports.
+- A rule limited to `udp:53`, or to any other UDP port, is not enough.
+- A rule to the internet on another TCP port, `tcp:443` for instance, is
+  enough: the server adds the DNS rule to the connector's filter for every
+  source the policy lets reach a public address through it.
+
+A machine with only an IPv6 tailnet address gets the split DNS toward a
+connector only when that connector is also an approved exit node. Over
+IPv6 the client checks an address that a connector on its own does not
+answer for.
 
 ## Machines at the connector's site
 

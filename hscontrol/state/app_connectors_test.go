@@ -26,6 +26,7 @@ func TestPeerAPIDNS(t *testing.T) {
 		node types.NodeView
 		peer types.NodeView
 		want string
+		src  netip.Addr
 	}{
 		{
 			name: "node with v4 and v6 and peer with peerapi4 and peerapi6 ports",
@@ -44,6 +45,7 @@ func TestPeerAPIDNS(t *testing.T) {
 				},
 			}).View(),
 			want: "http://100.64.0.2:1234/dns-query",
+			src:  nodeV4,
 		},
 		{
 			name: "node v6-only",
@@ -61,6 +63,7 @@ func TestPeerAPIDNS(t *testing.T) {
 				},
 			}).View(),
 			want: "http://[fd7a:115c:a1e0::2]:5678/dns-query",
+			src:  nodeV6,
 		},
 		{
 			name: "peer without services",
@@ -81,8 +84,9 @@ func TestPeerAPIDNS(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := peerAPIDNS(tt.node, tt.peer)
+			got, src := peerAPIDNS(tt.node, tt.peer)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.src, src)
 		})
 	}
 }
