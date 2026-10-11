@@ -227,6 +227,7 @@ func apiv2SettingsGoClient(t *testing.T, baseURL, apiKey string) {
 	settings, err := goClient(t, baseURL, apiKey).TailnetSettings().Get(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, "none", string(settings.UsersRoleAllowedToJoinExternalTailnets))
+	assert.Equal(t, tsclient.RouteSelectionRegionalRouting, settings.RouteSelection)
 }
 
 // tscliRun runs tscli and fails the test on a non-zero exit.
