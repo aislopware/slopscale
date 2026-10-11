@@ -4288,9 +4288,8 @@ func (s *State) applyAdvertiseTags(nodeToRegister *types.Node, params newNodePar
 		return nil
 	}
 
-	nodeToRegister.Tags = approvedTags
-	slices.Sort(nodeToRegister.Tags)
-	nodeToRegister.Tags = slices.Compact(nodeToRegister.Tags)
+	// Sort a copy: approvedTags is the node's reported Hostinfo.
+	nodeToRegister.Tags = slices.Compact(slices.Sorted(slices.Values(approvedTags)))
 
 	// Node is now tagged, so clear user ownership.
 	// Tagged nodes are owned by their tags, not a user.
