@@ -859,7 +859,7 @@ func LoadConfig(path string, isFile bool) error {
 	conf.SetDefault("derp.update_frequency", "3h")
 
 	conf.SetDefault("unix_socket", "/var/run/slopscale/slopscale.sock")
-	conf.SetDefault("unix_socket_permission", "0o770")
+	conf.SetDefault("unix_socket_permission", defaultUnixSocketPermission)
 
 	conf.SetDefault("cli.timeout", "5s")
 	conf.SetDefault("cli.insecure", false)
@@ -1877,6 +1877,7 @@ type serverSections struct {
 	funnel           FunnelConfig
 	clientUpdates    ClientUpdatesConfig
 	dialPlan         []netip.Addr
+	socketPerm       fs.FileMode
 }
 
 // readServerSections reads every section that can refuse a value and
@@ -1948,7 +1949,37 @@ func readServerSections(v *configValidator) serverSections {
 	s.dialPlan, err = controlDialPlanConfig()
 	addReaderError(v, err)
 
+	s.socketPerm = unixSocketPermission(v)
+
 	return s
+}
+
+// defaultUnixSocketPermission lets the socket's group use the CLI.
+const defaultUnixSocketPermission = "0o770"
+
+// unixSocketPermission reads unix_socket_permission. YAML reads an unquoted
+// 0770 as the integer 504, which cannot be told apart from a literal 504,
+// so only a string is accepted; a key left null keeps the default.
+func unixSocketPermission(v *configValidator) fs.FileMode {
+	raw := conf.Get("unix_socket_permission")
+	if raw == nil {
+		raw = defaultUnixSocketPermission
+	}
+
+	str, _ := raw.(string)
+
+	mode, err := util.ParseFileMode(str)
+	if err != nil {
+		v.Add(&ConfigError{
+			Reason:  "unix_socket_permission is not a quoted octal file mode",
+			Current: []KV{{"unix_socket_permission", raw}},
+			Maximum: `"0777"`,
+			Hint:    `quote the value, e.g. "0770"; unquoted, YAML reads 0770 as the number 504`,
+			Cause:   err,
+		})
+	}
+
+	return mode
 }
 
 // addReaderError records the error of a section reader whose message
@@ -2060,7 +2091,7 @@ func LoadServerConfig() (*Config, error) {
 		ACMEURL:   conf.GetString("acme_url"),
 
 		UnixSocket:           conf.GetString("unix_socket"),
-		UnixSocketPermission: util.GetFileMode("unix_socket_permission"),
+		UnixSocketPermission: s.socketPerm,
 
 		OIDC: s.oidc,
 
@@ -2261,6 +2292,17 @@ func (d *deprecator) apply(v *configValidator) {
 // per-client map builds that clone the result. It is a package-level lock so
 // [Config] stays freely copyable during construction.
 var tailcfgDNSMu sync.RWMutex
+
+// TailcfgDebug returns the [tailcfg.Debug] for full map responses: nil when
+// logtail is enabled, leaving client log uploads as the client set them,
+// otherwise an instruction to stop uploading logs.
+func (c *Config) TailcfgDebug() *tailcfg.Debug {
+	if c.LogTail.Enabled {
+		return nil
+	}
+
+	return &tailcfg.Debug{DisableLogTail: true}
+}
 
 // CloneTailcfgDNSConfig returns a deep copy of [Config.TailcfgDNSConfig], or
 // nil if none is set. Safe for concurrent use with the DNS setters.

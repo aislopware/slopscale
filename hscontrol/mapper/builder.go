@@ -66,53 +66,15 @@ func (b *MapResponseBuilder) WithCapabilityVersion(capVer tailcfg.CapabilityVers
 	return b
 }
 
-// WithSelfNode adds the requesting node to the response.
+// WithSelfNode adds the requesting node to the response, with what the
+// client keeps from it until told otherwise: tailnet lock state, display
+// messages, the dial plan and the client version.
 func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
-	nv, ok := b.node()
+	nv, ok := b.addSelfNode()
 	if !ok {
 		return b
 	}
 
-	_, matchers := b.mapper.state.Filter()
-
-	serviceHosts := b.mapper.state.ServiceHosts()
-
-	tailnode, err := nv.TailNode(
-		b.capVer,
-		func(id types.NodeID) []netip.Prefix {
-			// Self node: include own primaries + exit routes (no via steering for self),
-			// and the addresses of the services it is the elected host of.
-			primaries := policy.ReduceRoutes(nv, b.mapper.state.GetNodePrimaryRoutes(id), matchers)
-
-			return slices.Concat(primaries, nv.ExitRoutes(), b.mapper.state.ServiceRoutesFor(id, serviceHosts))
-		},
-		b.mapper.cfg,
-		b.mapper.state.NodeCapMap(nv.ID()),
-	)
-	if err != nil {
-		b.addError(err)
-		return b
-	}
-
-	// tailnet.maxKeyDuration carries the key expiry cap as seconds, the
-	// shape the hosted control plane uses; it is omitted while the cap is
-	// off, which the client reads as the default.
-	if keyExpiry := b.mapper.state.Settings().KeyExpiry; keyExpiry > 0 {
-		tailnode.CapMap[nodecap.MaxKeyDuration] = []tailcfg.RawMessage{
-			tailcfg.RawMessage(strconv.FormatFloat(keyExpiry.Seconds(), 'f', -1, 64)),
-		}
-	}
-
-	// Every node may take part in tailnet lock: the cap lets the client
-	// run `tailscale lock init` and follow the authority once one exists;
-	// TKAInfo carries the head to sync to, or that the lock is off.
-	tailnode.CapMap[nodecap.TailnetLock] = nil
-
-	// Only the self node carries the tailnet's ID; the client ignores it
-	// on peers and the hosted control plane leaves it off them.
-	tailnode.StableTailnetID = b.mapper.state.TailnetID()
-
-	b.resp.Node = tailnode
 	b.resp.TKAInfo = b.mapper.state.TKAInfo()
 	b.resp.DisplayMessages = displayMessages(nv, b.mapper.cfg.ServerURL)
 	b.resp.ControlDialPlan = b.mapper.cfg.DialPlan()
@@ -120,6 +82,17 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 	if hi := nv.Hostinfo(); hi.Valid() {
 		b.resp.ClientVersion = clientversion.For(hi.IPNVersion(), b.mapper.state.LatestClientVersion())
 	}
+
+	return b
+}
+
+// WithSelfNodeOnly adds the requesting node without what
+// [MapResponseBuilder.WithSelfNode] adds beside it. Each of those makes the
+// client rebuild its whole netmap, while a connection drops an unchanged
+// Node on send (see [connectionEntry.withSelfDelta]), so a response built
+// this way still applies as a delta when self did not move.
+func (b *MapResponseBuilder) WithSelfNodeOnly() *MapResponseBuilder {
+	b.addSelfNode()
 
 	return b
 }
@@ -205,12 +178,9 @@ func (b *MapResponseBuilder) WithCollectServicesDisabled() *MapResponseBuilder {
 	return b
 }
 
-// WithDebugConfig adds debug configuration
-// It disables log tailing if the mapper's LogTail is not enabled.
+// WithDebugConfig sets [tailcfg.MapResponse.Debug] from [types.Config.TailcfgDebug].
 func (b *MapResponseBuilder) WithDebugConfig() *MapResponseBuilder {
-	b.resp.Debug = &tailcfg.Debug{
-		DisableLogTail: !b.mapper.cfg.LogTail.Enabled,
-	}
+	b.resp.Debug = b.mapper.cfg.TailcfgDebug()
 
 	return b
 }
@@ -224,16 +194,15 @@ func (b *MapResponseBuilder) WithSSHPolicy() *MapResponseBuilder {
 
 	sshPolicy, err := b.mapper.state.SSHPolicy(node)
 	if err != nil {
-		// SSH policy is optional for a node to function. Rather than fail the
-		// whole map (leaving the node unable to connect), log and continue
-		// without it; the node still receives a usable netmap.
-		log.Warn().Caller().
+		// Don't fail the whole map over SSH, but fail closed: a nil
+		// SSHPolicy would leave the client's previous rules in force.
+		log.Error().Caller().
 			Err(err).
 			Uint64(zf.NodeID, node.ID().Uint64()).
 			Str(zf.NodeHostname, node.Hostname()).
-			Msg("building map response: skipping SSH policy for node; node will receive a map without SSH rules")
+			Msg("building map response: compiling SSH policy failed; sending empty SSH policy")
 
-		return b
+		sshPolicy = &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{}}
 	}
 
 	b.resp.SSHPolicy = sshPolicy
@@ -372,11 +341,66 @@ func (b *MapResponseBuilder) Build() (*tailcfg.MapResponse, error) {
 		return nil, fmt.Errorf("building map response: %w", errors.Join(b.errs...))
 	}
 
+	// Dumps show the generated response; an unchanged self or SSHPolicy
+	// is dropped later, per connection, before it reaches the wire.
 	if debugDumpMapResponsePath != "" {
 		writeDebugMapResponse(b.resp, b.debugType, b.nodeID)
 	}
 
 	return b.resp, nil
+}
+
+// addSelfNode renders the requesting node into the response and returns
+// it, or false when it is gone or does not render.
+func (b *MapResponseBuilder) addSelfNode() (types.NodeView, bool) {
+	nv, ok := b.node()
+	if !ok {
+		return types.NodeView{}, false
+	}
+
+	_, matchers := b.mapper.state.Filter()
+
+	serviceHosts := b.mapper.state.ServiceHosts()
+
+	tailnode, err := nv.TailNode(
+		b.capVer,
+		func(id types.NodeID) []netip.Prefix {
+			// Self node: include own primaries + exit routes (no via steering for self),
+			// and the addresses of the services it is the elected host of.
+			primaries := policy.ReduceRoutes(nv, b.mapper.state.GetNodePrimaryRoutes(id), matchers)
+
+			return slices.Concat(primaries, nv.ExitRoutes(), b.mapper.state.ServiceRoutesFor(id, serviceHosts))
+		},
+		b.mapper.cfg,
+		b.mapper.state.NodeCapMap(nv.ID()),
+	)
+	if err != nil {
+		b.addError(err)
+
+		return types.NodeView{}, false
+	}
+
+	// tailnet.maxKeyDuration carries the key expiry cap as seconds, the
+	// shape the hosted control plane uses; it is omitted while the cap is
+	// off, which the client reads as the default.
+	if keyExpiry := b.mapper.state.Settings().KeyExpiry; keyExpiry > 0 {
+		tailnode.CapMap[nodecap.MaxKeyDuration] = []tailcfg.RawMessage{
+			tailcfg.RawMessage(strconv.FormatFloat(keyExpiry.Seconds(), 'f', -1, 64)),
+		}
+	}
+
+	// Every node may take part in tailnet lock: the cap lets the client
+	// run `tailscale lock init` and follow the authority once one exists;
+	// TKAInfo carries the head to sync to, or that the lock is off.
+	tailnode.CapMap[nodecap.TailnetLock] = nil
+
+	// Only the self node carries the tailnet's ID; the client ignores it
+	// on peers and the hosted control plane leaves it off them.
+	tailnode.StableTailnetID = b.mapper.state.TailnetID()
+
+	b.resp.Node = tailnode
+
+	return nv, true
 }
 
 // addError adds an error to the builder's error list.

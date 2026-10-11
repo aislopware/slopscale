@@ -50,6 +50,7 @@ type serverConfig struct {
 	nodeExpiry       time.Duration
 	batcherWorkers   int
 	taildropEnabled  bool
+	logTailEnabled   bool
 	realListener     bool
 	nodeStoreBatch   time.Duration
 	oidc             *types.OIDCConfig
@@ -134,6 +135,12 @@ func WithRealListener() ServerOption {
 // always-on baseline.
 func WithTaildropEnabled(enabled bool) ServerOption {
 	return func(c *serverConfig) { c.taildropEnabled = enabled }
+}
+
+// WithLogTailEnabled sets logtail.enabled, so the server leaves client log
+// uploads alone instead of telling clients to disable them.
+func WithLogTailEnabled() ServerOption {
+	return func(c *serverConfig) { c.logTailEnabled = true }
 }
 
 // WithOIDC makes the server authenticate interactive logins against the
@@ -259,6 +266,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		// is off unless the config asks for it.
 		Debug:    types.DebugConfig{NodeAPIEnabled: true},
 		Taildrop: types.TaildropConfig{Enabled: sc.taildropEnabled},
+		LogTail:  types.LogTailConfig{Enabled: sc.logTailEnabled},
 		Tuning: types.Tuning{
 			BatchChangeDelay:               sc.batchDelay,
 			BatcherWorkers:                 sc.batcherWorkers,

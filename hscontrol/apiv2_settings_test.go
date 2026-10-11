@@ -120,12 +120,15 @@ func TestAPIv2SettingsConstantOffFields(t *testing.T) {
 
 	s := getSettings(t, settingsAPIWithConfig(t, &cfg))
 
-	// Only the four computed fields reflect cfg; everything else stays off.
+	// Only the four computed fields reflect cfg; route selection is always
+	// regional; everything else stays off.
 	want := apiv2.TailnetSettings{
 		ACLsExternallyManagedOn:                true,
 		DevicesKeyDurationDays:                 90,
 		HTTPSEnabled:                           true,
 		UsersRoleAllowedToJoinExternalTailnets: "none",
+		RegionalRoutingOn:                      true,
+		RouteSelection:                         "regional-routing",
 	}
 	if diff := cmp.Diff(want, s); diff != "" {
 		t.Errorf("settings mismatch (-want +got):\n%s", diff)

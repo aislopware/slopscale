@@ -8,7 +8,13 @@ export default defineConfig({
   content: { root: "content" },
   github: { owner: "aislopware", repo: "slopscale", dir: "docs" },
   deployment: { site: "https://aislopware.github.io", base: "/slopscale" },
-  theme: { accent: "sky", radius: "md", mode: "system" },
+  theme: {
+    // The slopscale sky (#2caff9) in dark mode; light mode takes a darker sky so
+    // links on white keep a 4.5:1 contrast.
+    accent: { light: "#0369a1", dark: "#2caff9" },
+    radius: "md",
+    mode: "system",
+  },
   seo: {
     og: { logo: "/mark.svg", palette: { accent: "#2caff9" } },
     software: { license: "BSD-3-Clause", operatingSystem: "Linux", price: 0 },

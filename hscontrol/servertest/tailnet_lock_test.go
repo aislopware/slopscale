@@ -23,7 +23,7 @@ import (
 
 // lockGenesis builds the genesis AUM `tailscale lock init` would, with
 // one trusted key and the given disablement secrets.
-func lockGenesis(t *testing.T, signer key.NLPrivate, secrets ...[]byte) tka.AUM {
+func lockGenesis(t *testing.T, signer key.TLPrivate, secrets ...[]byte) tka.AUM {
 	t.Helper()
 
 	var entropy [16]byte
@@ -49,7 +49,7 @@ func lockGenesis(t *testing.T, signer key.NLPrivate, secrets ...[]byte) tka.AUM 
 
 // signNodeKey signs a node key the way the client does for init and
 // `tailscale lock sign`.
-func signNodeKey(t *testing.T, info tailcfg.TKASignInfo, signer key.NLPrivate) tkatype.MarshaledSignature {
+func signNodeKey(t *testing.T, info tailcfg.TKASignInfo, signer key.TLPrivate) tkatype.MarshaledSignature {
 	t.Helper()
 
 	pub, err := info.NodePublic.MarshalBinary()
@@ -126,7 +126,7 @@ func TestTailnetLock(t *testing.T) {
 		return machineDo(t, srv, node, http.MethodGet, "tka/"+path, body)
 	}
 
-	signer := key.NewNLPrivate()
+	signer := key.NewTLPrivate()
 	nodeSecret := bytes.Repeat([]byte{1}, 32)
 	supportSecret := bytes.Repeat([]byte{2}, 32)
 	genesis := lockGenesis(t, signer, nodeSecret, supportSecret)
@@ -241,7 +241,7 @@ func TestTailnetLock(t *testing.T) {
 		assert.Empty(t, resp.DisablementSecret)
 	})
 
-	second := key.NewNLPrivate()
+	second := key.NewTLPrivate()
 
 	t.Run("sync offer and send move the head", func(t *testing.T) {
 		offer, err := authority.SyncOffer(chonk)
@@ -332,7 +332,7 @@ func TestTailnetLock(t *testing.T) {
 			NodePublic:     bob.NodePrivateKey().Public(),
 			RotationPubkey: bobNode.NLKey().Verifier(),
 		}
-		bad := signNodeKey(t, info, key.NewNLPrivate())
+		bad := signNodeKey(t, info, key.NewTLPrivate())
 
 		status, body := tkaDo(alice, "sign", tailcfg.TKASubmitSignatureRequest{
 			Version:   tailcfg.CurrentCapabilityVersion,

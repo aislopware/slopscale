@@ -286,6 +286,31 @@ func TestFeatureQueryTellsHowToEnable(t *testing.T) {
 	assert.Contains(t, query("teleport").Text, "not a feature this server knows")
 }
 
+// TestCacheNetworkMapsByDefault pins netmap caching on the self node: a
+// client at the current capability version is told to cache its netmap,
+// and the disable-cache-network-maps nodeAttr takes the instruction away,
+// as on the hosted control plane.
+func TestCacheNetworkMapsByDefault(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "owner")
+
+	alice := servertest.NewClient(t, srv, "alice", servertest.WithUser(owner))
+	alice.WaitForCondition(t, "cache-network-maps granted", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return hasCap(nm, nodecap.CacheNetworkMaps)
+	})
+
+	reloadPolicy(t, srv, `{
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+		"nodeAttrs": [{"target": ["*"], "attr": ["disable-cache-network-maps"]}]
+	}`)
+
+	alice.WaitForCondition(t, "cache-network-maps withdrawn", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return hasCap(nm, nodecap.DisableCacheNetworkMaps) && !hasCap(nm, nodecap.CacheNetworkMaps)
+	})
+}
+
 // TestMaxKeyDurationCapFollowsTheSetting pins tailnet.maxKeyDuration on the
 // self node: absent while the key expiry cap is off, the cap in seconds
 // once it is set.

@@ -165,12 +165,12 @@ func (h *Slopscale) handleVerifyRequest(
 		)
 	}
 
-	allow := h.state.ListNodes().ContainsFunc(func(n types.NodeView) bool {
-		return n.NodeKey() == derpAdmitClientRequest.NodePublic
-	})
+	// Every DERP connect lands here, unauthenticated, so use the NodeKey
+	// index rather than scanning every node.
+	nv, ok := h.state.GetNodeByNodeKey(derpAdmitClientRequest.NodePublic)
 
 	resp := &tailcfg.DERPAdmitClientResponse{
-		Allow: allow,
+		Allow: ok && nv.Valid(),
 	}
 
 	err = wire.MarshalWrite(writer, resp)
@@ -182,7 +182,9 @@ func (h *Slopscale) handleVerifyRequest(
 }
 
 // VerifyHandler answers the DERP server's verifyClientsURL check on whether a
-// client is allowed to connect. See:
+// client is allowed to connect ([tailcfg.DERPAdmitClientRequest]). A client
+// is admitted while its NodeKey belongs to a registered node; expiry, tags,
+// approval and ephemerality do not gate it. See:
 //
 // https://github.com/tailscale/tailscale/blob/964282d34f06ecc06ce644769c66b0b31d118340/derp/derp_server.go#L1159
 func (h *Slopscale) VerifyHandler(

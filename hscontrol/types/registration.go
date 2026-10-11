@@ -61,6 +61,6 @@ type RegistrationData struct {
 	// NLKey is [tailcfg.RegisterRequest.NLKey], the client's tailnet
 	// lock key, and NodeKeySignature the node key signature it sent, if
 	// any; see docs/ref/tailnet-lock.md.
-	NLKey            key.NLPublic
+	NLKey            key.TLPublic
 	NodeKeySignature tkatype.MarshaledSignature
 }

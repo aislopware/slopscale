@@ -495,6 +495,13 @@ func (u *Username) resolve(_ *Policy, users types.Users, nodes views.Slice[types
 	)
 
 	user, err := u.resolveUser(users)
+	if errors.Is(err, ErrUserNotFound) {
+		// A policy may name users before they register (#2863). Report it
+		// as an empty set, not an error: callers that bail on error would
+		// otherwise drop a whole group for one missing member (#3513).
+		return &netipx.IPSet{}, nil
+	}
+
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -2126,6 +2133,11 @@ type Grant struct {
 	SrcPosture []string `json:"srcPosture,omitempty"`
 }
 
+// HasVia reports whether the grant routes through via-tagged nodes.
+func (g Grant) HasVia() bool {
+	return len(g.Via) > 0
+}
+
 // NodeAttrGrant attaches Tailscale node capabilities (and/or an IP-pool
 // preference) to every node selected by Targets. The Targets aliases are
 // resolved exactly like ACL/grant sources, so users, groups, tags, hosts,
@@ -3035,7 +3047,7 @@ func (pol *Policy) validate() error {
 			errs = append(errs, err)
 		}
 
-		if len(grant.Via) > 0 && sourcesHaveShared(grant.Sources) {
+		if grant.HasVia() && sourcesHaveShared(grant.Sources) {
 			errs = append(errs, ErrAutogroupSharedVia)
 		}
 	}

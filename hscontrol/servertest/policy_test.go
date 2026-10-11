@@ -1,11 +1,13 @@
 package servertest_test
 
 import (
+	"fmt"
 	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
@@ -127,6 +129,101 @@ func TestPolicyChanges(t *testing.T) {
 
 			t.Logf("round %d: update received", round)
 		}
+	})
+
+	// https://github.com/juanfont/headscale/issues/3508
+	t.Run("ssh_removal_clears_client_ssh_policy", func(t *testing.T) {
+		t.Parallel()
+		h := servertest.NewHarness(t, 2)
+
+		h.ChangePolicy(t, []byte(`{
+			"acls": [],
+			"ssh": [{
+				"action": "accept",
+				"src":    ["autogroup:member"],
+				"dst":    ["autogroup:self"],
+				"users":  ["root"]
+			}]
+		}`))
+
+		h.Client(0).WaitForCondition(t, "SSH rules present", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) > 0
+			})
+
+		h.ChangePolicy(t, []byte(`{"acls": []}`))
+
+		h.Client(0).WaitForCondition(t, "SSH rules cleared", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) == 0
+			})
+	})
+
+	// An unchanged SSHPolicy is dropped from policy frames; the client
+	// must keep the rules it holds.
+	t.Run("unrelated_policy_change_keeps_client_ssh_rules", func(t *testing.T) {
+		t.Parallel()
+		h := servertest.NewHarness(t, 2)
+
+		withSSH := func(group string) []byte {
+			return fmt.Appendf(nil, `{
+				"groups": {%q: []},
+				"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+				"ssh": [{
+					"action": "accept",
+					"src":    ["autogroup:member"],
+					"dst":    ["autogroup:self"],
+					"users":  ["root"]
+				}]
+			}`, "group:"+group)
+		}
+
+		h.ChangePolicy(t, withSSH("a"))
+		h.Client(0).WaitForCondition(t, "SSH rules present", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) > 0
+			})
+
+		countBefore := h.Client(0).UpdateCount()
+
+		h.ChangePolicy(t, withSSH("b"))
+		h.Client(0).WaitForCondition(t, "policy update with SSH rules kept", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return h.Client(0).UpdateCount() > countBefore &&
+					nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) > 0
+			})
+	})
+
+	// A suspended machine has no SSH policy of its own; it must still be
+	// told so, or it keeps the rules it held.
+	t.Run("suspension_clears_client_ssh_policy", func(t *testing.T) {
+		t.Parallel()
+		h := servertest.NewHarness(t, 2)
+
+		h.ChangePolicy(t, []byte(`{
+			"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+			"ssh": [{
+				"action": "accept",
+				"src":    ["autogroup:member"],
+				"dst":    ["autogroup:self"],
+				"users":  ["root"]
+			}]
+		}`))
+
+		c := h.Client(0)
+		c.WaitForCondition(t, "SSH rules present", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) > 0
+			})
+
+		_, suspend, err := h.Server.State().SetNodeSuspension(types.NodeID(c.Netmap().SelfNode.ID()), true)
+		require.NoError(t, err)
+		h.Server.App.Change(suspend)
+
+		c.WaitForCondition(t, "SSH rules cleared", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) == 0
+			})
 	})
 
 	t.Run("policy_with_multiple_users", func(t *testing.T) {

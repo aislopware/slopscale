@@ -330,7 +330,7 @@ func (v NodeView) ApprovedServices() views.Slice[string] { return views.SliceOf(
 func (v NodeView) KeySignature() views.ByteSlice[tkatype.MarshaledSignature] {
 	return views.ByteSliceOf(v.ж.KeySignature)
 }
-func (v NodeView) NLKey() key.NLPublic { return v.ж.NLKey }
+func (v NodeView) NLKey() key.TLPublic { return v.ж.NLKey }
 
 // SourceAddr is the address the node's control connection last came
 // from, as the trusted-proxy middleware resolved it. It is runtime
@@ -440,7 +440,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	Services            *NodeServices
 	ApprovedServices    []string
 	KeySignature        tkatype.MarshaledSignature
-	NLKey               key.NLPublic
+	NLKey               key.TLPublic
 	SourceAddr          netip.Addr
 	SharedWith          []UserID
 	GlobalExitNode      bool

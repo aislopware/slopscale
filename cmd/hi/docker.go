@@ -383,8 +383,12 @@ func streamAndWait(ctx context.Context, cli *client.Client, containerID string) 
 	}
 	defer out.Close()
 
+	logsDone := make(chan struct{})
+
 	go func() {
 		_, _ = io.Copy(os.Stdout, out)
+
+		close(logsDone)
 	}()
 
 	waitResult := cli.ContainerWait(ctx, containerID, client.ContainerWaitOptions{
@@ -396,6 +400,14 @@ func streamAndWait(ctx context.Context, cli *client.Client, containerID string) 
 			return -1, fmt.Errorf("waiting for container: %w", err)
 		}
 	case status := <-waitResult.Result:
+		// The wait can finish before the log stream delivers its tail.
+		// Drain through EOF so a fast test exit keeps its final summary.
+		select {
+		case <-logsDone:
+		case <-ctx.Done():
+			return int(status.StatusCode), fmt.Errorf("waiting for container logs: %w", ctx.Err())
+		}
+
 		return int(status.StatusCode), nil
 	}
 

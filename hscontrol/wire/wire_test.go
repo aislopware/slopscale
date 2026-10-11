@@ -307,8 +307,8 @@ func fillKnown(v reflect.Value, seed *int) bool {
 		value = key.NewMachine().Public()
 	case reflect.TypeFor[key.DiscoPublic]():
 		value = key.NewDisco().Public()
-	case reflect.TypeFor[key.NLPublic]():
-		value = key.NewNLPrivate().Public()
+	case reflect.TypeFor[key.TLPublic]():
+		value = key.NewTLPrivate().Public()
 	case reflect.TypeFor[key.ChallengePublic]():
 		value = key.NewChallenge().Public()
 	case reflect.TypeFor[opt.Bool]():

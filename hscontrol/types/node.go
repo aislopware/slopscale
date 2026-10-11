@@ -43,6 +43,12 @@ type RouteFunc func(id NodeID) []netip.Prefix
 // See https://tailscale.com/docs/reference/troubleshooting/network-configuration/cgnat-conflicts.
 const nodeAttrDisableIPv4 nodecap.Cap = "disable-ipv4"
 
+// cacheNetworkMapsByDefault is the first capability version that asks the
+// control plane for [nodecap.CacheNetworkMaps] without a nodeAttr opting
+// it in. Older clients that understand the cap (135 and later) only get it
+// from the policy.
+const cacheNetworkMapsByDefault tailcfg.CapabilityVersion = 149
+
 // filterIPv4 returns ps with every IPv4 prefix dropped. Used by
 // [NodeView.TailNode] when the node carries the disable-ipv4 nodeAttr.
 func filterIPv4(ps []netip.Prefix) []netip.Prefix {
@@ -216,7 +222,7 @@ type Node struct {
 	// key, which may rotate that signature when the node key changes.
 	// See docs/ref/tailnet-lock.md.
 	KeySignature tkatype.MarshaledSignature
-	NLKey        key.NLPublic
+	NLKey        key.TLPublic
 
 	// SourceAddr is the address the node's control connection last came
 	// from, as the trusted-proxy middleware resolved it. It is runtime
@@ -319,6 +325,11 @@ func (node *Node) StringID() string {
 
 // IsExpired returns whether the node registration has expired.
 func (node *Node) IsExpired() bool {
+	return node.IsExpiredAt(time.Now())
+}
+
+// IsExpiredAt reports whether the node registration has expired at now.
+func (node *Node) IsExpiredAt(now time.Time) bool {
 	// If Expiry is not set, the client has not indicated that
 	// it wants an expiry time, it is therefore considered
 	// to mean "not expired"
@@ -326,7 +337,7 @@ func (node *Node) IsExpired() bool {
 		return false
 	}
 
-	return time.Since(*node.Expiry) > 0
+	return now.After(*node.Expiry)
 }
 
 // Online reports the node's last known connectivity. Unknown counts as
@@ -590,16 +601,6 @@ func (nodes Nodes) FilterByIP(ip netip.Addr) Nodes {
 	}
 
 	return found
-}
-
-func (nodes Nodes) ContainsNodeKey(nodeKey key.NodePublic) bool {
-	for _, node := range nodes {
-		if node.NodeKey == nodeKey {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (node *Node) GetFQDN(baseDomain string) (string, error) {
@@ -1078,6 +1079,15 @@ func (nv NodeView) IsExpired() bool {
 	return nv.ж.IsExpired()
 }
 
+// IsExpiredAt reports whether the node registration has expired at now.
+func (nv NodeView) IsExpiredAt(now time.Time) bool {
+	if !nv.Valid() {
+		return true
+	}
+
+	return nv.ж.IsExpiredAt(now)
+}
+
 // Online reports the node's last known connectivity.
 func (nv NodeView) Online() bool {
 	if !nv.Valid() {
@@ -1484,7 +1494,7 @@ func (nv NodeView) tailNode(
 	hostinfo := nv.Hostinfo()
 
 	if withCapMap {
-		capMap = selfCapMap(cfg, selfPolicyCaps)
+		capMap = selfCapMap(cfg, capVer, selfPolicyCaps)
 	} else {
 		hostinfo = peerHostinfo(nv.ж.Hostinfo, nv.exitNodePriorityForPeers())
 	}
@@ -1585,7 +1595,7 @@ func (nv NodeView) exitNodePriorityForPeers() int {
 // carry the nodeAttrs and the role caps (is-admin, is-owner) the policy
 // manager stamps from the owning user's role. Mirrors what Tailscale SaaS
 // emits for a default tailnet.
-func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
+func selfCapMap(cfg *Config, capVer tailcfg.CapabilityVersion, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 	capMap := tailcfg.NodeCapMap{
 		nodecap.SSH: []tailcfg.RawMessage{},
 	}
@@ -1616,7 +1626,19 @@ func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 		capMap[nodecap.HTTPS] = nil
 	}
 
+	// A client that asks for it caches its netmap on disk and reaches its
+	// peers from the cache before control answers, as on the hosted
+	// control plane; a disable-cache-network-maps nodeAttr opts a node
+	// out, and the client then drops the cache it holds.
+	if capVer >= cacheNetworkMapsByDefault {
+		capMap[nodecap.CacheNetworkMaps] = nil
+	}
+
 	maps.Copy(capMap, policyCaps)
+
+	if _, ok := capMap[nodecap.DisableCacheNetworkMaps]; ok {
+		delete(capMap, nodecap.CacheNetworkMaps)
+	}
 
 	// A node the policy grants Funnel learns which ports it may open, and
 	// is warned when HTTPS is off, since Funnel cannot work without a

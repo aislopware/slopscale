@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -274,6 +275,44 @@ func TestRegistrationRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 		"registering a NodeKey already bound to another machine must be rejected")
 }
 
+// TestRegistrationKeepsRequestTagsIntact guards the node's reported
+// Hostinfo.RequestTags against the in-place sort/compact that derives the
+// approved tag set: the two must not share a backing array.
+func TestRegistrationKeepsRequestTagsIntact(t *testing.T) {
+	t.Parallel()
+
+	dbPath := t.TempDir() + "/slopscale.db"
+	cfg := persistTestConfig(dbPath)
+
+	database, err := db.NewSlopscaleDatabase(cfg)
+	require.NoError(t, err)
+
+	user := database.CreateUserForTest("tagger")
+	require.NoError(t, database.Close())
+
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	_, err = s.SetPolicy([]byte(`{"tagOwners":{"tag:a":["tagger@"],"tag:b":["tagger@"]}}`))
+	require.NoError(t, err)
+
+	node, err := s.createAndSaveNewNode(newNodeParams{
+		User:           *user,
+		MachineKey:     key.NewMachine().Public(),
+		NodeKey:        key.NewNode().Public(),
+		DiscoKey:       key.NewDisco().Public(),
+		Hostname:       "node",
+		Hostinfo:       &tailcfg.Hostinfo{RequestTags: []string{"tag:b", "tag:a", "tag:a"}},
+		RegisterMethod: util.RegisterMethodCLI,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"tag:a", "tag:b"}, node.Tags().AsSlice())
+	assert.Equal(t, []string{"tag:b", "tag:a", "tag:a"}, node.Hostinfo().RequestTags().AsSlice(),
+		"reported RequestTags rewritten by tag approval")
+}
+
 // TestReauthRejectsNodeKeyClaimedByAnotherMachine proves the re-auth/update
 // path enforces the same 1:1 NodeKey<->MachineKey binding as the create path
 // (TestRegistrationRejectsNodeKeyClaimedByAnotherMachine) and the poll path
@@ -323,7 +362,7 @@ func TestReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 	require.NoError(t, err)
 
 	// Attacker re-authenticates its own node but supplies the victim's NodeKey.
-	_, err = s.applyAuthNodeUpdate(authNodeUpdateParams{
+	_, _, err = s.applyAuthNodeUpdate(authNodeUpdateParams{
 		ExistingNode: attackerNode,
 		RegData: &types.RegistrationData{
 			MachineKey: attackerMachine.Public(),
@@ -385,7 +424,7 @@ func TestReauthPreservesEndpointsWhenClientOmitsThem(t *testing.T) {
 
 	// Node re-authenticates, rotating its NodeKey. The RegisterRequest carries
 	// no endpoints.
-	updated, err := s.applyAuthNodeUpdate(authNodeUpdateParams{
+	updated, _, err := s.applyAuthNodeUpdate(authNodeUpdateParams{
 		ExistingNode: node,
 		RegData: &types.RegistrationData{
 			MachineKey: machine.Public(),
@@ -432,6 +471,51 @@ func TestReauthChange(t *testing.T) {
 	assert.Empty(t, pol.PeerPatches, "a policy change must not be a peer patch")
 	assert.Empty(t, pol.PeersChanged)
 	assert.False(t, pol.IsEmpty(), "a policy change must be non-empty")
+}
+
+// TestOnlyKeysChanged covers which relogins may ride the key-rotation patch:
+// one that flips Expired or changes Hostinfo peers read must not, as
+// [tailcfg.PeerChange] carries neither (#3531).
+func TestOnlyKeysChanged(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+	past, future := now.Add(-time.Minute), now.Add(time.Hour)
+
+	node := func(expiry time.Time, hi tailcfg.Hostinfo) types.NodeView {
+		n := types.Node{
+			NodeKey:  key.NewNode().Public(),
+			DiscoKey: key.NewDisco().Public(),
+			Expiry:   &expiry,
+			Hostinfo: &hi,
+		}
+
+		return n.View()
+	}
+
+	hi := tailcfg.Hostinfo{Hostname: "node", OS: "linux"}
+	withOSVersion, withService := hi, hi
+	withOSVersion.OSVersion = "6.1"
+	withService.Services = []tailcfg.Service{{Proto: tailcfg.PeerAPI4, Port: 4242}}
+
+	tests := []struct {
+		name          string
+		before, after types.NodeView
+		want          bool
+	}{
+		{name: "keys", before: node(future, hi), after: node(future, hi), want: true},
+		{name: "hostinfo peers do not read", before: node(future, hi), after: node(future, withOSVersion), want: true},
+		{name: "un-expired", before: node(past, hi), after: node(future, hi)},
+		{name: "hostinfo peers read", before: node(future, hi), after: node(future, withService)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, onlyKeysChanged(tt.before, tt.after, now))
+		})
+	}
 }
 
 // TestPreAuthKeyReauthRejectsNodeKeyClaimedByAnotherMachine is the pre-auth-key
@@ -526,9 +610,12 @@ func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
 	origNodeKey := node.NodeKey()
 
 	// Fail the node row update so the re-registration's database write errors
-	// after the NodeStore has already been mutated.
+	// after the NodeStore has already been mutated. A session connects during
+	// the write; the rollback must not undo it.
 	s.db.SetQueryHook(func(query string) error {
 		if strings.HasPrefix(query, "UPDATE nodes") {
+			s.Connect(node.ID())
+
 			return errInjectedNodeUpdate
 		}
 
@@ -545,6 +632,10 @@ func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, origNodeKey, got.NodeKey(),
 		"NodeStore must revert to the persisted node key when the write fails")
+
+	online, known := got.IsOnline().GetOk()
+	require.True(t, known)
+	require.True(t, online, "rollback dropped the session that connected during the write")
 }
 
 // TestConcurrentPreAuthKeyRegistrationSameMachineKey ensures concurrent
@@ -623,4 +714,66 @@ func TestUpdatePolicyManagerUsersUnchangedKeepsSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	require.NotSame(t, before, s.nodeStore.data.Load(),
 		"a user change must rebuild the peer map")
+}
+
+// TestBackfillNodeIPsSurvivesConcurrentPersist guards the backfill against a
+// node persist landing between its database write and the NodeStore reload:
+// that persist writes the old addresses back and the backfill is lost.
+func TestBackfillNodeIPsSurvivesConcurrentPersist(t *testing.T) {
+	t.Parallel()
+
+	dbPath, s, nodeID := persistTestSetup(t)
+	require.NoError(t, s.Close())
+
+	// Dropping the IPv6 prefix gives the backfill work to do.
+	cfg := persistTestConfig(dbPath)
+	cfg.PrefixV6 = nil
+
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	nv, ok := s.GetNodeByID(nodeID)
+	require.True(t, ok)
+	require.True(t, nv.IPv6().Valid(), "precondition: node has an IPv6 address")
+
+	// The backfill reads the nodes table twice: inside its write, then to
+	// reload NodeStore. Persist the node just before the reload.
+	var reads atomic.Int32
+
+	persisted := make(chan struct{})
+
+	s.db.SetQueryHook(func(query string) error {
+		if !strings.HasPrefix(query, "SELECT") || !strings.Contains(query, "FROM nodes") ||
+			reads.Add(1) != 2 {
+			return nil
+		}
+
+		go func() {
+			_, _ = s.persistNodeRowToDB(nv)
+
+			close(persisted)
+		}()
+
+		// Give an unserialised persist time to land before the reload.
+		select {
+		case <-persisted:
+		case <-time.After(200 * time.Millisecond):
+		}
+
+		return nil
+	})
+	t.Cleanup(func() { s.db.SetQueryHook(nil) })
+
+	_, _, err = s.BackfillNodeIPs()
+	require.NoError(t, err)
+	<-persisted
+
+	nv, ok = s.GetNodeByID(nodeID)
+	require.True(t, ok)
+	assert.False(t, nv.IPv6().Valid(), "NodeStore kept the removed IPv6 address")
+
+	dbNode, err := s.db.GetNodeByID(nodeID)
+	require.NoError(t, err)
+	assert.Nil(t, dbNode.IPv6, "database kept the removed IPv6 address")
 }

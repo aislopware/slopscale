@@ -85,18 +85,10 @@ const defaultSeconds = 185
 // 88 minutes, several times a shard, and splits into 24 independent leaves.
 //
 // A prefix must name a real subtest. [TestAutoApproveMultiNetwork] composes
-// its names as "<approver>-advertiseduringup-<bool>-pol-<mode>", the auth-key
-// relogin tests as "with-https-<bool>", and the rest take theirs from a table.
+// its names as "<approver>-advertiseduringup-<bool>-pol-<mode>", and the
+// rest take theirs from a table.
 var testsToSplit = map[string][]string{
 	"TestAutoApproveMultiNetwork": autoApproveSubtests(),
-	"TestAuthKeyLogoutAndReloginSameUser": {
-		"with-https-true",
-		"with-https-false",
-	},
-	"TestAuthKeyLogoutAndReloginSameUserExpiredKey": {
-		"with-https-true",
-		"with-https-false",
-	},
 	"TestSSHLocalpart": {
 		"MemberAndTagged",
 		"AutogroupSelf",

@@ -261,6 +261,11 @@ configuration and attributes. At least the following node attributes are current
   detection](https://tailscale.com/docs/integrations/captive-portals#disable-captive-portal-detection).
 - `disable-relay-server`: keep the node from acting as a [peer relay](/ref/networks#peer-relays), whatever its own
   `--relay-server-port` setting says.
+- `disable-cache-network-maps`: keep the node from caching its network map on disk. A client at capability version 149
+  or later (expected with Tailscale 1.104) caches it by default and, on its next start, reaches its peers from the cache
+  before the control server answers, which helps on slow or filtered networks. Opt out devices with wear-sensitive
+  storage such as SD cards; the client then drops the cache it holds. `cache-network-maps` turns caching on for older
+  clients that support it (1.98 and later).
 
 ```json title="policy.json"
 {
@@ -337,5 +342,5 @@ fine-grained configuration instead.
 [^1]: Slopscale also allows to store the policy in the database. This is typically only required in case the
     [admin console](/ref/console) is used.
 
-[^2]: Other key-only node attributes can be used as well. Find them in the client source code with `grep -E '^\s+NodeAttr\w+' tailcfg/tailcfg.go` or by using [GitHub code search (requires
-    login)](https://github.com/search?q=repo%3Atailscale%2Ftailscale%20language%3Ago%20path%3Atailcfg%2Ftailcfg.go%20symbol%3A%2FNodeAttr%5Cw%2B%2F&type=code).
+[^2]: Other key-only node attributes can be used as well. Find them in the client source code with `grep -E ' Cap ' tailcfg/nodecap/nodecap.go` or by using [GitHub code search (requires
+    login)](https://github.com/search?q=repo%3Atailscale%2Ftailscale+language%3Ago+path%3Atailcfg%2Fnodecap%2Fnodecap.go+%2F+Cap+%2F&type=code).

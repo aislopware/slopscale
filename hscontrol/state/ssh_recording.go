@@ -81,12 +81,13 @@ func (s *State) SetSSHRecording(recorders []string, enforce bool) (change.Change
 }
 
 // SSHRecordingFor returns the recorders and failure action a check-mode
-// session between src and dst records with; see
+// session from src to dst as localUser records with; see
 // [policyv2.PolicyManager.SSHRecordingFor].
 func (s *State) SSHRecordingFor(
 	srcNodeID, dstNodeID types.NodeID,
+	localUser string,
 ) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction) {
-	return s.polMan.SSHRecordingFor(s.cfg.ServerURL, srcNodeID, dstNodeID)
+	return s.polMan.SSHRecordingFor(s.cfg.ServerURL, srcNodeID, dstNodeID, localUser)
 }
 
 // NodeByIP finds the node that holds a tailnet address; the recorder

@@ -35,11 +35,20 @@ type TailnetSettings struct {
 	UsersApprovalOn                        bool   `json:"usersApprovalOn"`
 	UsersRoleAllowedToJoinExternalTailnets string `json:"usersRoleAllowedToJoinExternalTailnets"`
 
-	NetworkFlowLoggingOn        bool `json:"networkFlowLoggingOn"`
+	NetworkFlowLoggingOn bool `json:"networkFlowLoggingOn"`
+	// RegionalRoutingOn is the older form of RouteSelection, which the
+	// hosted API still returns.
 	RegionalRoutingOn           bool `json:"regionalRoutingOn"`
 	PostureIdentityCollectionOn bool `json:"postureIdentityCollectionOn"`
 	HTTPSEnabled                bool `json:"httpsEnabled"`
+	// RouteSelection is always regional routing: every machine is steered
+	// to the nearest healthy router, connector and exit node.
+	RouteSelection string `enum:"regional-routing" json:"routeSelection"`
 }
+
+// routeSelectionRegional is the hosted API's name for the steering slopscale
+// always does.
+const routeSelectionRegional = "regional-routing"
 
 type (
 	getSettingsInput struct {
@@ -77,6 +86,8 @@ func tailnetSettings(b Backend) TailnetSettings {
 		DevicesKeyDurationDays:                 int(keyDuration / (hoursPerDay * time.Hour)),
 		HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
 		PostureIdentityCollectionOn:            current.PostureIdentityOn,
+		RegionalRoutingOn:                      true,
+		RouteSelection:                         routeSelectionRegional,
 		UsersApprovalOn:                        current.UsersApprovalOn,
 		UsersRoleAllowedToJoinExternalTailnets: "none",
 	}

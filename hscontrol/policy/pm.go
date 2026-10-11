@@ -30,14 +30,17 @@ type PolicyManager interface {
 	// nodes: out[i] lists the positions of node i's peers.
 	BuildPeerPositions(nodes views.Slice[types.NodeView]) [][]int32
 	SSHPolicy(baseURL string, node types.NodeView) (*tailcfg.SSHPolicy, error)
-	// SSHCheckParams resolves the SSH check period for a (src, dst) pair
-	// from the current policy, avoiding trust of client-provided URL params.
-	SSHCheckParams(srcNodeID, dstNodeID types.NodeID) (time.Duration, bool)
+	// SSHCheckParams resolves the SSH check period for src logging in to
+	// dst as localUser from the current policy, avoiding trust of
+	// client-provided URL params.
+	SSHCheckParams(srcNodeID, dstNodeID types.NodeID, localUser string) (time.Duration, bool)
 	// SSHRecordingFor returns the recorders and failure action for the
-	// check-mode session between src and dst; nil when none records.
+	// check-mode session from src to dst as localUser; nil when none
+	// records.
 	SSHRecordingFor(
 		baseURL string,
 		srcNodeID, dstNodeID types.NodeID,
+		localUser string,
 	) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction)
 	// SetSSHRecording replaces the tailnet's default session recording.
 	SetSSHRecording(recording policyv2.SSHRecording) (bool, error)

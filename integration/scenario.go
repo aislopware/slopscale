@@ -689,8 +689,10 @@ func (s *Scenario) CreateTailscaleNodesInUser(
 
 			s.mu.Lock()
 
-			opts = append(
-				opts,
+			// Each client gets its own copy: appending to opts would hand
+			// every later client the options of the ones before it.
+			clientOpts := append(
+				slices.Clone(opts),
 				tsic.WithCACert(cert),
 				tsic.WithSlopscaleName(hostname),
 				tsic.WithExtraHosts(extraHosts),
@@ -703,7 +705,7 @@ func (s *Scenario) CreateTailscaleNodesInUser(
 				tsClient, err := tsic.New(
 					s.pool,
 					version,
-					opts...,
+					clientOpts...,
 				)
 				s.mu.Unlock()
 

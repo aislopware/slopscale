@@ -149,13 +149,14 @@ func generateMapResponse(
 		}
 
 		removed = nc.computePeerDiff(currentPeerIDs)
-		// Include self node when this is a self-update (e.g., node's own tags changed)
-		// so the node sees its updated self info along with new packet filters, or
-		// when the change asks for it on every node (approval flips
-		// MachineAuthorized on the self node of everyone it admits).
-		resp, err = mapper.policyChangeResponse(
-			nodeID, version, currentPeers, isSelfUpdate || r.IncludeSelf,
-		)
+		// The response always carries the self node: it renders from the
+		// same state as peers (approved routes, tags, approval's
+		// MachineAuthorized, role caps), and a connection that already
+		// holds an equal one has it dropped on send. What rides beside it
+		// (tailnet lock head, display messages) only comes along when the
+		// change is the node's own or asks for it on every node, as an
+		// approval or a tailnet lock head move does.
+		resp, err = mapper.policyChangeResponse(nodeID, version, currentPeers, isSelfUpdate || r.IncludeSelf)
 	case isSelfUpdate:
 		// Non-policy self-update: just send the self node info
 		resp, err = mapper.selfMapResponse(nodeID, version)
@@ -405,7 +406,8 @@ func (b *Batcher) AddNode(
 
 		// Peers removed while the node had no stream: the initial map is a
 		// full rebuild, so follow it with the removal as a delta, see
-		// [withRemovals].
+		// [withRemovals], and keep the removed peers tracked across the
+		// baseline reset below.
 		//
 		// TODO(kradalby): delete with the tailscale/tailscale#15660 compat, see
 		// capver.CanOldCodeBeCleanedUp.
@@ -414,8 +416,10 @@ func (b *Batcher) AddNode(
 			peerIDs = append(peerIDs, peer.ID)
 		}
 
-		removed := make([]types.NodeID, 0)
-		for _, peerID := range nodeConn.computePeerDiff(peerIDs) {
+		removedIDs := nodeConn.computePeerDiff(peerIDs)
+
+		removed := make([]types.NodeID, 0, len(removedIDs))
+		for _, peerID := range removedIDs {
 			removed = append(removed, types.NodeID(peerID)) //nolint:gosec // NodeID types are equivalent
 		}
 
@@ -426,7 +430,20 @@ func (b *Batcher) AddNode(
 		}
 
 		nodeConn.updateSentPeers(initialMap)
+
+		// The client has not had these removals as a delta yet. Pending
+		// may lose the queued one (a full supersedes it, or the node
+		// leaves before it is sent), so keep them tracked until delivery
+		// drops them: the next full or reconnect then re-derives them.
+		for _, peerID := range removedIDs {
+			nodeConn.lastSentPeers.Store(peerID, struct{}{})
+		}
+
 		nodeConn.workMu.Unlock()
+
+		// Still pendingInitial, so no broadcast can race this.
+		newEntry.lastSelf.Store(initialMap.Node)
+		newEntry.lastSSHPolicy.Store(initialMap.SSHPolicy)
 
 		// Open the connection for broadcast sends now that the initial
 		// map is the stream's first frame; send() requeued any changes
@@ -837,17 +854,15 @@ func (b *Batcher) addToBatch(changes ...change.Change) {
 		}
 	}
 
-	// Short circuit if any of the changes is a full update, which
-	// means we can skip sending individual changes.
+	// A full update supersedes every state change pending or in this call,
+	// but not the pings addressed to a node; those follow the full.
 	if change.HasFull(changes) {
 		b.nodes.Range(func(_ types.NodeID, nc *multiChannelNodeConn) bool {
 			if nc == nil {
 				return true
 			}
 
-			nc.pendingMu.Lock()
-			nc.pending = []change.Change{change.FullUpdate()}
-			nc.pendingMu.Unlock()
+			nc.collapsePendingToFull(changes)
 
 			return true
 		})

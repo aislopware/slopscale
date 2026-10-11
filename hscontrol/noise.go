@@ -33,9 +33,6 @@ var ErrUnsupportedClientVersion = errors.New("unsupported client version")
 // ErrMissingURLParameter is returned when a required URL parameter is not provided.
 var ErrMissingURLParameter = errors.New("missing URL parameter")
 
-// ErrNoAuthSession is returned when an auth_id does not match any active auth session.
-var ErrNoAuthSession = errors.New("no auth session found")
-
 // ErrSSHDstNodeNotFound is returned when the dst node id on a Noise SSH
 // action request does not match any registered node.
 var ErrSSHDstNodeNotFound = errors.New("ssh action: unknown dst node id")
@@ -490,6 +487,7 @@ func (ns *noiseServer) SSHActionHandler(
 		req.Context(),
 		reqLog,
 		srcNodeID, dstNodeID,
+		req.URL.Query().Get("local_user"),
 		req.URL.Query().Get("auth_id"),
 	)
 	if err != nil {
@@ -603,7 +601,7 @@ func (ns *noiseServer) RegistrationHandler(
 		return
 	}
 
-	registerResponse, err := ns.slopscale.handleRegister(req.Context(), registerRequest, ns.conn.Peer())
+	registerResponse, err := ns.slopscale.handleRegister(req.Context(), registerRequest, ns.machineKey)
 	if err != nil {
 		if httpErr, ok := errors.AsType[HTTPError](err); ok {
 			registerResponse = &tailcfg.RegisterResponse{Error: httpErr.Msg}
@@ -671,18 +669,20 @@ func (ns *noiseServer) earlyNoise(protocolVersion int, writer io.Writer) error {
 // sshAction resolves the SSH action for the given request parameters.
 // It returns the action to send to the client, or an [HTTPError] on failure.
 //
-// Three cases:
-//  1. Initial request, auto-approved — source recently authenticated
+// Four cases:
+//  1. No check rule covers the pair — reject; the client's rule is stale.
+//  2. Initial request, auto-approved — source recently authenticated
 //     within the check period, accept immediately.
-//  2. Initial request, needs auth — build a [tailcfg.SSHAction.HoldAndDelegate] URL and
+//  3. Initial request, needs auth — build a [tailcfg.SSHAction.HoldAndDelegate] URL and
 //     wait for the user to authenticate.
-//  3. Follow-up request — an auth_id is present, wait for the auth
-//     verdict and accept or reject.
+//  4. Follow-up request — an auth_id is present, wait for the auth
+//     verdict and accept or reject. A session that is gone or whose
+//     verdict another follow-up consumed is re-decided.
 func (ns *noiseServer) sshAction(
 	ctx context.Context,
 	reqLog zerolog.Logger,
 	srcNodeID, dstNodeID types.NodeID,
-	authIDStr string,
+	localUser, authIDStr string,
 ) (*tailcfg.SSHAction, error) {
 	action := tailcfg.SSHAction{
 		AllowAgentForwarding:      true,
@@ -692,25 +692,34 @@ func (ns *noiseServer) sshAction(
 
 	// The final action replaces the rule's, so it carries the
 	// recorders the rule would have.
-	action.Recorders, action.OnRecordingFailure = ns.slopscale.state.SSHRecordingFor(srcNodeID, dstNodeID)
+	action.Recorders, action.OnRecordingFailure = ns.slopscale.state.SSHRecordingFor(
+		srcNodeID, dstNodeID, localUser,
+	)
 
 	// Look up check params from the server's own policy rather than
 	// trusting URL parameters, which the client could tamper with.
+	// local_user only narrows which rule applies, and it comes from dst,
+	// the node enforcing the login.
 	checkPeriod, checkFound := ns.slopscale.state.SSHCheckParams(
-		srcNodeID, dstNodeID,
+		srcNodeID, dstNodeID, localUser,
 	)
+
+	// Clients only call back for check rules they were sent. Without one in
+	// the current policy the client's copy is stale.
+	if !checkFound {
+		return sshActionDeny(reqLog, &action), nil
+	}
 
 	// Follow-up request with auth_id — wait for the auth verdict.
 	if authIDStr != "" {
 		return ns.sshActionFollowUp(
 			ctx, reqLog, &action, authIDStr,
-			srcNodeID, dstNodeID,
-			checkFound,
+			srcNodeID, dstNodeID, localUser,
 		)
 	}
 
 	// Initial request — check if auto-approval applies.
-	if checkFound && checkPeriod > 0 {
+	if checkPeriod > 0 {
 		if lastAuth, ok := ns.slopscale.state.GetLastSSHAuth(
 			srcNodeID, dstNodeID,
 		); ok && time.Since(lastAuth) < checkPeriod {
@@ -726,7 +735,18 @@ func (ns *noiseServer) sshAction(
 	}
 
 	// No auto-approval — create an auth session and hold.
-	return ns.sshActionHoldAndDelegate(reqLog, &action, srcNodeID, dstNodeID)
+	return ns.sshActionHoldAndDelegate(reqLog, &action, srcNodeID, dstNodeID, localUser)
+}
+
+// sshActionDeny rejects a check the current policy does not require. It is a
+// 200 Reject, not an HTTP error: tailssh retries errors for up to 30 minutes.
+func sshActionDeny(reqLog zerolog.Logger, action *tailcfg.SSHAction) *tailcfg.SSHAction {
+	action.Reject = true
+	action.Message = "# Slopscale SSH: no check rule in the tailnet policy covers this connection.\n"
+
+	reqLog.Info().Caller().Msg("SSH check denied: no matching check rule")
+
+	return action
 }
 
 // sshActionHoldAndDelegate creates a new auth session bound to the
@@ -736,11 +756,11 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 	reqLog zerolog.Logger,
 	action *tailcfg.SSHAction,
 	srcNodeID, dstNodeID types.NodeID,
+	localUser string,
 ) (*tailcfg.SSHAction, error) {
 	holdURL, err := url.Parse(
 		ns.slopscale.cfg.ServerURL +
-			"/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID" +
-			"?local_user=$LOCAL_USER",
+			"/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID",
 	)
 	if err != nil {
 		return nil, NewHTTPError(
@@ -766,7 +786,10 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 
 	authURL := ns.slopscale.authProvider.AuthURL(authID)
 
+	// The concrete user, not $LOCAL_USER: Encode escapes the placeholder
+	// and tailssh only expands it literally.
 	q := holdURL.Query()
+	q.Set("local_user", localUser)
 	q.Set("auth_id", authID.String())
 	holdURL.RawQuery = q.Encode()
 
@@ -797,7 +820,7 @@ func (ns *noiseServer) sshActionFollowUp(
 	action *tailcfg.SSHAction,
 	authIDStr string,
 	srcNodeID, dstNodeID types.NodeID,
-	checkFound bool,
+	localUser string,
 ) (*tailcfg.SSHAction, error) {
 	authID, err := types.AuthIDFromString(authIDStr)
 	if err != nil {
@@ -810,26 +833,23 @@ func (ns *noiseServer) sshActionFollowUp(
 
 	reqLog = reqLog.With().Str("auth_id", authID.String()).Logger()
 
+	// The session is gone (expired, evicted, or lost on a control-plane
+	// restart) or its verdict was already consumed; neither may approve
+	// access. A bare error dead-ends the client: it keeps polling this
+	// now-defunct auth_id until the SSH connection times out. The caller
+	// checked that the policy still requires the check, so re-delegate
+	// and let the client complete a fresh one.
+	sessionGone := func(logMsg string) (*tailcfg.SSHAction, error) {
+		reqLog.Info().Caller().Msg(logMsg)
+
+		return ns.sshActionHoldAndDelegate(
+			reqLog, action, srcNodeID, dstNodeID, localUser,
+		)
+	}
+
 	auth, ok := ns.slopscale.state.GetAuthCacheEntry(authID)
 	if !ok {
-		// The session is gone (expired, evicted, or lost on a control-plane
-		// restart). A bare error dead-ends the client: it keeps polling this
-		// now-defunct auth_id until the SSH connection times out. Re-delegate
-		// so a still-required check can complete instead.
-		if checkFound {
-			reqLog.Info().Caller().
-				Msg("SSH check auth session missing; re-delegating")
-
-			return ns.sshActionHoldAndDelegate(
-				reqLog, action, srcNodeID, dstNodeID,
-			)
-		}
-
-		return nil, NewHTTPError(
-			http.StatusBadRequest,
-			"Invalid auth_id",
-			fmt.Errorf("%w: %s", ErrNoAuthSession, authID),
-		)
+		return sessionGone("SSH check auth session missing; re-delegating")
 	}
 
 	// Verify the cached binding matches the (src, dst) pair the
@@ -860,7 +880,11 @@ func (ns *noiseServer) sshActionFollowUp(
 
 	reqLog.Trace().Caller().Msg("SSH action follow-up")
 
-	var verdict types.AuthVerdict
+	var (
+		verdict   types.AuthVerdict
+		verdictOK bool
+	)
+
 	select {
 	case <-ctx.Done():
 		// The client disconnected (or its request timed out) before the
@@ -873,7 +897,14 @@ func (ns *noiseServer) sshActionFollowUp(
 			"ssh action follow-up cancelled",
 			ctx.Err(),
 		)
-	case verdict = <-auth.WaitForAuth():
+	case verdict, verdictOK = <-auth.WaitForAuth():
+	}
+
+	// FinishAuth buffers one verdict, then closes the channel. A closed
+	// receive yields the zero verdict, which Accept() reports as success,
+	// so a replayed follow-up would be approved even after a Reject.
+	if !verdictOK {
+		return sessionGone("SSH check verdict already consumed; re-delegating")
 	}
 
 	if !verdict.Accept() {
@@ -885,15 +916,19 @@ func (ns *noiseServer) sshActionFollowUp(
 		return action, nil
 	}
 
+	// The policy may have changed while the user authenticated, and the
+	// client won't drop a connection still waiting on its check.
+	if _, ok := ns.slopscale.state.SSHCheckParams(srcNodeID, dstNodeID, localUser); !ok {
+		return sshActionDeny(reqLog, action), nil
+	}
+
 	action.Accept = true
 
 	// Record the successful auth for future auto-approval.
-	if checkFound {
-		ns.slopscale.state.SetLastSSHAuth(srcNodeID, dstNodeID)
+	ns.slopscale.state.SetLastSSHAuth(srcNodeID, dstNodeID)
 
-		reqLog.Trace().Caller().
-			Msg("auth recorded for auto-approval")
-	}
+	reqLog.Trace().Caller().
+		Msg("auth recorded for auto-approval")
 
 	return action, nil
 }
@@ -917,7 +952,11 @@ func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWr
 
 	sess.log.Info().Caller().Msg("map request from an unknown node key, telling it to log in again")
 
-	err := sess.writeMap(nodeGoneResponse(sess.node))
+	resp := nodeGoneResponse(sess.node)
+	// This frame opens the stream in place of the initial map.
+	resp.Debug = ns.slopscale.cfg.TailcfgDebug()
+
+	err := sess.writeMap(resp)
 	if err != nil {
 		sess.log.Error().Caller().Err(err).Msg("cannot write map to unknown node")
 	}

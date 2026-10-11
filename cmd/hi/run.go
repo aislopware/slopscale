@@ -12,7 +12,10 @@ import (
 	"github.com/creachadair/command"
 )
 
-var ErrTestPatternRequired = errors.New("test pattern is required as first argument or use --test flag")
+var (
+	ErrTestPatternRequired     = errors.New("test pattern is required as first argument or use --test flag")
+	ErrUnexpectedTestArguments = errors.New("expected a single test pattern; check flag spelling and shell quoting")
+)
 
 type RunConfig struct {
 	TestPattern   string        `flag:"test,Test pattern to run"`
@@ -30,15 +33,30 @@ type RunConfig struct {
 	TSMemoryLimit float64       `flag:"ts-memory-limit,default=0,Fail if Tailscale exceeds this MB (0=disabled)"`
 }
 
-// runIntegrationTest executes the integration test workflow.
-func runIntegrationTest(env *command.Env) error {
-	args := env.Args
-	if len(args) > 0 && runConfig.TestPattern == "" {
-		runConfig.TestPattern = args[0]
+// validate takes the test pattern from args or --test and refuses anything
+// else: a stray positional argument is usually a flag the shell split or
+// quoted wrongly, and ignoring it would silently run with its default.
+func (c *RunConfig) validate(args []string) error {
+	if len(args) > 1 || (len(args) != 0 && c.TestPattern != "") {
+		return ErrUnexpectedTestArguments
 	}
 
-	if runConfig.TestPattern == "" {
+	if len(args) == 1 {
+		c.TestPattern = args[0]
+	}
+
+	if c.TestPattern == "" {
 		return ErrTestPatternRequired
+	}
+
+	return nil
+}
+
+// runIntegrationTest executes the integration test workflow.
+func runIntegrationTest(env *command.Env) error {
+	err := runConfig.validate(env.Args)
+	if err != nil {
+		return err
 	}
 
 	if runConfig.GoVersion == "" {
@@ -50,7 +68,7 @@ func runIntegrationTest(env *command.Env) error {
 		log.Printf("Running pre-flight system checks...")
 	}
 
-	err := runDoctorCheck(env.Context())
+	err = runDoctorCheck(env.Context())
 	if err != nil {
 		return fmt.Errorf("pre-flight checks failed: %w", err)
 	}
@@ -71,7 +89,7 @@ func detectGoVersion() string {
 	if err != nil {
 		content, err = os.ReadFile(filepath.Join("..", "..", "go.mod"))
 		if err != nil {
-			return "1.27.1"
+			return "1.27.2"
 		}
 	}
 
@@ -83,5 +101,5 @@ func detectGoVersion() string {
 		}
 	}
 
-	return "1.27.1"
+	return "1.27.2"
 }

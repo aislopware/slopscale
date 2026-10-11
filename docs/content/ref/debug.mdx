@@ -31,7 +31,7 @@ Many of the commands are helpful when trying to understand differences between S
 
 The log levels `debug` and `trace` can be useful to get more information from Slopscale.
 
-```yaml hl_lines="3"
+```yaml {3}
 log:
   # Valid log levels: panic, fatal, error, warn, info, debug, trace
   level: debug
@@ -45,7 +45,7 @@ written: `parameterized` logs placeholders instead of the bound arguments, `log_
 no rows as an error, and `slow_threshold` (milliseconds) marks slow queries. The former `database.gorm` block is
 still read with a deprecation warning.
 
-```yaml hl_lines="3 7"
+```yaml {3,7}
 database:
   # Enable debug mode. This setting requires the log.level to be set to "debug" or "trace".
   debug: false

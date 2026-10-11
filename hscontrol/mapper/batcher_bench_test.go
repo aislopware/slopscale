@@ -64,6 +64,66 @@ func BenchmarkMultiChannelSend(b *testing.B) {
 	}
 }
 
+// BenchmarkMultiChannelSendSSHPolicy measures a send carrying an SSHPolicy
+// equal to the one every connection already holds, as each policy frame
+// does when the SSH rules did not change.
+func BenchmarkMultiChannelSendSSHPolicy(b *testing.B) {
+	sshPolicy := func(rules int) *tailcfg.SSHPolicy {
+		pol := &tailcfg.SSHPolicy{Rules: make([]*tailcfg.SSHRule, rules)}
+		for i := range pol.Rules {
+			pol.Rules[i] = &tailcfg.SSHRule{
+				Principals: []*tailcfg.SSHPrincipal{
+					{NodeIP: fmt.Sprintf("100.64.0.%d", i%250+1)},
+					{NodeIP: fmt.Sprintf("fd7a:115c:a1e0::%x", i+1)},
+				},
+				SSHUsers: map[string]string{"root": "root", "*": "="},
+				Action:   &tailcfg.SSHAction{Accept: true},
+			}
+		}
+
+		return pol
+	}
+
+	for _, rules := range []int{0, 10, 100} {
+		b.Run(fmt.Sprintf("%drules/3conn", rules), func(b *testing.B) {
+			mc := newMultiChannelNodeConn(1, nil)
+
+			for i := range 3 {
+				ch := make(chan *tailcfg.MapResponse, 1)
+				go func() {
+					for range ch {
+					}
+				}()
+
+				b.Cleanup(func() { close(ch) })
+
+				entry := makeConnectionEntry(fmt.Sprintf("conn-%d", i), ch)
+				mc.addConnection(entry)
+			}
+
+			first := testMapResponse()
+			first.SSHPolicy = sshPolicy(rules)
+			_ = mc.send(first)
+
+			// Equal content in fresh pointers, as after a policy reload;
+			// alternating keeps every send on the deep comparison.
+			var data [2]*tailcfg.MapResponse
+			for i := range data {
+				data[i] = testMapResponse()
+				data[i].SSHPolicy = sshPolicy(rules)
+			}
+
+			b.ReportAllocs()
+
+			i := 0
+			for b.Loop() {
+				_ = mc.send(data[i%2])
+				i++
+			}
+		})
+	}
+}
+
 // BenchmarkComputePeerDiff measures the cost of computing peer diffs at scale.
 func BenchmarkComputePeerDiff(b *testing.B) {
 	for _, peerCount := range []int{10, 100, 1000} {
