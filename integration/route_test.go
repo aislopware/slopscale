@@ -1833,6 +1833,11 @@ func TestEnablingExitRoutes(t *testing.T) {
 					assert.Contains(c, peerStatus.AllowedIPs.AsSlice(), tsaddr.AllIPv6())
 				}
 			}
+
+			// The approved node must learn its own routes on its live
+			// session, not only after reconnecting (juanfont/headscale#3502).
+			assert.True(c, status.Self.ExitNodeOption,
+				"%s should offer itself as exit node", client.Hostname())
 		}
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.SlowPoll, "clients should see new routes")
 }
