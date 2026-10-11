@@ -247,16 +247,66 @@ func runViaMapCompat(t *testing.T, c *testcapture.Capture) {
 		}
 
 		t.Run(viewerName, func(t *testing.T) {
-			// Routes and primary routes arrive in map responses after the
-			// peer itself, so compare against a settled netmap.
-			assert.EventuallyWithT(t, func(c *assert.CollectT) {
+			// Routes, primary routes and filters arrive in map responses
+			// after the peer itself, so compare against a settled netmap.
+			requireNetmapHolds(t, func(tt require.TestingT) {
 				nm := cl.Netmap()
-				require.NotNil(c, nm, "netmap is nil")
+				require.NotNil(tt, nm, "netmap is nil")
 
-				compareNetmap(c, nm, capture, clients, saasAddrs)
-			}, 15*time.Second, 25*time.Millisecond)
+				compareNetmap(tt, nm, capture, clients, saasAddrs)
+			})
 		})
 	}
+}
+
+// requireNetmapHolds retries check until it passes on several consecutive
+// ticks. One passing tick is not enough: a netmap that matches and then
+// drifts, such as a primary flipping away, is the bug these oracles guard.
+func requireNetmapHolds(t *testing.T, check func(require.TestingT)) {
+	t.Helper()
+
+	// Long enough for a batch still in flight to land.
+	const holdTicks = 5
+
+	held := 0
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		tick := &failRecorder{CollectT: collect}
+
+		// Deferred because FailNow exits the goroutine.
+		defer func() {
+			if tick.failed {
+				held = 0
+
+				return
+			}
+
+			held++
+			if held < holdTicks {
+				collect.Errorf("netmap held for %d of %d ticks", held, holdTicks)
+			}
+		}()
+
+		check(tick)
+	}, 30*time.Second, 25*time.Millisecond)
+}
+
+// failRecorder notes whether a tick failed, which [assert.CollectT] does
+// not expose.
+type failRecorder struct {
+	*assert.CollectT
+
+	failed bool
+}
+
+func (r *failRecorder) Errorf(format string, args ...any) {
+	r.failed = true
+	r.CollectT.Errorf(format, args...)
+}
+
+func (r *failRecorder) FailNow() {
+	r.failed = true
+	r.CollectT.FailNow()
 }
 
 // compareNetmap compares the slopscale [tailcfg.MapResponse] against the

@@ -193,12 +193,13 @@ func runViaHACompat(t *testing.T, c *testcapture.Capture) {
 		}
 
 		t.Run(viewerName, func(t *testing.T) {
-			// Peer and route updates arrive as separate map responses, so
-			// compare against the netmap once it has converged rather than
-			// the first one that shows the right peer count.
-			assert.EventuallyWithT(t, func(c *assert.CollectT) {
-				compareCaptureNetmap(c, cl, capture, clients)
-			}, 15*time.Second, 25*time.Millisecond)
+			// Peer, route and filter updates arrive as separate map
+			// responses, so compare against the netmap once it has
+			// converged and stays there, rather than the first one that
+			// shows the right peer count.
+			requireNetmapHolds(t, func(tt require.TestingT) {
+				compareCaptureNetmap(tt, cl, capture, clients)
+			})
 		})
 	}
 }
