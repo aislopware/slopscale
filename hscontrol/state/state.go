@@ -2368,7 +2368,47 @@ func (s *State) HandleNodeFromAuthPath(
 	return finalNode, reauthChange(finalNode, nodeExistsForSameUser, policyChanged), nil
 }
 
-//nolint:gocyclo,gocognit,cyclop,funlen,maintidx,nestif // legacy: sequential validation/create, security-sensitive
+// pakSkipsValidation reports whether re-registering n with pak may skip key
+// validation at now. The machine key proves identity and a pre-auth key only
+// authorises the initial join, so a plain restart (container "tailscale up
+// --authkey=KEY") re-presents a spent key legitimately. Anything that
+// authorises something new must present a valid key:
+//   - a node key rotation;
+//   - an expired user-owned node, which is re-authenticating rather than
+//     waking up. Tagged nodes never expire, so their past expiry is only a
+//     stale logout stamp and does not count;
+//   - a tagged key converting a user-owned node to tagged;
+//   - a tagged key other than the one the node last authed with, which retags
+//     it.
+//
+// It is a pure function of the node so the NodeStore writer can decide again
+// on the node it actually replaces.
+func pakSkipsValidation(n types.NodeView, pak *types.PreAuthKey, nodeKey key.NodePublic, now time.Time) bool {
+	if !n.Valid() {
+		return false
+	}
+
+	isNodeKeyRotation := n.NodeKey() != nodeKey
+	isExpiredUserOwned := !n.IsTagged() && n.IsExpiredAt(now)
+	isOwnershipConversion := pak.ConvertsNodeToTagged(n)
+	isRetag := pak.RetagsNode(n)
+	ownershipMatches := n.IsTagged() ||
+		(pak.User != nil && n.UserID().Valid() && n.UserID().Get() == pak.User.ID)
+
+	return ownershipMatches && !isNodeKeyRotation && !isExpiredUserOwned &&
+		!isOwnershipConversion && !isRetag
+}
+
+// pakReregisterErr is the authorisation decision for re-registering n with
+// pak at now: nil when validation may be skipped, else the key's validity.
+func pakReregisterErr(n types.NodeView, pak *types.PreAuthKey, nodeKey key.NodePublic, now time.Time) error {
+	if pakSkipsValidation(n, pak, nodeKey, now) {
+		return nil
+	}
+
+	return pak.ValidAt(now)
+}
+
 func (s *State) HandleNodeFromPreAuthKey(
 	regReq tailcfg.RegisterRequest,
 	machineKey key.MachinePublic,
@@ -2401,72 +2441,15 @@ func (s *State) HandleNodeFromPreAuthKey(
 		return types.NodeView{}, s.policyChangeSince(genBefore), err
 	}
 
-	// Helper to get username for logging (handles nil User for tags-only keys)
-	pakUsername := func() string {
-		if pak.User != nil {
-			return pak.User.Username()
-		}
-
-		return types.TaggedDevices.Name
-	}
-
 	existingNodeSameUser, existsSameUser, err := s.findExistingNodeForPAK(machineKey, pak)
 	if err != nil {
 		return types.NodeView{}, s.policyChangeSince(genBefore), err
 	}
 
-	// For existing nodes, skip validation if:
-	// 1. MachineKey matches (cryptographic proof of machine identity)
-	// 2. User/tag ownership matches (from the PAK being used)
-	// 3. Not a NodeKey rotation (rotation requires fresh validation)
-	//
-	// Security: MachineKey is the cryptographic identity. If someone has the MachineKey,
-	// they control the machine. The PAK was only needed to authorize initial join.
-	// We don't check which specific PAK was used originally because:
-	// - Container restarts may use different PAKs (e.g., env var changed)
-	// - Original PAK may be deleted
-	// - MachineKey + ownership is sufficient to prove this is the same node
-	isExistingNodeReregistering := existsSameUser && existingNodeSameUser.Valid()
-
-	// Check if this is a NodeKey rotation (different NodeKey)
-	isNodeKeyRotation := existsSameUser && existingNodeSameUser.Valid() &&
-		existingNodeSameUser.NodeKey() != regReq.NodeKey
-
-	// An expired node is genuinely re-authenticating, not just waking up, so it
-	// must present a valid key. Without this a node that re-uses its NodeKey
-	// after expiry would skip validation and be re-authorised with a spent or
-	// expired key; the boundary must not depend on the client rotating its key.
-	//
-	// Tagged nodes are excluded: they never expire (KB 1068), so an
-	// IsExpired() tagged node only reflects a stale logout stamp left by an
-	// older slopscale (#3371). Forcing it down the re-validation path burns its
-	// fresh key and blocks re-auth forever; treat it as a plain re-registration
-	// and clear the stale expiry in the update below.
-	isExpired := existsSameUser && existingNodeSameUser.Valid() &&
-		!existingNodeSameUser.IsTagged() &&
-		existingNodeSameUser.IsExpired()
-
-	// A tagged key presented for a currently user-owned node converts that node
-	// to tagged. That is an ownership change, not a plain refresh, so it must
-	// present a valid key rather than ride the skip-validation fast-path.
-	isOwnershipConversion := existsSameUser && existingNodeSameUser.Valid() &&
-		pak.IsTagged() && !existingNodeSameUser.IsTagged()
-
-	// A tagged key that differs from the one the node last authed with retags
-	// the node (see the in-place update below). Applying a key's tags is an
-	// authorisation decision, so the key must be validated rather than ride the
-	// skip-validation fast-path; otherwise a spent, revoked or expired tagged
-	// key could still retag a node that reuses its node key. Like isExpired,
-	// this boundary must not depend on the client rotating its key.
-	isRetag := existsSameUser && existingNodeSameUser.Valid() &&
-		pak.IsTagged() && existingNodeSameUser.IsTagged() &&
-		(!existingNodeSameUser.AuthKeyID().Valid() || existingNodeSameUser.AuthKeyID().Get() != pak.ID)
-
-	if isExistingNodeReregistering && !isNodeKeyRotation && !isExpired && !isOwnershipConversion && !isRetag {
-		// Existing, still-valid node re-registering with same NodeKey: skip
-		// validation. Pre-auth keys are only needed for initial authentication.
-		// Critical for containers that run "tailscale up --authkey=KEY" on every
-		// restart.
+	// This decision is only an early reject that keeps a key error ahead of
+	// ErrNodeKeyInUse. An in-place re-registration decides again in the
+	// NodeStore writer, on the node it replaces; see reregisterNodeWithPAK.
+	if existsSameUser && pakSkipsValidation(existingNodeSameUser, pak, regReq.NodeKey, time.Now()) {
 		log.Debug().
 			Caller().
 			Uint64(zf.NodeID, existingNodeSameUser.ID().Uint64()).
@@ -2478,10 +2461,8 @@ func (s *State) HandleNodeFromPreAuthKey(
 			Bool(zf.AuthKeyUsed, pak.Used).
 			Bool(zf.AuthKeyExpired, pak.Expiration != nil && pak.Expiration.Before(time.Now())).
 			Bool(zf.AuthKeyReusable, pak.Reusable).
-			Bool(zf.NodeKeyRotation, isNodeKeyRotation).
-			Msg("Existing node re-registering with same NodeKey and auth key, skipping validation")
+			Msg("Existing node re-registering with same NodeKey; skipping key validation until the writer re-decides")
 	} else {
-		// New node or NodeKey rotation: require valid auth key.
 		err = pak.Validate()
 		if err != nil {
 			return types.NodeView{}, s.policyChangeSince(genBefore), err
@@ -2505,7 +2486,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 		Str(zf.NodeName, hostname).
 		Str(zf.MachineKey, machineKey.ShortString()).
 		Str(zf.NodeKey, regReq.NodeKey.ShortString()).
-		Str(zf.UserName, pakUsername()).
+		Str(zf.UserName, pak.Username()).
 		Msg("Registering node with pre-auth key")
 
 	var finalNode types.NodeView
@@ -2515,266 +2496,14 @@ func (s *State) HandleNodeFromPreAuthKey(
 	// a tagged node (findExistingNodeForPAK matches it under UserID 0); for a
 	// user-owned key it is true when the same user already has the node.
 	if existsSameUser && existingNodeSameUser.Valid() {
-		log.Trace().
-			Caller().
-			Str(zf.NodeName, existingNodeSameUser.Hostname()).
-			Uint64(zf.NodeID, existingNodeSameUser.ID().Uint64()).
-			Str(zf.MachineKey, machineKey.ShortString()).
-			Str(zf.NodeKey, existingNodeSameUser.NodeKey().ShortString()).
-			Str(zf.UserName, pakUsername()).
-			Msg("Node re-registering with existing machine key and user, updating in place")
-
-		// Re-registration rotates the NodeKey to the client-supplied value.
-		// Enforce the same 1:1 NodeKey<->MachineKey binding the auth path
-		// (applyAuthNodeUpdate) and poll-time validation enforce: a NodeKey
-		// already bound to a different machine must not be claimed here, or a
-		// re-registering node could rotate its key to a victim's and poison the
-		// NodeStore NodeKey index, denying the victim service.
-		if existing, ok := s.nodeStore.GetNodeByNodeKey(regReq.NodeKey); ok &&
-			existing.MachineKey() != machineKey {
-			return types.NodeView{}, s.policyChangeSince(genBefore), ErrNodeKeyInUse
-		}
-
-		// Snapshot the pre-update node so the NodeStore can be rolled back if
-		// the database write below fails. The view points at the immutable
-		// pre-update snapshot (UpdateNode swaps in a new one), so this stays
-		// valid after the mutation.
-		priorNode := existingNodeSameUser.AsStruct()
-
-		// Checked outside the update: the lock takes its own mutex and
-		// writes the NodeStore itself.
-		keySignature := s.tailnetLockSignature(regReq.NodeKey, hostname, regReq.NodeKeySignature)
-
-		// Update existing node - NodeStore first, then database
-		updatedNodeView, ok := s.nodeStore.UpdateNode(existingNodeSameUser.ID(), func(node *types.Node) {
-			applyLockKeys(node, regReq.NodeKey, regReq.NLKey, keySignature)
-			node.NodeKey = regReq.NodeKey
-			setHostname(node, hostname)
-
-			// TODO(kradalby): We should ensure we use the same hostinfo and node merge semantics
-			// when a node re-registers as we do when it sends a map request (UpdateNodeFromMapRequest).
-
-			// Preserve NetInfo from existing node when re-registering
-			node.Hostinfo = validHostinfo
-			node.Hostinfo.NetInfo = preserveNetInfo(existingNodeSameUser, existingNodeSameUser.ID(), validHostinfo)
-
-			node.RegisterMethod = util.RegisterMethodAuthKey
-
-			// Tags from a PreAuthKey are applied on initial registration and
-			// re-applied whenever a *different* key is presented on
-			// re-registration: re-keying is Tailscale's documented way to change
-			// an auth-key device's tags (KB 1068 - "generate a new auth key with
-			// the new set of tags ... doing so replaces the device's existing
-			// tags"). Presenting the SAME key again (container restart,
-			// #2830/#3312) preserves the node's current tags and any admin
-			// override. A tagged key presented for a user-owned node also converts
-			// it, dropping user ownership.
-			//
-			// node.AuthKeyID still holds the prior key's ID here (it is reassigned
-			// below), and SetNodeTags leaves AuthKeyID intact, so an admin retag
-			// cannot masquerade as a new key.
-			keyChanged := node.AuthKeyID == nil || *node.AuthKeyID != pak.ID
-			if pak.IsTagged() && (!node.IsTagged() || keyChanged) {
-				wasUserOwned := !node.IsTagged()
-
-				node.Tags = pak.Tags
-				node.UserID = nil
-				node.User = nil
-
-				// Converting a user-owned node to tagged drops the user's key
-				// expiry (tagged nodes never expire). But retagging an
-				// already-tagged node must preserve a deliberate FUTURE expiry
-				// set via `slopscale nodes expire` - that is a node property, not
-				// tied to the auth key - and only clear a stale PAST expiry. This
-				// keeps the retag path symmetric with the same-key relogin path
-				// (#3371) rather than silently overriding an admin decision.
-				if wasUserOwned || node.IsExpired() {
-					node.Expiry = nil
-				}
-			}
-
-			node.AuthKey = pak
-			node.AuthKeyID = &pak.ID
-			// Preserve online state during re-registration so a live node does
-			// not appear offline before the client restarts its map stream.
-			node.LastSeen = new(time.Now())
-
-			// Tagged nodes keep their existing expiry (disabled).
-			// User-owned nodes update expiry from the client request,
-			// falling back to the configured default if the client
-			// did not request a specific expiry. If neither is set,
-			// clear the expiry so the database holds NULL instead of
-			// a pointer to zero time.
-			if !node.IsTagged() {
-				node.Expiry = nil
-				if !regReq.Expiry.IsZero() {
-					node.Expiry = &regReq.Expiry
-				}
-
-				s.applyDefaultNodeExpiry(node)
-			} else if node.IsExpired() {
-				// #3371: a tagged node must never carry key expiry. Clear a
-				// stale PAST expiry left by a logout (older slopscale) so
-				// re-auth is not permanently blocked. A deliberate future
-				// expiry (slopscale nodes expire) has IsExpired() == false and
-				// is left untouched.
-				node.Expiry = nil
-			}
-		})
-
-		if !ok {
-			return types.NodeView{}, s.policyChangeSince(genBefore), fmt.Errorf(
-				"%w: %d",
-				ErrNodeNotInNodeStore,
-				existingNodeSameUser.ID(),
-			)
-		}
-
-		_, err = hsdb.Write(s.db, func(tx *hsdb.Tx) (*types.Node, error) {
-			// AuthKeyID is normally left out to avoid persisting a deleted
-			// key's stale reference on MapRequest (#2862), but
-			// re-registration presents a freshly-validated key, so its ID
-			// must be persisted here — otherwise a restart reloads the old
-			// key and any key-scoped property (e.g. Ephemeral) silently
-			// reverts.
-			updateErr := hsdb.UpdateNode(tx, updatedNodeView.AsStruct(), hsdb.NodeUpdate{Expiry: true, AuthKey: true})
-			if updateErr != nil {
-				return nil, fmt.Errorf("saving node: %w", updateErr)
-			}
-
-			// Only mark the key used on the *first* registration. On
-			// re-registration the same key is already used and the
-			// atomic compare-and-set in [hsdb.UsePreAuthKey] would otherwise
-			// reject it as "authkey already used". This is the path
-			// behind issue #2830 where containers restart with the
-			// same one-shot key.
-			if !pak.Reusable && !pak.Used {
-				err = hsdb.UsePreAuthKey(tx, pak)
-				if err != nil {
-					return nil, fmt.Errorf("using pre auth key: %w", err)
-				}
-			}
-
-			return nil, nil //nolint:nilnil // intentional: transaction success
-		})
+		finalNode, err = s.reregisterNodeWithPAK(existingNodeSameUser, pak, regReq, machineKey, hostname, validHostinfo)
 		if err != nil {
-			// The NodeStore was updated before the database write. Roll it back
-			// so it does not advertise a registration the database rejected
-			// (e.g. a node key that a restart would not reload). Restore only
-			// the fields the update above wrote: sessions, endpoints and health
-			// may have moved since priorNode was taken. LastSeen stays, as the
-			// node did contact us.
-			if priorNode != nil {
-				s.nodeStore.UpdateNode(priorNode.ID, func(n *types.Node) {
-					n.NodeKey = priorNode.NodeKey
-					n.NLKey = priorNode.NLKey
-					n.KeySignature = priorNode.KeySignature
-					n.Hostname = priorNode.Hostname
-					n.GivenName = priorNode.GivenName
-					n.Hostinfo = priorNode.Hostinfo
-					n.RegisterMethod = priorNode.RegisterMethod
-					n.Tags = priorNode.Tags
-					n.UserID = priorNode.UserID
-					n.User = priorNode.User
-					n.Expiry = priorNode.Expiry
-					n.AuthKey = priorNode.AuthKey
-					n.AuthKeyID = priorNode.AuthKeyID
-				})
-			}
-
-			return types.NodeView{}, s.policyChangeSince(genBefore), fmt.Errorf("writing node to database: %w", err)
+			return types.NodeView{}, s.policyChangeSince(genBefore), err
 		}
-
-		log.Trace().
-			Caller().
-			Str(zf.NodeName, updatedNodeView.Hostname()).
-			Uint64(zf.NodeID, updatedNodeView.ID().Uint64()).
-			Str(zf.MachineKey, machineKey.ShortString()).
-			Str(zf.NodeKey, updatedNodeView.NodeKey().ShortString()).
-			Str(zf.UserName, pakUsername()).
-			Msg("Node re-authorized")
-
-		finalNode = updatedNodeView
 	} else {
-		// Node does not exist for this user with this machine key.
-		// For a user-owned key, check whether the machine key is already held
-		// by a node belonging to a different user (tags-only keys skip this;
-		// tagged nodes have no owning user). Any such node yields the same
-		// outcome - create a new node for the new user, do not transfer - so a
-		// single representative is enough.
-		var differentUserNode types.NodeView
-
-		belongsToDifferentUser := false
-
-		if pak.User != nil {
-			for uid, node := range s.nodeStore.GetNodesByMachineKeyAllUsers(machineKey) {
-				if uid != 0 && !node.IsTagged() && uid != types.UserID(pak.User.ID) {
-					differentUserNode = node
-					belongsToDifferentUser = true
-				}
-			}
-		}
-
-		if belongsToDifferentUser {
-			// Node exists but belongs to a different user.
-			// Create a new node for the new user (do not transfer).
-			oldUser := differentUserNode.User()
-
-			oldUserName := ""
-			if oldUser.Valid() {
-				oldUserName = oldUser.Name()
-			}
-
-			log.Info().
-				Caller().
-				Str(zf.ExistingNodeName, differentUserNode.Hostname()).
-				Uint64(zf.ExistingNodeID, differentUserNode.ID().Uint64()).
-				Str(zf.MachineKey, machineKey.ShortString()).
-				Str(zf.OldUser, oldUserName).
-				Str(zf.NewUser, pakUsername()).
-				Msg("Creating new node for different user (same machine key exists for another user)")
-		}
-
-		// This is a new node - create it
-		// For user-owned keys: create for the user
-		// For tags-only keys: create as tagged node (createAndSaveNewNode handles this via PreAuthKey)
-
-		// Create and save new node
-		// Note: For tags-only keys, User is empty but createAndSaveNewNode uses PreAuthKey for ownership
-		var pakUser types.User
-		if pak.User != nil {
-			pakUser = *pak.User
-		}
-
-		// Only pass the client-requested expiry when it is actually set.
-		// A pointer to a zero time.Time gets persisted as "0001-01-01 00:00:00"
-		// rather than NULL, which breaks downstream consumers that distinguish
-		// "no expiry" from "expires at year 1".
-		var reqExpiry *time.Time
-		if !regReq.Expiry.IsZero() {
-			reqExpiry = &regReq.Expiry
-		}
-
-		var createErr error
-
-		finalNode, createErr = s.createAndSaveNewNode(newNodeParams{
-			User:                   pakUser,
-			MachineKey:             machineKey,
-			NodeKey:                regReq.NodeKey,
-			DiscoKey:               key.DiscoPublic{}, // DiscoKey not available in RegisterRequest
-			Hostname:               hostname,
-			Hostinfo:               validHostinfo,
-			Endpoints:              nil, // Endpoints not available in RegisterRequest
-			Expiry:                 reqExpiry,
-			RegisterMethod:         util.RegisterMethodAuthKey,
-			Ephemeral:              regReq.Ephemeral,
-			NLKey:                  regReq.NLKey,
-			KeySignature:           s.tailnetLockSignature(regReq.NodeKey, hostname, regReq.NodeKeySignature),
-			PreAuthKey:             pak,
-			ExistingNodeForNetinfo: differentUserNode,
-		})
-		if createErr != nil {
-			return types.NodeView{}, s.policyChangeSince(genBefore), fmt.Errorf("creating new node: %w", createErr)
+		finalNode, err = s.registerNewNodeWithPAK(pak, regReq, machineKey, hostname, validHostinfo)
+		if err != nil {
+			return types.NodeView{}, s.policyChangeSince(genBefore), err
 		}
 	}
 
@@ -3399,6 +3128,313 @@ func buildMapRequestChangeResponse(
 	}
 
 	return change.Change{}
+}
+
+// reregisterNodeWithPAK updates an existing node in place for a pre-auth key
+// re-registration: NodeStore first, then the database.
+//
+// The caller's lookup view goes stale before the NodeStore writer runs: an
+// admin or logout expiry, a node key reconcile, a retag or a deletion can land
+// in between, and the key or the node can expire. So the writer decides
+// whether the key must be valid on the node it replaces, at its own clock, and
+// leaves the node untouched when it is not. existingNodeSameUser is used only
+// for its ID and for logging.
+func (s *State) reregisterNodeWithPAK(
+	existingNodeSameUser types.NodeView,
+	pak *types.PreAuthKey,
+	regReq tailcfg.RegisterRequest,
+	machineKey key.MachinePublic,
+	hostname string,
+	validHostinfo *tailcfg.Hostinfo,
+) (types.NodeView, error) {
+	log.Trace().
+		Caller().
+		Str(zf.NodeName, existingNodeSameUser.Hostname()).
+		Uint64(zf.NodeID, existingNodeSameUser.ID().Uint64()).
+		Str(zf.MachineKey, machineKey.ShortString()).
+		Str(zf.NodeKey, existingNodeSameUser.NodeKey().ShortString()).
+		Str(zf.UserName, pak.Username()).
+		Msg("Node re-registering with existing machine key and user, updating in place")
+
+	// Re-registration rotates the NodeKey to the client-supplied value.
+	// Enforce the same 1:1 NodeKey<->MachineKey binding the auth path
+	// (applyAuthNodeUpdate) and poll-time validation enforce: a NodeKey
+	// already bound to a different machine must not be claimed here, or a
+	// re-registering node could rotate its key to a victim's and poison the
+	// NodeStore NodeKey index, denying the victim service.
+	if existing, ok := s.nodeStore.GetNodeByNodeKey(regReq.NodeKey); ok &&
+		existing.MachineKey() != machineKey {
+		return types.NodeView{}, ErrNodeKeyInUse
+	}
+
+	// Checked outside the update: the lock takes its own mutex and
+	// writes the NodeStore itself.
+	keySignature := s.tailnetLockSignature(regReq.NodeKey, hostname, regReq.NodeKeySignature)
+
+	// prior is the node the writer replaced: the NetInfo source and the
+	// rollback target if the database write below fails.
+	var (
+		prior   *types.Node
+		authErr error
+	)
+
+	// Update existing node - NodeStore first, then database
+	updatedNodeView, ok := s.nodeStore.UpdateNode(existingNodeSameUser.ID(), func(node *types.Node) {
+		// One clock read, so the whole mutation is decided at one instant.
+		now := time.Now()
+
+		prior = node.Clone()
+
+		authErr = pakReregisterErr(node.View(), pak, regReq.NodeKey, now)
+		if authErr != nil {
+			return
+		}
+
+		applyLockKeys(node, regReq.NodeKey, regReq.NLKey, keySignature)
+		node.NodeKey = regReq.NodeKey
+		setHostname(node, hostname)
+
+		// TODO(kradalby): We should ensure we use the same hostinfo and node merge semantics
+		// when a node re-registers as we do when it sends a map request (UpdateNodeFromMapRequest).
+
+		// Preserve NetInfo from existing node when re-registering
+		node.Hostinfo = validHostinfo
+		node.Hostinfo.NetInfo = preserveNetInfo(prior.View(), prior.ID, validHostinfo)
+
+		node.RegisterMethod = util.RegisterMethodAuthKey
+
+		// Tags from a PreAuthKey are applied on initial registration and
+		// re-applied whenever a *different* key is presented on
+		// re-registration: re-keying is Tailscale's documented way to change
+		// an auth-key device's tags (KB 1068 - "generate a new auth key with
+		// the new set of tags ... doing so replaces the device's existing
+		// tags"). Presenting the SAME key again (container restart,
+		// #2830/#3312) preserves the node's current tags and any admin
+		// override. A tagged key presented for a user-owned node also converts
+		// it, dropping user ownership.
+		//
+		// node.AuthKeyID still holds the prior key's ID here (it is reassigned
+		// below), and SetNodeTags leaves AuthKeyID intact, so an admin retag
+		// cannot masquerade as a new key.
+		if pak.ConvertsNodeToTagged(node.View()) || pak.RetagsNode(node.View()) {
+			wasUserOwned := !node.IsTagged()
+
+			node.Tags = pak.Tags
+			node.UserID = nil
+			node.User = nil
+
+			// Converting a user-owned node to tagged drops the user's key
+			// expiry (tagged nodes never expire). But retagging an
+			// already-tagged node must preserve a deliberate FUTURE expiry
+			// set via `slopscale nodes expire` - that is a node property, not
+			// tied to the auth key - and only clear a stale PAST expiry. This
+			// keeps the retag path symmetric with the same-key relogin path
+			// (#3371) rather than silently overriding an admin decision.
+			if wasUserOwned || node.IsExpiredAt(now) {
+				node.Expiry = nil
+			}
+		}
+
+		node.AuthKey = pak
+		node.AuthKeyID = &pak.ID
+		// Preserve online state during re-registration so a live node does
+		// not appear offline before the client restarts its map stream.
+		node.LastSeen = new(now)
+
+		// Tagged nodes keep their existing expiry (disabled).
+		// User-owned nodes update expiry from the client request,
+		// falling back to the configured default if the client
+		// did not request a specific expiry. If neither is set,
+		// clear the expiry so the database holds NULL instead of
+		// a pointer to zero time.
+		if !node.IsTagged() {
+			node.Expiry = nil
+			if !regReq.Expiry.IsZero() {
+				node.Expiry = &regReq.Expiry
+			}
+
+			s.applyDefaultNodeExpiry(node)
+		} else if node.IsExpiredAt(now) {
+			// #3371: a tagged node must never carry key expiry. Clear a
+			// stale PAST expiry left by a logout (older slopscale) so
+			// re-auth is not permanently blocked. A deliberate future
+			// expiry (slopscale nodes expire) is not yet expired and is
+			// left untouched.
+			node.Expiry = nil
+		}
+	})
+
+	// A nil prior means the writer never saw the node (deleted, or the store
+	// stopped), so nothing was decided and nothing may be persisted.
+	if !ok || prior == nil {
+		return types.NodeView{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, existingNodeSameUser.ID())
+	}
+
+	if authErr != nil {
+		log.Debug().
+			Caller().
+			Uint64(zf.NodeID, existingNodeSameUser.ID().Uint64()).
+			Str(zf.MachineKey, machineKey.ShortString()).
+			Uint64(zf.AuthKeyID, pak.ID).
+			Err(authErr).
+			Msg("Re-registration needs a valid auth key when it applies, rejecting")
+
+		return types.NodeView{}, authErr
+	}
+
+	_, err := hsdb.Write(s.db, func(tx *hsdb.Tx) (*types.Node, error) {
+		// AuthKeyID is normally left out to avoid persisting a deleted
+		// key's stale reference on MapRequest (#2862), but
+		// re-registration presents a key just loaded from the database,
+		// so its ID must be persisted here — otherwise a restart reloads
+		// the old key and any key-scoped property (e.g. Ephemeral)
+		// silently reverts.
+		updateErr := hsdb.UpdateNode(tx, updatedNodeView.AsStruct(), hsdb.NodeUpdate{Expiry: true, AuthKey: true})
+		if updateErr != nil {
+			return nil, fmt.Errorf("saving node: %w", updateErr)
+		}
+
+		// Only mark the key used on the *first* registration. On
+		// re-registration the same key is already used and the
+		// atomic compare-and-set in [hsdb.UsePreAuthKey] would otherwise
+		// reject it as "authkey already used", locking out containers
+		// that restart with the same one-shot key (#2830).
+		if !pak.Reusable && !pak.Used {
+			useErr := hsdb.UsePreAuthKey(tx, pak)
+			if useErr != nil {
+				return nil, fmt.Errorf("using pre auth key: %w", useErr)
+			}
+		}
+
+		return nil, nil //nolint:nilnil // intentional: transaction success
+	})
+	if err != nil {
+		// The NodeStore was updated before the database write. Roll it back
+		// so it does not advertise a registration the database rejected
+		// (e.g. a node key that a restart would not reload). Restore only
+		// the fields the update above wrote, from the node the writer
+		// replaced: sessions, endpoints and health may have moved since.
+		// LastSeen stays, as the node did contact us.
+		s.nodeStore.UpdateNode(prior.ID, func(n *types.Node) {
+			n.NodeKey = prior.NodeKey
+			n.NLKey = prior.NLKey
+			n.KeySignature = prior.KeySignature
+			n.Hostname = prior.Hostname
+			n.GivenName = prior.GivenName
+			n.Hostinfo = prior.Hostinfo
+			n.RegisterMethod = prior.RegisterMethod
+			n.Tags = prior.Tags
+			n.UserID = prior.UserID
+			n.User = prior.User
+			n.Expiry = prior.Expiry
+			n.AuthKey = prior.AuthKey
+			n.AuthKeyID = prior.AuthKeyID
+		})
+
+		return types.NodeView{}, fmt.Errorf("writing node to database: %w", err)
+	}
+
+	log.Trace().
+		Caller().
+		Str(zf.NodeName, updatedNodeView.Hostname()).
+		Uint64(zf.NodeID, updatedNodeView.ID().Uint64()).
+		Str(zf.MachineKey, machineKey.ShortString()).
+		Str(zf.NodeKey, updatedNodeView.NodeKey().ShortString()).
+		Str(zf.UserName, pak.Username()).
+		Msg("Node re-authorized")
+
+	return updatedNodeView, nil
+}
+
+// registerNewNodeWithPAK creates the node a pre-auth key registers when the
+// machine has none for the key's owner.
+func (s *State) registerNewNodeWithPAK(
+	pak *types.PreAuthKey,
+	regReq tailcfg.RegisterRequest,
+	machineKey key.MachinePublic,
+	hostname string,
+	validHostinfo *tailcfg.Hostinfo,
+) (types.NodeView, error) {
+	// Node does not exist for this user with this machine key.
+	// For a user-owned key, check whether the machine key is already held
+	// by a node belonging to a different user (tags-only keys skip this;
+	// tagged nodes have no owning user). Any such node yields the same
+	// outcome - create a new node for the new user, do not transfer - so a
+	// single representative is enough.
+	var differentUserNode types.NodeView
+
+	belongsToDifferentUser := false
+
+	if pak.User != nil {
+		for uid, node := range s.nodeStore.GetNodesByMachineKeyAllUsers(machineKey) {
+			if uid != 0 && !node.IsTagged() && uid != types.UserID(pak.User.ID) {
+				differentUserNode = node
+				belongsToDifferentUser = true
+			}
+		}
+	}
+
+	if belongsToDifferentUser {
+		// Node exists but belongs to a different user.
+		// Create a new node for the new user (do not transfer).
+		oldUser := differentUserNode.User()
+
+		oldUserName := ""
+		if oldUser.Valid() {
+			oldUserName = oldUser.Name()
+		}
+
+		log.Info().
+			Caller().
+			Str(zf.ExistingNodeName, differentUserNode.Hostname()).
+			Uint64(zf.ExistingNodeID, differentUserNode.ID().Uint64()).
+			Str(zf.MachineKey, machineKey.ShortString()).
+			Str(zf.OldUser, oldUserName).
+			Str(zf.NewUser, pak.Username()).
+			Msg("Creating new node for different user (same machine key exists for another user)")
+	}
+
+	// This is a new node - create it
+	// For user-owned keys: create for the user
+	// For tags-only keys: create as tagged node (createAndSaveNewNode handles this via PreAuthKey)
+
+	// Create and save new node
+	// Note: For tags-only keys, User is empty but createAndSaveNewNode uses PreAuthKey for ownership
+	var pakUser types.User
+	if pak.User != nil {
+		pakUser = *pak.User
+	}
+
+	// Only pass the client-requested expiry when it is actually set.
+	// A pointer to a zero time.Time gets persisted as "0001-01-01 00:00:00"
+	// rather than NULL, which breaks downstream consumers that distinguish
+	// "no expiry" from "expires at year 1".
+	var reqExpiry *time.Time
+	if !regReq.Expiry.IsZero() {
+		reqExpiry = &regReq.Expiry
+	}
+
+	node, err := s.createAndSaveNewNode(newNodeParams{
+		User:                   pakUser,
+		MachineKey:             machineKey,
+		NodeKey:                regReq.NodeKey,
+		DiscoKey:               key.DiscoPublic{}, // DiscoKey not available in RegisterRequest
+		Hostname:               hostname,
+		Hostinfo:               validHostinfo,
+		Endpoints:              nil, // Endpoints not available in RegisterRequest
+		Expiry:                 reqExpiry,
+		RegisterMethod:         util.RegisterMethodAuthKey,
+		Ephemeral:              regReq.Ephemeral,
+		NLKey:                  regReq.NLKey,
+		KeySignature:           s.tailnetLockSignature(regReq.NodeKey, hostname, regReq.NodeKeySignature),
+		PreAuthKey:             pak,
+		ExistingNodeForNetinfo: differentUserNode,
+	})
+	if err != nil {
+		return types.NodeView{}, fmt.Errorf("creating new node: %w", err)
+	}
+
+	return node, nil
 }
 
 // lockRegistration serialises registration for a single machine key and
