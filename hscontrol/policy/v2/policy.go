@@ -399,16 +399,18 @@ func (pm *PolicyManager) SSHPolicy(baseURL string, node types.NodeView) (*tailcf
 	return sshPol, nil
 }
 
-// SSHCheckParams resolves the SSH check period for a source-destination
-// node pair by looking up the current policy. This avoids trusting URL
+// SSHCheckParams resolves the SSH check period for src logging in to dst
+// as localUser by looking up the current policy. This avoids trusting URL
 // parameters that a client could tamper with. First-match wins across
-// the policy's SSH rules.
+// the policy's SSH rules; a rule only matches when it lets src log in as
+// localUser, as the client does when it picks the rule.
 //
 // Returns (duration, true) when a matching rule is found and
 // (0, false) when none is. A (0, true) return means the matched rule
 // uses a zero check period (re-check every session).
 func (pm *PolicyManager) SSHCheckParams(
 	srcNodeID, dstNodeID types.NodeID,
+	localUser string,
 ) (time.Duration, bool) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -424,7 +426,7 @@ func (pm *PolicyManager) SSHCheckParams(
 
 	// Iterate SSH rules to find the first matching check rule.
 	for _, rule := range pm.pol.SSHs {
-		if d, ok := pm.sshCheckPeriodForRule(rule, srcNode, dstNode); ok {
+		if d, ok := pm.sshCheckPeriodForRule(rule, srcNode, dstNode, localUser); ok {
 			return d, true
 		}
 	}
@@ -459,11 +461,12 @@ func (pm *PolicyManager) SetSSHRecording(recording SSHRecording) (bool, error) {
 }
 
 // SSHRecordingFor returns the recorders and failure action for the
-// session a check-mode rule admits between src and dst, so the final
-// action control returns carries them like the accept action would. Nil
+// session a check-mode rule admits from src to dst as localUser, so the
+// final action control returns carries them like the accept action
+// would. The rule is the one [PolicyManager.SSHCheckParams] picks. Nil
 // when no rule matches or the rule records nothing.
 func (pm *PolicyManager) SSHRecordingFor(
-	baseURL string, srcNodeID, dstNodeID types.NodeID,
+	baseURL string, srcNodeID, dstNodeID types.NodeID, localUser string,
 ) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
@@ -478,7 +481,7 @@ func (pm *PolicyManager) SSHRecordingFor(
 	}
 
 	for _, rule := range pm.pol.SSHs {
-		if _, ok := pm.sshCheckPeriodForRule(rule, srcNode, dstNode); !ok {
+		if _, ok := pm.sshCheckPeriodForRule(rule, srcNode, dstNode, localUser); !ok {
 			continue
 		}
 
@@ -2594,14 +2597,16 @@ func (pm *PolicyManager) findNodePairLocked(srcNodeID, dstNodeID types.NodeID) (
 }
 
 // sshCheckPeriodForRule reports the check period for rule when it is a
-// check rule matching the (srcNode, dstNode) pair, and whether it matched.
-// It must match exactly the pairs compileSSHPolicy sends dstNode a check
-// rule for, since that is the rule the client calls back about.
+// check rule letting srcNode log in to dstNode as localUser, and whether
+// it matched. It must match exactly the logins compileSSHPolicy sends
+// dstNode a check rule for, since that is the rule the client calls back
+// about.
 func (pm *PolicyManager) sshCheckPeriodForRule(
 	rule SSH,
 	srcNode, dstNode types.NodeView,
+	localUser string,
 ) (time.Duration, bool) {
-	if rule.Action != SSHActionCheck {
+	if rule.Action != SSHActionCheck || !pm.sshRuleAllowsUser(rule, srcNode, localUser) {
 		return 0, false
 	}
 
@@ -2654,6 +2659,29 @@ func (pm *PolicyManager) sshCheckPeriodForRule(
 	}
 
 	return 0, false
+}
+
+// sshRuleAllowsUser reports whether rule lets src log in as localUser,
+// mirroring the SSHUsers maps compileSSHPolicy emits: root when listed,
+// other users via autogroup:nonroot or a literal name, and anyone, root
+// included, whose name is the source user's localpart.
+func (pm *PolicyManager) sshRuleAllowsUser(rule SSH, srcNode types.NodeView, localUser string) bool {
+	isRoot := localUser == "root"
+
+	switch {
+	case localUser == "":
+		return false
+	case isRoot && rule.Users.ContainsRoot(),
+		!isRoot && rule.Users.ContainsNonRoot(),
+		!isRoot && slices.Contains(rule.Users.NormalUsers(), SSHUser(localUser)):
+		return true
+	case srcNode.IsTagged() || !srcNode.User().Valid() || !rule.Users.ContainsLocalpart():
+		return false
+	}
+
+	lp, ok := resolveLocalparts(rule.Users.LocalpartEntries(), pm.users)[srcNode.User().ID()]
+
+	return ok && lp == localUser
 }
 
 // sshAutogroupSelfMatches reports whether srcNode and dstNode belong to the

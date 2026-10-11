@@ -355,7 +355,7 @@ func TestSSHCheckParamsUnhydratedUserNoPanic(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
-		pm.SSHCheckParams(types.NodeID(1), types.NodeID(2))
+		pm.SSHCheckParams(types.NodeID(1), types.NodeID(2), "alice")
 	}, "SSHCheckParams must not panic when a non-tagged node has an unhydrated User")
 }
 
@@ -2511,7 +2511,7 @@ func TestUnregisteredUsersAreNoOp(t *testing.T) {
 					continue
 				}
 
-				period, ok := pm.SSHCheckParams(n.ID, p.ID)
+				period, ok := pm.SSHCheckParams(n.ID, p.ID, "root")
 				got[n.Hostname+"->"+p.Hostname+" via"] = pm.ViaRoutesForPeer(nv, p.View())
 				got[n.Hostname+"->"+p.Hostname+" check"] = checkParams{period, ok}
 			}

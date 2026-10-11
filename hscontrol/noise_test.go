@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -451,13 +452,17 @@ func TestSSHActionRoute_OldPathReturns404(t *testing.T) {
 	}
 }
 
+// sshTestLocalUser is the non-root local user the SSH action tests log in as.
+const sshTestLocalUser = "alice"
+
 // newSSHActionRequest builds an httptest request with the chi URL params
 // [noiseServer.SSHActionHandler] reads (src_node_id and dst_node_id), so the handler
 // can be exercised directly without going through the chi router.
 func newSSHActionRequest(t *testing.T, src, dst types.NodeID) *http.Request {
 	t.Helper()
 
-	target := fmt.Sprintf("/machine/ssh/action/%d/to/%d", src.Uint64(), dst.Uint64())
+	target := fmt.Sprintf("/machine/ssh/action/%d/to/%d?local_user=%s",
+		src.Uint64(), dst.Uint64(), sshTestLocalUser)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
 
 	rctx := chi.NewRouteContext()
@@ -517,7 +522,7 @@ func putSSHCheckNodes(t *testing.T, app *Slopscale, userName string, hostnames .
 	_, err := app.state.SetPolicy([]byte(sshCheckPolicy(userName)))
 	require.NoError(t, err)
 
-	_, checkFound := app.state.SSHCheckParams(nodes[0].ID, nodes[len(nodes)-1].ID)
+	_, checkFound := app.state.SSHCheckParams(nodes[0].ID, nodes[len(nodes)-1].ID, sshTestLocalUser)
 	require.True(t, checkFound, "test setup: nodes must be subject to an SSH check")
 
 	return nodes
@@ -608,8 +613,8 @@ func TestSSHActionFollowUp_RejectsBindingMismatch(t *testing.T) {
 	}
 
 	target := fmt.Sprintf(
-		"/machine/ssh/action/%d/to/%d?auth_id=%s",
-		srcOther.ID.Uint64(), dstOther.ID.Uint64(), authID.String(),
+		"/machine/ssh/action/%d/to/%d?local_user=%s&auth_id=%s",
+		srcOther.ID.Uint64(), dstOther.ID.Uint64(), sshTestLocalUser, authID.String(),
 	)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
 
@@ -700,7 +705,7 @@ func TestSSHActionHandler_RejectsWithoutCheck(t *testing.T) {
 	src := putTestNodeInStore(t, app, user, "src-node")
 	dst := putTestNodeInStore(t, app, user, "dst-node")
 
-	_, checkFound := app.state.SSHCheckParams(src.ID, dst.ID)
+	_, checkFound := app.state.SSHCheckParams(src.ID, dst.ID, sshTestLocalUser)
 	require.False(t, checkFound, "test setup: pair must not be subject to a check")
 
 	ns := &noiseServer{slopscale: app, machineKey: dst.MachineKey}
@@ -726,16 +731,30 @@ func TestSSHActionHandler_RejectsWithoutCheck(t *testing.T) {
 func TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved(t *testing.T) {
 	t.Parallel()
 
-	for name, removeRule := range map[string]bool{
-		"rule kept":    false,
-		"rule removed": true,
+	const userName = "ssh-verdict-user"
+
+	nonrootOnly := sshCheckPolicy(userName)
+	rootAndNonroot := strings.Replace(nonrootOnly,
+		`["autogroup:nonroot"]`, `["root", "autogroup:nonroot"]`, 1)
+
+	for name, tc := range map[string]struct {
+		after     string // policy once the user has authenticated; "" keeps it
+		localUser string
+	}{
+		"rule kept":    {"", sshTestLocalUser},
+		"rule removed": {`{}`, sshTestLocalUser},
+		// Another check rule still covers the pair, but not for root.
+		"root rule removed": {nonrootOnly, "root"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			app := createTestApp(t)
-			nodes := putSSHCheckNodes(t, app, "ssh-verdict-user", "src-node", "dst-node")
+			nodes := putSSHCheckNodes(t, app, userName, "src-node", "dst-node")
 			src, dst := nodes[0], nodes[1]
+
+			_, err := app.state.SetPolicy([]byte(rootAndNonroot))
+			require.NoError(t, err)
 
 			authID := types.MustAuthID()
 			app.state.SetAuthCacheEntry(authID, types.NewSSHCheckAuthRequest(src.ID, dst.ID))
@@ -744,8 +763,8 @@ func TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved(t *testing.T) {
 			require.True(t, ok)
 			auth.FinishAuth(types.AuthVerdict{})
 
-			if removeRule {
-				_, err := app.state.SetPolicy([]byte(`{}`))
+			if tc.after != "" {
+				_, err = app.state.SetPolicy([]byte(tc.after))
 				require.NoError(t, err)
 			}
 
@@ -755,15 +774,16 @@ func TestSSHActionFollowUp_RejectsVerdictAfterCheckRemoved(t *testing.T) {
 			// the policy changed while the user was authenticating.
 			action, err := ns.sshActionFollowUp(
 				t.Context(), zerolog.Nop(), &tailcfg.SSHAction{},
-				authID.String(), src.ID, dst.ID,
+				authID.String(), src.ID, dst.ID, tc.localUser,
 			)
 			require.NoError(t, err)
 
+			kept := tc.after == ""
 			_, recorded := app.state.GetLastSSHAuth(src.ID, dst.ID)
 
-			assert.Equal(t, !removeRule, action.Accept, "accept, got %+v", action)
-			assert.Equal(t, removeRule, action.Reject, "reject, got %+v", action)
-			assert.Equal(t, !removeRule, recorded, "auth recorded for auto-approval")
+			assert.Equal(t, kept, action.Accept, "accept, got %+v", action)
+			assert.Equal(t, !kept, action.Reject, "reject, got %+v", action)
+			assert.Equal(t, kept, recorded, "auth recorded for auto-approval")
 		})
 	}
 }
@@ -900,7 +920,7 @@ func newSSHVerdictFixture(t *testing.T) *sshVerdictFixture {
 	}`, user.Name+"@"))
 	require.NoError(t, err)
 
-	period, checkFound := app.state.SSHCheckParams(ids[0], ids[1])
+	period, checkFound := app.state.SSHCheckParams(ids[0], ids[1], sshTestLocalUser)
 	require.True(t, checkFound, "test setup: pair must be subject to a check")
 	require.Zero(t, period, "test setup: checkPeriod must be always")
 
@@ -1039,7 +1059,7 @@ func TestSSHActionFollowUp_ConsumedVerdictNotReplayed(t *testing.T) {
 			_, err := f.ns.slopscale.state.SetPolicy([]byte(`{}`))
 			require.NoError(t, err)
 
-			_, checkFound := f.ns.slopscale.state.SSHCheckParams(f.src, f.dst)
+			_, checkFound := f.ns.slopscale.state.SSHCheckParams(f.src, f.dst, sshTestLocalUser)
 			require.False(t, checkFound, "test setup: pair must no longer be subject to a check")
 
 			replay := sshActionFromRecorder(t, f.followUp(t, authID))

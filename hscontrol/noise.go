@@ -487,6 +487,7 @@ func (ns *noiseServer) SSHActionHandler(
 		req.Context(),
 		reqLog,
 		srcNodeID, dstNodeID,
+		req.URL.Query().Get("local_user"),
 		req.URL.Query().Get("auth_id"),
 	)
 	if err != nil {
@@ -681,7 +682,7 @@ func (ns *noiseServer) sshAction(
 	ctx context.Context,
 	reqLog zerolog.Logger,
 	srcNodeID, dstNodeID types.NodeID,
-	authIDStr string,
+	localUser, authIDStr string,
 ) (*tailcfg.SSHAction, error) {
 	action := tailcfg.SSHAction{
 		AllowAgentForwarding:      true,
@@ -691,12 +692,16 @@ func (ns *noiseServer) sshAction(
 
 	// The final action replaces the rule's, so it carries the
 	// recorders the rule would have.
-	action.Recorders, action.OnRecordingFailure = ns.slopscale.state.SSHRecordingFor(srcNodeID, dstNodeID)
+	action.Recorders, action.OnRecordingFailure = ns.slopscale.state.SSHRecordingFor(
+		srcNodeID, dstNodeID, localUser,
+	)
 
 	// Look up check params from the server's own policy rather than
 	// trusting URL parameters, which the client could tamper with.
+	// local_user only narrows which rule applies, and it comes from dst,
+	// the node enforcing the login.
 	checkPeriod, checkFound := ns.slopscale.state.SSHCheckParams(
-		srcNodeID, dstNodeID,
+		srcNodeID, dstNodeID, localUser,
 	)
 
 	// Clients only call back for check rules they were sent. Without one in
@@ -709,7 +714,7 @@ func (ns *noiseServer) sshAction(
 	if authIDStr != "" {
 		return ns.sshActionFollowUp(
 			ctx, reqLog, &action, authIDStr,
-			srcNodeID, dstNodeID,
+			srcNodeID, dstNodeID, localUser,
 		)
 	}
 
@@ -730,7 +735,7 @@ func (ns *noiseServer) sshAction(
 	}
 
 	// No auto-approval — create an auth session and hold.
-	return ns.sshActionHoldAndDelegate(reqLog, &action, srcNodeID, dstNodeID)
+	return ns.sshActionHoldAndDelegate(reqLog, &action, srcNodeID, dstNodeID, localUser)
 }
 
 // sshActionDeny rejects a check the current policy does not require. It is a
@@ -751,11 +756,11 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 	reqLog zerolog.Logger,
 	action *tailcfg.SSHAction,
 	srcNodeID, dstNodeID types.NodeID,
+	localUser string,
 ) (*tailcfg.SSHAction, error) {
 	holdURL, err := url.Parse(
 		ns.slopscale.cfg.ServerURL +
-			"/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID" +
-			"?local_user=$LOCAL_USER",
+			"/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID",
 	)
 	if err != nil {
 		return nil, NewHTTPError(
@@ -781,7 +786,10 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 
 	authURL := ns.slopscale.authProvider.AuthURL(authID)
 
+	// The concrete user, not $LOCAL_USER: Encode escapes the placeholder
+	// and tailssh only expands it literally.
 	q := holdURL.Query()
+	q.Set("local_user", localUser)
 	q.Set("auth_id", authID.String())
 	holdURL.RawQuery = q.Encode()
 
@@ -812,6 +820,7 @@ func (ns *noiseServer) sshActionFollowUp(
 	action *tailcfg.SSHAction,
 	authIDStr string,
 	srcNodeID, dstNodeID types.NodeID,
+	localUser string,
 ) (*tailcfg.SSHAction, error) {
 	authID, err := types.AuthIDFromString(authIDStr)
 	if err != nil {
@@ -834,7 +843,7 @@ func (ns *noiseServer) sshActionFollowUp(
 		reqLog.Info().Caller().Msg(logMsg)
 
 		return ns.sshActionHoldAndDelegate(
-			reqLog, action, srcNodeID, dstNodeID,
+			reqLog, action, srcNodeID, dstNodeID, localUser,
 		)
 	}
 
@@ -909,7 +918,7 @@ func (ns *noiseServer) sshActionFollowUp(
 
 	// The policy may have changed while the user authenticated, and the
 	// client won't drop a connection still waiting on its check.
-	if _, ok := ns.slopscale.state.SSHCheckParams(srcNodeID, dstNodeID); !ok {
+	if _, ok := ns.slopscale.state.SSHCheckParams(srcNodeID, dstNodeID, localUser); !ok {
 		return sshActionDeny(reqLog, action), nil
 	}
 
