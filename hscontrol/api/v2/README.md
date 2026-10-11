@@ -99,8 +99,8 @@ platform signed and gets a Slopscale access token back, so no long-lived secret
 has to be stored anywhere.
 
 - Create/update with `{"keyType":"federated","scopes":[…],"tags":[…],
-"description":"…","audience":"…","issuer":"https://…","subject":"…",
-"customClaimRules":{"claim":"value"}}`. Issuer, audience and subject are
+  "description":"…","audience":"…","issuer":"https://…","subject":"…",
+  "customClaimRules":{"claim":"value"}}`. Issuer, audience and subject are
   required; the issuer must be an `http(s)` URL that passes the egress guard.
 - Exchange at `POST /api/v2/oauth/token-exchange` (`token_exchange.go`), a
   plain form handler like the token endpoint: `grant_type` (optional; the Go
@@ -203,7 +203,7 @@ pre-auth keys.
 
 4. **Implement the Huma operation.** Declare named request/response structs with
    validation/`default`/`example`/`doc` tags; tag the operation `Tailscale
-compat`; declare its `Errors`; enforce the tailnet and scope. Map state
+   compat`; declare its `Errors`; enforce the tailnet and scope. Map state
    errors with `mapError`. _Acceptance: `go build ./hscontrol/api/v2/` and the
    operation appears in `Spec()`._
 
@@ -218,7 +218,7 @@ compat`; declare its `Errors`; enforce the tailnet and scope. Map state
    OpenTofu, full create→read→list→delete against one shared server on a real
    loopback port (`servertest.WithRealListener`). tscli and tofu come from the
    nix dev shell; a missing binary fails the test. _Acceptance: `nix develop -c
-go test ./hscontrol/servertest/ -run TestAPIv2` is green._
+   go test ./hscontrol/servertest/ -run TestAPIv2` is green._
 
 7. **Update the CLI** only if the v2 operation fully replaces a v1 one. Tailscale
    has no separate key-expire verb (its `DELETE` _is_ the revoke), so v2 maps

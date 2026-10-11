@@ -15,7 +15,9 @@ export default defineConfig({
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
     react(),
-    babel({ presets: [reactCompilerPreset()] }),
+    // A component the compiler cannot handle fails the build instead of
+    // shipping unmemoized; Babel 8 once made it bail on ~40 of them silently.
+    babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
     tailwindcss(),
   ],
   resolve: { tsconfigPaths: true },
