@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.58.0](https://github.com/aislopware/slopscale/compare/v0.57.1...v0.58.0) (2026-10-11)
+
+
+### Changes
+
+* cache netmaps on clients, sync upstream headscale through 2026-10-08 and update dependencies ([#60](https://github.com/aislopware/slopscale/issues/60)) ([fef4011](https://github.com/aislopware/slopscale/commit/fef401168855569f250bc0ec92fac2e75352e511))
+
 ## [0.57.1](https://github.com/aislopware/slopscale/compare/v0.57.0...v0.57.1) (2026-10-10)
 
 
