@@ -2133,6 +2133,11 @@ type Grant struct {
 	SrcPosture []string `json:"srcPosture,omitempty"`
 }
 
+// HasVia reports whether the grant routes through via-tagged nodes.
+func (g Grant) HasVia() bool {
+	return len(g.Via) > 0
+}
+
 // NodeAttrGrant attaches Tailscale node capabilities (and/or an IP-pool
 // preference) to every node selected by Targets. The Targets aliases are
 // resolved exactly like ACL/grant sources, so users, groups, tags, hosts,
@@ -3042,7 +3047,7 @@ func (pol *Policy) validate() error {
 			errs = append(errs, err)
 		}
 
-		if len(grant.Via) > 0 && sourcesHaveShared(grant.Sources) {
+		if grant.HasVia() && sourcesHaveShared(grant.Sources) {
 			errs = append(errs, ErrAutogroupSharedVia)
 		}
 	}

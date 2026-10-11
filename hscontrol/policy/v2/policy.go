@@ -1485,13 +1485,15 @@ func (g *resolvedViaGrant) matches(ips []netip.Addr) bool {
 // resolveViaGrants resolves every grant of pol for
 // [PolicyManager.ViaRoutesForPeer] and reports whether any of them has a
 // via tag. Sources that fail to resolve are skipped, as they were when the
-// resolution happened per call.
+// resolution happened per call. Without a via grant nothing is resolved:
+// only via grants add to the result, and ACLs never carry via, so the
+// work would be thrown away on every recompile.
 func resolveViaGrants(
 	pol *Policy,
 	users types.Users,
 	nodes views.Slice[types.NodeView],
 ) ([]resolvedViaGrant, bool) {
-	if pol == nil {
+	if pol == nil || !slices.ContainsFunc(pol.Grants, Grant.HasVia) {
 		return nil, false
 	}
 
@@ -1501,11 +1503,9 @@ func resolveViaGrants(
 	}
 
 	resolved := make([]resolvedViaGrant, len(grants))
-	hasVia := false
 
 	for i, grant := range grants {
 		resolved[i].via = grant.Via
-		hasVia = hasVia || len(grant.Via) > 0
 
 		for _, src := range grant.Sources {
 			ips, err := src.Resolve(pol, users, nodes)
@@ -1525,7 +1525,7 @@ func resolveViaGrants(
 			})
 	}
 
-	return resolved, hasVia
+	return resolved, true
 }
 
 func (pm *PolicyManager) Version() int {

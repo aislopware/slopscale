@@ -461,7 +461,7 @@ func (pol *Policy) compileOneSharedGrant(
 	users types.Users,
 	nodes views.Slice[types.NodeView],
 ) *compiledGrant {
-	if len(grant.Via) > 0 || len(grant.Destinations) == 0 {
+	if grant.HasVia() || len(grant.Destinations) == 0 {
 		return nil
 	}
 
@@ -519,7 +519,7 @@ func (pol *Policy) compileOneGrant(
 	nodes views.Slice[types.NodeView],
 ) (*compiledGrant, error) {
 	// Via grants: resolve sources, store deferred data.
-	if len(grant.Via) > 0 {
+	if grant.HasVia() {
 		return pol.compileOneViaGrant(grant, users, nodes)
 	}
 
