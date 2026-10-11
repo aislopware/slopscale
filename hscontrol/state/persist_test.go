@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -661,4 +662,66 @@ func TestUpdatePolicyManagerUsersUnchangedKeepsSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	require.NotSame(t, before, s.nodeStore.data.Load(),
 		"a user change must rebuild the peer map")
+}
+
+// TestBackfillNodeIPsSurvivesConcurrentPersist guards the backfill against a
+// node persist landing between its database write and the NodeStore reload:
+// that persist writes the old addresses back and the backfill is lost.
+func TestBackfillNodeIPsSurvivesConcurrentPersist(t *testing.T) {
+	t.Parallel()
+
+	dbPath, s, nodeID := persistTestSetup(t)
+	require.NoError(t, s.Close())
+
+	// Dropping the IPv6 prefix gives the backfill work to do.
+	cfg := persistTestConfig(dbPath)
+	cfg.PrefixV6 = nil
+
+	s, err := NewState(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	nv, ok := s.GetNodeByID(nodeID)
+	require.True(t, ok)
+	require.True(t, nv.IPv6().Valid(), "precondition: node has an IPv6 address")
+
+	// The backfill reads the nodes table twice: inside its write, then to
+	// reload NodeStore. Persist the node just before the reload.
+	var reads atomic.Int32
+
+	persisted := make(chan struct{})
+
+	s.db.SetQueryHook(func(query string) error {
+		if !strings.HasPrefix(query, "SELECT") || !strings.Contains(query, "FROM nodes") ||
+			reads.Add(1) != 2 {
+			return nil
+		}
+
+		go func() {
+			_, _ = s.persistNodeRowToDB(nv)
+
+			close(persisted)
+		}()
+
+		// Give an unserialised persist time to land before the reload.
+		select {
+		case <-persisted:
+		case <-time.After(200 * time.Millisecond):
+		}
+
+		return nil
+	})
+	t.Cleanup(func() { s.db.SetQueryHook(nil) })
+
+	_, _, err = s.BackfillNodeIPs()
+	require.NoError(t, err)
+	<-persisted
+
+	nv, ok = s.GetNodeByID(nodeID)
+	require.True(t, ok)
+	assert.False(t, nv.IPv6().Valid(), "NodeStore kept the removed IPv6 address")
+
+	dbNode, err := s.db.GetNodeByID(nodeID)
+	require.NoError(t, err)
+	assert.Nil(t, dbNode.IPv6, "database kept the removed IPv6 address")
 }
