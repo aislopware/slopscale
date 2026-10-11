@@ -20,7 +20,7 @@ server. It is published to the machines as region 999 together with Tailscale's 
 picks the closest region by measured latency. For improved connection stability configure the public IPv4 and
 public IPv6 address of your Slopscale server; the machines then reach the relay while their DNS is down:
 
-```yaml title="config.yaml" hl_lines="3-5"
+```yaml {3-5} title="config.yaml"
 derp:
   server:
     enabled: true
@@ -95,7 +95,7 @@ Slopscale's embedded DERP is added to the list of free-to-use [DERP
 servers](https://tailscale.com/docs/reference/derp-servers) offered by Tailscale Inc. To only use Slopscale's embedded
 DERP server, disable the loading of the default DERP map (or clear the map URLs on the console's _Relays_ page):
 
-```yaml title="config.yaml" hl_lines="6"
+```yaml {6} title="config.yaml"
 derp:
   server:
     enabled: true
@@ -135,7 +135,7 @@ regions:
 
 Use the following configuration to serve the default DERP map (excluding New York) to nodes:
 
-```yaml title="config.yaml" hl_lines="6 7"
+```yaml {6,7} title="config.yaml"
 derp:
   server:
     enabled: false
@@ -187,7 +187,7 @@ regions:
 
 Use the following configuration to only serve the two DERP servers from the above `derp.yaml`:
 
-```yaml title="config.yaml" hl_lines="5 6"
+```yaml {5,6} title="config.yaml"
 derp:
   server:
     enabled: false
@@ -230,7 +230,7 @@ clients.
 
 Client verification is enabled by default.
 
-```yaml title="config.yaml" hl_lines="3"
+```yaml {3} title="config.yaml"
 derp:
   server:
     verify_clients: true

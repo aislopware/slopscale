@@ -42,7 +42,7 @@ and it needs to handle two peculiarities of the Tailscale Control Protocol:
 Slopscale can be configured not to use TLS, leaving it to the reverse proxy to handle. Add the following configuration
 values to your Slopscale [configuration file](/ref/configuration):
 
-```yaml title="config.yaml" hl_lines="1"
+```yaml {1} title="config.yaml"
 server_url: https://<SERVER_NAME>
 tls_cert_path: ""
 tls_key_path: ""
@@ -92,7 +92,7 @@ is [assumed](/setup/requirements):
 - Both Slopscale and the reverse proxy are running on the same host.
 - [Metrics](/ref/debug#metrics-and-debug-endpoint) are not proxied, those are available via localhost.
 
-```yaml title="config.yaml" hl_lines="1"
+```yaml {1} title="config.yaml"
 server_url: https://<SERVER_NAME>
 listen_addr: 127.0.0.1:8080
 metrics_listen_addr: 127.0.0.1:9090
@@ -112,7 +112,7 @@ above](#reverse-proxy-specific-configuration). Substitute placeholders and adjus
 - `<PATH_TO_TLS_CERT>`: Absolute path to your TLS certificate
 - `<PATH_TO_TLS_KEY>`: Absolute path to your TLS private key
 
-```apache title="apache.conf" hl_lines="2 7 11 14-15"
+```apache {2,7,11,14-15} title="apache.conf"
 <VirtualHost *:80>
   ServerName <SERVER_NAME>
 
@@ -148,7 +148,7 @@ above](#reverse-proxy-specific-configuration). Substitute placeholders and adjus
 
 - `<SERVER_NAME>`: The server name for your instance, e.g. `slopscale.example.com`
 
-```none title="Caddyfile" hl_lines="1 12"
+```text {1,12} title="Caddyfile"
 http://<SERVER_NAME> {
 	# Tailscale captive portal detection
 	handle /generate_204 {
@@ -218,7 +218,7 @@ above](#reverse-proxy-specific-configuration). Substitute placeholders and adjus
 - `<PATH_TO_TLS_CERT>`: Absolute path to your TLS certificate
 - `<PATH_TO_TLS_KEY>`: Absolute path to your TLS private key
 
-```nginx title="nginx.conf" hl_lines="19 37 39-40"
+```nginx {19,37,39-40} title="nginx.conf"
 # slopscale
 upstream slopscale {
   zone upstreams 64K;

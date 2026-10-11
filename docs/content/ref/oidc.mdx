@@ -62,7 +62,7 @@ recommended and needs to be configured for Slopscale and the identity provider a
 <Tabs>
 <Tab title="Slopscale">
 
-```yaml hl_lines="5-6"
+```yaml {5-6}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -96,7 +96,7 @@ are configured, a user needs to pass all of them.
 - Access allowed: `alice@example.com`
 - Access denied: `bob@example.net`
 
-```yaml hl_lines="5-6"
+```yaml {5-6}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -114,7 +114,7 @@ oidc:
 - Access allowed: `alice@example.com`, `bob@example.net`
 - Access denied: `mallory@example.net`
 
-```yaml hl_lines="5-7"
+```yaml {5-7}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -133,7 +133,7 @@ oidc:
   left alone, and removing an address does not demote anyone.
 - A verified email address is required [unless email verification is disabled](#control-email-verification).
 
-```yaml hl_lines="5-6"
+```yaml {5-6}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -150,7 +150,7 @@ oidc:
 - Access allowed: users in the `slopscale_users` group
 - Access denied: users without groups, users with other groups
 
-```yaml hl_lines="5-7"
+```yaml {5-7}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -173,7 +173,7 @@ oidc:
   directly and the group can be renamed, described, used in rules and deleted. A group an operator made is never
   taken over by name; a claim that collides with one is logged and skipped.
 
-```yaml hl_lines="5-8"
+```yaml {5-8}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -196,7 +196,7 @@ via the `email_verified: true` claim.
 Unverified emails may be allowed in case an identity provider does not send the `email_verified` claim or email
 verification is not required. In that case, a user's email address is always synchronized to the user profile.
 
-```yaml hl_lines="5"
+```yaml {5}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
@@ -212,7 +212,7 @@ reauthenticate. The default node expiration can be configured via the top-level 
 <Tabs>
 <Tab title="Customize node expiration">
 
-```yaml hl_lines="2"
+```yaml {2}
 node:
   expiry: 30d   # Use 0 to disable node expiration
 ```
@@ -223,7 +223,7 @@ node:
 The Access Token is typically a short-lived token that expires within a few minutes. You
 will have to configure token expiration in your identity provider to avoid frequent re-authentication.
 
-```yaml hl_lines="5"
+```yaml {5}
 oidc:
   issuer: "https://sso.example.com"
   client_id: "slopscale"
