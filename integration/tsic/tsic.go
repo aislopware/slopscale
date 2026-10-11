@@ -56,13 +56,12 @@ func defaultPingTimeoutVal() time.Duration {
 }
 
 var (
-	errTailscalePingFailed             = errors.New("ping failed")
-	errTailscalePingNotDERP            = errors.New("ping not via DERP")
-	errTailscaleNotLoggedIn            = errors.New("tailscale not logged in")
-	errTailscaleWrongPeerCount         = errors.New("wrong peer count")
-	errTailscaleCannotUpWithoutAuthkey = errors.New("cannot up without authkey")
-	errInvalidClientConfig             = errors.New("verifiably invalid client config requested")
-	errInvalidTailscaleImageFormat     = errors.New(
+	errTailscalePingFailed         = errors.New("ping failed")
+	errTailscalePingNotDERP        = errors.New("ping not via DERP")
+	errTailscaleNotLoggedIn        = errors.New("tailscale not logged in")
+	errTailscaleWrongPeerCount     = errors.New("wrong peer count")
+	errInvalidClientConfig         = errors.New("verifiably invalid client config requested")
+	errInvalidTailscaleImageFormat = errors.New(
 		"invalid SLOPSCALE_INTEGRATION_TAILSCALE_IMAGE format, expected repository:tag",
 	)
 	errTailscaleImageRequiredInCI = errors.New(
@@ -94,6 +93,10 @@ type TailscaleInContainer struct {
 	// "cache"
 	ips  []netip.Addr
 	fqdn string
+
+	// Only the current attempt is checked: earlier logins may be deliberately
+	// abandoned or rejected before the test starts another one.
+	login *loginAttempt
 
 	// optional config
 	caCerts           [][]byte
@@ -641,6 +644,7 @@ func (t *TailscaleInContainer) Logs(stdout, stderr io.Writer) error {
 func (t *TailscaleInContainer) Login(
 	loginServer, authKey string,
 ) error {
+	t.login = nil
 	command := t.buildLoginCommand(loginServer, authKey)
 
 	_, _, err := t.Execute(
@@ -665,28 +669,30 @@ func (t *TailscaleInContainer) LoginWithURL(
 	loginServer string,
 ) (*url.URL, error) {
 	command := t.buildLoginCommand(loginServer, "")
+	command = append(command, "--timeout="+loginTimeout.String())
 
-	stdout, stderr, err := t.Execute(command)
-	if errors.Is(err, errTailscaleNotLoggedIn) {
-		return nil, errTailscaleCannotUpWithoutAuthkey
-	}
+	// Return the URL as soon as the CLI prints it, but let the CLI finish
+	// the login normally. Its own timeout bounds an abandoned login;
+	// WaitForRunning checks how it exited.
+	t.login = startLogin(command, func(cmd []string, stdout, stderr io.Writer) (int, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), loginTimeout+dockerExecuteTimeout)
+		defer cancel()
 
-	defer func() {
-		if err != nil {
-			log.Printf("join command: %q", strings.Join(command, " "))
-		}
-	}()
+		return dockertestutil.ExecuteStreaming(ctx, t.pool, t.container, cmd, stdout, stderr)
+	})
 
-	loginURL, err := util.ParseLoginURLFromCLILogin(stdout + stderr)
+	u, err := t.login.waitForURL(dockerExecuteTimeout)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s fetching login URL: %w", t.hostname, err)
 	}
 
-	return loginURL, nil
+	return u, nil
 }
 
 // Logout runs the logout routine on the given Tailscale instance.
 func (t *TailscaleInContainer) Logout() error {
+	t.login = nil
+
 	_, _, err := t.Execute([]string{tailscaleBin, "logout"})
 	if err != nil {
 		return err
@@ -1126,7 +1132,8 @@ func (t *TailscaleInContainer) WaitForNeedsLogin(timeout time.Duration) error {
 }
 
 // WaitForRunning blocks until the Tailscale (tailscaled) instance is logged in
-// and ready to be used.
+// and ready to be used, and the current web login command has exited
+// successfully.
 func (t *TailscaleInContainer) WaitForRunning(timeout time.Duration) error {
 	return t.waitForBackendState("Running", timeout)
 }
@@ -1713,6 +1720,17 @@ func (t *TailscaleInContainer) waitForBackendState(state string, timeout time.Du
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	if state == "Running" && t.login != nil {
+		select {
+		case <-t.login.done:
+			if t.login.err != nil {
+				return fmt.Errorf("%s login failed: %w", t.hostname, t.login.err)
+			}
+		case <-ctx.Done():
+			return fmt.Errorf("%s waiting for login command: %w", t.hostname, ctx.Err())
+		}
+	}
 
 	for {
 		select {

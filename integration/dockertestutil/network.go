@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/netip"
@@ -447,7 +448,7 @@ func execInContainer(
 	docker *client.Client,
 	containerID string,
 	cmd, env []string,
-	stdout, stderr *bytes.Buffer,
+	stdout, stderr io.Writer,
 ) (int, error) {
 	created, err := docker.ExecCreate(ctx, containerID, client.ExecCreateOptions{
 		Cmd:          cmd,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -38,6 +39,19 @@ func ExecuteCommandTimeout(timeout time.Duration) ExecuteCommandOption {
 		conf.timeout = timeout
 		return nil
 	})
+}
+
+// ExecuteStreaming runs cmd in the container and copies its output into
+// stdout and stderr as it arrives, for commands whose output a caller acts
+// on before they exit. It returns the exit code; only ctx bounds it.
+func ExecuteStreaming(
+	ctx context.Context,
+	pool *Pool,
+	resource dockertest.Resource,
+	cmd []string,
+	stdout, stderr io.Writer,
+) (int, error) {
+	return execInContainer(ctx, pool.Docker, resource.ID(), cmd, nil, stdout, stderr)
 }
 
 // ExecuteCommand runs cmd in the container with env and returns its
