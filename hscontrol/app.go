@@ -186,6 +186,20 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 			return
 		}
 
+		// Schedule and Cancel run outside the session transition, so a
+		// disconnecting session can arm a timer after a reconnect already
+		// cancelled it. The session count is authoritative; a stale timer
+		// is dropped and the next disconnect arms a fresh one. Not Online():
+		// an expired node keeps polling while offline.
+		// A Connect between this check and DeleteNode still loses the
+		// node; that is only reachable after a full inactivity timeout and
+		// would need a delete-if-idle in State.
+		if node.ActiveSessions() > 0 {
+			log.Debug().Caller().EmbedObject(node).Msg("ephemeral node has a live session, skipping garbage collection")
+
+			return
+		}
+
 		changes, deleteErr := app.state.DeleteNode(node)
 		app.Change(changes...)
 
