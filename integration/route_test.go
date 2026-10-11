@@ -3881,8 +3881,11 @@ func TestHASubnetRouterPingFailover(t *testing.T) {
 		[]tsic.Option{
 			tsic.WithAcceptRoutes(),
 			tsic.WithPackages("iptables"),
+			tsic.WithDERPOverHTTP(),
 		},
 		hsic.WithTestName("rt-hapingfail"),
+		// The firewall matches the callback path while Noise remains encrypted.
+		hsic.WithoutTLS(),
 		hsic.WithHAProbing(10*time.Second, 5*time.Second),
 	)
 	requireNoErrSlopscaleEnv(t, err)
@@ -3991,21 +3994,21 @@ func TestHASubnetRouterPingFailover(t *testing.T) {
 
 	t.Log("=== HA setup verified. Blocking ping callbacks on router 1 via iptables ===")
 
-	// Block NEW outbound TCP from router 1 to slopscale.
-	// Preserves the existing Noise HTTP/2 long-poll (ESTABLISHED).
+	// Block plaintext ping callbacks, including requests on reused HTTP
+	// connections. The encrypted Noise long-poll remains available.
 	hsIP := slopscale.GetIPInNetwork(usernet1)
 	iptablesAdd := []string{
 		"iptables", "-A", "OUTPUT",
 		"-d", hsIP,
 		"-p", "tcp", "--dport", "8080",
-		"-m", "state", "--state", "NEW",
+		"-m", "string", "--algo", "kmp", "--string", "/machine/ping-response",
 		"-j", "DROP",
 	}
 
 	_, _, err = subRouter1.Execute(iptablesAdd)
 	require.NoError(t, err, "failed to add iptables rule")
 
-	t.Logf("Blocked new TCP connections from %s to slopscale at %s:8080",
+	t.Logf("Blocked ping callbacks from %s to slopscale at %s:8080",
 		subRouter1.Hostname(), hsIP)
 
 	// Wait for the prober to detect the failure and trigger failover.
@@ -4050,7 +4053,7 @@ func TestHASubnetRouterPingFailover(t *testing.T) {
 		"iptables", "-D", "OUTPUT",
 		"-d", hsIP,
 		"-p", "tcp", "--dport", "8080",
-		"-m", "state", "--state", "NEW",
+		"-m", "string", "--algo", "kmp", "--string", "/machine/ping-response",
 		"-j", "DROP",
 	}
 
