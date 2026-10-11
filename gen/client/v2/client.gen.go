@@ -45,6 +45,21 @@ func (e CreateWebhookRequestProviderType) Valid() bool {
 	}
 }
 
+// Defines values for TailnetSettingsRouteSelection.
+const (
+	RegionalRouting TailnetSettingsRouteSelection = "regional-routing"
+)
+
+// Valid indicates whether the value is a known member of the TailnetSettingsRouteSelection enum.
+func (e TailnetSettingsRouteSelection) Valid() bool {
+	switch e {
+	case RegionalRouting:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UpdateWebhookRequestProviderType.
 const (
 	UpdateWebhookRequestProviderTypeDiscord    UpdateWebhookRequestProviderType = "discord"
@@ -453,18 +468,22 @@ type SetTagsRequest struct {
 
 // TailnetSettings defines model for TailnetSettings.
 type TailnetSettings struct {
-	AclsExternalLink                       string `json:"aclsExternalLink"`
-	AclsExternallyManagedOn                bool   `json:"aclsExternallyManagedOn"`
-	DevicesApprovalOn                      bool   `json:"devicesApprovalOn"`
-	DevicesAutoUpdatesOn                   bool   `json:"devicesAutoUpdatesOn"`
-	DevicesKeyDurationDays                 int64  `json:"devicesKeyDurationDays"`
-	HttpsEnabled                           bool   `json:"httpsEnabled"`
-	NetworkFlowLoggingOn                   bool   `json:"networkFlowLoggingOn"`
-	PostureIdentityCollectionOn            bool   `json:"postureIdentityCollectionOn"`
-	RegionalRoutingOn                      bool   `json:"regionalRoutingOn"`
-	UsersApprovalOn                        bool   `json:"usersApprovalOn"`
-	UsersRoleAllowedToJoinExternalTailnets string `json:"usersRoleAllowedToJoinExternalTailnets"`
+	AclsExternalLink                       string                        `json:"aclsExternalLink"`
+	AclsExternallyManagedOn                bool                          `json:"aclsExternallyManagedOn"`
+	DevicesApprovalOn                      bool                          `json:"devicesApprovalOn"`
+	DevicesAutoUpdatesOn                   bool                          `json:"devicesAutoUpdatesOn"`
+	DevicesKeyDurationDays                 int64                         `json:"devicesKeyDurationDays"`
+	HttpsEnabled                           bool                          `json:"httpsEnabled"`
+	NetworkFlowLoggingOn                   bool                          `json:"networkFlowLoggingOn"`
+	PostureIdentityCollectionOn            bool                          `json:"postureIdentityCollectionOn"`
+	RegionalRoutingOn                      bool                          `json:"regionalRoutingOn"`
+	RouteSelection                         TailnetSettingsRouteSelection `json:"routeSelection"`
+	UsersApprovalOn                        bool                          `json:"usersApprovalOn"`
+	UsersRoleAllowedToJoinExternalTailnets string                        `json:"usersRoleAllowedToJoinExternalTailnets"`
 }
+
+// TailnetSettingsRouteSelection defines model for TailnetSettings.RouteSelection.
+type TailnetSettingsRouteSelection string
 
 // TrafficStats defines model for TrafficStats.
 type TrafficStats struct {
