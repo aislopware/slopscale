@@ -603,7 +603,7 @@ func (ns *noiseServer) RegistrationHandler(
 		return
 	}
 
-	registerResponse, err := ns.slopscale.handleRegister(req.Context(), registerRequest, ns.conn.Peer())
+	registerResponse, err := ns.slopscale.handleRegister(req.Context(), registerRequest, ns.machineKey)
 	if err != nil {
 		if httpErr, ok := errors.AsType[HTTPError](err); ok {
 			registerResponse = &tailcfg.RegisterResponse{Error: httpErr.Msg}
