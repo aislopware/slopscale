@@ -25,9 +25,10 @@ import (
 //   - bypass: no-bypass talks to the server over gRPC; bypass opens the
 //     database directly.
 //
-// Each row spins up its own scenario because policy_mode is fixed at boot
-// via `SLOPSCALE_POLICY_MODE`. The two users + two nodes give the tests
-// block real `user@` aliases to resolve against.
+// Each policy mode shares one scenario across its sequential checks because
+// policy_mode is fixed at boot. The two users + two nodes give the tests
+// block real `user@` aliases to resolve against. Check inputs are separate
+// from the live policy, which must remain unchanged after every check.
 func TestPolicyCheckCommand(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -80,44 +81,56 @@ func TestPolicyCheckCommand(t *testing.T) {
 
 	type row struct {
 		name       string
-		policyMode string
 		fixture    fixture
 		bypass     bool
 		wantErr    string
 		wantStdout string
 	}
 
-	modes := []string{"file", "database"}
+	modes := []types.PolicyMode{types.PolicyModeFile, types.PolicyModeDB}
 	bypasses := []bool{false, true}
-	rows := make([]row, 0, len(modes)*len(fixtures)*len(bypasses))
+	rows := make([]row, 0, len(fixtures)*len(bypasses))
 
-	for _, mode := range modes {
-		for _, f := range fixtures {
-			for _, bypass := range bypasses {
-				suffix := "no-bypass"
-				if bypass {
-					suffix = "bypass"
-				}
-
-				r := row{
-					name:       mode + "-" + f.name + "-" + suffix,
-					policyMode: mode,
-					fixture:    f,
-					bypass:     bypass,
-					wantStdout: "Policy is valid",
-				}
-				if f.name == "acl-plus-failing-tests" {
-					r.wantErr = "test(s) failed"
-					r.wantStdout = ""
-				}
-
-				rows = append(rows, r)
+	for _, f := range fixtures {
+		for _, bypass := range bypasses {
+			suffix := "no-bypass"
+			if bypass {
+				suffix = "bypass"
 			}
+
+			r := row{
+				name:       f.name + "-" + suffix,
+				fixture:    f,
+				bypass:     bypass,
+				wantStdout: "Policy is valid",
+			}
+			if f.name == "acl-plus-failing-tests" {
+				r.wantErr = "test(s) failed"
+				r.wantStdout = ""
+			}
+
+			rows = append(rows, r)
 		}
 	}
 
-	for _, tt := range rows {
-		t.Run(tt.name, func(t *testing.T) {
+	// Use a live policy distinct from every check fixture so an accidental
+	// policy update is observable, including for the ACL-only fixture.
+	livePolicy := policyv2.Policy{
+		ACLs: []policyv2.ACL{
+			{
+				Action:  policyv2.ActionAccept,
+				Sources: []policyv2.Alias{wildcard()},
+				Destinations: []policyv2.AliasWithPorts{
+					aliasWithPorts(wildcard(), tailcfg.PortRangeAny),
+				},
+			},
+		},
+	}
+	livePolicyBytes, err := json.Marshal(livePolicy)
+	require.NoError(t, err)
+
+	for _, mode := range modes {
+		t.Run(string(mode), func(t *testing.T) {
 			spec := ScenarioSpec{
 				NodesPerUser: 1,
 				Users: []string{
@@ -129,45 +142,64 @@ func TestPolicyCheckCommand(t *testing.T) {
 			scenario, err := NewScenario(spec)
 			require.NoError(t, err)
 
-			defer scenario.ShutdownAssertNoPanics(t)
+			t.Cleanup(func() { scenario.ShutdownAssertNoPanics(t) })
 
 			err = scenario.CreateSlopscaleEnv(
 				[]tsic.Option{},
 				hsic.WithTestName("cli-policycheck"),
-				hsic.WithConfigEnv(map[string]string{
-					"SLOPSCALE_POLICY_MODE": tt.policyMode,
-				}),
+				hsic.WithPolicyMode(mode),
+				hsic.WithACLPolicy(&livePolicy),
 			)
 			require.NoError(t, err)
 
 			slopscale, err := scenario.Slopscale()
 			require.NoError(t, err)
 
-			pBytes, err := json.Marshal(tt.fixture.policy)
-			require.NoError(t, err)
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				stdout, getErr := slopscale.Execute([]string{"slopscale", "policy", "get"})
+				assert.NoError(c, getErr)
+				assert.JSONEq(c, string(livePolicyBytes), stdout)
+			}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+				"live policy should be loaded before checks")
 
-			policyFilePath := "/etc/slopscale/policy.json"
-			err = slopscale.WriteFile(policyFilePath, pBytes)
-			require.NoError(t, err)
+			for _, tt := range rows {
+				t.Run(tt.name, func(t *testing.T) {
+					pBytes, err := json.Marshal(tt.fixture.policy)
+					require.NoError(t, err)
 
-			cmd := []string{"slopscale", "policy", "check", "-f", policyFilePath}
-			if tt.bypass {
-				// --force suppresses the "is the server running?"
-				// confirmation prompt so the command can run
-				// non-interactively under the test harness.
-				cmd = append(cmd, "--bypass-server-and-access-database-directly", "--force")
+					policyFilePath := "/etc/slopscale/policy-check-" + tt.name + ".json"
+					err = slopscale.WriteFile(policyFilePath, pBytes)
+					require.NoError(t, err)
+
+					t.Cleanup(func() {
+						assert.EventuallyWithT(t, func(c *assert.CollectT) {
+							stdout, getErr := slopscale.Execute([]string{"slopscale", "policy", "get"})
+							assert.NoError(c, getErr)
+							assert.JSONEq(c, string(livePolicyBytes), stdout)
+						}, integrationutil.StatusReadyTimeout, integrationutil.FastPoll,
+							"policy check must not alter the live policy")
+					})
+
+					cmd := []string{"slopscale", "policy", "check", "-f", policyFilePath}
+					if tt.bypass {
+						// --force suppresses the "is the server running?"
+						// confirmation prompt so the command can run
+						// non-interactively under the test harness.
+						cmd = append(cmd, "--bypass-server-and-access-database-directly", "--force")
+					}
+
+					stdout, err := slopscale.Execute(cmd)
+
+					if tt.wantErr != "" {
+						require.ErrorContains(t, err, tt.wantErr)
+
+						return
+					}
+
+					require.NoError(t, err)
+					require.Contains(t, stdout, tt.wantStdout)
+				})
 			}
-
-			stdout, err := slopscale.Execute(cmd)
-
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr)
-
-				return
-			}
-
-			require.NoError(t, err)
-			require.Contains(t, stdout, tt.wantStdout)
 		})
 	}
 }
