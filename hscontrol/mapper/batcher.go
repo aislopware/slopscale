@@ -149,13 +149,14 @@ func generateMapResponse(
 		}
 
 		removed = nc.computePeerDiff(currentPeerIDs)
-		// Include self node when this is a self-update (e.g., node's own tags changed)
-		// so the node sees its updated self info along with new packet filters, or
-		// when the change asks for it on every node (approval flips
-		// MachineAuthorized on the self node of everyone it admits).
-		resp, err = mapper.policyChangeResponse(
-			nodeID, version, currentPeers, isSelfUpdate || r.IncludeSelf,
-		)
+		// The response always carries the self node: it renders from the
+		// same state as peers (approved routes, tags, approval's
+		// MachineAuthorized, role caps), and a connection that already
+		// holds an equal one has it dropped on send. What rides beside it
+		// (tailnet lock head, display messages) only comes along when the
+		// change is the node's own or asks for it on every node, as an
+		// approval or a tailnet lock head move does.
+		resp, err = mapper.policyChangeResponse(nodeID, version, currentPeers, isSelfUpdate || r.IncludeSelf)
 	case isSelfUpdate:
 		// Non-policy self-update: just send the self node info
 		resp, err = mapper.selfMapResponse(nodeID, version)
@@ -439,6 +440,9 @@ func (b *Batcher) AddNode(
 		}
 
 		nodeConn.workMu.Unlock()
+
+		// Still pendingInitial, so no broadcast can race this.
+		newEntry.lastSelf.Store(initialMap.Node)
 
 		// Open the connection for broadcast sends now that the initial
 		// map is the stream's first frame; send() requeued any changes

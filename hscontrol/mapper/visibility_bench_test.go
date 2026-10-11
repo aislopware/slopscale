@@ -140,6 +140,19 @@ func BenchmarkPeerVisibility(b *testing.B) {
 					fanOut(b, change.PeersChanged("bench", target))
 				})
 
+				b.Run("policy="+pol.name+"/op=policy_change", func(b *testing.B) {
+					b.ReportAllocs()
+
+					for b.Loop() {
+						for _, id := range ids {
+							_, err := m.policyChangeResponse(id, capVer, m.state.ListPeers(id), false)
+							if err != nil {
+								b.Fatal(err)
+							}
+						}
+					}
+				})
+
 				b.Run("policy="+pol.name+"/op=full_map", func(b *testing.B) {
 					b.ReportAllocs()
 
