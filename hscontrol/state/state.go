@@ -2121,7 +2121,7 @@ func preserveNetInfo(
 func applyLockKeys(
 	node *types.Node,
 	newKey key.NodePublic,
-	nlKey key.NLPublic,
+	nlKey key.TLPublic,
 	verified tkatype.MarshaledSignature,
 ) {
 	if !nlKey.IsZero() {
@@ -2155,7 +2155,7 @@ type newNodeParams struct {
 	// NLKey is the client's tailnet lock key; KeySignature the node key
 	// signature it registered with, already checked against the
 	// authority (see [State.tailnetLockSignature]).
-	NLKey        key.NLPublic
+	NLKey        key.TLPublic
 	KeySignature tkatype.MarshaledSignature
 
 	// Optional: Pre-auth key specific fields

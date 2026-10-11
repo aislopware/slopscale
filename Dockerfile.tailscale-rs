@@ -1,3 +1,5 @@
+# The Rust minor follows tailscale-rs's rust-toolchain.toml (1.98.1 today): with
+# any other image rustup downloads that toolchain during the build anyway.
 FROM rust:1.98-trixie AS builder
 
 ARG TAILSCALE_RS_REPO=https://github.com/tailscale/tailscale-rs.git

@@ -134,7 +134,7 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	Services            *NodeServices
 	ApprovedServices    []string
 	KeySignature        tkatype.MarshaledSignature
-	NLKey               key.NLPublic
+	NLKey               key.TLPublic
 	SourceAddr          netip.Addr
 	SharedWith          []UserID
 	GlobalExitNode      bool

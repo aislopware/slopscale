@@ -246,7 +246,7 @@ func (s *State) TailnetLock() types.TailnetLockStatus {
 	for _, k := range l.authority.Keys() {
 		status.Keys = append(status.Keys, types.TailnetLockKey{
 			ID:     hex.EncodeToString(k.MustID()),
-			Public: key.NLPublicFromEd25519Unsafe(k.Public).CLIString(),
+			Public: key.TLPublicFromEd25519Unsafe(k.Public).CLIString(),
 			Votes:  k.Votes,
 		})
 	}

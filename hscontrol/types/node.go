@@ -216,7 +216,7 @@ type Node struct {
 	// key, which may rotate that signature when the node key changes.
 	// See docs/ref/tailnet-lock.md.
 	KeySignature tkatype.MarshaledSignature
-	NLKey        key.NLPublic
+	NLKey        key.TLPublic
 
 	// SourceAddr is the address the node's control connection last came
 	// from, as the trusted-proxy middleware resolved it. It is runtime

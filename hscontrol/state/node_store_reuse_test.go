@@ -358,7 +358,7 @@ func TestPeerInputsChangedClassifiesEveryNodeField(t *testing.T) {
 			wantRecompute: true,
 		},
 		"KeySignature":     {mutate: func(n *types.Node) { n.KeySignature = []byte{1} }},
-		"NLKey":            {mutate: func(n *types.Node) { n.NLKey = key.NewNLPrivate().Public() }},
+		"NLKey":            {mutate: func(n *types.Node) { n.NLKey = key.NewTLPrivate().Public() }},
 		"SourceAddr":       {mutate: func(n *types.Node) { n.SourceAddr = netip.MustParseAddr("192.0.2.7") }},
 		"SharedWith":       {mutate: func(n *types.Node) { n.SharedWith = []types.UserID{9} }, wantRecompute: true},
 		"GlobalExitNode":   {mutate: func(n *types.Node) { n.GlobalExitNode = true }, wantRecompute: true},
