@@ -1841,8 +1841,9 @@ func (c pakReregCase) reregister(
 	regReq tailcfg.RegisterRequest,
 ) (types.NodeView, error) {
 	hi := regReq.Hostinfo.Clone()
+	node, _, err := c.s.reregisterNodeWithPAK(view, pak, regReq, c.machineKey, hi.Hostname, hi)
 
-	return c.s.reregisterNodeWithPAK(view, pak, regReq, c.machineKey, hi.Hostname, hi)
+	return node, err
 }
 
 // pakNodeFields are the node fields a re-registration writes. Expiry is in

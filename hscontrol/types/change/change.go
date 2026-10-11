@@ -586,7 +586,9 @@ func EndpointOrDERPUpdate(id types.NodeID, patch *tailcfg.PeerChange) Change {
 // did. Peers only need those changed fields, so it is sent as the minimal
 // incremental [tailcfg.PeerChange] patch rather than re-advertising the whole
 // node, the smallest update that conveys the rotation, and the least
-// disruptive for peers reconciling it.
+// disruptive for peers reconciling it. Use it only when nothing else peers
+// read changed: the patch carries no Hostinfo, and a new key expiry does not
+// clear a peer's [tailcfg.Node.Expired].
 func NodeKeyRotated(node types.NodeView) Change {
 	nk := node.NodeKey()
 	dk := node.DiscoKey()
