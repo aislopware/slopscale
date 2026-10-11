@@ -2595,6 +2595,8 @@ func (pm *PolicyManager) findNodePairLocked(srcNodeID, dstNodeID types.NodeID) (
 
 // sshCheckPeriodForRule reports the check period for rule when it is a
 // check rule matching the (srcNode, dstNode) pair, and whether it matched.
+// It must match exactly the pairs compileSSHPolicy sends dstNode a check
+// rule for, since that is the rule the client calls back about.
 func (pm *PolicyManager) sshCheckPeriodForRule(
 	rule SSH,
 	srcNode, dstNode types.NodeView,
@@ -2603,8 +2605,9 @@ func (pm *PolicyManager) sshCheckPeriodForRule(
 		return 0, false
 	}
 
-	// Resolve sources and check if src node matches.
-	srcIPs, err := rule.Sources.Resolve(pm.pol, pm.users, pm.nodes)
+	// Resolve sources as compileSSHPolicy does for dstNode, so
+	// autogroup:shared names the users dstNode is shared with.
+	srcIPs, err := pm.pol.resolveSSHSources(rule.Sources, pm.users, dstNode, pm.nodes)
 	if err != nil || srcIPs == nil {
 		return 0, false
 	}
@@ -2614,6 +2617,8 @@ func (pm *PolicyManager) sshCheckPeriodForRule(
 	}
 
 	// Check if dst node matches any destination.
+	hasOtherDests := false
+
 	for _, dst := range rule.Destinations {
 		if ag, isAG := dst.(*AutoGroup); isAG && ag.Is(AutoGroupSelf) {
 			if sshAutogroupSelfMatches(srcNode, dstNode) {
@@ -2623,12 +2628,27 @@ func (pm *PolicyManager) sshCheckPeriodForRule(
 			continue
 		}
 
+		hasOtherDests = true
+
 		dstIPs, err := dst.Resolve(pm.pol, pm.users, pm.nodes)
 		if err != nil || dstIPs == nil {
 			continue
 		}
 
 		if slices.ContainsFunc(dstNode.IPs(), dstIPs.Contains) {
+			return checkPeriodFromRule(rule), true
+		}
+	}
+
+	// Localpart self-access: a source outside dst still gets the rule
+	// for its own user's nodes, or itself if tagged (compileSSHPolicy).
+	if hasOtherDests && rule.Users.ContainsLocalpart() &&
+		slices.ContainsFunc(dstNode.IPs(), srcIPs.Contains) {
+		if dstNode.IsTagged() {
+			if srcNode.ID() == dstNode.ID() {
+				return checkPeriodFromRule(rule), true
+			}
+		} else if sshAutogroupSelfMatches(srcNode, dstNode) {
 			return checkPeriodFromRule(rule), true
 		}
 	}

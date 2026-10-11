@@ -262,3 +262,130 @@ func TestSSHDataCompat(t *testing.T) {
 		})
 	}
 }
+
+// assertSSHCheckParamsMatchRules checks SSHCheckParams against check rules as
+// the client reads them: (src, dst) must be found exactly when a
+// holdAndDelegate rule for dst lists src as a principal.
+func assertSSHCheckParamsMatchRules(
+	t *testing.T,
+	pm *PolicyManager,
+	nodes types.Nodes,
+	rulesFor func(dst *types.Node) []*tailcfg.SSHRule,
+) {
+	t.Helper()
+
+	byIP := make(map[string]*types.Node)
+
+	for _, n := range nodes {
+		for _, ip := range n.IPs() {
+			byIP[ip.String()] = n
+		}
+	}
+
+	for _, dst := range nodes {
+		want := make(map[types.NodeID]bool)
+
+		for _, rule := range rulesFor(dst) {
+			if rule.Action == nil || rule.Action.HoldAndDelegate == "" {
+				continue
+			}
+
+			for _, p := range rule.Principals {
+				src, ok := byIP[p.NodeIP]
+				require.Truef(t, ok, "principal %q is not a node", p.NodeIP)
+
+				want[src.ID] = true
+			}
+		}
+
+		for _, src := range nodes {
+			_, got := pm.SSHCheckParams(src.ID, dst.ID)
+			assert.Equalf(t, want[src.ID], got,
+				"SSHCheckParams(%s -> %s)", src.Hostname, dst.Hostname)
+		}
+	}
+}
+
+// TestSSHCheckParamsMatchesCaptures pins SSHCheckParams, which decides the
+// SSH check callback, to the check rules the hosted control plane sent.
+func TestSSHCheckParamsMatchesCaptures(t *testing.T) {
+	t.Parallel()
+
+	files, err := filepath.Glob(filepath.Join("testdata", "ssh_results", "ssh-*.hujson"))
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	users := setupSSHDataCompatUsers()
+
+	for _, file := range files {
+		tf := loadSSHTestFile(t, file)
+		if tf.Input.APIResponseCode != 200 {
+			continue
+		}
+
+		if _, skip := sshSkipReasons[tf.TestID]; skip {
+			continue
+		}
+
+		t.Run(tf.TestID, func(t *testing.T) {
+			t.Parallel()
+
+			nodes := buildGrantsNodesFromCapture(users, tf)
+
+			pm, err := NewPolicyManager(
+				[]byte(tf.Input.FullPolicy), users, nodes.ViewSlice(),
+			)
+			require.NoError(t, err)
+
+			assertSSHCheckParamsMatchRules(t, pm, nodes,
+				func(dst *types.Node) []*tailcfg.SSHRule {
+					return tf.Captures[dst.GivenName].SSHRules
+				})
+		})
+	}
+}
+
+// TestSSHCheckParamsMatchesCompiledRules pins SSHCheckParams to slopscale's
+// own compiled rules for sources the captures lack, such as
+// autogroup:shared, which resolves per destination node.
+func TestSSHCheckParamsMatchesCompiledRules(t *testing.T) {
+	t.Parallel()
+
+	users := types.Users{
+		{ID: 1, Name: "owner", Email: "owner@example.com"},
+		{ID: 2, Name: "guest", Email: "guest@example.com"},
+	}
+
+	nodes := types.Nodes{
+		node("owner-1", "100.64.0.1", "fd7a:115c:a1e0::1", users[0]),
+		node("owner-2", "100.64.0.2", "fd7a:115c:a1e0::2", users[0]),
+		node("guest-1", "100.64.0.3", "fd7a:115c:a1e0::3", users[1]),
+	}
+	for i, n := range nodes {
+		n.ID = types.NodeID(i + 1)
+	}
+
+	nodes[1].SharedWith = []types.UserID{2}
+
+	for name, pol := range map[string]string{
+		"shared": `{"ssh": [{"action": "check", "src": ["autogroup:shared"],
+			"dst": ["autogroup:member"], "users": ["autogroup:nonroot"]}]}`,
+		"self": `{"ssh": [{"action": "check", "src": ["autogroup:member"],
+			"dst": ["autogroup:self"], "users": ["autogroup:nonroot"]}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			pm, err := NewPolicyManager([]byte(pol), users, nodes.ViewSlice())
+			require.NoError(t, err)
+
+			assertSSHCheckParamsMatchRules(t, pm, nodes,
+				func(dst *types.Node) []*tailcfg.SSHRule {
+					sshPol, err := pm.SSHPolicy("", dst.View())
+					require.NoError(t, err)
+
+					return sshPol.Rules
+				})
+		})
+	}
+}
