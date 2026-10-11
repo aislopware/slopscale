@@ -933,7 +933,11 @@ func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWr
 
 	sess.log.Info().Caller().Msg("map request from an unknown node key, telling it to log in again")
 
-	err := sess.writeMap(nodeGoneResponse(sess.node))
+	resp := nodeGoneResponse(sess.node)
+	// This frame opens the stream in place of the initial map.
+	resp.Debug = ns.slopscale.cfg.TailcfgDebug()
+
+	err := sess.writeMap(resp)
 	if err != nil {
 		sess.log.Error().Caller().Err(err).Msg("cannot write map to unknown node")
 	}

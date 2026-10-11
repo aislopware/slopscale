@@ -1161,11 +1161,22 @@ func decodeMapResponse(t *testing.T, compress string, body []byte) tailcfg.MapRe
 func TestPollNetMapHandler_DeletedNodeGetsExpiredSelf(t *testing.T) {
 	t.Parallel()
 
-	for _, compress := range []string{"", util.ZstdCompression} {
-		t.Run("compress="+compress, func(t *testing.T) {
+	for _, tc := range []struct {
+		compress  string
+		logTail   bool
+		wantDebug *tailcfg.Debug
+	}{
+		{"", false, &tailcfg.Debug{DisableLogTail: true}},
+		{util.ZstdCompression, false, &tailcfg.Debug{DisableLogTail: true}},
+		{"", true, nil},
+		{util.ZstdCompression, true, nil},
+	} {
+		compress := tc.compress
+		t.Run(fmt.Sprintf("compress=%s/logtail=%t", compress, tc.logTail), func(t *testing.T) {
 			t.Parallel()
 
 			app := createTestApp(t)
+			app.cfg.LogTail.Enabled = tc.logTail
 			user := app.state.CreateUserForTest("deleted-node-user")
 			node := putTestNodeInStore(t, app, user, "deleted-node")
 
@@ -1192,6 +1203,9 @@ func TestPollNetMapHandler_DeletedNodeGetsExpiredSelf(t *testing.T) {
 			assert.Equal(t, node.NodeKey, resp.Node.Key)
 			assert.True(t, resp.Node.KeyExpiry.Before(time.Now()),
 				"a past KeyExpiry is what drives the client to NeedsLogin, got %v", resp.Node.KeyExpiry)
+			// This frame starts the stream, so it must carry the logtail
+			// instruction the initial map would have.
+			assert.Equal(t, tc.wantDebug, resp.Debug)
 		})
 	}
 }

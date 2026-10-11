@@ -2262,6 +2262,17 @@ func (d *deprecator) apply(v *configValidator) {
 // [Config] stays freely copyable during construction.
 var tailcfgDNSMu sync.RWMutex
 
+// TailcfgDebug returns the [tailcfg.Debug] for full map responses: nil when
+// logtail is enabled, leaving client log uploads as the client set them,
+// otherwise an instruction to stop uploading logs.
+func (c *Config) TailcfgDebug() *tailcfg.Debug {
+	if c.LogTail.Enabled {
+		return nil
+	}
+
+	return &tailcfg.Debug{DisableLogTail: true}
+}
+
 // CloneTailcfgDNSConfig returns a deep copy of [Config.TailcfgDNSConfig], or
 // nil if none is set. Safe for concurrent use with the DNS setters.
 func (c *Config) CloneTailcfgDNSConfig() *tailcfg.DNSConfig {
