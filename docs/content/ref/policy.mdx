@@ -261,6 +261,11 @@ configuration and attributes. At least the following node attributes are current
   detection](https://tailscale.com/docs/integrations/captive-portals#disable-captive-portal-detection).
 - `disable-relay-server`: keep the node from acting as a [peer relay](/ref/networks#peer-relays), whatever its own
   `--relay-server-port` setting says.
+- `disable-cache-network-maps`: keep the node from caching its network map on disk. A client at capability version 149
+  or later (expected with Tailscale 1.104) caches it by default and, on its next start, reaches its peers from the cache
+  before the control server answers, which helps on slow or filtered networks. Opt out devices with wear-sensitive
+  storage such as SD cards; the client then drops the cache it holds. `cache-network-maps` turns caching on for older
+  clients that support it (1.98 and later).
 
 ```json title="policy.json"
 {

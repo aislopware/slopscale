@@ -43,6 +43,12 @@ type RouteFunc func(id NodeID) []netip.Prefix
 // See https://tailscale.com/docs/reference/troubleshooting/network-configuration/cgnat-conflicts.
 const nodeAttrDisableIPv4 nodecap.Cap = "disable-ipv4"
 
+// cacheNetworkMapsByDefault is the first capability version that asks the
+// control plane for [nodecap.CacheNetworkMaps] without a nodeAttr opting
+// it in. Older clients that understand the cap (135 and later) only get it
+// from the policy.
+const cacheNetworkMapsByDefault tailcfg.CapabilityVersion = 149
+
 // filterIPv4 returns ps with every IPv4 prefix dropped. Used by
 // [NodeView.TailNode] when the node carries the disable-ipv4 nodeAttr.
 func filterIPv4(ps []netip.Prefix) []netip.Prefix {
@@ -1484,7 +1490,7 @@ func (nv NodeView) tailNode(
 	hostinfo := nv.Hostinfo()
 
 	if withCapMap {
-		capMap = selfCapMap(cfg, selfPolicyCaps)
+		capMap = selfCapMap(cfg, capVer, selfPolicyCaps)
 	} else {
 		hostinfo = peerHostinfo(nv.ж.Hostinfo, nv.exitNodePriorityForPeers())
 	}
@@ -1585,7 +1591,7 @@ func (nv NodeView) exitNodePriorityForPeers() int {
 // carry the nodeAttrs and the role caps (is-admin, is-owner) the policy
 // manager stamps from the owning user's role. Mirrors what Tailscale SaaS
 // emits for a default tailnet.
-func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
+func selfCapMap(cfg *Config, capVer tailcfg.CapabilityVersion, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 	capMap := tailcfg.NodeCapMap{
 		nodecap.SSH: []tailcfg.RawMessage{},
 	}
@@ -1616,7 +1622,19 @@ func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 		capMap[nodecap.HTTPS] = nil
 	}
 
+	// A client that asks for it caches its netmap on disk and reaches its
+	// peers from the cache before control answers, as on the hosted
+	// control plane; a disable-cache-network-maps nodeAttr opts a node
+	// out, and the client then drops the cache it holds.
+	if capVer >= cacheNetworkMapsByDefault {
+		capMap[nodecap.CacheNetworkMaps] = nil
+	}
+
 	maps.Copy(capMap, policyCaps)
+
+	if _, ok := capMap[nodecap.DisableCacheNetworkMaps]; ok {
+		delete(capMap, nodecap.CacheNetworkMaps)
+	}
 
 	// A node the policy grants Funnel learns which ports it may open, and
 	// is warned when HTTPS is off, since Funnel cannot work without a
