@@ -337,7 +337,8 @@ func (m *mapper) selfMapResponse(
 // [handleNodeChange]. It sends:
 //   - PeersChanged for remaining peers (their AllowedIPs may have changed due to policy)
 //   - Updated PacketFilters
-//   - Updated SSHPolicy (SSH rules may reference users/groups that changed)
+//   - Updated SSHPolicy (SSH rules may reference users/groups that changed);
+//     dropped per connection when unchanged, see [connectionEntry.withSSHPolicyDelta]
 //   - DNSConfig so the client's resolver state stays anchored even when a
 //     policy-triggered wgengine reconfigure races a netmon LinkChange (the
 //     LinkChange handler reapplies dns.Manager.Set with the engine's

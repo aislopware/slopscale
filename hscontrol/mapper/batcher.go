@@ -443,6 +443,7 @@ func (b *Batcher) AddNode(
 
 		// Still pendingInitial, so no broadcast can race this.
 		newEntry.lastSelf.Store(initialMap.Node)
+		newEntry.lastSSHPolicy.Store(initialMap.SSHPolicy)
 
 		// Open the connection for broadcast sends now that the initial
 		// map is the stream's first frame; send() requeued any changes
