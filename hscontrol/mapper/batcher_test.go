@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/db"
 	"github.com/aislopware/slopscale/hscontrol/derp"
+	"github.com/aislopware/slopscale/hscontrol/policy"
 	"github.com/aislopware/slopscale/hscontrol/state"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
@@ -2473,4 +2475,53 @@ func TestSelfSentOnlyWhenChanged(t *testing.T) {
 	require.NotNil(t, frames[0].Node, "first connection still holds the old self")
 	assert.Contains(t, frames[0].Node.Name, "renamed-again")
 	assert.Nil(t, frames[1].Node, "second connection already holds the new self")
+}
+
+var errInjectedSSHPolicy = errors.New("injected SSH policy failure")
+
+type failingSSHPolicyManager struct {
+	policy.PolicyManager
+}
+
+func (failingSSHPolicyManager) SSHPolicy(string, types.NodeView) (*tailcfg.SSHPolicy, error) {
+	return nil, errInjectedSSHPolicy
+}
+
+// TestSSHPolicyEmptyOnWire pins that a node without SSH rules, or whose SSH
+// policy fails to compile, gets "SSHPolicy":{"rules":[]}. A nil SSHPolicy
+// leaves the client's previous rules in force.
+// https://github.com/juanfont/headscale/issues/3508
+func TestSSHPolicyEmptyOnWire(t *testing.T) {
+	for name, failCompile := range map[string]bool{
+		"no ssh rules":  false,
+		"compile error": true,
+	} {
+		t.Run(name, func(t *testing.T) {
+			testData, cleanup := setupBatcherWithTestData(t, NewBatcherAndMapper, 1, 2, normalBufferSize)
+			defer cleanup()
+
+			if failCompile {
+				testData.State.WrapPolicyManagerForTest(
+					func(pm policy.PolicyManager) policy.PolicyManager {
+						return failingSSHPolicyManager{PolicyManager: pm}
+					},
+				)
+			}
+
+			self := testData.Nodes[0].n.ID
+			mc := newMockNodeConnection(self)
+
+			require.NoError(t, handleNodeChange(mc, testData.Batcher.mapper, change.PolicyChange()))
+			require.NoError(t, handleNodeChange(mc, testData.Batcher.mapper, change.FullSelf(self)))
+
+			sent := mc.getSent()
+			require.Len(t, sent, 2)
+
+			for _, resp := range sent {
+				wire, err := json.Marshal(resp)
+				require.NoError(t, err)
+				assert.Contains(t, string(wire), `"SSHPolicy":{"rules":[]}`)
+			}
+		})
+	}
 }

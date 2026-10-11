@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
@@ -152,6 +153,38 @@ func TestPolicyChanges(t *testing.T) {
 		h.ChangePolicy(t, []byte(`{"acls": []}`))
 
 		h.Client(0).WaitForCondition(t, "SSH rules cleared", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) == 0
+			})
+	})
+
+	// A suspended machine has no SSH policy of its own; it must still be
+	// told so, or it keeps the rules it held.
+	t.Run("suspension_clears_client_ssh_policy", func(t *testing.T) {
+		t.Parallel()
+		h := servertest.NewHarness(t, 2)
+
+		h.ChangePolicy(t, []byte(`{
+			"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+			"ssh": [{
+				"action": "accept",
+				"src":    ["autogroup:member"],
+				"dst":    ["autogroup:self"],
+				"users":  ["root"]
+			}]
+		}`))
+
+		c := h.Client(0)
+		c.WaitForCondition(t, "SSH rules present", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) > 0
+			})
+
+		_, suspend, err := h.Server.State().SetNodeSuspension(types.NodeID(c.Netmap().SelfNode.ID()), true)
+		require.NoError(t, err)
+		h.Server.App.Change(suspend)
+
+		c.WaitForCondition(t, "SSH rules cleared", 10*time.Second,
 			func(nm *netmap.NetworkMap) bool {
 				return nm.SSHPolicy != nil && len(nm.SSHPolicy.Rules) == 0
 			})

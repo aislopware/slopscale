@@ -1401,10 +1401,12 @@ func (s *State) ExpireExpiredNodes(lastCheck time.Time) (time.Time, []change.Cha
 	return started, nil, false
 }
 
-// SSHPolicy returns the SSH access policy for a node.
+// SSHPolicy returns the SSH access policy for a node. It is never nil:
+// a client reads a nil SSHPolicy as "keep the previous rules", so a node
+// waiting for approval, or suspended, gets an empty one.
 func (s *State) SSHPolicy(node types.NodeView) (*tailcfg.SSHPolicy, error) {
 	if !node.IsAdmitted() {
-		return nil, nil //nolint:nilnil // a node waiting for approval, or suspended, has no SSH policy
+		return &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{}}, nil
 	}
 
 	return s.polMan.SSHPolicy(s.cfg.ServerURL, node)
@@ -1916,6 +1918,13 @@ func (s *State) PutNodeInStoreForTest(node types.Node) types.NodeView {
 // failures in poll-session tests while keeping the DB row intact for later restore.
 func (s *State) DeleteNodeFromStoreForTest(id types.NodeID) {
 	s.nodeStore.DeleteNode(id)
+}
+
+// WrapPolicyManagerForTest replaces the policy manager with wrap(current) so
+// tests can fail a single method. The [NodeStore] keeps the original manager,
+// so wrap must delegate to its argument. Call before any map is served.
+func (s *State) WrapPolicyManagerForTest(wrap func(policy.PolicyManager) policy.PolicyManager) {
+	s.polMan = wrap(s.polMan)
 }
 
 // CreateRegisteredNodeForTest creates a test node with allocated IPs. This is
