@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.58.2](https://github.com/aislopware/slopscale/compare/v0.58.1...v0.58.2) (2026-10-14)
+
+
+### Fixes
+
+* **capver:** track Tailscale 1.104 and refuse clients older than 1.84 ([#65](https://github.com/aislopware/slopscale/issues/65)) ([53a652f](https://github.com/aislopware/slopscale/commit/53a652f2d414fbea652e393da508921c50e98d1f))
+* **mapper:** stop a slow control plane from piling up abandoned sessions ([#66](https://github.com/aislopware/slopscale/issues/66)) ([f4f8b87](https://github.com/aislopware/slopscale/commit/f4f8b8786740e20824966715b8edb9d73c05ac19))
+* **state:** skip an app on every connector for machines at one connector's site ([#64](https://github.com/aislopware/slopscale/issues/64)) ([03bfc35](https://github.com/aislopware/slopscale/commit/03bfc3579d4a673abab6f84c60fb8e63b4028569))
+
 ## [0.58.1](https://github.com/aislopware/slopscale/compare/v0.58.0...v0.58.1) (2026-10-14)
 
 
