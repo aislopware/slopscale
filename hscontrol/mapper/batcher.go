@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -35,6 +36,13 @@ const offlineNodeCleanupThreshold = 15 * time.Minute
 // initialMapSendTimeout bounds how long [Batcher.AddNode] waits for the
 // initial map to be accepted by the connection channel.
 const initialMapSendTimeout = 5 * time.Second
+
+// initialMapWait bounds how long [Batcher.AddNodeContext] waits for the
+// initial map to be generated. Past it the workers are behind, and a
+// session that keeps waiting only adds to the queue the client will give
+// up on anyway; [ErrBatcherBusy] lets the caller send the client away to
+// come back later.
+const initialMapWait = 60 * time.Second
 
 var mapResponseGenerated = promauto.NewCounterVec(prometheus.CounterOpts{
 	Namespace: "slopscale",
@@ -263,6 +271,9 @@ type work struct {
 	changes  []change.Change
 	nodeID   types.NodeID
 	resultCh chan<- workResult // optional channel for synchronous operations
+	// ctx is the waiting caller's for synchronous work: once it ends
+	// nobody reads the result, so the map is not generated.
+	ctx context.Context //nolint:containedctx // carried to the worker with the work it cancels
 }
 
 // Batcher errors.
@@ -271,6 +282,7 @@ var (
 	ErrInitialMapSendTimeout = errors.New("sending initial map: timeout")
 	ErrBatcherShuttingDown   = errors.New("batcher shutting down")
 	ErrConnectionSendTimeout = errors.New("timeout sending to channel (likely stale connection)")
+	ErrBatcherBusy           = errors.New("initial map not generated in time; workers are behind")
 )
 
 // Batcher batches and distributes map responses to connected nodes.
@@ -340,6 +352,21 @@ func (b *Batcher) AddNode(
 	version tailcfg.CapabilityVersion,
 	stop func(),
 ) error {
+	return b.AddNodeContext(context.Background(), id, c, version, stop)
+}
+
+// AddNodeContext is [Batcher.AddNode] for a session that can end while
+// it waits: when ctx ends, or the initial map takes longer than
+// [initialMapWait] ([ErrBatcherBusy]), the connection is detached and its
+// queued map is never generated. A session whose client gave up must not
+// stay registered, or every later change is generated for it too.
+func (b *Batcher) AddNodeContext(
+	ctx context.Context,
+	id types.NodeID,
+	c chan<- *tailcfg.MapResponse,
+	version tailcfg.CapabilityVersion,
+	stop func(),
+) error {
 	addNodeStart := time.Now()
 	nlog := log.With().Uint64(zf.NodeID, id.Uint64()).Logger()
 
@@ -387,7 +414,10 @@ func (b *Batcher) AddNode(
 	)
 
 	// Use the worker pool for controlled concurrency instead of direct generation
-	initialMap, err := b.MapResponseFromChange(id, change.FullSelf(id))
+	waitCtx, cancel := context.WithTimeoutCause(ctx, initialMapWait, ErrBatcherBusy)
+	defer cancel()
+
+	initialMap, err := b.mapResponseFromChange(waitCtx, id, change.FullSelf(id))
 	if err != nil {
 		nlog.Error().Err(err).Msg("initial map generation failed")
 		nodeConn.detach(c)
@@ -594,18 +624,7 @@ func (b *Batcher) ConnectedMap() *xsync.Map[types.NodeID, bool] {
 // MapResponseFromChange queues work to generate a map response and waits for the result.
 // This allows synchronous map generation using the same worker pool.
 func (b *Batcher) MapResponseFromChange(id types.NodeID, ch change.Change) (*tailcfg.MapResponse, error) {
-	resultCh := make(chan workResult, 1)
-
-	// Queue the work with a result channel using the safe queueing method
-	b.queueWork(work{changes: []change.Change{ch}, nodeID: id, resultCh: resultCh})
-
-	// Wait for the result
-	select {
-	case result := <-resultCh:
-		return result.mapResponse, result.err
-	case <-b.done:
-		return nil, fmt.Errorf("%w while generating map response for node %d", ErrBatcherShuttingDown, id)
-	}
+	return b.mapResponseFromChange(context.Background(), id, ch)
 }
 
 // FullMapResponse builds the one map a non-streaming request without
@@ -649,6 +668,32 @@ func (b *Batcher) DebugMapResponses() (map[types.NodeID][]tailcfg.MapResponse, e
 // This is primarily useful for testing and debugging.
 func (b *Batcher) WorkErrors() int64 {
 	return b.workErrors.Load()
+}
+
+// mapResponseFromChange is [Batcher.MapResponseFromChange] that gives up,
+// with ctx's cause, when ctx ends first.
+func (b *Batcher) mapResponseFromChange(
+	ctx context.Context,
+	id types.NodeID,
+	ch change.Change,
+) (*tailcfg.MapResponse, error) {
+	resultCh := make(chan workResult, 1)
+
+	// Queue the work with a result channel using the safe queueing method
+	err := b.queueWork(ctx, work{changes: []change.Change{ch}, nodeID: id, resultCh: resultCh, ctx: ctx})
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for the result
+	select {
+	case result := <-resultCh:
+		return result.mapResponse, result.err
+	case <-ctx.Done():
+		return nil, fmt.Errorf("waiting for map response for node %d: %w", id, context.Cause(ctx))
+	case <-b.done:
+		return nil, fmt.Errorf("%w while generating map response for node %d", ErrBatcherShuttingDown, id)
+	}
 }
 
 func (b *Batcher) doWork() {
@@ -714,7 +759,13 @@ func (b *Batcher) worker(workerID int) {
 func (b *Batcher) processSyncWork(wlog *zerolog.Logger, w work) bool {
 	var result workResult
 
-	if nc, exists := b.nodes.Load(w.nodeID); exists && nc != nil {
+	if w.ctx != nil && w.ctx.Err() != nil {
+		// The caller stopped waiting; its result channel is buffered, so
+		// the send below cannot block.
+		result.err = context.Cause(w.ctx)
+
+		mapperChangesDropped.WithLabelValues("abandoned").Inc()
+	} else if nc, exists := b.nodes.Load(w.nodeID); exists && nc != nil {
 		// Hold workMu so concurrent async work for this
 		// node waits until the initial map is sent.
 		nc.workMu.Lock()
@@ -805,16 +856,19 @@ func (b *Batcher) processAsyncWork(wlog *zerolog.Logger, w work) {
 	nc.inFlight.Store(false)
 }
 
-// queueWork safely queues work.
-func (b *Batcher) queueWork(w work) {
+// queueWork safely queues work. It gives up with ctx's cause when ctx
+// ends before the queue has room, and with [ErrBatcherShuttingDown] when
+// the batcher stops.
+func (b *Batcher) queueWork(ctx context.Context, w work) error {
 	b.workQueuedCount.Add(1)
 
 	select {
 	case b.workCh <- w:
-		// Successfully queued
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("queueing work for node %d: %w", w.nodeID, context.Cause(ctx))
 	case <-b.done:
-		// Batcher is shutting down
-		return
+		return ErrBatcherShuttingDown
 	}
 }
 
@@ -922,7 +976,8 @@ func (b *Batcher) processBatchedChanges() {
 
 		// Queue a single work item containing all pending changes.
 		nc.inFlight.Store(true)
-		b.queueWork(work{changes: pending, nodeID: nodeID, resultCh: nil})
+		// Only shutdown stops it, which leaves nothing to deliver to.
+		_ = b.queueWork(context.Background(), work{changes: pending, nodeID: nodeID, resultCh: nil})
 
 		return true
 	})
