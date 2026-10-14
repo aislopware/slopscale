@@ -191,7 +191,8 @@ func (s *State) AppConnectorNodes(app types.AppConnector) []types.NodeView {
 // learn the addresses (dnstype.Resolver's http:// form). Only connectors
 // that are the node's peers and answer it are offered (see
 // [State.dnsConnectors]), online ones first; a connector gets no routes
-// for its own apps. A wildcard domain covers its base.
+// for its own apps, nor a node for the apps it skips (see
+// [State.skippedApps]). A wildcard domain covers its base.
 func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver {
 	apps := s.AppConnectors()
 	if len(apps) == 0 {
@@ -204,11 +205,14 @@ func (s *State) AppDNSRoutes(node types.NodeView) map[string][]*dnstype.Resolver
 	}
 
 	tags := node.Tags().AsSlice()
+	skipped := s.skippedApps(node)
 
 	var routes map[string][]*dnstype.Resolver
 
 	for _, app := range apps {
-		if app.Selects(tags, runsAppConnector(node)) {
+		if app.Selects(tags, runsAppConnector(node)) || slices.ContainsFunc(skipped, func(a types.AppConnector) bool {
+			return a.ID == app.ID
+		}) {
 			continue
 		}
 
@@ -288,12 +292,19 @@ func (s *State) dnsConnectors(node types.NodeView, peers views.Slice[types.NodeV
 }
 
 // A machine that reaches the internet from the same public address as a
-// connector skips it: the apps already see the address they allow, so the
-// detour only costs a hop. A laptop carried into the office goes straight
-// out while everyone at home still goes through the office connector. Its
-// view of the connector carries none of the app routes and its app DNS
-// does not point there. The match is the NAT address the client reports
-// among its endpoints, so nothing is configured and it follows the machine.
+// connector skips that connector's apps: they already see the address they
+// allow, so the detour only costs a hop. A laptop carried into the office
+// goes straight out while everyone at home still goes through the office
+// connector. The app is skipped on every connector, not only the one
+// sharing the address: with a second connector abroad for failover, the
+// office machine would otherwise send the app's names and traffic abroad.
+// So the app's DNS points nowhere and no connector carries its static
+// routes in the machine's view; the connector sharing the address carries
+// none of its learned routes either. Another connector keeps its learned
+// routes, which cannot be told apart from those of the apps it serves
+// alone; with the app's names resolved locally the machine rarely meets
+// them. The match is the NAT address the client reports among its
+// endpoints, so nothing is configured and it follows the machine.
 
 // runsAppConnector reports whether the node advertises the connector
 // service.
@@ -352,42 +363,73 @@ func servesApps(apps []types.AppConnector, node types.NodeView) bool {
 	})
 }
 
-// bypassedApps returns the apps the peer connects when the viewer skips
-// it as a connector, nil otherwise. It runs per viewer and peer pair on
-// the map path, so the cheap connector check comes first.
-func (s *State) bypassedApps(viewer, peer types.NodeView) []types.AppConnector {
+// skippedApps returns the apps the node skips: those with a connector
+// behind the node's own public address.
+func (s *State) skippedApps(node types.NodeView) []types.AppConnector {
 	apps := s.appConnectors.Load()
-	if apps == nil || viewer.ID() == peer.ID() || !runsAppConnector(peer) {
+	if apps == nil || len(*apps) == 0 {
 		return nil
 	}
 
-	mine := make([]types.AppConnector, 0, len(*apps))
-	tags := peer.Tags().AsSlice()
+	egress := egressAddrs(node)
+	if len(egress) == 0 {
+		return nil
+	}
 
-	for _, app := range *apps {
-		if app.Selects(tags, true) {
-			mine = append(mine, app)
+	var skipped []types.AppConnector
+
+	for _, peer := range s.nodeStore.ListNodes().All() {
+		if peer.ID() == node.ID() || !runsAppConnector(peer) || !sharesEgress(egress, egressAddrs(peer)) {
+			continue
+		}
+
+		tags := peer.Tags().AsSlice()
+
+		for _, app := range *apps {
+			if app.Selects(tags, true) && !slices.ContainsFunc(skipped, func(a types.AppConnector) bool {
+				return a.ID == app.ID
+			}) {
+				skipped = append(skipped, app)
+			}
 		}
 	}
 
-	if len(mine) == 0 || !sharesEgress(egressAddrs(viewer), egressAddrs(peer)) {
-		return nil
-	}
-
-	return mine
+	return skipped
 }
 
-// withoutAppRoutes drops a connector's app routes: the public host routes
-// it learned from the domains and the public prefixes inside its apps'
-// static routes. A private prefix stays, since a shared public address
-// says nothing about reaching it, and so do exit routes.
-func withoutAppRoutes(apps []types.AppConnector, routes []netip.Prefix) []netip.Prefix {
+// bypassedApps returns the apps the peer connects that the viewer skips,
+// and whether the peer is a connector the viewer shares its address with,
+// whose learned routes go too. It runs per viewer and peer pair on the
+// map path, so the cheap connector check comes first.
+func (s *State) bypassedApps(viewer, peer types.NodeView) ([]types.AppConnector, bool) {
+	if viewer.ID() == peer.ID() || !runsAppConnector(peer) {
+		return nil, false
+	}
+
+	tags := peer.Tags().AsSlice()
+	mine := slices.DeleteFunc(s.skippedApps(viewer), func(app types.AppConnector) bool {
+		return !app.Selects(tags, true)
+	})
+
+	if len(mine) == 0 {
+		return nil, false
+	}
+
+	return mine, sharesEgress(egressAddrs(viewer), egressAddrs(peer))
+}
+
+// withoutAppRoutes drops the apps' routes from a connector's: the public
+// prefixes inside the apps' static routes and, when learned is set, the
+// public host routes it learned from the domains. A private prefix stays,
+// since a shared public address says nothing about reaching it, and so do
+// exit routes.
+func withoutAppRoutes(apps []types.AppConnector, routes []netip.Prefix, learned bool) []netip.Prefix {
 	return slices.DeleteFunc(routes, func(route netip.Prefix) bool {
 		if !isPublicAddr(route.Addr()) {
 			return false
 		}
 
-		if route.IsSingleIP() {
+		if learned && route.IsSingleIP() {
 			return true
 		}
 

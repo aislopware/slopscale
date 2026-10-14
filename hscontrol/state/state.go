@@ -1638,8 +1638,8 @@ func (s *State) RoutesForPeer(
 		}
 	}
 
-	if apps := s.bypassedApps(viewer, peer); apps != nil {
-		reduced = withoutAppRoutes(apps, reduced)
+	if apps, learned := s.bypassedApps(viewer, peer); apps != nil {
+		reduced = withoutAppRoutes(apps, reduced, learned)
 	}
 
 	// Co-router visibility: when the viewer advertises the same prefix

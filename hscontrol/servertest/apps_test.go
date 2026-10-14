@@ -279,3 +279,136 @@ func TestAppConnectorBypassSameEgress(t *testing.T) {
 	routesThrough(home, []netip.Prefix{private}, false)
 	routesThrough(office, all, true)
 }
+
+// TestAppConnectorBypassEveryConnector covers an app with a second
+// connector abroad for failover: a machine sharing the office connector's
+// address skips the app on both connectors, so neither its names nor its
+// static routes go abroad, while the abroad connector's own app still
+// goes through it.
+func TestAppConnectorBypassEveryConnector(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithDNS(types.DNSConfig{
+		MagicDNS:    true,
+		BaseDomain:  "ts.example",
+		Nameservers: types.Nameservers{Global: []string{"1.1.1.1"}},
+	}))
+	user := srv.CreateUser(t, "every-user")
+
+	shared := netip.MustParsePrefix("203.0.113.0/24")
+	abroadOnly := netip.MustParsePrefix("198.51.100.0/24")
+	learnedAbroad := netip.MustParsePrefix("198.18.0.1/32")
+	learnedOffice := netip.MustParsePrefix("198.18.0.2/32")
+
+	officeConn := servertest.NewClient(t, srv, "every-office-conn", servertest.WithTags("tag:office"))
+	abroadConn := servertest.NewClient(t, srv, "every-abroad-conn", servertest.WithTags("tag:abroad"))
+	office := servertest.NewClient(t, srv, "every-office", servertest.WithUser(user))
+	home := servertest.NewClient(t, srv, "every-home", servertest.WithUser(user))
+
+	for _, c := range []*servertest.TestClient{officeConn, abroadConn, office, home} {
+		c.WaitForPeers(t, 3, 10*time.Second)
+	}
+
+	setEndpoints(t, officeConn, "192.0.2.10:41641", "192.168.1.5:41641")
+	setEndpoints(t, abroadConn, "192.0.2.77:41641", "10.1.0.5:41641")
+	setEndpoints(t, office, "192.0.2.10:50123", "192.168.1.20:41641")
+	setEndpoints(t, home, "192.0.2.99:41641", "192.168.1.20:41641")
+
+	for _, app := range []types.AppConnector{
+		{
+			Name:       "both",
+			Domains:    []string{"both.example"},
+			Connectors: []string{"tag:office", "tag:abroad"},
+			Routes:     []netip.Prefix{shared},
+		},
+		{
+			Name:       "abroad",
+			Domains:    []string{"abroad.example"},
+			Connectors: []string{"tag:abroad"},
+			Routes:     []netip.Prefix{abroadOnly},
+		},
+	} {
+		_, c, err := srv.State().CreateAppConnector(app)
+		require.NoError(t, err)
+		srv.App.Change(c)
+	}
+
+	runConnector := func(c *servertest.TestClient, routes ...netip.Prefix) {
+		c.Direct().SetHostinfo(&tailcfg.Hostinfo{
+			BackendLogID: "servertest-" + c.Name,
+			Hostname:     c.Name,
+			AppConnector: opt.NewBool(true),
+			RoutableIPs:  routes,
+			Services:     []tailcfg.Service{{Proto: tailcfg.PeerAPI4, Port: 41000}},
+		})
+
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+
+		_ = c.Direct().SendUpdate(ctx)
+	}
+
+	runConnector(officeConn, shared, learnedOffice)
+	runConnector(abroadConn, shared, abroadOnly, learnedAbroad)
+
+	// via is the routes the viewer sends through a connector: the
+	// connector's primary routes it is allowed to use.
+	via := func(nm *netmap.NetworkMap, connector string) []netip.Prefix {
+		allowed := peerAllowedIPs(nm, connector)
+
+		var out []netip.Prefix
+
+		for _, p := range nm.Peers {
+			if !p.Hostinfo().Valid() || p.Hostinfo().Hostname() != connector {
+				continue
+			}
+
+			for _, r := range p.PrimaryRoutes().All() {
+				if slices.Contains(allowed, r) {
+					out = append(out, r)
+				}
+			}
+		}
+
+		slices.SortFunc(out, netip.Prefix.Compare)
+
+		return out
+	}
+
+	sorted := func(ps ...netip.Prefix) []netip.Prefix {
+		slices.SortFunc(ps, netip.Prefix.Compare)
+		return ps
+	}
+
+	// The office machine skips "both" everywhere: nothing through the
+	// office connector, only "abroad" and the abroad connector's learned
+	// route through it, and no DNS for both.example.
+	office.WaitForCondition(t, "office machine skips the shared app on both connectors", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			return len(via(nm, officeConn.Name)) == 0 &&
+				slices.Equal(via(nm, abroadConn.Name), sorted(abroadOnly, learnedAbroad)) &&
+				len(nm.DNS.Routes["both.example"]) == 0 &&
+				len(nm.DNS.Routes["abroad.example"]) == 1
+		})
+
+	// The home machine uses both: the shared prefix through one of the
+	// connectors, and both connectors answer both.example.
+	home.WaitForCondition(t, "home machine goes through both connectors", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			all := sorted(append(via(nm, officeConn.Name), via(nm, abroadConn.Name)...)...)
+
+			return slices.Equal(all, sorted(shared, abroadOnly, learnedAbroad, learnedOffice)) &&
+				len(nm.DNS.Routes["both.example"]) == 2 &&
+				len(nm.DNS.Routes["abroad.example"]) == 1
+		})
+
+	// Out of the office it uses the shared app again.
+	setEndpoints(t, office, "192.0.2.50:50123", "10.0.0.7:41641")
+	office.WaitForCondition(t, "office machine away uses the shared app", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			all := sorted(append(via(nm, officeConn.Name), via(nm, abroadConn.Name)...)...)
+
+			return slices.Equal(all, sorted(shared, abroadOnly, learnedAbroad, learnedOffice)) &&
+				len(nm.DNS.Routes["both.example"]) == 2
+		})
+}
