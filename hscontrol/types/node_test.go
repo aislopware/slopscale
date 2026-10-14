@@ -991,3 +991,31 @@ func TestNodeIsExpiredAt(t *testing.T) {
 			"an invalid view counts as expired, like IsExpired")
 	})
 }
+
+// TestSubnetRoutesLargeLists covers the set lookup [Node.SubnetRoutes]
+// switches to past smallRouteList: same answer as the scan, announced
+// order kept, exit and unapproved routes dropped.
+func TestSubnetRoutesLargeLists(t *testing.T) {
+	announced := make([]netip.Prefix, 0, 1+2*smallRouteList)
+	announced = append(announced, netip.MustParsePrefix("0.0.0.0/0"))
+	approved := []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0")}
+
+	var want []netip.Prefix
+
+	for i := range 2 * smallRouteList {
+		route := netip.PrefixFrom(netip.AddrFrom4([4]byte{10, 0, 0, byte(i)}), 32)
+		announced = append(announced, route)
+
+		if i%2 == 0 {
+			approved = append(approved, route)
+			want = append(want, route)
+		}
+	}
+
+	// Approved but no longer announced: not a subnet route.
+	approved = append(approved, netip.MustParsePrefix("192.168.0.0/24"))
+
+	node := &Node{Hostinfo: &tailcfg.Hostinfo{RoutableIPs: announced}, ApprovedRoutes: approved}
+
+	assert.Equal(t, want, node.SubnetRoutes())
+}

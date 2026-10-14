@@ -551,39 +551,48 @@ func (node *Node) CanAccess(matchers []matcher.Match, node2 *Node) bool {
 // matchers where [matcher.Match.DestsOverlapsPrefixes](0.0.0.0/0) already returns
 // true, so the check would be redundant for that case.
 func (node *Node) CanAccessRoute(matchers []matcher.Match, route netip.Prefix) bool {
+	return len(node.AccessibleRoutes(matchers, []netip.Prefix{route})) > 0
+}
+
+// AccessibleRoutes returns the routes [Node.CanAccessRoute] admits, in
+// order. What a matcher says about the node itself (its IPs, its subnet
+// routes) is worked out once per matcher rather than once per route: an
+// app connector reducing its own few thousand learned routes otherwise
+// pays routes × subnet routes per matcher.
+func (node *Node) AccessibleRoutes(matchers []matcher.Match, routes []netip.Prefix) []netip.Prefix {
 	src := node.IPs()
 	subnetRoutes := node.SubnetRoutes()
 
-	for _, matcher := range matchers {
-		if matcher.SrcsContainsIPs(src...) && matcher.DestsOverlapsPrefixes(route) {
-			return true
-		}
+	// A matcher admits a route as a destination when the node is one of
+	// its sources, or as a source when the node is one of its
+	// destinations. A subnet router acts on behalf of its approved
+	// subnets in both directions: it needs a route to forward traffic
+	// from its local subnet, and for the return traffic towards it.
+	asDst := make([]bool, len(matchers))
+	asSrc := make([]bool, len(matchers))
 
-		if matcher.SrcsOverlapsPrefixes(route) && matcher.DestsContainsIP(src...) {
-			return true
-		}
+	for i := range matchers {
+		m := &matchers[i]
+		asDst[i] = m.SrcsContainsIPs(src...) ||
+			len(subnetRoutes) > 0 && m.SrcsOverlapsPrefixes(subnetRoutes...)
+		asSrc[i] = m.DestsContainsIP(src...) ||
+			len(subnetRoutes) > 0 && m.DestsOverlapsPrefixes(subnetRoutes...)
+	}
 
-		// A subnet router acts on behalf of its advertised subnets.
-		// If the node's approved subnet routes overlap the source set
-		// and the route overlaps the destination set, the router needs
-		// this route to forward traffic from its local subnet.
-		if len(subnetRoutes) > 0 {
-			if matcher.SrcsOverlapsPrefixes(subnetRoutes...) &&
-				matcher.DestsOverlapsPrefixes(route) {
-				return true
-			}
+	var result []netip.Prefix
 
-			// Reverse: traffic from the route's subnet is destined for
-			// this node's subnets; the router needs the route for return
-			// traffic.
-			if matcher.SrcsOverlapsPrefixes(route) &&
-				matcher.DestsOverlapsPrefixes(subnetRoutes...) {
-				return true
+	for _, route := range routes {
+		for i := range matchers {
+			if asDst[i] && matchers[i].DestsOverlapsPrefixes(route) ||
+				asSrc[i] && matchers[i].SrcsOverlapsPrefixes(route) {
+				result = append(result, route)
+
+				break
 			}
 		}
 	}
 
-	return false
+	return result
 }
 
 func (nodes Nodes) FilterByIP(ip netip.Addr) Nodes {
@@ -667,20 +676,44 @@ func (node *Node) AnnouncedRoutes() []netip.Prefix {
 // responses that need the routes actively served by the node must
 // populate SubnetRoutes from the primary-route election instead.
 func (node *Node) SubnetRoutes() []netip.Prefix {
+	announced := node.AnnouncedRoutes()
+
+	// An app connector announces and has approved thousands of learned
+	// routes; a linear scan of the approved list per announced route
+	// made this quadratic on every snapshot and map. Small lists keep
+	// the scan, which beats building a set.
+	isApproved := func(route netip.Prefix) bool { return slices.Contains(node.ApprovedRoutes, route) }
+
+	if len(announced) > smallRouteList && len(node.ApprovedRoutes) > smallRouteList {
+		approved := make(map[netip.Prefix]struct{}, len(node.ApprovedRoutes))
+		for _, route := range node.ApprovedRoutes {
+			approved[route] = struct{}{}
+		}
+
+		isApproved = func(route netip.Prefix) bool {
+			_, ok := approved[route]
+			return ok
+		}
+	}
+
 	var routes []netip.Prefix
 
-	for _, route := range node.AnnouncedRoutes() {
+	for _, route := range announced {
 		if tsaddr.IsExitRoute(route) {
 			continue
 		}
 
-		if slices.Contains(node.ApprovedRoutes, route) {
+		if isApproved(route) {
 			routes = append(routes, route)
 		}
 	}
 
 	return routes
 }
+
+// smallRouteList is the route count up to which [Node.SubnetRoutes]
+// scans the approved list instead of building a set from it.
+const smallRouteList = 32
 
 // IsSubnetRouter reports if the node has any subnet routes.
 func (node *Node) IsSubnetRouter() bool {
@@ -997,6 +1030,14 @@ func (nv NodeView) CanAccessRoute(matchers []matcher.Match, route netip.Prefix) 
 	}
 
 	return nv.ж.CanAccessRoute(matchers, route)
+}
+
+func (nv NodeView) AccessibleRoutes(matchers []matcher.Match, routes []netip.Prefix) []netip.Prefix {
+	if !nv.Valid() {
+		return nil
+	}
+
+	return nv.ж.AccessibleRoutes(matchers, routes)
 }
 
 func (nv NodeView) AnnouncedRoutes() []netip.Prefix {
