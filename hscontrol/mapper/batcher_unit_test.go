@@ -5,6 +5,7 @@ package mapper
 // updateSentPeers, generateMapResponse branching, and handleNodeChange in isolation.
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime"
@@ -1165,7 +1166,8 @@ func TestBatcher_QueueWorkAfterClose_DoesNotHang(t *testing.T) {
 
 	go func() {
 		// queueWork selects on done; with done closed this must return.
-		b.queueWork(work{})
+		_ = b.queueWork(t.Context(), work{})
+
 		close(done)
 	}()
 
@@ -1488,4 +1490,47 @@ func TestMultiChannelSend_SSHPolicyPerConnection(t *testing.T) {
 
 	assert.Nil(t, expectReceive(t, chA, "a").SSHPolicy, "a already holds this policy")
 	assert.Same(t, data.SSHPolicy, expectReceive(t, chB, "b").SSHPolicy, "b holds an older policy")
+}
+
+// TestAddNodeContextAbandoned covers a session whose client gives up
+// while the workers are behind: AddNodeContext returns with the cause,
+// the connection no longer counts, and the queued initial map is dropped
+// unbuilt once a worker reaches it (a nil mapper would panic if built).
+func TestAddNodeContextAbandoned(t *testing.T) {
+	t.Parallel()
+
+	// Not started: no worker takes the initial map, as when they are
+	// all busy.
+	b := NewBatcher(50*time.Millisecond, 1, nil)
+	t.Cleanup(b.Close)
+
+	gone := errors.New("client left")
+	ctx, cancel := context.WithCancelCause(t.Context())
+
+	ch := make(chan *tailcfg.MapResponse, 1)
+	errCh := make(chan error, 1)
+
+	go func() { errCh <- b.AddNodeContext(ctx, 1, ch, tailcfg.CurrentCapabilityVersion, func() {}) }()
+
+	require.Eventually(t, func() bool { return b.Debug()[1].ActiveConnections == 1 && len(b.workCh) == 1 },
+		5*time.Second, 5*time.Millisecond, "connection registered and its map queued")
+
+	cancel(gone)
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, gone)
+	case <-time.After(5 * time.Second):
+		t.Fatal("AddNodeContext still waiting after its context ended")
+	}
+
+	assert.Equal(t, 0, b.Debug()[1].ActiveConnections, "abandoned connection still counted")
+
+	before := b.workProcessed.Load()
+
+	b.Start()
+
+	require.Eventually(t, func() bool { return b.workProcessed.Load() > before },
+		5*time.Second, 5*time.Millisecond, "worker never reached the abandoned map")
+	assert.Empty(t, ch, "abandoned session was sent a map")
 }

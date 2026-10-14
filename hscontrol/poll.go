@@ -9,10 +9,12 @@ import (
 	"math"
 	"math/rand/v2"
 	"net/http"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/mapper"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -26,6 +28,12 @@ import (
 
 const (
 	keepAliveInterval = 50 * time.Second
+
+	// busyRetryAfterMin and busyRetryAfterSpread are the seconds a client
+	// sent away by [mapper.ErrBatcherBusy] is told to wait: 30 to 89, so
+	// a crowd that arrived together comes back spread out.
+	busyRetryAfterMin    = 30
+	busyRetryAfterSpread = 60
 )
 
 // errMapResponseTooLarge is returned when a marshalled map response would
@@ -363,16 +371,30 @@ func (m *mapSession) serveLongPoll() {
 	// adding this before connecting it to the state ensure that
 	// it does not miss any updates that might be sent in the split
 	// time between the node connecting and the batcher being ready.
-	err = m.h.mapBatcher.AddNode(m.node.ID(), m.ch, m.capVer, m.stopFromBatcher)
+	err = m.h.mapBatcher.AddNodeContext(ctx, m.node.ID(), m.ch, m.capVer, m.stopFromBatcher)
 	if err != nil {
-		m.log.Error().Caller().Err(err).Msg("failed to add node to batcher")
 		// The map request already changed state other nodes must see.
 		m.h.Change(mapReqChange)
 
-		// Write an explicit error rather than returning silently: a bare
-		// return leaves net/http to send an empty 200, which the client
-		// reads as "unexpected EOF" and retries forever (issue #3346).
-		httpError(m.w, err)
+		switch {
+		case ctx.Err() != nil:
+			// The client went away while its initial map waited.
+			m.log.Debug().Caller().Err(err).Msg("client left before its initial map")
+		case errors.Is(err, mapper.ErrBatcherBusy):
+			// Clients from capability version 147 wait out Retry-After
+			// on a 503 instead of backing off as from a failure; the
+			// spread keeps them from returning together.
+			m.log.Warn().Caller().Err(err).Msg("initial map too slow, sending the client away")
+			//nolint:gosec // weak random is fine for jitter
+			m.w.Header().Set("Retry-After", strconv.Itoa(busyRetryAfterMin+rand.IntN(busyRetryAfterSpread)))
+			http.Error(m.w, "server busy", http.StatusServiceUnavailable)
+		default:
+			m.log.Error().Caller().Err(err).Msg("failed to add node to batcher")
+			// Write an explicit error rather than returning silently: a bare
+			// return leaves net/http to send an empty 200, which the client
+			// reads as "unexpected EOF" and retries forever (issue #3346).
+			httpError(m.w, err)
+		}
 
 		return
 	}

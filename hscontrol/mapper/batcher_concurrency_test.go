@@ -994,7 +994,7 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 	// Without the nil guard, this would panic: nc.change(w.c) on nil nc.
 	const asyncNilWork = 10
 	for range asyncNilWork {
-		lb.b.queueWork(work{
+		_ = lb.b.queueWork(t.Context(), work{
 			changes: []change.Change{change.DERPMap()},
 			nodeID:  nilNodeID,
 		})
@@ -1006,7 +1006,7 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 	const syncNilWork = 5
 	for range syncNilWork {
 		resultCh := make(chan workResult, 1)
-		lb.b.queueWork(work{
+		_ = lb.b.queueWork(t.Context(), work{
 			changes:  []change.Change{change.DERPMap()},
 			nodeID:   nilNodeID,
 			resultCh: resultCh,
@@ -1035,7 +1035,7 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 
 	const validWork = 5
 	for range validWork {
-		lb.b.queueWork(work{
+		_ = lb.b.queueWork(t.Context(), work{
 			changes: []change.Change{change.DERPMap()},
 			nodeID:  types.NodeID(1),
 		})
