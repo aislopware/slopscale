@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.58.1](https://github.com/aislopware/slopscale/compare/v0.58.0...v0.58.1) (2026-10-14)
+
+
+### Fixes
+
+* **types:** stop app connectors with thousands of learned routes from stalling every map ([#62](https://github.com/aislopware/slopscale/issues/62)) ([72cd23a](https://github.com/aislopware/slopscale/commit/72cd23a2fba0b0c25ff90955f746f7da31d4a6d7))
+
 ## [0.58.0](https://github.com/aislopware/slopscale/compare/v0.57.1...v0.58.0) (2026-10-11)
 
 
