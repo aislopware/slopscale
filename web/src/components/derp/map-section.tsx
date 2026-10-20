@@ -86,6 +86,15 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
       </div>
       <TableGroup>
         <TableScroll
+          footer={
+            regions.length === 0 ? null : (
+              <TableFooter>
+                {regions.length === total
+                  ? `Showing ${total === 1 ? "1 region" : `${total} regions`}`
+                  : `Showing ${regions.length} of ${total} regions`}
+              </TableFooter>
+            )
+          }
           below={
             regions.length === 0 ? (
               <SectionEmpty
@@ -134,11 +143,6 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
             </Table>
           )}
         </TableScroll>
-        <TableFooter>
-          {regions.length === total
-            ? `Showing ${total === 1 ? "1 region" : `${total} regions`}`
-            : `Showing ${regions.length} of ${total} regions`}
-        </TableFooter>
       </TableGroup>
     </>
   );
