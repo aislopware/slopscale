@@ -6,7 +6,7 @@ import { derpQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { EmbeddedSection } from "~/components/derp/embedded-section.tsx";
 import { useDerpMutations } from "~/components/derp/mutations.ts";
-import { SourceBanner, StaleSettingsBanner } from "~/components/derp/source.tsx";
+import { DerpSourceActions, StaleSettingsBanner } from "~/components/derp/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/relays/embedded")({
@@ -28,12 +28,10 @@ function EmbeddedPage(): ReactElement {
         title="Embedded relay"
         docs="ref/derp"
         description="The relay built into this server, the region it joins and how it verifies clients."
+        actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}
       />
-      <div className="flex flex-col gap-6">
-        <StaleSettingsBanner mutations={mutations} />
-        <SourceBanner derp={derp} canEdit={canEdit} mutations={mutations} />
-        <EmbeddedSection derp={derp} canEdit={canEdit} mutations={mutations} />
-      </div>
+      <StaleSettingsBanner mutations={mutations} />
+      <EmbeddedSection derp={derp} canEdit={canEdit} mutations={mutations} />
     </>
   );
 }

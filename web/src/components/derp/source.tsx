@@ -1,17 +1,16 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
-import { ArrowCounterClockwiseIcon, FileTextIcon, WarningIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { WarningIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
+import { SourceActions } from "~/components/dns/source.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 
-/** Where the settings come from, and the way back to the file once they were edited here. */
-export function SourceBanner({
+/** Where the relay settings come from, and the way back to the file once they were edited here. */
+export function DerpSourceActions({
   derp,
   canEdit,
   mutations,
@@ -20,70 +19,34 @@ export function SourceBanner({
   readonly canEdit: boolean;
   readonly mutations: DerpMutations;
 }): ReactElement {
-  const [confirming, setConfirming] = useState(false);
-
-  if (!derp.overridden) {
-    return (
-      <Callout
-        icon={FileTextIcon}
-        title="Settings come from the config file"
-        description={
-          <>
-            Changes made here are stored in the database and replace the file&rsquo;s{" "}
-            <Code>derp</Code> section until you reset. Map files, the relay&rsquo;s key and{" "}
-            <Code>automatically_add_embedded_derp_region</Code> always come from the file.
-          </>
-        }
-      />
-    );
-  }
-
   return (
-    <>
-      <Callout
-        icon={ArrowCounterClockwiseIcon}
-        title="Settings were changed in the console"
-        description={
-          <>
-            They replace the config file&rsquo;s <Code>derp</Code> section. Reset to go back to what
-            the file says.
-          </>
-        }
-        {...(canEdit
-          ? {
-              action: (
-                <Banner.Action
-                  variant="ghost"
-                  onClick={() => {
-                    setConfirming(true);
-                  }}
-                >
-                  Reset to config file
-                </Banner.Action>
-              ),
-            }
-          : {})}
-      />
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        title="Reset relay settings?"
-        description="Every relay setting goes back to the config file. The maps are fetched again and every machine gets the new map at once."
-        confirmLabel="Reset"
-        loading={mutations.reset.isPending}
-        error={mutations.reset.isError ? errorMessage(mutations.reset.error) : undefined}
-        onConfirm={() => {
-          mutations.reset.mutate(
-            {},
-            {
-              onSuccess: () => {
-                setConfirming(false);
-              },
-            },
-          );
-        }}
-      />
-    </>
+    <SourceActions
+      overridden={derp.overridden}
+      canEdit={canEdit}
+      fromFile={
+        <>
+          Changes made here are stored in the database and replace the file&rsquo;s{" "}
+          <Code>derp</Code> section until you reset. Map files, the relay&rsquo;s key and{" "}
+          <Code>automatically_add_embedded_derp_region</Code> always come from the file.
+        </>
+      }
+      fromConsole={
+        <>
+          They replace the config file&rsquo;s <Code>derp</Code> section. Reset to go back to what
+          the file says.
+        </>
+      }
+      reset={{
+        title: "Reset relay settings?",
+        description:
+          "Every relay setting goes back to the config file. The maps are fetched again and every machine gets the new map at once.",
+        pending: mutations.reset.isPending,
+        error: mutations.reset.isError ? errorMessage(mutations.reset.error) : undefined,
+        onConfirm: (done) => {
+          mutations.reset.mutate({}, { onSuccess: done });
+        },
+      }}
+    />
   );
 }
 
