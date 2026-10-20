@@ -155,7 +155,7 @@ export function logDate(date: Date): string {
 /**
  * When the event was recorded, as the Zero Trust admin log writes it: a 14px human date that is the
  * row's link, in the link colour, opening the event's sheet. The exact moment, to the second and
- * with the zone, and how long ago it was are in the tooltip.
+ * with the zone, and how long ago it was are in the tooltip, one to a line.
  */
 export function TimeCell({
   event,
@@ -172,7 +172,12 @@ export function TimeCell({
 
   return (
     <Tooltip
-      content={`${exactTime.format(at)} (${formatRelative(at)})`}
+      content={
+        <>
+          <span>{exactTime.format(at)}</span>
+          <span className="text-kumo-subtle">{formatRelative(at)}</span>
+        </>
+      }
       render={
         <button
           type="button"

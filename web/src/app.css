@@ -89,3 +89,15 @@
     min-width: 0;
   }
 }
+
+/*
+ * Every Kumo Tooltip as the dashboard draws it (design spec §9): at most 300px wide so a long hint
+ * wraps instead of running across the page, 12px by 8px of padding, snug 13px lines, the large
+ * shadow and the fill outline. Kumo's own popup is 10px by 6px with no width cap; its classes are
+ * utilities, so the override sits in the same layer, after them.
+ */
+@layer utilities {
+  .kumo-tooltip-popup {
+    @apply max-w-[300px] px-3 py-2 text-sm leading-snug shadow-lg outline-1 outline-kumo-fill;
+  }
+}
