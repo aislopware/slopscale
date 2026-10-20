@@ -7,6 +7,10 @@ function tint(chip: Element | null | undefined): string {
   return chip instanceof Element ? getComputedStyle(chip).backgroundColor : "";
 }
 
+function styleOf(element: Element | null | undefined): CSSStyleDeclaration | undefined {
+  return element instanceof Element ? getComputedStyle(element) : undefined;
+}
+
 function radiusOf(chip: Element | null): string {
   return chip instanceof Element ? getComputedStyle(chip).borderRadius : "";
 }
@@ -18,7 +22,7 @@ describe(Tag, () => {
 
     expect(chip).not.toBeNull();
     expect(chip?.textContent).toBe("tag:server");
-    expect(chip?.querySelector(".opacity-60")?.textContent).toBe("tag:");
+    expect(chip?.querySelector("[data-tag-prefix]")?.textContent).toBe("tag:");
     expect(Number(radiusOf(chip).replace("px", ""))).toBeGreaterThanOrEqual(9);
   });
 
@@ -36,6 +40,20 @@ describe(Tag, () => {
     expect(tint(web)).toBe(tint(webAgain));
     expect(tint(web)).toBe(tint(ci));
     expect(tint(web)).not.toBe("rgba(0, 0, 0, 0)");
+  });
+});
+
+describe("a tag chip's size", () => {
+  // Design spec §7.1: the chips are 20px with 13px text, a dense table's included, and the prefix
+  // is stepped back only a little.
+  it.each(["sm", "base"] as const)("draws a %s chip 20px tall at 13px", async (size) => {
+    const view = await render(<Tag tag="tag:server" size={size} />);
+    const chip = view.container.querySelector('[title="tag:server"]');
+    const prefix = chip?.querySelector("[data-tag-prefix]");
+
+    expect(chip?.getBoundingClientRect().height).toBe(20);
+    expect(styleOf(chip)?.fontSize).toBe("13px");
+    expect(Number(styleOf(prefix)?.opacity)).toBeGreaterThanOrEqual(0.8);
   });
 });
 
