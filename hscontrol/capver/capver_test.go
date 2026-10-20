@@ -27,3 +27,16 @@ func TestCapVerMinimumTailscaleVersion(t *testing.T) {
 		})
 	}
 }
+
+// TestCanOldCodeBeCleanedUp fails the regeneration that raises
+// MinSupportedCapabilityVersion past a compat threshold, so the old path is
+// deleted in that pull request instead of the server panicking at startup.
+func TestCanOldCodeBeCleanedUp(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("CanOldCodeBeCleanedUp: %v", r)
+		}
+	}()
+
+	CanOldCodeBeCleanedUp()
+}
