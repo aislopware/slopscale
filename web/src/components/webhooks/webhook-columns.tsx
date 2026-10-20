@@ -1,8 +1,10 @@
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { Webhook } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
@@ -22,7 +24,7 @@ export const webhookColumns = helper.columns([
     header: "Endpoint",
     enableSorting: true,
     cell: ({ row }) => <EndpointCell webhook={row.original} />,
-    meta: { className: "w-[30%] min-w-48" },
+    meta: { className: "min-w-48 max-sm:w-full sm:w-[30%]" },
   }),
   helper.accessor((webhook) => providerLabel(webhook.providerType), {
     id: "provider",
@@ -47,7 +49,7 @@ export const webhookColumns = helper.columns([
     enableGlobalFilter: false,
     cell: ({ row }) => <DeliveryCell webhook={row.original} />,
     // The header stays on one line; the cell may wrap its badge and time on a phone.
-    meta: { className: "w-[22%] [&>button]:whitespace-nowrap" },
+    meta: { className: "w-[22%] [&>button]:whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.display({
     id: "actions",
@@ -75,6 +77,10 @@ function EndpointCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
       {/* The provider and events columns are hidden on small screens, so the endpoint carries them there. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">
         {`${providerLabel(webhook.providerType)} · ${countEvents(webhook.subscriptions.length)}`}
+      </span>
+      {/* So is the last delivery on a phone, whose state must not be a sliver under the actions. */}
+      <span className={cn("pt-0.5 text-sm", narrowOnlyClass)}>
+        <DeliveryCell webhook={webhook} />
       </span>
     </div>
   );
