@@ -5,8 +5,9 @@ import type { Settings } from "~/api/queries.ts";
 import type { UpdateSettingsRequestBody } from "~/api/schema.gen.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
+import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsCard } from "~/components/ui/settings-card.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 interface ApprovalSwitch {
@@ -69,7 +70,16 @@ export function ApprovalSection(props: {
   readonly settings: Settings;
   readonly canEdit: boolean;
 }): ReactElement {
-  return <SwitchSection title="Approval" rows={approvals} {...props} />;
+  return (
+    <SwitchSection
+      id="approval"
+      title="Approval"
+      docs="ref/approval"
+      description="Who waits for an administrator before reaching the tailnet."
+      rows={approvals}
+      {...props}
+    />
+  );
 }
 
 export function DeviceTrustSection(props: {
@@ -78,7 +88,9 @@ export function DeviceTrustSection(props: {
 }): ReactElement {
   return (
     <SwitchSection
+      id="device-trust"
       title="Device trust"
+      docs="ref/device-trust"
       description="What the server may learn about machines for posture checks."
       rows={trust}
       {...props}
@@ -87,13 +99,17 @@ export function DeviceTrustSection(props: {
 }
 
 function SwitchSection({
+  id,
   title,
+  docs,
   description,
   rows,
   settings,
   canEdit,
 }: {
+  readonly id: string;
   readonly title: string;
+  readonly docs: string;
   readonly description?: string;
   readonly rows: readonly ApprovalSwitch[];
   readonly settings: Settings;
@@ -102,32 +118,39 @@ function SwitchSection({
   const update = useSettingsMutation();
 
   return (
-    <Section title={title} description={description} bodyClassName="p-0">
-      {rows.map((row) => (
-        <SettingRow
-          key={row.id}
-          title={row.title}
-          description={row.description}
-          control={
-            <Switch
-              aria-label={row.title}
-              checked={row.read(settings)}
-              disabled={!canEdit || update.isPending}
-              transitioning={update.isPending}
-              onCheckedChange={(on) => {
-                update.mutate(
-                  { body: row.write(on) },
-                  {
-                    onSuccess: () => {
-                      toast.success(`${row.title} ${on ? "on" : "off"}`);
+    <SettingsGroup
+      id={id}
+      title={title}
+      docs={docs}
+      {...(description === undefined ? {} : { description })}
+    >
+      <SettingsCard>
+        {rows.map((row) => (
+          <SettingRow
+            key={row.id}
+            title={row.title}
+            description={row.description}
+            control={
+              <Switch
+                aria-label={row.title}
+                checked={row.read(settings)}
+                disabled={!canEdit || update.isPending}
+                transitioning={update.isPending}
+                onCheckedChange={(on) => {
+                  update.mutate(
+                    { body: row.write(on) },
+                    {
+                      onSuccess: () => {
+                        toast.success(`${row.title} ${on ? "on" : "off"}`);
+                      },
                     },
-                  },
-                );
-              }}
-            />
-          }
-        />
-      ))}
-    </Section>
+                  );
+                }}
+              />
+            }
+          />
+        ))}
+      </SettingsCard>
+    </SettingsGroup>
   );
 }

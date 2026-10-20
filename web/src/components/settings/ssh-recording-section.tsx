@@ -7,8 +7,9 @@ import type { ReactElement, SubmitEvent } from "react";
 import type { Settings } from "~/api/queries.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
+import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** Comma or whitespace separated recorder names, blanks dropped. */
@@ -58,21 +59,23 @@ export function SSHRecordingSection({
   );
 
   return (
-    <Section
+    <SettingsGroup
+      id="ssh-recording"
       title="SSH session recording"
+      docs="ref/ssh-recording"
       description="Where sessions admitted by SSH rules are recorded, unless a rule names its own recorder."
-      bodyClassName="p-0"
     >
-      <SettingRow
-        title="Default recorders"
-        description={
-          <>Tags or tailnet addresses of the recorder machines, comma separated. {embedded}</>
-        }
-        control={
-          <form onSubmit={save} className="flex items-center gap-2">
+      <SettingsCard>
+        <SettingsRow
+          title="Default recorders"
+          description={
+            <>Tags or tailnet addresses of the recorder machines, comma separated. {embedded}</>
+          }
+        >
+          <form onSubmit={save} className="flex max-w-[560px] items-center gap-2">
             <Input
               aria-label="Default recorders"
-              className="w-72"
+              className="min-w-0 flex-1"
               value={draft}
               placeholder="tag:recorder"
               spellCheck={false}
@@ -91,30 +94,30 @@ export function SSHRecordingSection({
               Save
             </Button>
           </form>
-        }
-      />
-      <SettingRow
-        title="Require recording"
-        description="Refuse a session when no recorder can be reached, and end it if the recording stops. Off, the session continues unrecorded and the failure is logged."
-        control={
-          <Switch
-            aria-label="Require recording"
-            checked={settings.sshRecordingEnforce}
-            disabled={!canEdit || update.isPending}
-            transitioning={update.isPending}
-            onCheckedChange={(on) => {
-              update.mutate(
-                { body: { sshRecordingEnforce: on } },
-                {
-                  onSuccess: () => {
-                    toast.success(`Recording ${on ? "required" : "optional"}`);
+        </SettingsRow>
+        <SettingRow
+          title="Require recording"
+          description="Refuse a session when no recorder can be reached, and end it if the recording stops. Off, the session continues unrecorded and the failure is logged."
+          control={
+            <Switch
+              aria-label="Require recording"
+              checked={settings.sshRecordingEnforce}
+              disabled={!canEdit || update.isPending}
+              transitioning={update.isPending}
+              onCheckedChange={(on) => {
+                update.mutate(
+                  { body: { sshRecordingEnforce: on } },
+                  {
+                    onSuccess: () => {
+                      toast.success(`Recording ${on ? "required" : "optional"}`);
+                    },
                   },
-                },
-              );
-            }}
-          />
-        }
-      />
-    </Section>
+                );
+              }}
+            />
+          }
+        />
+      </SettingsCard>
+    </SettingsGroup>
   );
 }
