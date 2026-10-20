@@ -206,6 +206,18 @@ describe("a table's columns", () => {
     expect(getComputedStyle(cell).right).toBe("0px");
   });
 
+  // The header cell over the actions column scrolled away with the rest while the table's own
+  // `relative` on every header cell outranked Kumo's `sticky`.
+  it("pins the action column's header cell with its cells", async () => {
+    const screen = await render(<Machines count={2} />);
+    const positions = Array.from(
+      screen.container.querySelectorAll("thead th"),
+      (cell) => getComputedStyle(cell).position,
+    );
+
+    expect(positions.at(-1)).toBe("sticky");
+  });
+
   // The dashboard's tables: 44px rows, 16px from the card's edge to the text.
   it("sets each row 44px tall with its text 16px in from the card", async () => {
     const screen = await render(<Machines count={2} />);

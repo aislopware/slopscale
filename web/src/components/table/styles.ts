@@ -10,7 +10,9 @@ import { cn } from "@cloudflare/kumo/utils";
  */
 export const tableClass = cn(
   "border-separate border-spacing-0",
-  "[&_th]:relative [&_th]:h-11 [&_th]:border-b-0 [&_th]:bg-kumo-canvas [&_th]:px-4 [&_th]:py-2",
+  // No `relative` here: Kumo's Table.Head sets it, and a descendant rule would outrank the
+  // `sticky` of a pinned header cell, leaving the ⋯ column's heading to scroll away from its cells.
+  "[&_th]:h-11 [&_th]:border-b-0 [&_th]:bg-kumo-canvas [&_th]:px-4 [&_th]:py-2",
   "[&_th]:align-middle [&_th]:text-sm [&_th]:font-medium [&_th]:whitespace-nowrap [&_th]:text-kumo-subtle",
   // The column divider: a tick half the header's height, at the cell's right edge.
   "[&_th:not(:last-child)]:after:absolute [&_th:not(:last-child)]:after:top-1/4 [&_th:not(:last-child)]:after:right-0",
