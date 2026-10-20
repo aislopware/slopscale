@@ -128,26 +128,54 @@ function useExpressionCheck(text: string): ExpressionCheck {
   return { expressions, serverErrors, error: firstExpressionError(text, serverErrors) };
 }
 
-/** The expressions a machine must pass, with the ready-made ones as tiles under the editor. */
+/**
+ * The expressions a machine must pass and the ready-made ones as tiles. A new posture starts from
+ * the tiles, as the dashboard's posture checks start from a type picker, with the raw expressions
+ * after them; an existing one leads with its expressions and offers the tiles to add more.
+ */
 function ConditionsSection({
   draft,
+  creating,
   serverErrors,
   error,
   geoIpAvailable,
   onChange,
 }: {
   readonly draft: Draft;
+  readonly creating: boolean;
   readonly serverErrors: readonly string[];
   readonly error: string | undefined;
   readonly geoIpAvailable: boolean;
   readonly onChange: Change;
 }): ReactElement {
+  const tiles = (
+    <ExampleTiles
+      title={creating ? "Select an attribute" : "Add an expression"}
+      {...(creating
+        ? {
+            description:
+              "Each one adds its expression to the editor below, where you can change it.",
+          }
+        : {})}
+      geoIpAvailable={geoIpAvailable}
+      onPick={(expression) => {
+        onChange({
+          expressions:
+            draft.expressions.trim() === ""
+              ? expression
+              : `${draft.expressions.replace(/\n+$/v, "")}\n${expression}`,
+        });
+      }}
+    />
+  );
+
   return (
     <Section
       title="Conditions"
       description="Every expression must hold for a machine to pass. A rule that requires the posture admits only machines that pass."
       bodyClassName="flex flex-col gap-5 p-4"
     >
+      {creating ? tiles : null}
       <ExpressionEditor
         label="Expressions"
         description="One per line. Use node:… for what the client reports, custom:… for machine attributes and ip:… for where it connects."
@@ -161,17 +189,7 @@ function ConditionsSection({
       {error === undefined ? null : (
         <p className="-mt-3 text-sm leading-snug text-kumo-danger">{error}</p>
       )}
-      <ExampleTiles
-        geoIpAvailable={geoIpAvailable}
-        onPick={(expression) => {
-          onChange({
-            expressions:
-              draft.expressions.trim() === ""
-                ? expression
-                : `${draft.expressions.replace(/\n+$/v, "")}\n${expression}`,
-          });
-        }}
-      />
+      {creating ? null : tiles}
     </Section>
   );
 }
@@ -305,6 +323,7 @@ export function PostureEditor({
       <BasicSection draft={draft} nameError={shown.name} onChange={update} />
       <ConditionsSection
         draft={draft}
+        creating={posture === undefined}
         serverErrors={check.serverErrors}
         error={shown.conditions}
         geoIpAvailable={geoIpAvailable}

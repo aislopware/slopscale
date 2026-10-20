@@ -1,7 +1,16 @@
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
 import { Input } from "@cloudflare/kumo/components/input";
 import type { Icon } from "@phosphor-icons/react";
-import { DesktopIcon, GlobeIcon, TagIcon } from "@phosphor-icons/react";
+import {
+  ArrowCircleUpIcon,
+  ArrowsClockwiseIcon,
+  BarcodeIcon,
+  BuildingsIcon,
+  DesktopIcon,
+  GitBranchIcon,
+  GlobeHemisphereWestIcon,
+  TagIcon,
+} from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import {
@@ -23,54 +32,66 @@ export interface ScheduleDraft {
   readonly timezone: string;
 }
 
-/** The kind of attribute an example reads, for its tile's icon. */
-function exampleIcon(expression: string): Icon {
-  if (expression.startsWith("ip:")) {
-    return GlobeIcon;
-  }
-
-  return expression.startsWith("custom:") ? TagIcon : DesktopIcon;
-}
+/** Each ready-made expression's icon, by the label it is listed under. */
+const exampleIcons: ReadonlyMap<string, Icon> = new Map([
+  ["Current client", ArrowCircleUpIcon],
+  ["Stable track", GitBranchIcon],
+  ["macOS or Windows", DesktopIcon],
+  ["Auto-update on", ArrowsClockwiseIcon],
+  ["Known serial", BarcodeIcon],
+  ["Custom marker", TagIcon],
+  ["Office network", BuildingsIcon],
+  ["Country", GlobeHemisphereWestIcon],
+]);
 
 /**
- * Ready-made expressions as the dashboard's attribute tiles: a grid of tinted tiles, each adding
- * its expression to the editor. A country check needs a GeoIP database, and its tile says so.
+ * Ready-made expressions as the dashboard's posture type picker: a two-column grid of tinted 58px
+ * tiles, each naming the attribute and showing the whole expression it adds, so two tiles that read
+ * the same attribute still tell apart. A country check needs a GeoIP database, and its tile says
+ * so.
  */
 export function ExampleTiles({
+  title,
+  description,
   geoIpAvailable,
   onPick,
 }: {
+  readonly title: string;
+  readonly description?: string;
   readonly geoIpAvailable: boolean;
   readonly onPick: (expression: string) => void;
 }): ReactElement {
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium text-kumo-default">Add an expression</h3>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-0.5">
+        <h3 className="font-medium text-kumo-default">{title}</h3>
+        {description === undefined ? null : (
+          <p className="text-sm text-pretty text-kumo-subtle">{description}</p>
+        )}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
         {expressionExamples.map((example) => {
           const needsGeo = example.expression.startsWith("ip:country");
           const disabled = needsGeo && !geoIpAvailable;
-          const TileIcon = exampleIcon(example.expression);
+          const TileIcon = exampleIcons.get(example.label) ?? DesktopIcon;
 
           return (
             <button
               key={example.label}
               type="button"
               disabled={disabled}
-              title={
-                disabled
-                  ? "Needs policy.geoip_database in the server configuration."
-                  : example.expression
-              }
+              {...(disabled
+                ? { title: "Needs policy.geoip_database in the server configuration." }
+                : {})}
               className="flex min-h-[58px] min-w-0 items-center gap-3 rounded-lg bg-kumo-tint px-4 py-2 text-left hover:bg-kumo-fill focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => {
                 onPick(example.expression);
               }}
             >
-              <TileIcon size={tileIconSize} aria-hidden className="shrink-0 text-kumo-subtle" />
+              <TileIcon size={tileIconSize} aria-hidden className="shrink-0 text-kumo-default" />
               <span className="flex min-w-0 flex-col">
-                <span className="truncate font-medium text-kumo-default">{example.label}</span>
-                <span className="truncate font-mono text-xs text-kumo-subtle">
+                <span className="text-lg font-semibold text-kumo-default">{example.label}</span>
+                <span className="font-mono text-xs break-words text-kumo-subtle">
                   {disabled ? "Needs a GeoIP database" : example.expression}
                 </span>
               </span>
