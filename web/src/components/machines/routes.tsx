@@ -1,4 +1,4 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { GlobeIcon, PathIcon } from "@phosphor-icons/react";
@@ -15,7 +15,7 @@ import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { advertisesExit, exitRoutes, isExitNode, isExitRoute } from "~/lib/node.ts";
+import { advertisesExit, exitRoutes, isExitNode, isExitRoute, nodeName } from "~/lib/node.ts";
 
 const routeIconSize = 14;
 
@@ -46,7 +46,22 @@ export function RoutesSection({
   }
 
   return (
-    <Section title="Routes" description="Only approved routes reach the rest of the tailnet.">
+    <Section
+      title="Routes"
+      meta={routes.length === 0 ? undefined : String(routes.length)}
+      description="Only approved routes reach the rest of the tailnet."
+      actions={
+        routes.length === 0 ? undefined : (
+          <LinkButton
+            href={`/routes?q=${encodeURIComponent(nodeName(node))}`}
+            variant="ghost"
+            size="sm"
+          >
+            View in Routes
+          </LinkButton>
+        )
+      }
+    >
       {routes.length === 0 ? (
         <SectionRow className="text-kumo-subtle">
           Nothing advertised. Run <Code>tailscale set --advertise-routes</Code> or{" "}

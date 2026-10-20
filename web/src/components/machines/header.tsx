@@ -7,14 +7,14 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
-import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { TagList } from "~/components/ui/tag.tsx";
-import { isTagged, nodeName, nodeStatus, ownerLabel } from "~/lib/node.ts";
+import { nodeName } from "~/lib/node.ts";
 
-/** The machine page's title row: what it is, who owns it, how it joined and how it is doing. */
+/**
+ * The machine page's title row: its name with the docs pill, and what can be done to it on the
+ * right. How it is doing (state, owner, address) is the summary strip under the rule.
+ */
 export function MachineHeader({
   node,
   me,
@@ -27,7 +27,7 @@ export function MachineHeader({
   return (
     <PageHeader
       title={nodeName(node)}
-      meta={<MachineFacts node={node} />}
+      docs="ref/device-management"
       actions={
         <>
           <SSHButton node={node} me={me} />
@@ -76,38 +76,6 @@ function SSHButton({ node, me }: { readonly node: Node; readonly me: Me }): Reac
     <LinkButton href={`/machines/${node.id}/ssh`} variant="secondary" icon={TerminalWindowIcon}>
       SSH
     </LinkButton>
-  );
-}
-
-/**
- * The line under the name: the state first, since it is the fact the operator came for, then who
- * owns it (its tags, for a tagged machine) and when it was last seen. What the Overview panel two
- * inches below states in full -- the client and its platform, how the machine registered -- is left
- * to it, so no fact on this page is written twice and in two wordings.
- */
-function MachineFacts({ node }: { readonly node: Node }): ReactElement {
-  return (
-    <>
-      <StatusBadge status={nodeStatus(node)} />
-      <span aria-hidden>·</span>
-      {isTagged(node) ? <TagList tags={node.tags} size="sm" /> : <span>{ownerLabel(node)}</span>}
-      {node.ephemeral ? (
-        <>
-          <span aria-hidden>·</span>
-          <span>ephemeral, deleted when it logs out or goes offline</span>
-        </>
-      ) : null}
-      {/* The badge above already says a connected machine is connected. */}
-      {node.online ? null : (
-        <>
-          <span aria-hidden>·</span>
-          <span>
-            {"last seen "}
-            <RelativeTime value={node.lastSeen} />
-          </span>
-        </>
-      )}
-    </>
   );
 }
 

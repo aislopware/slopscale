@@ -6,24 +6,14 @@ import { api } from "~/api/client.ts";
 import { appsQuery, groupsQuery, servicesQuery, usersQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can, canListUsers } from "~/auth/me.ts";
-import { AppConnectorSection } from "~/components/apps/app-connector-section.tsx";
-import { ClientHealthSection } from "~/components/machines/client-health.tsx";
-import { ConnectivitySection } from "~/components/machines/connectivity.tsx";
-import { DangerZone } from "~/components/machines/danger-zone.tsx";
-import { GroupsSection } from "~/components/machines/groups.tsx";
+import { MachineCards } from "~/components/machines/detail-cards.tsx";
+import { MachineDetails } from "~/components/machines/details-rail.tsx";
 import { MachineHeader } from "~/components/machines/header.tsx";
-import { AddressesSection, OverviewSection } from "~/components/machines/overview.tsx";
-import { mayManageNode } from "~/components/machines/owner.ts";
 import { machinePolling } from "~/components/machines/polling.ts";
-import { PostureSection } from "~/components/machines/posture.tsx";
-import { PreferencesSection } from "~/components/machines/preferences.tsx";
-import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.tsx";
-import { ServicesSection } from "~/components/machines/services.tsx";
-import { SharingSection } from "~/components/machines/sharing.tsx";
+import { MachineSummary } from "~/components/machines/summary-strip.tsx";
 import { ClientWarnings } from "~/components/machines/warnings.tsx";
-import { MachineTrafficSection } from "~/components/traffic/machine-section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
-import { nodeLabel } from "~/lib/node.ts";
+import { nodeName } from "~/lib/node.ts";
 
 const emptyUsers: readonly User[] = [];
 
@@ -63,44 +53,36 @@ function MachinePage(): ReactElement {
   const services = useQuery({ ...servicesQuery, enabled: can(me, "services:read") });
   const { node } = detail.data;
   const userList = users.data?.users ?? emptyUsers;
-  const routes = can(me, "devices:routes");
 
-  useBreadcrumb(nodeLabel(node));
+  // The trail names the machine alone; its tags and owner are on the summary strip.
+  useBreadcrumb(nodeName(node));
 
   return (
     <>
       <MachineHeader node={node} me={me} users={userList} />
       <ClientWarnings node={node} />
-      <div className="grid grid-cols-1 items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
-        <div className="flex flex-col gap-6">
-          <OverviewSection node={node} />
-          <RoutesSection node={node} canEdit={routes} />
-          {node.appConnector && apps.data !== undefined ? (
-            <AppConnectorSection node={node} apps={apps.data.apps} />
-          ) : null}
-          {services.data === undefined ? null : (
-            <ServicesSection
+      {/* The Zero Trust detail layout: the summary strip, then the cards in three columns' room
+          and the details in a sticky rail in the fourth. On a phone the rail comes first, since
+          the name, the ID and the addresses are what an operator opens a machine for. */}
+      <div className="flex flex-col gap-4">
+        <MachineSummary node={node} />
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-4">
+          <div className="min-w-0 lg:col-span-3">
+            <MachineCards
               node={node}
-              services={services.data.services}
-              canEdit={can(me, "services")}
+              me={me}
+              users={userList}
+              groups={groups.data?.groups}
+              apps={apps.data?.apps}
+              services={services.data?.services}
             />
-          )}
-          <PreferencesSection node={node} me={me} />
-          <PostureSection node={node} me={me} />
-          {groups.data === undefined ? null : (
-            <GroupsSection node={node} groups={groups.data.groups} users={userList} me={me} />
-          )}
-          <SharingSection node={node} users={userList} me={me} />
-        </div>
-        <div className="flex flex-col gap-6">
-          <AddressesSection node={node} />
-          <ConnectivitySection node={node} />
-          {can(me, "logs:network:read") ? <MachineTrafficSection nodeId={node.id} /> : null}
-          <ClientHealthSection node={node} me={me} />
-          <GlobalExitSection node={node} canEdit={routes} />
-          {mayManageNode(me, node) ? (
-            <DangerZone node={node} canSuspend={can(me, "devices:core")} />
-          ) : null}
+          </div>
+          <aside
+            aria-label="Machine details"
+            className="flex min-w-0 flex-col gap-4 max-lg:order-first lg:sticky lg:top-[calc(var(--app-header-height,0px)+1rem)]"
+          >
+            <MachineDetails node={node} me={me} />
+          </aside>
         </div>
       </div>
     </>
