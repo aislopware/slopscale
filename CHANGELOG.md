@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [0.59.0](https://github.com/aislopware/slopscale/compare/v0.58.2...v0.59.0) (2026-10-20)
+
+
+### Changes
+
+* **hscontrol:** get the server certificate with certmagic, DNS-01 included ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **nix:** declare the nested tls options ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **state:** choose how machines pick among routers with a route selection setting ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **state:** send each machine to a healthy nearby host of a service ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** create keys on full pages and mask the auth key in join commands while copying it whole ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** edit rules, groups and postures on full pages, with a HuJSON view beside the visual rule builder ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** give the audit log a filter popover, reorderable columns and an event side sheet ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** rebuild the admin console on the Cloudflare dashboard's shell, tables, settings cards, tags and badges ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** set the traffic logs' time range, rows per page and columns from one toolbar ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** split the machine page into Overview, Routes, Diagnostics and Settings tabs and add machines through a full-screen wizard ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** tell how to reconnect a disconnected machine on its connection card ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+
+
+### Fixes
+
+* **api/v2:** accept tailnet settings writes from the Tailscale Go client and Terraform ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **mapper:** show suspension and approval notices on Tailscale v1.84 clients ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **state:** stop regional failover routing a prefix through two routers ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **state:** treat machine names case-insensitively and resend a renamed machine its certificate name ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+
+
+### Performance
+
+* **state:** build the peer map once per policy write instead of twice ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** compile the console with oxc's React Compiler instead of Babel ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+
+
+### Dependencies
+
+* **docs:** update blume to 2.2.4 ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* pin tailscale.com to the commit of unstable 1.105.59 and update Go modules ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+* **web:** bump kumo to 2.15.0, oxlint to 1.89.0, oxfmt to 0.74.0 and TanStack Query to 5.104.5 ([aa2bc52](https://github.com/aislopware/slopscale/commit/aa2bc52a2cc7d8073d376f0d635ce39fcd84ac2e))
+
 ## [0.58.2](https://github.com/aislopware/slopscale/compare/v0.58.1...v0.58.2) (2026-10-14)
 
 
