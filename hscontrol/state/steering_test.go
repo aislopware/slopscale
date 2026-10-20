@@ -145,7 +145,7 @@ func TestSteer(t *testing.T) {
 	sites := []site{dcOld, office, eu}
 
 	pick := func(prefix netip.Prefix, viewer viewerSite, fallback types.NodeID) types.NodeID {
-		return steer(prefix, sites, nearest(sites, viewer), viewer, fallback)
+		return steer(isPublicAddr(prefix.Addr()), sites, nearest(sites, viewer), viewer, fallback)
 	}
 
 	assert.Equal(t, eu.id, pick(public, amsterdam(1), office.id), "Amsterdam leaves through Frankfurt")

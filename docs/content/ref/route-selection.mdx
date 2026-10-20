@@ -5,8 +5,9 @@ description: "Choose how machines pick among subnet routers and app connectors t
 
 When two or more healthy machines serve the same prefix, each client has to
 use one of them. Route selection is the tailnet-wide setting that decides
-which. It applies to [subnet routers](/ref/routes#subnet-router) and
-[app connectors](/ref/apps), and it decides whether [global exit nodes](/ref/routes#global-exit-node) are
+which. It applies to [subnet routers](/ref/routes#subnet-router),
+[app connectors](/ref/apps) and the hosts of a [service](/ref/services), and
+it decides whether [global exit nodes](/ref/routes#global-exit-node) are
 reordered per client. Clients need nothing new: the server puts each prefix
 in the `AllowedIPs` of the router that client should use, so every Tailscale
 client follows it.
@@ -58,6 +59,11 @@ Health and stickiness are the same in every mode: an unhealthy router, one
 the [high availability](/ref/routes#high-availability) prober found not
 answering, is never chosen while a healthy one serves the prefix, and a
 primary is kept until it stops being a candidate.
+
+A service's hosts are chosen the same way, with one difference: clients
+equally near several hosts are always spread over them, whatever the
+service's addresses, because the host ends the connection and there is no
+return path to keep on one machine.
 
 ## Changing it
 

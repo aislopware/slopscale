@@ -1,11 +1,20 @@
 package state
 
-import "github.com/aislopware/slopscale/hscontrol/types"
+import (
+	"maps"
+	"net/netip"
+	"slices"
+
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"tailscale.com/tailcfg"
+)
 
 // routeInputs is what a snapshot's route election reads besides the
-// nodes. The zero value is the default route selection.
+// nodes. The zero value is the default route selection without services.
 type routeInputs struct {
 	selection types.RouteSelection
+	// services are the tailnet's services and their addresses, by name.
+	services map[tailcfg.ServiceName][]netip.Prefix
 }
 
 // SetRouteSelection changes how viewers choose among routers and
@@ -18,6 +27,21 @@ func (s *NodeStore) SetRouteSelection(selection types.RouteSelection) bool {
 		}
 
 		in.selection = selection
+
+		return true
+	})
+}
+
+// SetServices hands the election the tailnet's services and returns once
+// a snapshot elected with them is published. It reports whether a
+// service or its addresses changed.
+func (s *NodeStore) SetServices(services map[tailcfg.ServiceName][]netip.Prefix) bool {
+	return s.setRouteInputs(func(in *routeInputs) bool {
+		if maps.EqualFunc(in.services, services, slices.Equal) {
+			return false
+		}
+
+		in.services = services
 
 		return true
 	})

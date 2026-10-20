@@ -360,16 +360,14 @@ func (b *MapResponseBuilder) addSelfNode() (types.NodeView, bool) {
 
 	_, matchers := b.mapper.state.Filter()
 
-	serviceHosts := b.mapper.state.ServiceHosts()
-
 	tailnode, err := nv.TailNode(
 		b.capVer,
 		func(id types.NodeID) []netip.Prefix {
 			// Self node: include own primaries + exit routes (no via steering for self),
-			// and the addresses of the services it is the elected host of.
+			// and the addresses of the services it is the tailnet-wide host of.
 			primaries := policy.ReduceRoutes(nv, b.mapper.state.GetNodePrimaryRoutes(id), matchers)
 
-			return slices.Concat(primaries, nv.ExitRoutes(), b.mapper.state.ServiceRoutesFor(id, serviceHosts))
+			return slices.Concat(primaries, nv.ExitRoutes(), b.mapper.state.ServiceRoutesForNode(id))
 		},
 		b.mapper.cfg,
 		b.mapper.state.NodeCapMap(nv.ID()),
@@ -450,8 +448,8 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	// path used to take pm.mu N times for an N-peer response.
 	allCapMaps := b.mapper.state.NodeCapMaps()
 	globalExitNodes := b.mapper.state.HasGlobalExitNode()
-	serviceHosts := b.mapper.state.ServiceHosts()
 	exitPriorities := b.mapper.state.ExitNodePrioritiesFor(node)
+	serviceRoutes := b.mapper.state.ServiceRoutesByHost(node)
 
 	// Build tail nodes with per-peer via-aware route function.
 	tailPeers := make([]*tailcfg.Node, 0, peers.Len())
@@ -461,11 +459,11 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		// (today: disable-ipv4) apply consistently in the viewer's
 		// netmap; the entry's own CapMap is set by PeerCapMap below.
 		tn, err := peer.PeerTailNode(func(id types.NodeID) []netip.Prefix {
-			// The elected host of a service carries its addresses so the
-			// viewer routes them to it.
+			// The host of a service this viewer is sent to carries its
+			// addresses so the viewer routes them to it.
 			return slices.Concat(
 				b.mapper.state.RoutesForPeer(node, peer, matchers),
-				b.mapper.state.ServiceRoutesFor(id, serviceHosts),
+				serviceRoutes[id],
 			)
 		}, b.mapper.cfg, allCapMaps[peer.ID()])
 		if err == nil {
