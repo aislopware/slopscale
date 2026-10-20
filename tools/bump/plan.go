@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+
+	"golang.org/x/mod/semver"
 )
 
 // cmdPlan resolves every upstream the bump reads and prints the gap against
@@ -157,20 +159,27 @@ func planBuilders(ctx context.Context, r *repo) []string {
 	return lines
 }
 
-// planLockstep reports tailscale.com against the tip of main, and each partner
-// against the version that tip pins.
+// planLockstep reports tailscale.com against the commit of the newest unstable
+// release, and each partner against the version that commit pins.
 func planLockstep(ctx context.Context, r *repo) []string {
 	have, err := moduleVersion(ctx, r, modTailscale)
 	if err != nil {
 		return []string{modTailscale + ": " + err.Error()}
 	}
 
-	want, err := mainVersion(ctx, modTailscale)
+	want, release, err := unstablePin(ctx)
 	if err != nil {
 		return []string{modTailscale + ": " + err.Error()}
 	}
 
-	lines := []string{gap(modTailscale+"@main", have, want)}
+	what := modTailscale + "@unstable " + release
+	if semver.Compare(have, want) > 0 {
+		// The atom never moves a pin backwards, so the partners stay where
+		// the current pin wants them.
+		return []string{fmt.Sprintf("%s: %s (ahead of %s, kept)", what, have, want)}
+	}
+
+	lines := []string{gap(what, have, want)}
 
 	for _, pair := range lockstepPairs {
 		partner, err := partnerVersion(ctx, pair.owner, want, pair.dep)

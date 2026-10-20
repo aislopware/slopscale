@@ -100,17 +100,6 @@ func fetchInfo(ctx context.Context, path, ref string) (versionInfo, error) {
 	return info, nil
 }
 
-// mainVersion is the pseudo-version of the tip of path's main branch, as the
-// proxy resolves it for `go get path@main`.
-func mainVersion(ctx context.Context, path string) (string, error) {
-	info, err := fetchInfo(ctx, path, "@v/main.info")
-	if err != nil {
-		return "", err
-	}
-
-	return info.Version, nil
-}
-
 // versionTime is when version of path was committed. Pseudo-versions carry it
 // in their own name, so only tagged versions cost a round trip.
 func versionTime(ctx context.Context, path, version string) (time.Time, error) {

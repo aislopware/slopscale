@@ -11,8 +11,8 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// Modules whose versions are not independent. tailscale.com follows its main
-// branch, and the modules it pins by pseudo-version or for platform code this
+// Modules whose versions are not independent. tailscale.com follows the commit
+// of Tailscale's newest unstable release, and the modules it pins by pseudo-version or for platform code this
 // repository never compiles move with it or not at all.
 const (
 	modTailscale        = "tailscale.com"
@@ -52,8 +52,13 @@ func moduleVersion(ctx context.Context, r *repo, path string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
-// tailscaleAtom moves tailscale.com to the tip of main and drags gvisor to
-// whatever that exact commit requires.
+// tailscaleAtom moves tailscale.com to the commit of Tailscale's newest
+// unstable release and drags gvisor to whatever that exact commit requires.
+//
+// An unstable release is main that Tailscale built, shipped and runs on its
+// own unstable track, so the server stays a cycle ahead of the stable clients
+// without standing on a commit that may be reverted the next day. A pin
+// already past that commit is left alone until the next release overtakes it.
 //
 // `go get -u tailscale.com` is wrong here: the pin is a pseudo-version that
 // sorts above the newest release tag, so -u either no-ops or downgrades.
@@ -63,9 +68,16 @@ func tailscaleAtom(ctx context.Context, r *repo) (string, error) {
 		return "", err
 	}
 
-	_, err = r.nixRun(ctx, "go", "get", modTailscale+"@main")
+	want, release, err := unstablePin(ctx)
 	if err != nil {
 		return "", err
+	}
+
+	if semver.Compare(want, before) > 0 {
+		_, err = r.nixRun(ctx, "go", "get", modTailscale+"@"+want)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	after, err := moduleVersion(ctx, r, modTailscale)
@@ -93,7 +105,7 @@ func tailscaleAtom(ctx context.Context, r *repo) (string, error) {
 		return "", nil
 	}
 
-	return fmt.Sprintf("tailscale.com %s -> %s (gvisor %s)", before, after, gvisor), nil
+	return fmt.Sprintf("tailscale.com %s -> %s (unstable %s, gvisor %s)", before, after, release, gvisor), nil
 }
 
 // directRequirements is every direct requirement not already owned by the
