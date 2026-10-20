@@ -7,7 +7,6 @@ import { accessRulesQuery, policyQuery, usersQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { PolicyFileTab } from "~/components/policy/policy-file-tab.tsx";
-import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/policy/file")({
   loader: async ({ context }) => {
@@ -44,19 +43,14 @@ function PolicyFilePage(): ReactElement {
     [users.data],
   );
 
+  // The page header lives with the draft, because its Check and Save act on it.
   return (
-    <>
-      <PageHeader
-        title="Policy file"
-        description="The HuJSON policy for everything the rules do not say."
-      />
-      <PolicyFileTab
-        policy={policy}
-        canEdit={can(me, "policy_file")}
-        hasRules={rules.some((rule) => rule.enabled)}
-        enforces={policyFileEnforces}
-        users={names}
-      />
-    </>
+    <PolicyFileTab
+      policy={policy}
+      canEdit={can(me, "policy_file")}
+      hasRules={rules.some((rule) => rule.enabled)}
+      enforces={policyFileEnforces}
+      users={names}
+    />
   );
 }

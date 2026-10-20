@@ -2,9 +2,6 @@ import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
-import { seededColours } from "~/lib/hue.ts";
-import { tagHueSteps } from "~/lib/tag.ts";
-
 const wildcard = "*.";
 
 /** Second-level labels under a two-letter country code that are registries in their own right. */
@@ -35,12 +32,9 @@ export function splitDomain(name: string): { readonly sub: string; readonly site
 }
 
 /**
- * A domain as a name token in a tint seeded by the registered site, so a list of hosts under two
- * sites reads as two groups before any name is read. The tint carries the grouping itself: a
- * coloured dot beside grey text made the token look like a status light, and at 6px the hue it
- * carried was the one thing on the row too small to compare. The registered site leads, its
- * subdomain and a wildcard's `*.` step back within the tint, and the code face keeps the token a
- * value rather than a `Tag`'s label.
+ * A domain as plain text, the way the dashboard's DNS records name a host: the part before the
+ * registered site in the default colour, the site itself (and a wildcard's `*.`) stepped back to
+ * the subtle colour, so a list of hosts under one site reads by what differs between them.
  */
 export function Domain({
   domain,
@@ -54,18 +48,13 @@ export function Domain({
   const { sub, site } = splitDomain(name);
 
   return (
-    <span
-      title={domain}
-      className={cn(
-        "inline-flex max-w-full min-w-0 items-center rounded-md px-1.5 py-0.5 font-mono text-[0.9em] leading-4 ring ring-kumo-line ring-inset",
-        className,
-      )}
-      style={seededColours(site, tagHueSteps)}
-    >
+    <span title={domain} className={cn("inline-flex max-w-full min-w-0", className)}>
       <span className="truncate">
-        {wild ? <span className="opacity-60">{wildcard}</span> : null}
-        {sub === "" ? null : <span className="opacity-60">{sub}</span>}
-        <span className="font-medium">{site}</span>
+        {wild ? <span className="text-kumo-subtle">{wildcard}</span> : null}
+        {sub === "" ? null : <span className="text-kumo-default">{sub}</span>}
+        <span className={sub === "" && !wild ? "text-kumo-default" : "text-kumo-subtle"}>
+          {site}
+        </span>
       </span>
     </span>
   );

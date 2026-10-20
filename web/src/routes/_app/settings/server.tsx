@@ -5,8 +5,10 @@ import type { ReactElement } from "react";
 import { serverInfoQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { MaintenanceSection } from "~/components/settings/maintenance-section.tsx";
-import { ServerSection } from "~/components/settings/server-section.tsx";
+import { ServerSection, serverParts } from "~/components/settings/server-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { SettingsLayout } from "~/components/ui/settings-layout.tsx";
+import type { SettingsPart } from "~/components/ui/settings-layout.tsx";
 
 export const Route = createFileRoute("/_app/settings/server")({
   loader: async ({ context }) => {
@@ -14,6 +16,11 @@ export const Route = createFileRoute("/_app/settings/server")({
   },
   component: ServerSettingsPage,
 });
+
+const parts: readonly SettingsPart[] = [
+  ...serverParts,
+  { id: "maintenance", label: "Maintenance" },
+];
 
 function ServerSettingsPage(): ReactElement {
   const { me } = Route.useRouteContext();
@@ -23,12 +30,13 @@ function ServerSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Server"
+        docs="ref/configuration"
         description="Build, addresses and config file values of this server, and its maintenance tasks."
       />
-      <div className="flex flex-col gap-6">
+      <SettingsLayout parts={parts}>
         <ServerSection info={info} />
         <MaintenanceSection canRun={can(me, "devices:core")} />
-      </div>
+      </SettingsLayout>
     </>
   );
 }

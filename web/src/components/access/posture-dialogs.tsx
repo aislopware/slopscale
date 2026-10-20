@@ -1,380 +1,33 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
-import { Checkbox } from "@cloudflare/kumo/components/checkbox";
-import { Input } from "@cloudflare/kumo/components/input";
-import { Switch } from "@cloudflare/kumo/components/switch";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import type { ReactElement } from "react";
 
-import { api } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Posture } from "~/api/queries.ts";
-import { ExpressionEditor, firstExpressionError } from "~/components/access/expression-editor.tsx";
 import type { AccessMutations } from "~/components/access/mutations.ts";
-import {
-  expressionExamples,
-  isClock,
-  isWeekday,
-  parseExpressions,
-  rulesUsingPosture,
-  weekdayLabels,
-  weekdays,
-} from "~/components/access/posture-model.ts";
-import type { Weekday } from "~/components/access/posture-model.ts";
-import { FormFooter } from "~/components/machines/dialogs.tsx";
-import {
-  DialogClose,
-  DialogContent,
-  DialogError,
-  DialogFooter,
-  DialogRoot,
-} from "~/components/ui/dialog.tsx";
-import { toast } from "~/components/ui/toast.ts";
-import { useDebounced } from "~/lib/use-debounced.ts";
+import { rulesUsingPosture } from "~/components/access/posture-model.ts";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
+import { DialogClose, DialogContent, DialogFooter, DialogRoot } from "~/components/ui/dialog.tsx";
 
-type PostureBody = Parameters<AccessMutations["createPosture"]["mutate"]>[0]["body"];
-
-/** How long typing pauses before the draft goes to the server; the editor checks syntax itself. */
-const checkDelayMs = 400;
-
-const noErrors: readonly string[] = [];
-
-export interface PostureDialogProps {
-  /** The posture to edit; absent when creating one. */
-  readonly posture?: Posture | undefined;
-  /** Whether the server can answer ip:country, which needs a GeoIP database. */
-  readonly geoIpAvailable: boolean;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly mutations: AccessMutations;
-}
-
-/** Creates a posture or edits one; the form mounts with the dialog so it starts from the record. */
-export function PostureDialog(props: PostureDialogProps): ReactElement {
-  const editing = props.posture !== undefined;
-
-  return (
-    <DialogRoot open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent
-        size="lg"
-        title={editing ? "Edit posture" : "New posture"}
-        description="Conditions a machine must meet for a rule that names this posture. Every expression must hold, and a schedule limits it to a weekly window."
-      >
-        <PostureForm {...props} />
-      </DialogContent>
-    </DialogRoot>
-  );
-}
-
-interface Draft {
-  readonly name: string;
-  readonly description: string;
-  readonly expressions: string;
-  readonly scheduled: boolean;
-  readonly days: readonly Weekday[];
-  readonly start: string;
-  readonly end: string;
-  readonly timezone: string;
-}
-
-const workdays: readonly Weekday[] = ["mon", "tue", "wed", "thu", "fri"];
-
-function draftFrom(posture: Posture | undefined): Draft {
-  const schedule = posture?.schedule;
-
-  return {
-    name: posture?.name ?? "",
-    description: posture?.description ?? "",
-    expressions: posture?.expressions.join("\n") ?? "",
-    scheduled: schedule !== undefined,
-    days: schedule === undefined ? workdays : schedule.days.filter(isWeekday),
-    start: schedule?.start ?? "09:00",
-    end: schedule?.end ?? "18:00",
-    timezone: schedule?.timezone ?? localTimezone(),
-  };
-}
-
-function localTimezone(): string {
-  try {
-    return new Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch {
-    return "";
-  }
-}
-
-/** The request body for the draft; the schedule is sent only when it is on. */
-function bodyFrom(draft: Draft, expressions: string[]): PostureBody {
-  return {
-    name: draft.name.trim(),
-    description: draft.description.trim(),
-    expressions,
-    ...(draft.scheduled
-      ? {
-          schedule: {
-            days: [...draft.days],
-            start: draft.start,
-            end: draft.end,
-            timezone: draft.timezone.trim(),
-          },
-        }
-      : {}),
-  };
-}
-
-/** Why the draft cannot be saved yet, or null when it can. */
-function draftIssue(draft: Draft): string | null {
-  if (draft.name.trim() === "") {
-    return "incomplete";
-  }
-
-  if (parseExpressions(draft.expressions).length === 0 && !draft.scheduled) {
-    return "A posture needs at least one expression or a schedule.";
-  }
-
-  if (
-    draft.scheduled &&
-    (draft.days.length === 0 || !isClock(draft.start) || !isClock(draft.end))
-  ) {
-    return "A schedule needs at least one day and HH:MM times.";
-  }
-
-  return null;
-}
-
-function PostureForm({
-  posture,
-  geoIpAvailable,
-  onOpenChange,
-  mutations,
-}: Omit<PostureDialogProps, "open">): ReactElement {
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(posture));
-  const mutation = posture === undefined ? mutations.createPosture : mutations.updatePosture;
-  const update = (patch: Partial<Draft>): void => {
-    setDraft((current) => ({ ...current, ...patch }));
-  };
-
-  const expressions = parseExpressions(draft.expressions);
-  const settled = parseExpressions(useDebounced(draft.expressions, checkDelayMs));
-  const check = useQuery({
-    ...api.queryOptions("post", "/api/v1/posture/check", { body: { expressions: settled } }),
-    enabled: settled.length > 0,
-    placeholderData: keepPreviousData,
-  });
-  // The server's answer is about the draft it was sent, so it stands only while that is the draft.
-  const errors =
-    settled.length === expressions.length &&
-    settled.every((line, index) => line === expressions[index])
-      ? (check.data?.errors ?? noErrors)
-      : noErrors;
-  const firstError = firstExpressionError(draft.expressions, errors);
-  const issue = draftIssue(draft);
-
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-
-    const body = bodyFrom(draft, expressions);
-    const done = {
-      onSuccess: (): void => {
-        toast.success(posture === undefined ? "Posture created" : "Posture updated");
-        onOpenChange(false);
-      },
-    };
-
-    if (posture === undefined) {
-      mutations.createPosture.mutate({ body }, done);
-    } else {
-      mutations.updatePosture.mutate({ params: { path: { id: posture.id } }, body }, done);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <Input
-        label="Name"
-        value={draft.name}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder="Managed laptops"
-        onChange={(event) => {
-          update({ name: event.target.value });
-        }}
-      />
-      <Input
-        label="Description"
-        required={false}
-        value={draft.description}
-        placeholder="Current client on a known serial number"
-        onChange={(event) => {
-          update({ description: event.target.value });
-        }}
-      />
-      <ExpressionEditor
-        label="Expressions"
-        description="One per line. Use node:… for what the client reports, custom:… for machine attributes and ip:… for where it connects."
-        value={draft.expressions}
-        placeholder={"node:tsVersion >= '1.80'\nnode:os IN ['macos', 'windows']"}
-        serverErrors={errors}
-        onChange={(next) => {
-          update({ expressions: next });
-        }}
-      />
-      <Examples
-        geoIpAvailable={geoIpAvailable}
-        onPick={(expression) => {
-          update({
-            expressions:
-              draft.expressions.trim() === ""
-                ? expression
-                : `${draft.expressions.replace(/\n+$/v, "")}\n${expression}`,
-          });
-        }}
-      />
-      <Switch.Group>
-        <Switch.Legend>Schedule</Switch.Legend>
-        <Switch
-          checked={draft.scheduled}
-          onCheckedChange={(scheduled) => {
-            update({ scheduled });
-          }}
-          label={
-            <span className="flex flex-col gap-0.5">
-              <span className="font-medium text-kumo-default">Only during a weekly window</span>
-              <span className="text-xs text-kumo-subtle">
-                Outside the window the posture fails, so rules that require it deny traffic.
-              </span>
-            </span>
-          }
-        />
-      </Switch.Group>
-      {draft.scheduled ? <ScheduleFields draft={draft} onChange={update} /> : null}
-      <DialogError message={mutation.isError ? errorMessage(mutation.error) : undefined} />
-      <FormFooter
-        label={posture === undefined ? "Create posture" : "Save"}
-        pending={mutation.isPending}
-        disabled={issue !== null || firstError !== null}
-      />
-    </form>
-  );
-}
-
-function Examples({
-  geoIpAvailable,
-  onPick,
-}: {
-  readonly geoIpAvailable: boolean;
-  readonly onPick: (expression: string) => void;
-}): ReactElement {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-kumo-subtle">Examples</span>
-      {expressionExamples.map((example) => {
-        const needsGeo = example.expression.startsWith("ip:country");
-
-        return (
-          <Button
-            key={example.label}
-            type="button"
-            variant="outline"
-            size="xs"
-            disabled={needsGeo && !geoIpAvailable}
-            title={
-              needsGeo && !geoIpAvailable
-                ? "Needs policy.geoip_database in the server configuration."
-                : example.expression
-            }
-            onClick={() => {
-              onPick(example.expression);
-            }}
-          >
-            {example.label}
-          </Button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ScheduleFields({
-  draft,
-  onChange,
-}: {
-  readonly draft: Draft;
-  readonly onChange: (patch: Partial<Draft>) => void;
-}): ReactElement {
-  const toggle = (day: Weekday, checked: boolean): void => {
-    onChange({
-      days: weekdays.filter((known) => (known === day ? checked : draft.days.includes(known))),
-    });
-  };
-
-  return (
-    <div className="flex flex-col gap-4 rounded-lg border border-kumo-line p-4">
-      <div className="flex flex-wrap gap-x-4 gap-y-2">
-        {weekdays.map((day) => (
-          <Checkbox
-            key={day}
-            label={weekdayLabels[day]}
-            checked={draft.days.includes(day)}
-            onCheckedChange={(checked) => {
-              toggle(day, checked);
-            }}
-          />
-        ))}
-      </div>
-      <div className="grid items-start gap-4 sm:grid-cols-2">
-        <Input
-          label="From"
-          value={draft.start}
-          placeholder="09:00"
-          spellCheck={false}
-          {...(isClock(draft.start) ? {} : { error: "HH:MM" })}
-          onChange={(event) => {
-            onChange({ start: event.target.value });
-          }}
-        />
-        <Input
-          label="To"
-          description="An end before the start runs past midnight."
-          value={draft.end}
-          placeholder="18:00"
-          spellCheck={false}
-          {...(isClock(draft.end) ? {} : { error: "HH:MM" })}
-          onChange={(event) => {
-            onChange({ end: event.target.value });
-          }}
-        />
-      </div>
-      <div className="grid gap-4">
-        <Input
-          label="Time zone"
-          required={false}
-          description="An IANA name such as Europe/Berlin. Empty means UTC."
-          value={draft.timezone}
-          placeholder="Asia/Ho_Chi_Minh"
-          spellCheck={false}
-          onChange={(event) => {
-            onChange({ timezone: event.target.value });
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Deletes a posture, or says which rules still require it: the server refuses to delete one a rule
+ * names.
+ */
 export function DeletePostureDialog({
   posture,
   rules,
   open,
   onOpenChange,
   mutations,
+  onDeleted,
 }: {
   readonly posture: Posture;
   readonly rules: readonly AccessRule[];
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly mutations: AccessMutations;
+  /** Runs once the posture is gone, such as leaving the posture's own page. */
+  readonly onDeleted?: () => void;
 }): ReactElement {
   const { deletePosture } = mutations;
   const using = rulesUsingPosture(rules, posture);
@@ -393,8 +46,8 @@ export function DeletePostureDialog({
             {using.map((rule) => (
               <li key={rule.id} className="truncate">
                 <Link
-                  to="/policy/rules"
-                  search={{ q: rule.name }}
+                  to="/policy/rules/$ruleId"
+                  params={{ ruleId: rule.id }}
                   className="hover:text-kumo-link"
                   onClick={() => {
                     onOpenChange(false);
@@ -414,7 +67,7 @@ export function DeletePostureDialog({
   }
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="posture"
@@ -423,14 +76,18 @@ export function DeletePostureDialog({
       isDeleting={deletePosture.isPending}
       {...(deletePosture.isError ? { errorMessage: errorMessage(deletePosture.error) } : {})}
       onDelete={() => {
-        deletePosture.mutate(
-          { params: { path: { id: posture.id } } },
-          {
-            onSuccess: () => {
-              onOpenChange(false);
-            },
-          },
-        );
+        // Awaited rather than passed to mutate: the refetch after a delete drops the record, and
+        // the page that showed it may unmount before mutate's own callbacks would run.
+        void (async (): Promise<void> => {
+          try {
+            await deletePosture.mutateAsync({ params: { path: { id: posture.id } } });
+          } catch {
+            // The dialog shows the refusal from the mutation's own state.
+            return;
+          }
+          onOpenChange(false);
+          onDeleted?.();
+        })();
       }}
     />
   );

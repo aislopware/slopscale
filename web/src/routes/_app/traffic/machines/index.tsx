@@ -1,20 +1,26 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import type { ReactElement } from "react";
 import { object } from "valibot";
 
 import { trafficReportersQuery, trafficSummaryQuery } from "~/api/traffic.ts";
 import type { TrafficScope } from "~/api/traffic.ts";
 import { plural } from "~/components/overview/plural.ts";
+import { tablePageSize } from "~/components/table/app-table.tsx";
+import { ColumnsMenu, LimitSelect, useHiddenColumns } from "~/components/table/log-view.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
-import { MachinesTable, trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
+import {
+  MachinesTable,
+  machineColumnChoices,
+  trafficNodeName,
+} from "~/components/traffic/machines-table.tsx";
 import { optionalText, trafficWindowEntries, windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 
 /** The server's own cap on how many machines one summary lists. */
@@ -55,6 +61,8 @@ function MachinesPage(): ReactElement {
       ? nodes
       : nodes.filter((node) => trafficNodeName(node).toLowerCase().includes(needle));
   const whole = data === undefined ? 0 : data.total.txBytes + data.total.rxBytes;
+  const [pageSize, setPageSize] = useState(tablePageSize);
+  const columns = useHiddenColumns("slopscale-admin.traffic.machines.hidden-columns");
 
   return (
     <>
@@ -73,22 +81,31 @@ function MachinesPage(): ReactElement {
         onChange={(next) => {
           void navigate({ search: (previous) => ({ ...previous, ...next }) });
         }}
-      >
-        <SearchInput
-          value={search.q}
-          placeholder="Search machines"
-          onValueChange={(q) => {
-            void navigate({ search: (previous) => ({ ...previous, q }), replace: true });
-          }}
-        />
-      </WindowToolbar>
+        query={
+          <SearchInput
+            value={search.q}
+            placeholder="Search machines"
+            onValueChange={(q) => {
+              void navigate({ search: (previous) => ({ ...previous, q }), replace: true });
+            }}
+          />
+        }
+        actions={
+          <>
+            <LimitSelect value={pageSize} onChange={setPageSize} />
+            <ColumnsMenu choices={machineColumnChoices(data?.reporters ?? [])} columns={columns} />
+          </>
+        }
+      />
       {isRefusedWindow(error) ? null : (
-        <Frame>
+        <TableGroup>
           <MachinesTable
             nodes={shown}
             gateways={data?.reporters ?? []}
             whole={whole}
             search={search}
+            pageSize={pageSize}
+            hidden={columns.hidden}
             empty={
               needle === "" ? undefined : (
                 <SectionEmpty
@@ -97,17 +114,8 @@ function MachinesPage(): ReactElement {
                 />
               )
             }
-            footer={
-              nodes.length === 0 ? undefined : (
-                <TableFooter>
-                  {shown.length === nodes.length
-                    ? `Showing ${plural(nodes.length, "machine")}`
-                    : `Showing ${shown.length} of ${plural(nodes.length, "machine")}`}
-                </TableFooter>
-              )
-            }
           />
-        </Frame>
+        </TableGroup>
       )}
     </>
   );

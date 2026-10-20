@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
@@ -10,7 +9,7 @@ import type { User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -123,7 +122,6 @@ function CreateUserForm({
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button
           type="submit"
           variant="primary"
@@ -132,6 +130,7 @@ function CreateUserForm({
         >
           Add user
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );
@@ -195,7 +194,6 @@ function RenameUserForm({
       />
       <DialogError message={rename.isError ? errorMessage(rename.error) : undefined} />
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button
           type="submit"
           variant="primary"
@@ -204,6 +202,7 @@ function RenameUserForm({
         >
           Rename
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );
@@ -272,7 +271,6 @@ function RoleForm({
         ))}
       </Select>
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button
           type="submit"
           variant="primary"
@@ -281,6 +279,7 @@ function RoleForm({
         >
           Change role
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );
@@ -299,7 +298,7 @@ export function DeleteUserDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="user"

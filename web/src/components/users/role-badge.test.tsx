@@ -9,7 +9,8 @@ function tint(chip: Element | null): string {
 }
 
 describe(RoleBadge, () => {
-  it("names the role and gives every role a tint of its own", async () => {
+  // Roles are outline badges, as the dashboard's plan badge is; a member, the default, is grey.
+  it("names the role, with a member set apart from the elevated roles", async () => {
     const view = await render(
       <>
         {userRoles.map((role) => (
@@ -19,7 +20,7 @@ describe(RoleBadge, () => {
     );
 
     const chips = [...view.container.querySelectorAll("[data-role]")];
-    const tints = new Set(chips.map((chip) => tint(chip)));
+    const tints = new Set(chips.map((chip) => tint(chip.firstElementChild)));
 
     expect(chips.map((chip) => chip.textContent)).toStrictEqual([
       "Owner",
@@ -29,7 +30,10 @@ describe(RoleBadge, () => {
       "Auditor",
       "Member",
     ]);
-    expect(tints.size).toBe(userRoles.length);
+    expect(tints.size).toBe(2);
+    expect(tint(view.getByText("Member").element())).not.toBe(
+      tint(view.getByText("Owner").element()),
+    );
   });
 
   it("treats an unknown or empty role as a member", async () => {

@@ -1,6 +1,6 @@
 import { cn } from "@cloudflare/kumo/utils";
 import type { Icon } from "@phosphor-icons/react";
-import { WarningIcon } from "@phosphor-icons/react";
+import { CheckIcon, InfoIcon, WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
 import { HoverPopover } from "~/components/ui/hover-popover.tsx";
@@ -23,11 +23,23 @@ const texts: Record<Tone, string> = {
 
 const noteIconSize = 14;
 
+/** The 14px icon in front of a state's word; an ordinary state has none. */
+const icons: Record<Tone, Icon | undefined> = {
+  success: CheckIcon,
+  warning: WarningIcon,
+  danger: WarningCircleIcon,
+  info: InfoIcon,
+  neutral: undefined,
+};
+
+const statusIconSize = 14;
+
 /**
- * A state as words: "On", "Valid", "Update available". Plain text, not a pill and not a dot, for a
+ * A state as the dashboard's status cell writes it: a 14px icon and the word, "✓ Active". For a
  * fact about a thing inside a definition list, a sentence or a cell that says something else too.
- * The state of the thing itself, in a table's state column or a page header, is `Badge` from
- * `ui/badge.tsx`, so a page carries one tinted state per thing and the rest stays words.
+ * Only bad news is coloured; an ordinary or inactive state is the word alone in the subtle colour.
+ * The state of the thing itself, in a table's state column or a page header, may be a `Badge` from
+ * `ui/badge.tsx` instead.
  */
 export function Status({
   tone,
@@ -38,7 +50,18 @@ export function Status({
   readonly children: ReactNode;
   readonly className?: string;
 }): ReactElement {
-  return <span className={cn("whitespace-nowrap", texts[tone], className)}>{children}</span>;
+  const StatusIcon = icons[tone];
+
+  return (
+    <span
+      className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", texts[tone], className)}
+    >
+      {StatusIcon === undefined ? null : (
+        <StatusIcon size={statusIconSize} aria-hidden className="shrink-0" />
+      )}
+      {children}
+    </span>
+  );
 }
 
 /**

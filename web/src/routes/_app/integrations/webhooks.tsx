@@ -43,8 +43,9 @@ function WebhooksPage(): ReactElement {
     <>
       <PageHeader
         title="Webhooks"
+        docs="ref/webhooks"
         description="Endpoints, chat channels and inboxes that receive signed events as they happen."
-        meta={meta}
+        {...(webhooks.length === 0 ? {} : { meta })}
       />
       <WebhooksTab
         me={me}

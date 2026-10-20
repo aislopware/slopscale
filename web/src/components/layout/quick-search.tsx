@@ -125,10 +125,14 @@ export function QuickSearch({
                   >
                     <span className="flex min-w-0 items-center gap-3">
                       <item.icon className="size-4 shrink-0 text-kumo-subtle" />
-                      <span className="flex min-w-0 flex-col gap-0.5">
-                        <span className="truncate">{item.title}</span>
+                      {/* "Title — Section" on one line, the way the dashboard's palette reads. */}
+                      <span className="min-w-0 truncate">
+                        <span>{item.title}</span>
                         {item.hint === undefined ? null : (
-                          <span className="truncate text-xs text-kumo-subtle">{item.hint}</span>
+                          <span className="text-kumo-subtle">
+                            {" — "}
+                            <span>{item.hint}</span>
+                          </span>
                         )}
                       </span>
                     </span>
@@ -233,7 +237,7 @@ function buildGroups(
 
 function Key({ children }: { readonly children: string }): ReactElement {
   return (
-    <kbd className="rounded border border-kumo-hairline bg-kumo-base px-1.5 py-0.5 text-[10px]">
+    <kbd className="inline-flex h-5 items-center rounded-sm bg-kumo-base px-1 font-sans text-xs ring ring-kumo-line">
       {children}
     </kbd>
   );

@@ -1,8 +1,7 @@
 import { Select } from "@cloudflare/kumo/components/select";
-import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { object } from "valibot";
 
@@ -11,13 +10,15 @@ import type { Node } from "~/api/queries.ts";
 import { trafficNamesQuery, trafficReportersQuery, trafficSettingsQuery } from "~/api/traffic.ts";
 import type { NameFilters, TrafficName, TrafficScope } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
-import { FilterChips } from "~/components/machines/filter-chips.tsx";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
-import { plural } from "~/components/overview/plural.ts";
+import { tablePageSize } from "~/components/table/app-table.tsx";
+import type { LogFilter } from "~/components/table/log-filters.tsx";
+import { ColumnsMenu, LimitSelect, useHiddenColumns } from "~/components/table/log-view.tsx";
+import type { HiddenColumns } from "~/components/table/log-view.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { DnsLoggingOff, DnsLoggingOffNote } from "~/components/traffic/dns-logging-off.tsx";
-import { NamesTable } from "~/components/traffic/names-table.tsx";
+import { NamesTable, nameColumnChoices } from "~/components/traffic/names-table.tsx";
 import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import { useSearchDraft } from "~/components/traffic/search-draft.ts";
@@ -31,8 +32,11 @@ import {
 import type { NameSearch } from "~/components/traffic/search.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
-import { WindowToolbar, windowSearchClass } from "~/components/traffic/window-toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import {
+  GroupBySelect,
+  WindowToolbar,
+  pickedFilter,
+} from "~/components/traffic/window-toolbar.tsx";
 import { nodeLabel } from "~/lib/node.ts";
 
 /** The server's cap on one read. */
@@ -107,6 +111,8 @@ function DnsPage(): ReactElement {
     nodes.data === undefined ? (id: string): string => `Machine ${id}` : undefined,
     setSearch,
   );
+  const [pageSize, setPageSize] = useState(tablePageSize);
+  const columns = useHiddenColumns("slopscale-admin.traffic.dns.hidden-columns");
 
   return (
     <>
@@ -125,61 +131,106 @@ function DnsPage(): ReactElement {
         onChange={(next) => {
           void navigate({ search: (previous) => ({ ...previous, ...next }) });
         }}
+        query={<SearchInput value={draft} placeholder="Search names" onValueChange={setDraft} />}
+        filters={nameLogFilters({
+          search,
+          nodes: nodes.data?.nodes,
+          chips,
+          onSearch: setSearch,
+        })}
+        onClearFilters={(window) => {
+          setSearch({ ...search, ...window, node: "", name: "" });
+        }}
         actions={
-          <Tabs
-            variant="segmented"
-            aria-label="Group lookups by"
-            tabs={groupTabs}
-            value={search.by}
-            onValueChange={(value) => {
-              void navigate({
-                search: (previous) => ({ ...previous, by: toNameGrouping(value) }),
-                replace: true,
-              });
-            }}
-          />
+          <>
+            <GroupBySelect
+              label="Group lookups by"
+              tabs={groupTabs}
+              value={search.by}
+              onChange={(value) => {
+                void navigate({
+                  search: (previous) => ({ ...previous, by: toNameGrouping(value) }),
+                  replace: true,
+                });
+              }}
+            />
+            <LimitSelect value={pageSize} onChange={setPageSize} />
+            <ColumnsMenu
+              choices={nameColumnChoices(search.by, search.node !== "")}
+              columns={columns}
+            />
+          </>
         }
-      >
-        <SearchInput
-          className={windowSearchClass}
-          value={draft}
-          placeholder="Search names"
-          onValueChange={setDraft}
-        />
-        {nodes.data === undefined ? null : (
-          <Select
-            aria-label="Machine"
-            className="w-44"
-            value={search.node}
-            items={machineItems(nodes.data.nodes)}
-            onValueChange={(value) => {
-              setSearch({ ...search, node: value ?? "" });
-            }}
-          />
-        )}
-      </WindowToolbar>
+      />
       {isRefusedWindow(names.error) ? null : (
         <NamesFrame
           search={search}
           rows={names.data?.names ?? []}
-          chips={chips}
           onSearch={setSearch}
+          pageSize={pageSize}
+          columns={columns}
         />
       )}
     </>
   );
 }
 
-function NamesFrame({
+/**
+ * The DNS page's rows of the Filters popover: a name picked from a row, read-only, and the machine
+ * as a picker when the caller may list machines, else as the read-only id it came with.
+ */
+function nameLogFilters({
   search,
-  rows,
+  nodes,
   chips,
   onSearch,
 }: {
   readonly search: NameSearch;
-  readonly rows: readonly TrafficName[];
-  readonly chips: FilterChip[];
+  readonly nodes: readonly Node[] | undefined;
+  readonly chips: readonly FilterChip[];
   readonly onSearch: (next: NameSearch) => void;
+}): LogFilter[] {
+  const filters = chips.map((chip) => pickedFilter(chip));
+
+  if (nodes !== undefined) {
+    filters.push({
+      id: "node",
+      label: "Machine",
+      operator: "is",
+      value: (
+        <Select
+          aria-label="Machine"
+          className="w-full min-w-0"
+          value={search.node}
+          items={machineItems(nodes)}
+          onValueChange={(value) => {
+            onSearch({ ...search, node: value ?? "" });
+          }}
+        />
+      ),
+      active: search.node !== "",
+      addable: true,
+      onRemove: () => {
+        onSearch({ ...search, node: "" });
+      },
+    });
+  }
+
+  return filters;
+}
+
+function NamesFrame({
+  search,
+  rows,
+  onSearch,
+  pageSize,
+  columns,
+}: {
+  readonly search: NameSearch;
+  readonly rows: readonly TrafficName[];
+  readonly onSearch: (next: NameSearch) => void;
+  readonly pageSize: number;
+  readonly columns: HiddenColumns;
 }): ReactElement {
   const settings = useQuery(trafficSettingsQuery);
   const clear = (): void => {
@@ -202,27 +253,19 @@ function NamesFrame({
   return (
     <>
       {loggingOff && rows.length > 0 ? <DnsLoggingOffNote /> : null}
-      <Frame>
-        <FilterChips chips={chips} onClearAll={clear} />
+      <TableGroup>
         <NamesTable
           rows={rows}
           groupBy={search.by}
           empty={empty}
           oneMachine={search.node !== ""}
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>
-                {rows.length >= allRows
-                  ? `The ${allRows} most asked`
-                  : `Showing ${plural(rows.length, search.by === "node" ? "machine" : "name")}`}
-              </TableFooter>
-            )
-          }
+          pageSize={pageSize}
+          hidden={columns.hidden}
           onPick={(row) => {
             onSearch({ ...search, ...pickName(row, search.by) });
           }}
         />
-      </Frame>
+      </TableGroup>
     </>
   );
 }

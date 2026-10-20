@@ -1,11 +1,11 @@
 import type { TimeseriesData } from "@cloudflare/kumo/components/chart";
 import { ChartPalette, TimeseriesChart } from "@cloudflare/kumo/components/chart";
-import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import { clientError } from "~/components/audit/cells.tsx";
-import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { Section } from "~/components/ui/section.tsx";
+import { StatGrid, StatTile } from "~/components/ui/stat-tile.tsx";
 import { echarts } from "~/lib/echarts.ts";
 import { useDarkMode } from "~/lib/theme.ts";
 import { daySeconds, formatAbsolute, minuteSeconds, parseTime } from "~/lib/time.ts";
@@ -13,34 +13,6 @@ import { daySeconds, formatAbsolute, minuteSeconds, parseTime } from "~/lib/time
 /** One actor: the user behind the call, or the credential kind when no user is bound. */
 function actorKey(event: AuditEvent): string {
   return event.actorUserId === "" ? `${event.actorKind}:${event.actorName}` : event.actorUserId;
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  alert = false,
-}: {
-  readonly label: string;
-  readonly value: number;
-  readonly hint: string;
-  /** Draws the number in the danger colour once it is not zero. */
-  readonly alert?: boolean;
-}): ReactElement {
-  return (
-    <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4")}>
-      <span className="text-sm text-kumo-subtle">{label}</span>
-      <span
-        className={cn(
-          "text-xl font-semibold tabular-nums",
-          alert && value > 0 ? "text-kumo-danger" : "text-kumo-strong",
-        )}
-      >
-        {value}
-      </span>
-      <span className="text-sm text-kumo-subtle">{hint}</span>
-    </div>
-  );
 }
 
 /** How many bars the strip has; each is the same slice of the loaded window. */
@@ -100,12 +72,39 @@ const dayMs = daySeconds * millisecond;
 const timeOfDay = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 const dayOfMonth = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
+/** A legend entry on the chart card's band: the series' dot, its total and its name. */
+function LegendItem({
+  color,
+  value,
+  label,
+}: {
+  readonly color: string;
+  readonly value: number;
+  readonly label: string;
+}): ReactElement {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-kumo-subtle">
+      <span aria-hidden className="size-2.5 rounded-full" style={{ backgroundColor: color }} />
+      <span className="tabular-nums">{value.toLocaleString()}</span>
+      {label}
+    </span>
+  );
+}
+
 /**
- * Event volume over the loaded window, one stacked bar per slice with the failed share in the
- * attention colour: where the activity was, and whether the failures came in a burst or trickled
- * through. Kumo's chart draws the axes and tooltip; the palette follows the resolved theme.
+ * Event volume over the loaded window, as the dashboard's "Actions over time" card: one stacked bar
+ * per slice with the failed share in the attention colour, so it shows where the activity was and
+ * whether the failures came in a burst or trickled through, with the two totals as the legend on
+ * the card's band. Kumo's chart draws the axes and tooltip; the palette follows the resolved
+ * theme.
  */
-function Activity({ events }: { readonly events: readonly AuditEvent[] }): ReactElement | null {
+function Activity({
+  events,
+  failures,
+}: {
+  readonly events: readonly AuditEvent[];
+  readonly failures: number;
+}): ReactElement | null {
   const dark = useDarkMode();
   const buckets = bucketEvents(events);
   const tallest = Math.max(...buckets.map((bucket) => bucket.total));
@@ -118,22 +117,32 @@ function Activity({ events }: { readonly events: readonly AuditEvent[] }): React
   const from = first.start;
   const last = buckets.at(-1)?.start ?? from;
   const withinDay = last.getTime() - from.getTime() < dayMs;
+  const succeeded = ChartPalette.categorical(0, dark);
+  const failed = ChartPalette.semantic("Attention", dark);
   const series: TimeseriesData[] = [
     {
       name: "Succeeded",
-      color: ChartPalette.categorical(0, dark),
+      color: succeeded,
       data: buckets.map((bucket) => [bucket.start.getTime(), bucket.total - bucket.failed]),
     },
     {
       name: "Failed",
-      color: ChartPalette.semantic("Attention", dark),
+      color: failed,
       data: buckets.map((bucket) => [bucket.start.getTime(), bucket.failed]),
     },
   ];
 
   return (
-    <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4 sm:col-span-3")}>
-      <span className="text-sm text-kumo-subtle">Activity</span>
+    <Section
+      title="Actions over time"
+      actions={
+        <span className="flex flex-wrap items-center gap-4">
+          <LegendItem color={succeeded} value={events.length - failures} label="Success" />
+          <LegendItem color={failed} value={failures} label="Failed" />
+        </span>
+      }
+      bodyClassName="px-4 py-3"
+    >
       <TimeseriesChart
         echarts={echarts}
         type="bar"
@@ -146,24 +155,39 @@ function Activity({ events }: { readonly events: readonly AuditEvent[] }): React
         tooltipValueFormat={(value) => `${value} ${value === 1 ? "event" : "events"}`}
         ariaDescription={`Events over time, ${bucketCount} bars from ${formatAbsolute(from)} to now`}
       />
-    </div>
+    </Section>
   );
 }
 
+const percent = 100;
+
 /**
- * What the loaded pages add up to. The server pages the log, so these count what is on screen,
- * which is what an operator is reading through; loading more raises them.
+ * What the loaded pages add up to: the activity chart, then the totals as the dashboard's stat
+ * tiles. The server pages the log, so these count what is on screen, which is what an operator is
+ * reading through; loading more raises them.
  */
 export function AuditStats({ events }: { readonly events: readonly AuditEvent[] }): ReactElement {
   const actors = new Set(events.map((event) => actorKey(event)));
   const failures = events.filter((event) => event.outcome >= clientError).length;
+  const rate = events.length === 0 ? 0 : Math.round((failures / events.length) * percent);
 
   return (
-    <Frame className="grid gap-1 sm:grid-cols-3">
-      <Stat label="Events loaded" value={events.length} hint="In the selected range" />
-      <Stat label="Distinct actors" value={actors.size} hint="Users, machines, keys and sessions" />
-      <Stat label="Failures" value={failures} hint="HTTP status 400 or higher" alert />
-      <Activity events={events} />
-    </Frame>
+    <div className="flex flex-col gap-4">
+      <Activity events={events} failures={failures} />
+      <StatGrid className="sm:grid-cols-3">
+        <StatTile label="Events loaded" value={events.length} hint="In the selected range" />
+        <StatTile
+          label="Distinct actors"
+          value={actors.size}
+          hint="Users, machines, keys and sessions"
+        />
+        <StatTile
+          label="Failures"
+          value={failures}
+          hint={`${rate}% of loaded events, HTTP status 400 or higher`}
+          tone={failures > 0 ? "danger" : "default"}
+        />
+      </StatGrid>
+    </div>
   );
 }

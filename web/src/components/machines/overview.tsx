@@ -5,15 +5,17 @@ import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
 import type { NodeHardwareAttestation, NodeTpm } from "~/api/schema.gen.ts";
+import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
-import type { Definition } from "~/components/ui/definition-list.tsx";
+import { FactGrid } from "~/components/ui/fact-grid.tsx";
+import type { Fact } from "~/components/ui/fact-grid.tsx";
 import { OsMark } from "~/components/ui/os-mark.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
-import { isTagged, nodeName, userLabel } from "~/lib/node.ts";
+import { isTagged, userLabel } from "~/lib/node.ts";
 import { osLabel } from "~/lib/os.ts";
-import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
+import { formatRelative, parseTime } from "~/lib/time.ts";
 
 const registerMethods: Record<string, string> = {
   REGISTER_METHOD_AUTH_KEY: "Pre-auth key",
@@ -23,35 +25,37 @@ const registerMethods: Record<string, string> = {
 
 const caretSize = 14;
 
-/** How the machine was registered and who it answers to. */
+/**
+ * What the machine is and how it joined, as the settings card of a Zero Trust detail page: a grid
+ * of short facts, with the two long keys folded away under it. Its identity (name, ID, addresses,
+ * times) is in the details rail beside it, so no fact on the page is written twice.
+ */
 export function OverviewSection({ node }: { readonly node: Node }): ReactElement {
   return (
-    <Section title="Overview">
-      <DefinitionList items={overview(node)} columns={2} />
+    <Section title="Properties" bodyClassName="p-0">
+      <FactGrid facts={overview(node)} />
       <Keys node={node} />
     </Section>
   );
 }
 
-function overview(node: Node): Definition[] {
+function overview(node: Node): Fact[] {
   return [
-    { key: "hostname", label: "Hostname", value: node.name, copy: node.name },
+    { key: "hostname", label: "Hostname", value: <CopyText value={node.name} /> },
     { key: "owner", label: "Owner", value: <Owner node={node} /> },
-    { key: "id", label: "Machine ID", value: node.id, copy: node.id },
     {
       key: "method",
       label: "Registered with",
       value: registerMethods[node.registerMethod] ?? "Unknown",
     },
-    { key: "created", label: "Created", value: <Timestamp value={node.createdAt} /> },
-    { key: "expiry", label: "Key expiry", value: <Expiry node={node} /> },
-    { key: "funnel", label: "Funnel", value: <OnOff on={node.funnelEnabled} /> },
     { key: "client", label: "Client", value: <Client node={node} /> },
+    { key: "platform", label: "Platform", value: <Platform node={node} /> },
+    { key: "funnel", label: "Funnel", value: <OnOff on={node.funnelEnabled} /> },
     { key: "attestation", label: "Hardware attestation", value: <Attestation node={node} /> },
     ...(node.tpm === undefined
       ? []
-      : [{ key: "tpm", label: "TPM", value: tpmText(node.tpm), copy: tpmText(node.tpm) }]),
-    // The Preferences section carries the line that turns it on, with room to read it.
+      : [{ key: "tpm", label: "TPM", value: <span className="block">{tpmText(node.tpm)}</span> }]),
+    // The Preferences card carries the line that turns it on, with room to read it.
     { key: "remote", label: "Remote configuration", value: <OnOff on={node.remoteConfig} /> },
   ];
 }
@@ -59,46 +63,44 @@ function overview(node: Node): Definition[] {
 /**
  * The Tailscale client version the machine reported, and whether a newer stable one exists. The
  * update itself is an item in the Actions menu with the other things done to the machine; a button
- * here beside the version and the state made one row three things.
+ * here beside the version and the state made one fact three things.
  */
 function Client({ node }: { readonly node: Node }): ReactElement {
   if (node.clientVersion === "") {
     return <span className="text-kumo-subtle">Unknown until it connects</span>;
   }
 
-  const platform =
-    node.os === "" ? null : (
-      <span className="inline-flex items-center gap-1 text-xs text-kumo-subtle">
-        <OsMark os={node.os} version={node.osVersion} size={12} />
-        {osLabel(node.os, node.osVersion)}
-      </span>
-    );
-
   if (!node.updateAvailable) {
-    return (
-      <span className="inline-flex flex-col items-end gap-0.5">
-        <span>{node.clientVersion}</span>
-        {platform}
-      </span>
-    );
+    return <span>{node.clientVersion}</span>;
   }
 
   return (
-    <span className="inline-flex flex-col items-end gap-0.5">
-      <span className="inline-flex items-center gap-2">
-        <span>{node.clientVersion}</span>
-        <StatusDetail
-          tone="warning"
-          label="Update available"
-          title="A newer stable Tailscale is out"
-          detail={
-            node.online
-              ? "Update client in the Actions menu asks the machine to install it. Tailscale restarts there while it does."
-              : "Update client in the Actions menu asks the machine to install it, once it is connected again."
-          }
-        />
-      </span>
-      {platform}
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <span>{node.clientVersion}</span>
+      <StatusDetail
+        tone="warning"
+        label="Update available"
+        title="A newer stable Tailscale is out"
+        detail={
+          node.online
+            ? "Update client in the Actions menu asks the machine to install it. Tailscale restarts there while it does."
+            : "Update client in the Actions menu asks the machine to install it, once it is connected again."
+        }
+      />
+    </span>
+  );
+}
+
+/** The operating system the client reported, its mark beside the name. */
+function Platform({ node }: { readonly node: Node }): ReactElement {
+  if (node.os === "") {
+    return <span className="text-kumo-subtle">Unknown until it connects</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <OsMark os={node.os} version={node.osVersion} />
+      {osLabel(node.os, node.osVersion)}
     </span>
   );
 }
@@ -149,8 +151,8 @@ function tpmText(tpm: NodeTpm): string {
 }
 
 /**
- * A setting that is either on or off, as the other rows of this list read: the state alone. What to
- * do about an "Off" belongs where the setting is changed, not in a row of facts.
+ * A setting that is either on or off, as the other facts read: the state alone. What to do about an
+ * "Off" belongs where the setting is changed, not in a grid of facts.
  */
 function OnOff({ on }: { readonly on: boolean }): ReactElement {
   return on ? <Status tone="success">On</Status> : <span className="text-kumo-subtle">Off</span>;
@@ -162,15 +164,15 @@ function OnOff({ on }: { readonly on: boolean }): ReactElement {
  */
 function Keys({ node }: { readonly node: Node }): ReactElement {
   return (
-    <Collapsible.Root className="border-t border-kumo-hairline">
-      <Collapsible.Trigger className="group flex w-full items-center gap-1.5 px-5 py-2.5 text-left text-kumo-subtle hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none">
+    <Collapsible.Root className="border-t border-kumo-line">
+      <Collapsible.Trigger className="group flex w-full items-center gap-1.5 px-4 py-2.5 text-left text-sm text-kumo-subtle hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none">
         <CaretRightIcon size={caretSize} className="group-data-[panel-open]:rotate-90" />
         Keys
       </Collapsible.Trigger>
       <Collapsible.Panel>
         <DefinitionList
           wrap
-          className="border-t border-kumo-hairline"
+          className="border-t border-kumo-line"
           items={[
             { key: "nodeKey", label: "Node key", value: node.nodeKey, copy: node.nodeKey },
             {
@@ -186,45 +188,10 @@ function Keys({ node }: { readonly node: Node }): ReactElement {
   );
 }
 
-/** Every way to reach the machine, each one click-to-copy. */
-export function AddressesSection({ node }: { readonly node: Node }): ReactElement {
-  const addresses: Definition[] = node.ipAddresses.map((address) => ({
-    key: address,
-    label: address.includes(":") ? "IPv6" : "IPv4",
-    value: address,
-    copy: address,
-  }));
-
-  return (
-    <Section title="Addresses">
-      <DefinitionList
-        items={[
-          { key: "name", label: "Name", value: nodeName(node), copy: nodeName(node) },
-          ...addresses,
-        ]}
-      />
-    </Section>
-  );
-}
-
 function Owner({ node }: { readonly node: Node }): ReactElement {
   if (isTagged(node)) {
-    return <TagList tags={node.tags} size="sm" className="justify-end" />;
+    return <TagList tags={node.tags} size="sm" />;
   }
 
-  return <span>{userLabel(node.user)}</span>;
-}
-
-function Expiry({ node }: { readonly node: Node }): ReactElement {
-  return parseTime(node.expiry) === null ? <span>Never</span> : <Timestamp value={node.expiry} />;
-}
-
-function Timestamp({ value }: { readonly value: string | null }): ReactElement {
-  const date = parseTime(value);
-
-  return date === null ? (
-    <span className="text-kumo-subtle">Unknown</span>
-  ) : (
-    <span>{formatAbsolute(date)}</span>
-  );
+  return <span className="block truncate">{userLabel(node.user)}</span>;
 }

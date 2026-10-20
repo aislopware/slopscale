@@ -1,10 +1,11 @@
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { Avatar } from "~/components/ui/avatar.tsx";
+import { cellSecondaryClass, narrowOnlyClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
@@ -41,19 +42,15 @@ export const columns = helper.columns([
     header: "Role",
     enableSorting: true,
     cell: ({ row }) => <RoleBadge role={row.original.role} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.accessor((user) => (user.approved ? 1 : 0), {
     id: "status",
     header: "Status",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ row }) => (
-      <Badge tone={row.original.approved ? "success" : "warning"}>
-        {row.original.approved ? "Approved" : "Needs approval"}
-      </Badge>
-    ),
-    meta: { className: "whitespace-nowrap" },
+    cell: ({ row }) => <UserStatus user={row.original} />,
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.display({
     id: "groups",
@@ -65,6 +62,7 @@ export const columns = helper.columns([
         <GroupNames
           ids={groupsOfUser(groups, row.original).map((group) => group.id)}
           groups={groups}
+          emptyLabel="—"
           max={2}
         />
       );
@@ -100,7 +98,8 @@ export const columns = helper.columns([
  * The name, and under it the username and email on one line: the username is what the policy refers
  * to, the email is how the operator knows who that is. Each shows once, so a provider that uses the
  * address as the username does not print it twice. A separate Email column pushed the role and
- * status off the right edge at 1280px.
+ * status off the right edge at 1280px. There is no avatar: the dashboard's members list names each
+ * member in text alone, and a column of coloured initials only repeated the name beside it.
  */
 function NameCell({ user }: { readonly user: User }): ReactElement {
   const label = userLabel(user);
@@ -109,14 +108,23 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
   const title = [label, ...parts, provider ?? ""].filter((part) => part !== "").join(", ");
 
   return (
-    <div className="flex max-w-80 items-center gap-2.5" title={title}>
-      <Avatar name={label} id={user.id} src={user.profilePicUrl} size="xl" />
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate font-medium text-kumo-default">{label}</span>
-        {parts.length === 0 ? null : (
-          <span className="truncate text-xs text-kumo-subtle">{parts.join(" · ")}</span>
-        )}
-      </div>
+    <div className="flex max-w-80 min-w-0 flex-col gap-0.5" title={title}>
+      <span className="truncate font-medium text-kumo-default">{label}</span>
+      {parts.length === 0 ? null : <span className={cellSecondaryClass}>{parts.join(" · ")}</span>}
+      {/* A phone hides the Role and Status columns, so they take a line of their own instead
+          of sitting half under the pinned actions column. */}
+      <span className={cn("flex flex-wrap items-center gap-1.5 pt-0.5", narrowOnlyClass)}>
+        <RoleBadge role={user.role} />
+        <UserStatus user={user} />
+      </span>
     </div>
+  );
+}
+
+function UserStatus({ user }: { readonly user: User }): ReactElement {
+  return (
+    <Badge tone={user.approved ? "success" : "warning"}>
+      {user.approved ? "Approved" : "Needs approval"}
+    </Badge>
   );
 }

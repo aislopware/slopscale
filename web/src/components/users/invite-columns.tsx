@@ -1,8 +1,10 @@
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { Invite, User } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
@@ -37,6 +39,12 @@ function senderLabel(users: readonly User[] | undefined, id: string): string | n
   return user === undefined ? `#${id}` : userLabel(user);
 }
 
+function InviteStatus({ invite }: { readonly invite: Invite }): ReactElement {
+  const state = inviteState(invite);
+
+  return <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>;
+}
+
 export const inviteColumns = helper.columns([
   helper.accessor((invite) => invite.email, {
     id: "email",
@@ -45,9 +53,15 @@ export const inviteColumns = helper.columns([
     // An address has no spaces to break at, and `truncate` would set the column to the width of the
     // longest one, pushing the last columns out of the panel. It wraps inside the word instead.
     cell: ({ row }) => (
-      <span className="font-medium wrap-anywhere text-kumo-default">{row.original.email}</span>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <span className="font-medium wrap-anywhere text-kumo-default">{row.original.email}</span>
+        {/* A phone hides the Status column, so the state takes a line of its own. */}
+        <span className={cn("pt-0.5", narrowOnlyClass)}>
+          <InviteStatus invite={row.original} />
+        </span>
+      </div>
     ),
-    meta: { className: "w-[28%] min-w-52 align-top" },
+    meta: { className: "w-[28%] min-w-52" },
   }),
   helper.accessor((invite) => invite.role, {
     id: "role",
@@ -63,7 +77,7 @@ export const inviteColumns = helper.columns([
       const groups = table.options.meta?.groups;
 
       return groups === undefined ? null : (
-        <GroupNames ids={row.original.groupIds} groups={groups} max={2} />
+        <GroupNames ids={row.original.groupIds} groups={groups} emptyLabel="—" max={2} />
       );
     },
     meta: { className: "hidden lg:table-cell" },
@@ -93,12 +107,8 @@ export const inviteColumns = helper.columns([
     header: "Status",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ row }) => {
-      const state = inviteState(row.original);
-
-      return <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>;
-    },
-    meta: { className: "whitespace-nowrap" },
+    cell: ({ row }) => <InviteStatus invite={row.original} />,
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.display({
     id: "actions",

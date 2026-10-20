@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
   ArrowsClockwiseIcon,
@@ -8,9 +7,9 @@ import {
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 
@@ -38,6 +37,8 @@ export interface DeleteAction extends KeyAction {
   readonly buttonText?: string | undefined;
   /** Custom label for the menu item, defaulting to "Delete…". */
   readonly menuItemText?: string | undefined;
+  /** The credential in the dialog's inset card: whose it is and what it does. */
+  readonly summary?: ReactNode;
 }
 
 export interface EditEntry {
@@ -205,7 +206,7 @@ export function KeyActions({
           }}
         />
       )}
-      <DeleteResource
+      <DeleteDialog
         open={dialog === "delete"}
         onOpenChange={(next) => {
           if (!next) {
@@ -216,6 +217,7 @@ export function KeyActions({
         resourceName={remove.resourceName}
         deleteButtonText={remove.buttonText ?? `Delete ${remove.resourceType}`}
         isDeleting={remove.pending}
+        summary={remove.summary}
         {...(remove.error === undefined ? {} : { errorMessage: remove.error })}
         onDelete={() => {
           remove.run(close);

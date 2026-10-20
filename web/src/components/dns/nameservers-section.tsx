@@ -15,9 +15,9 @@ import {
   withoutNameserver,
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
-import { ValueDialog } from "~/components/dns/value-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { StagedAddPanel } from "~/components/ui/staged-add-panel.tsx";
 
 /** The id of the override paragraph, which explains why a disabled toggle is disabled. */
 const overrideHelpId = "dns-override-local-help";
@@ -44,103 +44,132 @@ export function NameserversSection({
   const pending = mutations.set.isPending;
 
   return (
-    <Section
-      title="Nameservers"
-      description="Global resolvers every machine uses for names outside the tailnet."
-      bodyClassName="p-0"
-      {...(canEdit
-        ? {
-            actions: (
-              <Button
-                variant="secondary"
-                icon={PlusIcon}
-                onClick={() => {
-                  mutations.set.reset();
-                  setAdding(true);
+    <>
+      {adding ? (
+        <AddNameserversPanel
+          settings={settings}
+          mutations={mutations}
+          onClose={() => {
+            setAdding(false);
+          }}
+        />
+      ) : null}
+      <Section
+        title="Nameservers"
+        description="Global resolvers every machine uses for names outside the tailnet."
+        bodyClassName="p-0"
+        {...(canEdit
+          ? {
+              actions: (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={PlusIcon}
+                  disabled={adding}
+                  onClick={() => {
+                    setAdding(true);
+                  }}
+                >
+                  Add nameserver
+                </Button>
+              ),
+            }
+          : {})}
+      >
+        <EntryList
+          canEdit={canEdit}
+          pending={pending}
+          empty={{
+            title: "No global nameservers",
+            description: "Machines keep using the resolvers they already have.",
+          }}
+          entries={settings.nameservers.map((ns) => ({
+            key: ns,
+            value: ns,
+            control: (
+              <ExitNodeToggle
+                name={ns}
+                checked={keptWithExitNode(settings, ns)}
+                disabled={!canEdit || pending || !settings.overrideLocalDns}
+                describedBy={settings.overrideLocalDns ? undefined : overrideHelpId}
+                reason={toggleReason(canEdit, settings.overrideLocalDns)}
+                pending={pending}
+                onChange={(on) => {
+                  mutations.apply(
+                    withUseWithExitNode(settings, ns, on),
+                    `${ns} ${on ? "will be used" : "will not be used"} with an exit node`,
+                  );
                 }}
-              >
-                Add nameserver
-              </Button>
+              />
             ),
-          }
-        : {})}
-    >
-      <EntryList
-        canEdit={canEdit}
-        pending={pending}
-        empty={{
-          title: "No global nameservers",
-          description: "Machines keep using the resolvers they already have.",
-        }}
-        entries={settings.nameservers.map((ns) => ({
-          key: ns,
-          value: ns,
-          control: (
-            <ExitNodeToggle
-              name={ns}
-              checked={keptWithExitNode(settings, ns)}
-              disabled={!canEdit || pending || !settings.overrideLocalDns}
-              describedBy={settings.overrideLocalDns ? undefined : overrideHelpId}
-              reason={toggleReason(canEdit, settings.overrideLocalDns)}
-              pending={pending}
-              onChange={(on) => {
+            menuLabel: `Actions for nameserver ${ns}`,
+            onRemove: () => {
+              mutations.apply(withoutNameserver(settings, ns), `Removed ${ns}`);
+            },
+          }))}
+        />
+        <SectionRow className="flex items-start justify-between gap-4 sm:gap-6">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="font-medium text-kumo-strong">Override local DNS</span>
+            <p id={overrideHelpId} className="max-w-prose text-kumo-subtle">
+              Machines use the nameservers above for every query, not only when their own resolvers
+              cannot answer. Needs at least one nameserver.
+            </p>
+          </div>
+          {/* The spacer stands where a nameserver row's remove button is, so both toggles end together. */}
+          <span className="flex h-lh shrink-0 items-center gap-3">
+            <Switch
+              aria-label="Override local DNS"
+              checked={settings.overrideLocalDns}
+              disabled={
+                !canEdit ||
+                pending ||
+                (settings.nameservers.length === 0 && !settings.overrideLocalDns)
+              }
+              transitioning={pending}
+              onCheckedChange={(on) => {
                 mutations.apply(
-                  withUseWithExitNode(settings, ns, on),
-                  `${ns} ${on ? "will be used" : "will not be used"} with an exit node`,
+                  withOverrideLocalDns(settings, on),
+                  `Override local DNS turned ${on ? "on" : "off"}`,
                 );
               }}
             />
-          ),
-          menuLabel: `Actions for nameserver ${ns}`,
-          onRemove: () => {
-            mutations.apply(withoutNameserver(settings, ns), `Removed ${ns}`);
-          },
-        }))}
-      />
-      <SectionRow className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="font-medium text-kumo-strong">Override local DNS</span>
-          <p id={overrideHelpId} className="max-w-prose text-kumo-subtle">
-            Machines use the nameservers above for every query, not only when their own resolvers
-            cannot answer. Needs at least one nameserver.
-          </p>
-        </div>
-        {/* The spacer stands where a nameserver row's remove button is, so both toggles end together. */}
-        <span className="flex h-lh shrink-0 items-center gap-3">
-          <Switch
-            aria-label="Override local DNS"
-            checked={settings.overrideLocalDns}
-            disabled={
-              !canEdit ||
-              pending ||
-              (settings.nameservers.length === 0 && !settings.overrideLocalDns)
-            }
-            transitioning={pending}
-            onCheckedChange={(on) => {
-              mutations.apply(
-                withOverrideLocalDns(settings, on),
-                `Override local DNS turned ${on ? "on" : "off"}`,
-              );
-            }}
-          />
-          {canEdit ? <EntryActionSpacer /> : null}
-        </span>
-      </SectionRow>
-      <ValueDialog
-        open={adding}
-        onOpenChange={setAdding}
-        title="Add nameserver"
-        description="An IP address, an IP with port, or a DNS-over-HTTPS URL such as https://dns.nextdns.io/abc123."
-        label="Nameserver"
-        placeholder="1.1.1.1"
-        validate={nameserverError}
-        successMessage="Nameserver added"
-        mutation={mutations.set}
-        onSubmit={(value, done) => {
-          mutations.set.mutate({ body: withNameserver(settings, value) }, { onSuccess: done });
-        }}
-      />
-    </Section>
+            {canEdit ? <EntryActionSpacer /> : null}
+          </span>
+        </SectionRow>
+      </Section>
+    </>
+  );
+}
+
+/** Nameservers staged in a panel above the list and saved as one change. */
+function AddNameserversPanel({
+  settings,
+  mutations,
+  onClose,
+}: {
+  readonly settings: DnsSettings;
+  readonly mutations: DnsMutations;
+  readonly onClose: () => void;
+}): ReactElement {
+  return (
+    <StagedAddPanel
+      title="Add nameservers"
+      description="An IP address, an IP with port, or a DNS-over-HTTPS URL such as https://dns.nextdns.io/abc123."
+      label="Nameserver"
+      placeholder="1.1.1.1"
+      validate={nameserverError}
+      existing={settings.nameservers}
+      successMessage={(count) => (count === 1 ? "Nameserver added" : `${count} nameservers added`)}
+      mutation={mutations.set}
+      onClose={onClose}
+      onSubmit={(values, done) => {
+        mutations.set.mutate(
+          { body: values.reduce((next, value) => withNameserver(next, value), settings) },
+          { onSuccess: done },
+        );
+      }}
+    />
   );
 }
 

@@ -1,7 +1,9 @@
 import { Switch } from "@cloudflare/kumo/components/switch";
+import { cn } from "@cloudflare/kumo/utils";
 import { ArrowRightIcon, ArrowsLeftRightIcon } from "@phosphor-icons/react";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Group, Posture } from "~/api/queries.ts";
@@ -13,6 +15,7 @@ import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureName } from "~/components/access/posture-model.ts";
 import { RuleMenu } from "~/components/access/rule-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -52,7 +55,26 @@ export const ruleColumns = helper.columns([
     id: "name",
     header: "Rule",
     enableSorting: true,
-    cell: ({ row }) => <NameCell rule={row.original} />,
+    cell: ({ row, table }) => {
+      const { me } = table.options.meta ?? {};
+
+      return (
+        <NameCell
+          rule={row.original}
+          state={
+            me === undefined ? null : (
+              <EnabledCell
+                rule={row.original}
+                me={me}
+                rules={table.options.meta?.rules ?? []}
+                policyFileEnforces={table.options.meta?.policyFileEnforces === true}
+                labelled
+              />
+            )
+          }
+        />
+      );
+    },
     meta: { className: "w-[26%] min-w-44 align-top" },
   }),
   helper.accessor((rule) => `${rule.sourceNames} ${rule.postureNames}`, {
@@ -96,7 +118,7 @@ export const ruleColumns = helper.columns([
   }),
   helper.accessor((rule) => (rule.enabled ? 1 : 0), {
     id: "enabled",
-    header: "Enabled",
+    header: "Status",
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row, table }) => {
@@ -111,19 +133,33 @@ export const ruleColumns = helper.columns([
         />
       );
     },
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap align-top", hideBelow: "sm" },
+  }),
+  helper.accessor((rule) => rule.updatedAt, {
+    id: "updated",
+    header: "Last edited",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    sortDescFirst: true,
+    cell: ({ row }) =>
+      isBuiltinRule(row.original) ? (
+        <span className="text-kumo-subtle">—</span>
+      ) : (
+        <span className="text-kumo-subtle">
+          <RelativeTime value={row.original.updatedAt} />
+        </span>
+      ),
+    meta: { className: "hidden whitespace-nowrap align-top xl:table-cell" },
   }),
   helper.display({
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, groups, postures, rules, policyFileEnforces } = table.options.meta ?? {};
+      const { me, rules, policyFileEnforces } = table.options.meta ?? {};
 
       return me === undefined || isBuiltinRule(row.original) ? null : (
         <RuleMenu
           rule={row.original}
-          groups={groups ?? []}
-          postures={postures ?? []}
           rules={rules ?? []}
           policyFileEnforces={policyFileEnforces === true}
           me={me}
@@ -134,13 +170,30 @@ export const ruleColumns = helper.columns([
   }),
 ]);
 
-function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
+/** The rule's name and description; on a phone, which hides the Status column, its switch too. */
+function NameCell({
+  rule,
+  state,
+}: {
+  readonly rule: AccessRule;
+  readonly state: ReactNode;
+}): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
-        <span className="font-medium whitespace-normal text-kumo-default" title={rule.name}>
-          {rule.name}
-        </span>
+        {isBuiltinRule(rule) ? (
+          <span className="font-medium whitespace-normal text-kumo-default" title={rule.name}>
+            {rule.name}
+          </span>
+        ) : (
+          <Link
+            to="/policy/rules/$ruleId"
+            params={{ ruleId: rule.id }}
+            className={cn("font-medium whitespace-normal", rowLinkClass)}
+          >
+            {rule.name}
+          </Link>
+        )}
         {isBuiltinRule(rule) ? <span className="text-xs text-kumo-subtle">Built-in</span> : null}
       </span>
       {rule.description === "" ? null : (
@@ -153,6 +206,7 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
         {protocolSummary(rule)}
       </span>
       <ExpiryLine rule={rule} />
+      {state === null ? null : <span className={cn("pt-0.5", narrowOnlyClass)}>{state}</span>}
     </div>
   );
 }
@@ -228,11 +282,14 @@ function EnabledCell({
   me,
   rules,
   policyFileEnforces,
+  labelled = false,
 }: {
   readonly rule: AccessRule;
   readonly me: Me;
   readonly rules: readonly AccessRule[];
   readonly policyFileEnforces: boolean;
+  /** Says "Enabled" or "Disabled" beside the switch, where no column heading names it. */
+  readonly labelled?: boolean;
 }): ReactElement {
   const { setRuleEnabled } = useAccessMutations();
   const [confirming, setConfirming] = useState(false);
@@ -256,20 +313,25 @@ function EnabledCell({
 
   return (
     <>
-      <Switch
-        size="sm"
-        aria-label={`${rule.name} enabled`}
-        checked={rule.enabled}
-        disabled={!can(me, "policy_file") || setRuleEnabled.isPending}
-        transitioning={setRuleEnabled.isPending}
-        onCheckedChange={(enabled) => {
-          if (!enabled && opensTailnet) {
-            setConfirming(true);
-          } else {
-            apply(enabled);
-          }
-        }}
-      />
+      <span className="flex h-lh items-center gap-2">
+        <Switch
+          size="sm"
+          aria-label={`${rule.name} enabled`}
+          checked={rule.enabled}
+          disabled={!can(me, "policy_file") || setRuleEnabled.isPending}
+          transitioning={setRuleEnabled.isPending}
+          onCheckedChange={(enabled) => {
+            if (!enabled && opensTailnet) {
+              setConfirming(true);
+            } else {
+              apply(enabled);
+            }
+          }}
+        />
+        {labelled ? (
+          <span className="text-sm text-kumo-subtle">{rule.enabled ? "Enabled" : "Disabled"}</span>
+        ) : null}
+      </span>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}

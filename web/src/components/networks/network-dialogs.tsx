@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Input, Textarea } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { useState } from "react";
@@ -17,6 +16,7 @@ import { prefixesError } from "~/components/networks/model.ts";
 import type { NetworkMutations } from "~/components/networks/mutations.ts";
 import { Callout } from "~/components/ui/callout.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import type { PickerItem } from "~/components/ui/multi-picker.tsx";
@@ -285,7 +285,7 @@ export function DeleteNetworkDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="network"

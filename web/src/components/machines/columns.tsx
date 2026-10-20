@@ -1,5 +1,7 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { Popover } from "@cloudflare/kumo/components/popover";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
 import {
   FunnelIcon,
   GlobeIcon,
@@ -19,6 +21,7 @@ import { SelectAllCheckbox, SelectRowCheckbox } from "~/components/machines/sele
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { hostedServices } from "~/components/services/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { cellSecondaryClass, narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
@@ -44,6 +47,7 @@ const helper = createAppColumnHelper<Node>();
 
 const statusOrder = { online: 0, pending: 1, suspended: 2, offline: 3, expired: 4 } as const;
 const markSize = 13;
+const popoverDelay = 150;
 /** Tags an owner cell shows before it counts the rest; the column is 18% of the table. */
 const maxOwnerTags = 2;
 
@@ -71,7 +75,7 @@ export const columns = helper.columns([
     header: "Owner",
     enableSorting: true,
     cell: ({ row }) => <OwnerCell node={row.original} />,
-    meta: { className: "w-[18%]" },
+    meta: { className: "w-[18%]", hideBelow: "sm" },
   }),
   // The hostname rides along here so a search matches it without a column of its own.
   helper.accessor((node) => [...node.ipAddresses, node.name].join(" "), {
@@ -87,6 +91,7 @@ export const columns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <StatusCell node={row.original} />,
+    meta: { hideBelow: "sm" },
   }),
   helper.accessor((node) => parseTime(node.lastSeen)?.getTime() ?? 0, {
     id: "lastSeen",
@@ -114,6 +119,12 @@ export const columns = helper.columns([
 /** The same table with the bulk-action tick boxes, for a caller that may act on a machine. */
 export const selectableColumns = helper.columns([selectColumn, ...columns]);
 
+/**
+ * The machine on one line, so a row keeps the dashboard's 44px: the OS mark, the name as the row's
+ * link and what the machine does for the tailnet as icons after it. The hostname gets a second line
+ * only where it differs from the name, the two-line cell the dashboard uses for a name and its
+ * subtitle.
+ */
 function NameCell({ node }: { readonly node: Node }): ReactElement {
   const name = nodeName(node);
 
@@ -124,17 +135,23 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
         <Link
           to="/machines/$nodeId"
           params={{ nodeId: node.id }}
-          className="block min-w-0 truncate font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
+          className={cn("block min-w-0 truncate font-medium", rowLinkClass)}
         >
           {name}
         </Link>
-      </span>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-kumo-subtle">
-        {node.name === name ? null : (
-          <span className="truncate font-mono text-xs">{node.name}</span>
-        )}
         <Attributes node={node} />
-      </div>
+      </span>
+      {node.name === name ? null : (
+        <span className={cn(cellSecondaryClass, "font-mono")}>{node.name}</span>
+      )}
+      {/* A phone hides the Owner and Status columns, so they take the lines under the name
+          instead of sitting half under the pinned actions column. */}
+      <span className={cn("pt-0.5", narrowOnlyClass)}>
+        <OwnerCell node={node} />
+      </span>
+      <span className={cn("pt-0.5", narrowOnlyClass)}>
+        <StatusCell node={node} />
+      </span>
     </div>
   );
 }
@@ -214,7 +231,7 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
   }
 
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex shrink-0 items-center gap-1 text-xs text-kumo-subtle">
       {marks}
       {pending.length === 0 ? null : (
         <Flagged
@@ -275,13 +292,56 @@ function OwnerCell({ node }: { readonly node: Node }): ReactElement {
   );
 }
 
+/**
+ * The machine's IPv4 address, click to copy, with the others one hover away: two addresses stacked
+ * made every row two lines tall, and the IPv6 one is the address an operator types least.
+ */
 function AddressCell({ node }: { readonly node: Node }): ReactElement {
+  const [first, ...rest] = node.ipAddresses.toSorted(
+    (left, right) => Number(left.includes(":")) - Number(right.includes(":")),
+  );
+
+  if (first === undefined) {
+    return <span className="text-kumo-subtle">—</span>;
+  }
+
   return (
-    <div className="flex flex-col items-start gap-0.5 whitespace-nowrap text-kumo-subtle">
-      {node.ipAddresses.map((address) => (
-        <CopyText key={address} value={address} />
-      ))}
+    <div className="flex items-center gap-1.5 whitespace-nowrap text-kumo-subtle">
+      <CopyText value={first} />
+      {rest.length === 0 ? null : <OtherAddresses name={nodeName(node)} addresses={rest} />}
     </div>
+  );
+}
+
+/** "IPv6" (or "+2") beside the first address, opening the rest, each one click to copy. */
+function OtherAddresses({
+  name,
+  addresses,
+}: {
+  readonly name: string;
+  readonly addresses: readonly string[];
+}): ReactElement {
+  const label =
+    addresses.length === 1 && addresses[0]?.includes(":") === true
+      ? "IPv6"
+      : `+${addresses.length}`;
+
+  return (
+    <Popover>
+      <Popover.Trigger
+        openOnHover
+        delay={popoverDelay}
+        aria-label={`Other addresses of ${name}`}
+        className="inline-flex h-5 items-center rounded-full px-1.5 text-xs text-kumo-subtle ring ring-kumo-line outline-none hover:text-kumo-default focus-visible:ring-2 focus-visible:ring-kumo-focus"
+      >
+        {label}
+      </Popover.Trigger>
+      <Popover.Content side="top" className="gap-1">
+        {addresses.map((address) => (
+          <CopyText key={address} value={address} className="text-kumo-default" />
+        ))}
+      </Popover.Content>
+    </Popover>
   );
 }
 
@@ -290,9 +350,9 @@ function StatusCell({ node }: { readonly node: Node }): ReactElement {
   const soon = expiryWorthShowing(parseTime(node.expiry));
 
   return (
-    <div className="flex flex-col items-start gap-1 whitespace-nowrap">
+    <div className="flex items-center gap-2 whitespace-nowrap">
       <StatusBadge status={status} />
-      {/* The badge already says the key expired; the line under it only says when. */}
+      {/* The badge already says the key expired; the words beside it only say when. */}
       {soon ? (
         <span className="text-xs text-kumo-subtle">
           {status === "expired" ? null : "Expires "}

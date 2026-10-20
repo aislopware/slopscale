@@ -1,5 +1,5 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { PlusIcon, ShieldCheckIcon, UserPlusIcon } from "@phosphor-icons/react";
+import { PlusIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -10,26 +10,20 @@ import { useUserMutations } from "~/components/users/mutations.ts";
 
 export interface QuickActionsProps {
   readonly me: Me;
-  readonly onAddMachine: () => void;
 }
 
 /**
- * The three things an operator comes here to do: Access controls, Add user, and Add machine. Adding
- * a machine is the one the page is for, so it is the only filled button, rightmost in the group;
- * the rest are secondary. Each one is hidden rather than disabled when the caller has no scope for
- * it, so the row never offers a dead end.
+ * The two things an operator comes here to add: a user and a machine. Adding a machine is the one
+ * the page is for, so it is the only filled button, rightmost in the group; the other is secondary,
+ * as the dashboard pairs its header actions. Each one is hidden rather than disabled when the
+ * caller has no scope for it, so the row never offers a dead end.
  */
-export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElement {
+export function QuickActions({ me }: QuickActionsProps): ReactElement {
   const [userOpen, setUserOpen] = useState(false);
   const userMutations = useUserMutations();
 
   return (
     <>
-      {can(me, "policy_file") ? (
-        <LinkButton href="/policy/rules" variant="secondary" icon={ShieldCheckIcon}>
-          Access controls
-        </LinkButton>
-      ) : null}
       {can(me, "users") ? (
         <>
           <Button
@@ -45,9 +39,9 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
         </>
       ) : null}
       {can(me, "auth_keys") ? (
-        <Button variant="primary" icon={PlusIcon} onClick={onAddMachine}>
+        <LinkButton href="/machines/add" variant="primary" icon={PlusIcon}>
           Add machine
-        </Button>
+        </LinkButton>
       ) : null}
     </>
   );

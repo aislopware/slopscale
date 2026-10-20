@@ -11,15 +11,16 @@ import { appColumns } from "~/components/apps/app-columns.tsx";
 import type { AppRow } from "~/components/apps/app-columns.tsx";
 import { AppDialog } from "~/components/apps/app-dialogs.tsx";
 import { useLearnedCounts } from "~/components/apps/learned.ts";
-import { countApps } from "~/components/apps/model.ts";
+import { connectorMachineCounts, totalPendingRoutes } from "~/components/apps/model.ts";
 import { useAppMutations } from "~/components/apps/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { FacetChips } from "~/components/ui/facet-chips.tsx";
+import type { Facet } from "~/components/ui/facet-chips.tsx";
 
 export interface AppsTabProps {
   readonly me: Me;
@@ -35,9 +36,14 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
   const [creating, setCreating] = useState(false);
   const mutations = useAppMutations();
   const learned = useLearnedCounts(apps, me);
+  const [facet, setFacet] = useState<AppFacet>("all");
+  const facets = useMemo(() => appFacets(apps), [apps]);
   const rows = useMemo(
-    (): AppRow[] => apps.map((app) => ({ ...app, learned: learned?.get(app.id) ?? null })),
-    [apps, learned],
+    (): AppRow[] =>
+      apps.flatMap((app) =>
+        inFacet(app, facet) ? [{ ...app, learned: learned?.get(app.id) ?? null }] : [],
+      ),
+    [apps, learned, facet],
   );
 
   const table = useAppTable({
@@ -50,31 +56,35 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
   });
 
   const total = apps.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
-      <TableToolbar
-        actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New app
-          </Button>
-        }
-      >
-        <SearchInput
-          value={search}
-          placeholder="Search by name, domain, tag or machine"
-          onValueChange={onSearchChange}
-        />
-      </TableToolbar>
-      <Frame>
+      <div className="flex flex-col gap-3">
+        {total === 0 ? null : (
+          <FacetChips label="Apps by state" facets={facets} value={facet} onChange={setFacet} />
+        )}
+        <TableToolbar
+          actions={
+            <Button
+              variant="primary"
+              icon={PlusIcon}
+              disabled={!canEdit}
+              onClick={() => {
+                setCreating(true);
+              }}
+            >
+              New app
+            </Button>
+          }
+        >
+          <SearchInput
+            value={search}
+            placeholder="Search by name, domain, tag or machine"
+            onValueChange={onSearchChange}
+          />
+        </TableToolbar>
+      </div>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -90,24 +100,55 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
                     variant="secondary"
                     onClick={() => {
                       onSearchChange("");
+                      setFacet("all");
                     }}
                   >
-                    Clear search
+                    Clear filters
                   </Button>
                 }
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countApps(total)}`}</TableFooter>
-            )
-          }
         />
-      </Frame>
+      </TableGroup>
       <AppDialog me={me} open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );
+}
+
+/** Which apps the list shows: all of them, or the ones that need the operator. */
+type AppFacet = "all" | "pending" | "offline";
+
+function inFacet(app: App, facet: AppFacet): boolean {
+  if (facet === "pending") {
+    return totalPendingRoutes(app.nodes) > 0;
+  }
+
+  if (facet === "offline") {
+    return connectorMachineCounts(app.nodes).online === 0;
+  }
+
+  return true;
+}
+
+/**
+ * The facet chips over the table, as the dashboard's Routes page counts its routes by kind: every
+ * app, the ones with routes waiting for approval and the ones no connector serves right now.
+ */
+function appFacets(apps: readonly App[]): Facet<AppFacet>[] {
+  return [
+    { value: "all", label: "Apps", count: apps.length },
+    {
+      value: "pending",
+      label: "Routes pending",
+      count: apps.filter((app) => inFacet(app, "pending")).length,
+    },
+    {
+      value: "offline",
+      label: "No connector online",
+      count: apps.filter((app) => inFacet(app, "offline")).length,
+    },
+  ];
 }
 
 /**

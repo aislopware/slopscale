@@ -1,8 +1,7 @@
-import { Banner } from "@cloudflare/kumo/components/banner";
-import { WarningIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
+import { Callout } from "~/components/ui/callout.tsx";
 
 interface Warning {
   readonly title: string;
@@ -49,11 +48,9 @@ export function ClientWarnings({ node }: { readonly node: Node }): ReactElement 
         const warning = describe(flag);
 
         return (
-          <Banner
+          <Callout
             key={flag}
-            size="sm"
-            variant="alert"
-            icon={<WarningIcon />}
+            tone="warning"
             title={warning.title}
             description={warning.description}
           />

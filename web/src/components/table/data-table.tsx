@@ -1,14 +1,20 @@
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
-import { ArrowDownIcon, ArrowsDownUpIcon, ArrowUpIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CaretUpDownIcon, CaretUpIcon } from "@phosphor-icons/react";
 import type { RowData, SortDirection } from "@tanstack/react-table";
 import { useEffect, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { AppTableInstance } from "~/components/table/app-table.tsx";
-import { PagingBand, smallestPageSize } from "~/components/table/paging.tsx";
+import { PagingBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
+import {
+  hideBelowClasses,
+  pinnedEdgeClass,
+  tableClass,
+  tableRowClass,
+} from "~/components/table/styles.ts";
+import type { HideBelow } from "~/components/table/styles.ts";
 
 export interface DataTableProps<TData extends RowData> {
   /**
@@ -19,8 +25,9 @@ export interface DataTableProps<TData extends RowData> {
   /** Rendered in place of the body when the (filtered) model is empty. */
   readonly empty: ReactNode;
   /**
-   * Rendered on the band under the panel: "Showing N of M". A table with enough rows to page shows
-   * the range, the page size and the paging controls there instead.
+   * A line of the table's own for the band at the foot of the card, such as "The 10 busiest" and a
+   * link to the whole list on a preview table. Without it, and on any table with more rows than one
+   * page holds, the band is the dashboard's: "Showing x-y of z", the rows per page and the pager.
    */
   readonly footer?: ReactNode;
   /** Adds a click handler and pointer cursor to every row. */
@@ -31,22 +38,33 @@ export interface DataTableProps<TData extends RowData> {
    */
   readonly isRowClickable?: ((rowId: string) => boolean) | undefined;
   /**
-   * Drawn on the header row after the first column, such as the actions for the ticked rows next to
-   * the select-all box. It stays mounted, so a dialog inside it outlives the selection it acts on.
+   * A band inside the card above the header row, such as the actions for the ticked rows: the
+   * dashboard's DNS bulk bar, which takes the place of the info band and leaves the column headings
+   * where they are. It stays mounted, so a dialog inside it outlives the selection it acts on.
    */
   readonly headerOverlay?: ReactNode;
-  /**
-   * Whether the overlay stands in for the other headings. They keep their room, invisible, so no
-   * column changes width and no row moves when the overlay comes and goes.
-   */
+  /** Whether the overlay stands in the band; while it does not, it stays mounted, hidden. */
   readonly overlayShown?: boolean;
+  /**
+   * What the band says while no rows are ticked, the dashboard's info band ("You have used 169 of
+   * 3,500 records"). The band is always there on a table with an overlay, so ticking the first row
+   * does not push the rows down under the pointer.
+   */
+  readonly headerInfo?: ReactNode;
+  /**
+   * The rows per page a log toolbar's "Limit" sets: the table follows it, and the band leaves its
+   * own "Per page" out so the choice is made in one place.
+   */
+  readonly pageSize?: number;
 }
 
 /**
- * Renders the table with Kumo's table parts, as the panel of the Frame it sits in, with the footer
- * on the band below. Columns declare `meta.className` for cell widths and alignment, `meta.numeric`
- * for a column of figures, `meta.sticky` to pin a column to an edge and `enableSorting` for a
- * sortable header; everything else is the column's `cell` renderer.
+ * The Cloudflare dashboard's DataTable: Kumo's table parts styled by `tableClass` in the card
+ * `TableScroll` draws, with the "Showing x-y of z", rows per page and pager band inside the card's
+ * foot. Columns declare `meta.className` for cell widths and alignment, `meta.numeric` for a column
+ * of figures, `meta.sticky` to pin a column to an edge (the row's ⋯ menu, 50px), `meta.hideBelow`
+ * for a column a phone can do without and `enableSorting` for a sortable header; everything else is
+ * the column's `cell` renderer. A row whose checkbox is ticked takes the tint fill.
  */
 export function DataTable<TData extends RowData>({
   table,
@@ -56,37 +74,47 @@ export function DataTable<TData extends RowData>({
   isRowClickable,
   headerOverlay,
   overlayShown = false,
+  headerInfo,
+  pageSize,
 }: DataTableProps<TData>): ReactElement {
   const { rows } = table.getRowModel();
   const pinnedRight = table
     .getAllColumns()
     .some((column) => column.columnDef.meta?.sticky === "right");
-  // What the rows on the page depend on, by value: a state read hands back a fresh array for a slice
-  // that did not change, and the instance itself is rebuilt on every render, so a reference would
-  // make this look changed every time.
-  const shows = `${table.state.globalFilter ?? ""}|${JSON.stringify(table.state.columnFilters)}|${table.getRowCount()}`;
-  const shown = useRef(shows);
-  const { setPageIndex } = table;
-
-  // Back to the first page whenever the rows change under the table: a search, a filter or a
-  // narrower collection. The row model's own reset cannot do this, because a page rebuilds its
-  // filtered array on every render and a new array is not new data.
-  useEffect(() => {
-    if (shown.current !== shows) {
-      shown.current = shows;
-      setPageIndex(0);
-    }
-  }, [shows, setPageIndex]);
+  useFirstPageOnNewRows(table);
+  useFollowPageSize(table, pageSize);
 
   return (
-    <>
-      <TableScroll pinnedRight={pinnedRight} below={rows.length === 0 ? empty : null}>
+    // A container while there is a band above the header, so its actions can fold to icons.
+    <div className={cn("flex min-w-0 flex-col", headerOverlay !== undefined && "@container")}>
+      <TableScroll
+        pinnedRight={pinnedRight}
+        header={
+          headerOverlay === undefined ? null : (
+            <div
+              data-slot="table-header-band"
+              className="flex min-h-12 items-center border-b border-kumo-line bg-kumo-base px-4 py-2"
+            >
+              <div className={cn("w-full min-w-0 items-center", overlayShown ? "flex" : "hidden")}>
+                {headerOverlay}
+              </div>
+              {overlayShown ? null : (
+                <p className="text-kumo-subtle">
+                  {headerInfo ?? "Tick rows to act on several at once."}
+                </p>
+              )}
+            </div>
+          )
+        }
+        below={rows.length === 0 ? empty : null}
+        footer={pageBand(table, footer, pageSize !== undefined)}
+      >
         {(overflowing) => (
-          <Table className={frameTableClass}>
-            <Table.Header variant="compact">
+          <Table className={tableClass}>
+            <Table.Header>
               {table.getHeaderGroups().map((group) => (
                 <Table.Row key={group.id}>
-                  {group.headers.map((header, index) => {
+                  {group.headers.map((header) => {
                     const { meta } = header.column.columnDef;
 
                     return (
@@ -95,11 +123,7 @@ export function DataTable<TData extends RowData>({
                         {...(meta?.sticky === undefined ? {} : { sticky: meta.sticky })}
                         // A column whose cells sit at the top still has its heading on the
                         // header row's line, so `align-top` in the meta reaches the cells alone.
-                        className={cn(
-                          cellClass(meta, overflowing),
-                          "align-middle",
-                          overlayShown && index > 0 && "invisible",
-                        )}
+                        className={cn(cellClass(meta, overflowing), "align-middle")}
                       >
                         {header.isPlaceholder ? null : (
                           <HeaderContent
@@ -111,13 +135,6 @@ export function DataTable<TData extends RowData>({
                             <table.FlexRender header={header} />
                           </HeaderContent>
                         )}
-                        {index === 0 && headerOverlay !== undefined ? (
-                          // w-max, because an absolute box left at the cell's edge would otherwise
-                          // shrink to the room left inside the cell, which is none.
-                          <div className="absolute inset-y-0 left-full flex w-max items-center">
-                            {headerOverlay}
-                          </div>
-                        ) : null}
                       </Table.Head>
                     );
                   })}
@@ -131,7 +148,7 @@ export function DataTable<TData extends RowData>({
                 return (
                   <Table.Row
                     key={row.id}
-                    className={cn(frameTableRowClass, clickable && "cursor-pointer")}
+                    className={cn(tableRowClass, clickable && "cursor-pointer")}
                     onClick={
                       !clickable || onRowClick === undefined
                         ? undefined
@@ -170,45 +187,91 @@ export function DataTable<TData extends RowData>({
           </Table>
         )}
       </TableScroll>
-      <PageBand table={table} fallback={footer} />
-    </>
+    </div>
   );
+}
+
+/**
+ * Back to the first page whenever the rows change under the table: a search, a filter or a narrower
+ * collection. The row model's own reset cannot do this, because a page rebuilds its filtered array
+ * on every render and a new array is not new data.
+ */
+function useFirstPageOnNewRows<TData extends RowData>(table: AppTableInstance<TData>): void {
+  // What the rows on the page depend on, by value: a state read hands back a fresh array for a slice
+  // that did not change, and the instance itself is rebuilt on every render, so a reference would
+  // make this look changed every time.
+  const shows = `${table.state.globalFilter ?? ""}|${JSON.stringify(table.state.columnFilters)}|${table.getRowCount()}`;
+  const shown = useRef(shows);
+  const { setPageIndex } = table;
+
+  useEffect(() => {
+    if (shown.current !== shows) {
+      shown.current = shows;
+      setPageIndex(0);
+    }
+  }, [shows, setPageIndex]);
+}
+
+/**
+ * The toolbar's Limit lives with the page, the rows per page with the table; this keeps the table
+ * on the toolbar's choice.
+ */
+function useFollowPageSize<TData extends RowData>(
+  table: AppTableInstance<TData>,
+  pageSize: number | undefined,
+): void {
+  const { setPageSize } = table;
+  const current = table.state.pagination.pageSize;
+
+  useEffect(() => {
+    if (pageSize !== undefined && current !== pageSize) {
+      setPageSize(pageSize);
+    }
+  }, [pageSize, current, setPageSize]);
 }
 
 /** The classes a column asks for, in the order that lets `meta.className` override the convention. */
 function cellClass(
   meta:
-    | { readonly className?: string; readonly numeric?: boolean; readonly sticky?: string }
+    | {
+        readonly className?: string;
+        readonly numeric?: boolean;
+        readonly sticky?: string;
+        readonly hideBelow?: HideBelow;
+      }
     | undefined,
   overflowing: boolean,
 ): string {
   return cn(
     meta?.numeric === true && "text-right tabular-nums",
-    // The hairline reads as the pinned column's edge, so it appears only while there is something
-    // scrolled behind it.
-    meta?.sticky === "right" && overflowing && pinnedEdgeClass,
+    // The fade reads as the pinned column's edge, so it is drawn only while something is scrolled
+    // behind it; Kumo's own fade is wider than the dashboard's.
+    meta?.sticky === "right" && (overflowing ? pinnedEdgeClass : "before:hidden"),
+    meta?.hideBelow === undefined ? undefined : hideBelowClasses[meta.hideBelow],
     meta?.className,
   );
 }
 
 /**
- * The band under the panel: the page's own count while the rows fit the smallest page, and the
- * range with the page size and the paging controls once there are enough rows to page.
+ * The band at the foot of the card: the range, the rows per page and the pager, on every table that
+ * has rows, a short one included (design spec §13.3). A table with a line of its own, a preview of
+ * a longer list, shows that line instead while its rows fit one page.
  */
-function PageBand<TData extends RowData>({
-  table,
-  fallback,
-}: {
-  readonly table: AppTableInstance<TData>;
-  readonly fallback: ReactNode;
-}): ReactNode {
+function pageBand<TData extends RowData>(
+  table: AppTableInstance<TData>,
+  custom: ReactNode,
+  hidePageSize: boolean,
+): ReactNode {
   const total = table.getRowCount();
+  const { pageIndex, pageSize } = table.state.pagination;
 
-  if (total <= smallestPageSize) {
-    return fallback;
+  if (total === 0) {
+    return null;
   }
 
-  const { pageIndex, pageSize } = table.state.pagination;
+  if (custom !== undefined && custom !== null && total <= pageSize) {
+    return custom;
+  }
 
   return (
     <PagingBand
@@ -221,6 +284,7 @@ function PageBand<TData extends RowData>({
       setPageSize={(size) => {
         table.setPageSize(size);
       }}
+      hidePageSize={hidePageSize}
     />
   );
 }
@@ -249,9 +313,7 @@ function HeaderContent({
       type="button"
       onClick={onToggle}
       className={cn(
-        "group/sort inline-flex h-6 items-center gap-1 rounded-sm px-1.5 hover:bg-kumo-tint hover:text-kumo-default focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
-        // The padding is pulled back off the cell's inset, so the label starts where a cell's text does.
-        numeric ? "-mr-1.5" : "-ml-1.5",
+        "group/sort inline-flex h-6 items-center gap-1.5 rounded-sm hover:text-kumo-default focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
         sorted !== false && "text-kumo-default",
       )}
     >
@@ -263,24 +325,17 @@ function HeaderContent({
 }
 
 /**
- * The direction the column is sorted in. An unsorted column keeps the icon's room but only shows it
- * under the pointer or the keyboard, so a wide table's headers read as words rather than as
- * arrows.
+ * The sort caret beside a sortable heading: the 12px up-down caret at half strength while the
+ * column is not sorted, a single caret in the heading's own colour once it is.
  */
 function SortIcon({ sorted }: { readonly sorted: false | SortDirection }): ReactElement {
   if (sorted === "asc") {
-    return <ArrowUpIcon size={14} aria-label="Sorted ascending" />;
+    return <CaretUpIcon size={12} weight="bold" aria-label="Sorted ascending" />;
   }
 
   if (sorted === "desc") {
-    return <ArrowDownIcon size={14} aria-label="Sorted descending" />;
+    return <CaretDownIcon size={12} weight="bold" aria-label="Sorted descending" />;
   }
 
-  return (
-    <ArrowsDownUpIcon
-      size={14}
-      aria-hidden
-      className="text-kumo-subtle opacity-0 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100"
-    />
-  );
+  return <CaretUpDownIcon size={12} aria-hidden className="opacity-50" />;
 }

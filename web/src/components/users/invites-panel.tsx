@@ -1,4 +1,3 @@
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -8,16 +7,15 @@ import type { Me } from "~/auth/me.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
-import { TableFooter } from "~/components/table/toolbar.tsx";
-import { Frame, FrameBand } from "~/components/ui/frame.tsx";
+import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { inviteColumns } from "~/components/users/invite-columns.tsx";
 import { openInvites } from "~/components/users/invites.ts";
 
 /**
- * The invitations that have not been used yet, under the users table. An accepted one is a user row
- * above, so only the open ones are listed; the whole panel is absent for a reader who could not
- * send one anyway.
+ * The invitations that have not been used yet, under the users table, as a layered card: the title
+ * and the count on the grey band, the table resting in it. An accepted one is a user row above, so
+ * only the open ones are listed; the whole card is absent for a reader who could not send one
+ * anyway.
  */
 export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null {
   const readable = can(me, "users:read");
@@ -43,30 +41,21 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
   }
 
   return (
-    <Frame>
-      {/* px-5 puts the title where the first column's text starts. */}
-      <FrameBand className="px-5 pt-1.5 pb-2">
-        <h2 className="font-semibold text-kumo-strong">Pending invitations</h2>
-        <p className="text-kumo-subtle">
-          An invitation becomes a user the first time its link is opened.
-        </p>
-      </FrameBand>
+    <Section
+      title="Pending invitations"
+      meta={rows.length === 0 ? undefined : plural(rows.length, "invitation")}
+      description="An invitation becomes a user the first time its link is opened."
+      panel={false}
+    >
       <DataTable
         table={table}
         empty={
-          <Empty
-            className={tableEmptyClass}
-            size="sm"
+          <SectionEmpty
             title="No invitations waiting"
             description="An invitation stays here until it is used, revoked or expired."
           />
         }
-        footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter>{`Showing ${plural(rows.length, "invitation")}`}</TableFooter>
-          )
-        }
       />
-    </Frame>
+    </Section>
   );
 }

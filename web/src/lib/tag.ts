@@ -12,7 +12,7 @@ const namePattern = /^[a-z][a-z0-9._-]*$/u;
 /** Commas and whitespace, the two ways a list of tags gets pasted. */
 const separators = /[\s,]+/u;
 
-/** The prefix and the name apart, so the prefix can be drawn lighter than the name. */
+/** The prefix and the name apart, so a search can match the name alone. */
 export function splitTag(tag: string): { readonly prefix: string; readonly name: string } {
   return tag.startsWith(tagPrefix)
     ? { prefix: tagPrefix, name: tag.slice(tagPrefix.length) }

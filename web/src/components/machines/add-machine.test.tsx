@@ -1,29 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
-import type { Me } from "~/auth/me.ts";
 import { CreatedKey } from "~/components/keys/created-key.tsx";
-import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { connectCommand, joinInstructions, platforms } from "~/components/machines/connect.ts";
-
-/** No users:read, so the dialog asks for a user id instead of loading the user list. */
-const operator: Me = {
-  kind: "session",
-  role: "admin",
-  allAccess: false,
-  scoped: false,
-  scopes: [],
-  permissions: { auth_keys: true, "devices:core": true },
-};
-
-/** The dialog loads users and groups when allowed, so it needs a query client around it. */
-function queried(element: ReactElement): ReactElement {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-
-  return <QueryClientProvider client={client}>{element}</QueryClientProvider>;
-}
 
 describe(connectCommand, () => {
   it("points the machine at this console with the key it was given", () => {
@@ -33,46 +12,14 @@ describe(connectCommand, () => {
   });
 });
 
-describe(CreatePreAuthKeyDialog, () => {
-  it("is titled for the machine, not the key, when adding a machine", async () => {
-    const screen = await render(
-      queried(
-        <CreatePreAuthKeyDialog
-          me={operator}
-          intent="add-machine"
-          open
-          onOpenChange={() => {
-            // The page owns the dialog.
-          }}
-        />,
-      ),
-    );
-
-    await expect.element(screen.getByRole("dialog", { name: "Add machine" })).toBeVisible();
-  });
-
-  it("keeps the key wording for the keys page", async () => {
-    const screen = await render(
-      queried(
-        <CreatePreAuthKeyDialog
-          me={operator}
-          open
-          onOpenChange={() => {
-            // The page owns the dialog.
-          }}
-        />,
-      ),
-    );
-
-    await expect.element(screen.getByRole("dialog", { name: "Create pre-auth key" })).toBeVisible();
-  });
-});
-
 describe(CreatedKey, () => {
   it("hands over the join command per platform with a QR code", async () => {
+    const key = "hskey-auth-abc123-s3cr3tv4lu3";
+    const masked = `hskey-auth-abc123-${"•".repeat(16)}`;
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
     const screen = await render(
       <CreatedKey
-        value="secret"
+        value={key}
         note="Shown once."
         join
         onDone={() => {
@@ -81,16 +28,22 @@ describe(CreatedKey, () => {
       />,
     );
 
+    // Design spec §13.15.12: the command shows the key masked and copies it whole.
     await expect
-      .element(screen.getByText(`sudo ${connectCommand("secret")}`, { exact: false }))
+      .element(screen.getByText(`sudo ${connectCommand(masked)}`, { exact: false }))
       .toBeVisible();
+    expect(screen.container.querySelector("code")?.textContent).not.toContain("s3cr3t");
+
+    await screen.getByRole("button", { name: "Copy command" }).click();
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining(connectCommand(key)));
     await expect
       .element(screen.getByRole("img", { name: "QR code with the server address" }))
       .not.toBeInTheDocument();
 
     await screen.getByRole("tab", { name: "Docker" }).click();
 
-    await expect.element(screen.getByText("TS_AUTHKEY=secret", { exact: false })).toBeVisible();
+    await expect.element(screen.getByText(`TS_AUTHKEY=${masked}`, { exact: false })).toBeVisible();
 
     await screen.getByRole("tab", { name: "iOS and Android" }).click();
 

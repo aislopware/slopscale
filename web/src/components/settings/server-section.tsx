@@ -5,11 +5,11 @@ import type { ReactElement, ReactNode } from "react";
 
 import { api } from "~/api/client.ts";
 import type { ServerInfo } from "~/api/queries.ts";
-import { CopyText } from "~/components/ui/copy-text.tsx";
+import { Card } from "~/components/ui/card.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 
@@ -55,10 +55,23 @@ function Stacked({
   );
 }
 
+/** A full git hash is 40 characters, wider than a phone's row; 12 still names one commit. */
+const shortCommitLength = 12;
+
+/** The commit as git abbreviates it, a build string that is not a hash as it is. */
+function shortCommit(commit: string): string {
+  return /^[0-9a-f]{40}$/u.test(commit) ? commit.slice(0, shortCommitLength) : commit;
+}
+
 function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[] {
   return [
-    { label: "Version", value: info.version, copy: info.version },
-    { label: "Commit", value: info.commit, copy: info.commit },
+    { label: "Version", value: info.version, copy: info.version, copyLabel: "Copy version" },
+    {
+      label: "Commit",
+      value: <span title={info.commit}>{shortCommit(info.commit)}</span>,
+      copy: info.commit,
+      copyLabel: "Copy commit",
+    },
     {
       label: "Running since",
       value: <RelativeTime value={info.startedAt} />,
@@ -81,28 +94,50 @@ function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[]
 
 function networkItems(info: ServerInfo): readonly Definition[] {
   return [
-    { label: "Server URL", value: <UrlText url={info.serverUrl} />, copy: info.serverUrl },
-    { label: "Listening on", value: info.listenAddr, copy: info.listenAddr },
-    { label: "IPv4 range", value: info.ipv4Prefix, copy: info.ipv4Prefix },
-    { label: "IPv6 range", value: info.ipv6Prefix, copy: info.ipv6Prefix },
+    {
+      label: "Server URL",
+      value: <UrlText url={info.serverUrl} />,
+      copy: info.serverUrl,
+      copyLabel: "Copy server URL",
+    },
+    {
+      label: "Listening on",
+      value: info.listenAddr,
+      copy: info.listenAddr,
+      copyLabel: "Copy listen address",
+    },
+    {
+      label: "IPv4 range",
+      value: info.ipv4Prefix,
+      copy: info.ipv4Prefix,
+      copyLabel: "Copy IPv4 range",
+    },
+    {
+      label: "IPv6 range",
+      value: info.ipv6Prefix,
+      copy: info.ipv6Prefix,
+      copyLabel: "Copy IPv6 range",
+    },
     ...(info.baseDomain === ""
       ? [{ label: "Base domain", value: <Muted>None</Muted> }]
-      : [{ label: "Base domain", value: info.baseDomain, copy: info.baseDomain }]),
+      : [
+          {
+            label: "Base domain",
+            value: info.baseDomain,
+            copy: info.baseDomain,
+            copyLabel: "Copy base domain",
+          },
+        ]),
     { label: "MagicDNS", value: info.magicDns ? "On" : <Muted>Off</Muted> },
     { label: "TLS", value: tlsLabels[info.tls] ?? info.tls },
-    {
-      label: "Identity provider",
-      value:
-        info.oidcIssuer === "" ? (
-          <Muted>None. Users are created by hand.</Muted>
-        ) : (
-          <CopyText
-            value={info.oidcIssuer}
-            display={<UrlText url={info.oidcIssuer} />}
-            label="Copy the issuer URL"
-          />
-        ),
-    },
+    info.oidcIssuer === ""
+      ? { label: "Identity provider", value: <Muted>None. Users are created by hand.</Muted> }
+      : {
+          label: "Identity provider",
+          value: <UrlText url={info.oidcIssuer} />,
+          copy: info.oidcIssuer,
+          copyLabel: "Copy the issuer URL",
+        },
   ];
 }
 
@@ -198,37 +233,93 @@ function LatestClient({ info }: { readonly info: ServerInfo }): ReactElement {
   return <span>{info.latestClientVersion}</span>;
 }
 
-/** The build, addresses and config file values of the running server. */
+/** The parts of the server page, in the order `ServerSection` renders them. */
+export const serverParts = [
+  { id: "build", label: "Build" },
+  { id: "network", label: "Network" },
+  { id: "policy", label: "Policy and clients" },
+  { id: "relays", label: "Relays" },
+] as const;
+
+/** A part of the server page: its facts as the dashboard's account details rows on a card. */
+function FactsGroup({
+  id,
+  title,
+  description,
+  docs,
+  items,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly docs?: string;
+  readonly items: readonly Definition[];
+}): ReactElement {
+  return (
+    <SettingsGroup
+      id={id}
+      title={title}
+      {...(description === undefined ? {} : { description })}
+      {...(docs === undefined ? {} : { docs })}
+    >
+      <Card>
+        <DefinitionList items={items} />
+      </Card>
+    </SettingsGroup>
+  );
+}
+
+/**
+ * The build, addresses and config file values of the running server, one part each. Values from the
+ * config file change only with a restart; the rest is read live.
+ */
 export function ServerSection({ info }: { readonly info: ServerInfo }): ReactElement {
   const health = api.useQuery("get", "/api/v1/health");
   const reachable = health.data?.databaseConnectivity === true;
-  const items: readonly Definition[] = [
-    ...buildItems(info, reachable),
-    ...networkItems(info),
-    ...policyItems(info),
-    {
-      label: "DERP relays",
-      wrap: true,
-      value: (
-        <Stacked note={info.derpServer ? "Embedded relay running" : "Embedded relay off"}>
-          <Link to="/relays/map" className={cn(inlineLinkClass, "flex items-center gap-1")}>
-            {info.derpRegions === 0
-              ? "No regions"
-              : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
-            <ArrowRightIcon size={linkIconSize} aria-hidden />
-          </Link>
-        </Stacked>
-      ),
-    },
-  ];
 
   return (
-    <Section
-      title="Server"
-      description="Values from the config file change only with a restart; the rest is read live."
-      bodyClassName="p-0"
-    >
-      <DefinitionList items={items} />
-    </Section>
+    <>
+      <FactsGroup
+        id="build"
+        title="Build"
+        description="What is running and since when. Values from the config file change only with a restart; the rest is read live."
+        items={buildItems(info, reachable)}
+      />
+      <FactsGroup
+        id="network"
+        title="Network"
+        docs="ref/configuration"
+        description="Where clients reach the server and the addresses it hands out."
+        items={networkItems(info)}
+      />
+      <FactsGroup
+        id="policy"
+        title="Policy and clients"
+        docs="ref/policy"
+        description="Where the policy lives and how the server treats clients."
+        items={policyItems(info)}
+      />
+      <FactsGroup
+        id="relays"
+        title="Relays"
+        docs="ref/derp"
+        items={[
+          {
+            label: "DERP relays",
+            wrap: true,
+            value: (
+              <Stacked note={info.derpServer ? "Embedded relay running" : "Embedded relay off"}>
+                <Link to="/relays/map" className={cn(inlineLinkClass, "flex items-center gap-1")}>
+                  {info.derpRegions === 0
+                    ? "No regions"
+                    : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
+                  <ArrowRightIcon size={linkIconSize} aria-hidden />
+                </Link>
+              </Stacked>
+            ),
+          },
+        ]}
+      />
+    </>
   );
 }

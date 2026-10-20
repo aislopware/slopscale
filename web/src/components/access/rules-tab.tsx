@@ -1,22 +1,19 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { AccessRule, Group, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
 import { ruleColumns, toRuleRows } from "~/components/access/rule-columns.tsx";
-import { RuleDialog } from "~/components/access/rule-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 
 export interface RulesTabProps {
   readonly me: Me;
@@ -41,8 +38,6 @@ export function RulesTab({
 }: RulesTabProps): ReactElement {
   const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
   const enabled = rules.filter((rule) => rule.enabled).length;
   const rows = useMemo(() => toRuleRows(rules, groups, postures), [rules, groups, postures]);
 
@@ -56,23 +51,20 @@ export function RulesTab({
   });
 
   const total = rules.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
       <StateBanner enabled={enabled} policyFileEnforces={policyFileEnforces} />
       <TableToolbar
         actions={
-          <Button
+          <LinkButton
+            href="/policy/rules/new"
             variant="primary"
             icon={PlusIcon}
             disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
           >
             New rule
-          </Button>
+          </LinkButton>
         }
       >
         <SearchInput
@@ -81,7 +73,7 @@ export function RulesTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -114,27 +106,10 @@ export function RulesTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countRules(total)}`}</TableFooter>
-            )
-          }
         />
-      </Frame>
-      <RuleDialog
-        groups={groups}
-        postures={postures}
-        policyFileEnforces={policyFileEnforces}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
+      </TableGroup>
     </>
   );
-}
-
-function countRules(total: number): string {
-  return total === 1 ? "1 rule" : `${total} rules`;
 }
 
 /** What the tailnet does right now, so a disabled last rule is never a surprise. */

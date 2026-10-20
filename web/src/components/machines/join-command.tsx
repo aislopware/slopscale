@@ -35,7 +35,7 @@ export function JoinCommand({ authKey }: { readonly authKey: string }): ReactEle
       <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
         <div className="flex min-w-0 flex-col gap-1.5">
           {instructions.command === null ? null : (
-            <CommandBox command={instructions.command} wrap />
+            <CommandBox command={instructions.command} secret={authKey} wrap />
           )}
           <p className="text-kumo-subtle">{instructions.note}</p>
           {instructions.command === null ? null : (

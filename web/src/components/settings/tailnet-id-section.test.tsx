@@ -8,9 +8,9 @@ describe(TailnetIDSection, () => {
     const screen = await render(<TailnetIDSection tailnetId="T4bXk29QaZmCNTRL" />);
 
     await expect.element(screen.getByText("Tailnet ID")).toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: "Copy T4bXk29QaZmCNTRL" }))
-      .toBeVisible();
+    await expect.element(screen.getByText("T4bXk29QaZmCNTRL")).toBeVisible();
+    // Design spec §6: the copy control is in view, not only on hover.
+    await expect.element(screen.getByRole("button", { name: "Copy tailnet ID" })).toBeVisible();
     await expect.element(screen.getByText("CurrentTailnet.StableID")).toBeVisible();
   });
 });

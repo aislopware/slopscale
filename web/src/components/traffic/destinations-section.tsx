@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { DestinationGrouping, TrafficDestination } from "~/api/traffic.ts";
 import { DestinationsTable } from "~/components/traffic/destinations-table.tsx";
 import { destinationTabs, toDestinationGrouping } from "~/components/traffic/search.ts";
-import { Section } from "~/components/ui/section.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 
 /** The groupings a section offers: every view of "where", none of "who". */
 const whereTabs = destinationTabs
@@ -60,6 +60,7 @@ export function DestinationsSection({
   groupBy,
   whole,
   footer,
+  actions,
   oneMachine = false,
   onGroupChange,
   onPick,
@@ -70,16 +71,22 @@ export function DestinationsSection({
   readonly groupBy: DestinationGrouping;
   readonly whole: number;
   readonly footer?: ReactNode;
+  /** Links beside the grouping, such as one to the whole list. */
+  readonly actions?: ReactNode;
   readonly oneMachine?: boolean;
   readonly onGroupChange: (by: DestinationGrouping) => void;
   readonly onPick: (row: TrafficDestination) => void;
 }): ReactElement {
   return (
-    <Section
+    <PageSection
       title={title}
       description={description}
-      actions={<GroupingPicker tabs={whereTabs} value={groupBy} onChange={onGroupChange} />}
-      panel={false}
+      actions={
+        <div className="flex items-center gap-4">
+          {actions}
+          <GroupingPicker tabs={whereTabs} value={groupBy} onChange={onGroupChange} />
+        </div>
+      }
     >
       <DestinationsTable
         rows={rows}
@@ -89,6 +96,6 @@ export function DestinationsSection({
         oneMachine={oneMachine}
         onPick={onPick}
       />
-    </Section>
+    </PageSection>
   );
 }

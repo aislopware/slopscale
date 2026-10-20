@@ -9,10 +9,8 @@ import { nodeAppConnectorRoutesQuery } from "~/api/queries.ts";
 import type { App, Node } from "~/api/queries.ts";
 import { appsForNode, learnedForApp, learnedRoutes } from "~/components/apps/model.ts";
 import type { LearnedRoute } from "~/components/apps/model.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
@@ -134,11 +132,6 @@ function LearnedRoutesSection({ node }: { readonly node: Node }): ReactElement {
               void routes.refetch();
             }}
           />
-        }
-        footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter>{`Showing ${plural(rows.length, "domain")}`}</TableFooter>
-          )
         }
       />
     </Section>

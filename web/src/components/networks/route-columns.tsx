@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { cn } from "@cloudflare/kumo/utils";
 import { CaretDownIcon, CaretRightIcon, GlobeIcon, PathIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -18,6 +19,7 @@ import {
 import type { RouteAdvertiser, RouteGroup, RoutesRow } from "~/components/networks/routes-model.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
@@ -55,15 +57,26 @@ export const routeColumns = helper.columns([
     id: "route",
     header: "Route",
     enableSorting: true,
+    // A phone hides the Status column, so the state takes a line of its own under the route, or in
+    // the route's place on a machine's row the group unfolds into.
     cell: ({ row }) =>
       isRouteGroup(row.original) ? (
-        <RouteCell
-          group={row.original}
-          expandable={row.getCanExpand()}
-          expanded={row.getIsExpanded()}
-          onToggle={row.getToggleExpandedHandler()}
-        />
-      ) : null,
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <RouteCell
+            group={row.original}
+            expandable={row.getCanExpand()}
+            expanded={row.getIsExpanded()}
+            onToggle={row.getToggleExpandedHandler()}
+          />
+          <span className={cn("pt-0.5 pl-5", narrowOnlyClass)}>
+            <StatusCell row={row.original} />
+          </span>
+        </div>
+      ) : (
+        <span className={cn("pl-5", narrowOnlyClass)}>
+          <StatusCell row={row.original} />
+        </span>
+      ),
     meta: { className: "w-[28%] min-w-44" },
   }),
   helper.accessor(machineNames, {
@@ -86,7 +99,7 @@ export const routeColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <StatusCell row={row.original} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.display({
     id: "actions",

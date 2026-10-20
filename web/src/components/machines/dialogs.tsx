@@ -1,5 +1,3 @@
-// DeleteResource is exported from the package root only.
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
@@ -10,7 +8,7 @@ import type { Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import type { useNodeMutations } from "~/components/machines/mutations.ts";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -21,7 +19,7 @@ import {
 import { TagField } from "~/components/ui/tag-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { dnsLabelIssue } from "~/lib/dns-label.ts";
-import { nodeLabel, nodeName } from "~/lib/node.ts";
+import { nodeLabel, nodeName, ownerLabel } from "~/lib/node.ts";
 
 type Mutations = ReturnType<typeof useNodeMutations>;
 
@@ -46,10 +44,10 @@ export function FormFooter({
     // Enter in a text input presses the hidden submitter, so it holds what the visible button does:
     // a form nobody can submit by button is not one Enter can submit either.
     <DialogFooter submitDisabled={disabled || pending}>
-      <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       <Button type="submit" variant="primary" loading={pending} disabled={disabled}>
         {label}
       </Button>
+      <DialogClose render={<Button variant="secondary">Cancel</Button>} />
     </DialogFooter>
   );
 }
@@ -359,7 +357,9 @@ export function BulkClientUpdateDialog({
 
 /**
  * Removing a machine is not undoable and the tailnet keeps working without it, so it asks for the
- * name to be typed rather than for one more click.
+ * name to be typed rather than for one more click. The dialog repeats the machine in an inset
+ * summary card, as the dashboard's Networking deletes do (a route's CIDR, a tunnel's name and ID),
+ * so the operator sees which of several similar names they are about to remove.
  */
 export function DeleteDialog({
   node,
@@ -368,17 +368,25 @@ export function DeleteDialog({
   mutations,
 }: NodeDialogProps): ReactElement {
   const { remove } = mutations;
+  const name = nodeName(node);
 
   return (
-    <DeleteResource
+    <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      resourceType="machine"
-      resourceName={nodeName(node)}
-      deleteButtonText="Remove machine"
-      isDeleting={remove.isPending}
-      {...(remove.isError ? { errorMessage: errorMessage(remove.error) } : {})}
-      onDelete={() => {
+      title={`Remove ${name}?`}
+      description="The machine leaves the tailnet with its routes and shares. It can register again with a new key."
+      summary={
+        <ConfirmSummary name={name}>
+          <span className="font-mono text-xs">{node.ipAddresses.join(" · ")}</span>
+          <span>{ownerLabel(node)}</span>
+        </ConfirmSummary>
+      }
+      confirmLabel="Remove machine"
+      loading={remove.isPending}
+      error={remove.isError ? errorMessage(remove.error) : undefined}
+      confirmName={name}
+      onConfirm={() => {
         remove.mutate({ params: { path: { nodeId: node.id } } });
       }}
     />

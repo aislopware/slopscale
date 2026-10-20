@@ -7,7 +7,7 @@ import { RulesTab } from "~/components/access/rules-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/policy/rules")({
+export const Route = createFileRoute("/_app/policy/rules/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([
@@ -39,6 +39,7 @@ function RulesPage(): ReactElement {
     <>
       <PageHeader
         title="Rules"
+        docs="ref/access-control"
         description="Each rule opens ports from a set of sources to a set of destinations. The policy file covers whatever the rules leave out."
         meta={enabled === 1 ? "1 rule enabled" : `${enabled} rules enabled`}
       />

@@ -2,44 +2,36 @@ import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
-import { seededColours } from "~/lib/hue.ts";
-import { splitTag, tagHueSteps } from "~/lib/tag.ts";
-
-const sizes = {
-  /** For the second line of a table cell and a dense list. */
-  sm: "h-5 px-1.5 text-xs",
-  /** For a page header, a definition list and a form. */
-  base: "h-6 px-2 text-sm",
-} as const;
+/**
+ * One chip size everywhere, the tag input's (design spec §7.1): 20px tall, 13px text. A dense table
+ * once drew 18px chips at 12px, smaller than the tags the operator typed in; `sm` stays as a name
+ * for the callers that ask for it.
+ */
+const chipSize = "h-5 px-2 text-sm";
+const sizes = { sm: chipSize, base: chipSize } as const;
 
 export type TagSize = keyof typeof sizes;
 
-/** The chip's colours for a tag: the same tag is the same hue on every page. */
-export function tagColours(tag: string): ReturnType<typeof seededColours> {
-  return seededColours(tag, tagHueSteps);
-}
+/**
+ * The Cloudflare dashboard's tag chip, the one its tag input draws: a 20px pill in the info tint
+ * with the text in the info blue (light blue on dark blue in dark mode). Every tag is the same
+ * colour; the name tells them apart. Shared with the tag field's chips, so a tag looks the same
+ * being entered and being shown.
+ */
+export const tagChipClass = "rounded-full bg-kumo-info-tint text-kumo-info";
 
 /**
- * The words of a tag with the `tag:` prefix stepped back, so a row of tags reads by its names and
- * the prefix still says what kind of thing it is. Used inside `Tag` and inside a picker's chips.
+ * The words of a tag in one colour, prefix and name alike, the way the dashboard's tag input draws
+ * its chips; the name already tells two tags apart. Used inside `Tag` and inside a picker's chips.
  */
 export function TagText({ tag }: { readonly tag: string }): ReactElement {
-  const { prefix, name } = splitTag(tag);
-
-  return (
-    <span className="truncate">
-      {prefix === "" ? null : <span className="opacity-60">{prefix}</span>}
-      {name}
-    </span>
-  );
+  return <span className="truncate">{tag}</span>;
 }
 
 /**
- * An ACL tag as a chip in a tint seeded by its name, so `tag:prod` is the same colour in every
- * table, page and picker and two tags tell apart before they are read. A tag is the one identifier
- * the console draws as a chip: it is a label by nature, the policy hands it out and the machines
- * wear it, whereas a domain or a route is a value and stays text. The corner radius is the
- * controls', not a pill's, so it sits with the badges and inputs around it.
+ * An ACL tag as the dashboard's tag chip. A tag is the one identifier the console draws as a chip:
+ * it is a label by nature, the policy hands it out and the machines wear it, whereas a domain or a
+ * route is a value and stays text.
  */
 export function Tag({
   tag,
@@ -54,11 +46,11 @@ export function Tag({
     <span
       title={tag}
       className={cn(
-        "inline-flex max-w-full min-w-0 shrink items-center rounded-md leading-none font-medium whitespace-nowrap ring ring-kumo-line ring-inset",
+        "inline-flex max-w-full min-w-0 shrink items-center leading-none whitespace-nowrap",
+        tagChipClass,
         sizes[size],
         className,
       )}
-      style={tagColours(tag)}
     >
       <TagText tag={tag} />
     </span>

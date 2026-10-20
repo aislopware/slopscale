@@ -253,10 +253,10 @@ function EditOAuthClientForm({
       />
       <DialogError message={update.isError ? errorMessage(update.error) : undefined} />
       <DialogFooter submitDisabled={!canSubmit || update.isPending}>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" disabled={!canSubmit} loading={update.isPending}>
           Save
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

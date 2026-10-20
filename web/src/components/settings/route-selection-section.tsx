@@ -3,8 +3,8 @@ import type { ReactElement } from "react";
 
 import type { Settings } from "~/api/queries.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 type RouteSelection = Settings["routeSelection"];
@@ -46,44 +46,47 @@ export function RouteSelectionSection({
   const current = settings.routeSelection;
 
   return (
-    <Section
+    <SettingsGroup
+      id="route-selection"
       title="Route selection"
+      docs="ref/console"
       description="Which machine each client uses when several serve the same subnet, app connector or service."
-      bodyClassName="p-0"
     >
-      <SettingRow
-        title="Mode"
-        description={descriptions[current]}
-        control={
-          <Select
-            aria-label="Route selection"
-            value={current}
-            disabled={!canEdit || update.isPending}
-            renderValue={(value) => labels[modes.find((mode) => mode === value) ?? current]}
-            onValueChange={(value) => {
-              const mode = modes.find((known) => known === value);
-              if (mode === undefined || mode === current) {
-                return;
-              }
+      <SettingsCard>
+        <SettingsRow
+          title="Mode"
+          description={descriptions[current]}
+          control={
+            <Select
+              aria-label="Route selection"
+              value={current}
+              disabled={!canEdit || update.isPending}
+              renderValue={(value) => labels[modes.find((mode) => mode === value) ?? current]}
+              onValueChange={(value) => {
+                const mode = modes.find((known) => known === value);
+                if (mode === undefined || mode === current) {
+                  return;
+                }
 
-              update.mutate(
-                { body: { routeSelection: mode } },
-                {
-                  onSuccess: () => {
-                    toast.success(`Route selection set to ${labels[mode]}`);
+                update.mutate(
+                  { body: { routeSelection: mode } },
+                  {
+                    onSuccess: () => {
+                      toast.success(`Route selection set to ${labels[mode]}`);
+                    },
                   },
-                },
-              );
-            }}
-          >
-            {modes.map((mode) => (
-              <Select.Option key={mode} value={mode}>
-                {labels[mode]}
-              </Select.Option>
-            ))}
-          </Select>
-        }
-      />
-    </Section>
+                );
+              }}
+            >
+              {modes.map((mode) => (
+                <Select.Option key={mode} value={mode}>
+                  {labels[mode]}
+                </Select.Option>
+              ))}
+            </Select>
+          }
+        />
+      </SettingsCard>
+    </SettingsGroup>
   );
 }

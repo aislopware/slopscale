@@ -81,6 +81,7 @@ function RoutesPage(): ReactElement {
     <>
       <PageHeader
         title="Routes"
+        docs="ref/routes"
         description="Every route any machine advertises, approved or waiting. Routes a network owns are approved by that network."
         meta={pending === 1 ? "1 route pending" : `${pending} routes pending`}
       />

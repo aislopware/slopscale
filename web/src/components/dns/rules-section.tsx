@@ -7,12 +7,13 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { DnsRule, Group } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
+import { AddressList, ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
-import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 
 type Dialog = "closed" | "new" | { readonly edit: DnsRule } | { readonly remove: DnsRule };
 
@@ -41,12 +42,13 @@ export function DnsRulesSection({
     <Section
       title="Split DNS per group"
       description="Split DNS that only the machines in some groups receive, on top of the split DNS above."
-      bodyClassName="p-0"
+      panel={false}
       {...(canEdit
         ? {
             actions: (
               <Button
                 variant="secondary"
+                size="sm"
                 icon={PlusIcon}
                 onClick={() => {
                   setDialog("new");
@@ -58,40 +60,38 @@ export function DnsRulesSection({
           }
         : {})}
     >
-      {rules.length === 0 ? (
-        <SectionEmpty
-          title="No group DNS rules"
-          description="Every machine resolves names the same way."
-        />
-      ) : (
-        rules.map((rule) => (
-          <SectionRow key={rule.id} className="flex items-center justify-between gap-4 py-2.5">
-            <RuleSummary rule={rule} groups={groups} />
-            {canEdit ? (
-              <RowMenu label={`Actions for DNS rule ${rule.name}`}>
-                <DropdownMenu.Item
-                  icon={PencilSimpleIcon}
-                  onClick={() => {
-                    setDialog({ edit: rule });
-                  }}
-                >
-                  Edit…
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator />
-                <DropdownMenu.Item
-                  icon={TrashIcon}
-                  variant="danger"
-                  onClick={() => {
-                    setDialog({ remove: rule });
-                  }}
-                >
-                  Delete…
-                </DropdownMenu.Item>
-              </RowMenu>
-            ) : null}
-          </SectionRow>
-        ))
-      )}
+      <ListTable
+        columns={[
+          { key: "name", label: "Rule", className: "w-[22%]" },
+          { key: "domains", label: "Domains" },
+          { key: "servers", label: "Nameservers" },
+          { key: "groups", label: "Groups", className: "w-[18%] min-w-32" },
+        ]}
+        actions={canEdit}
+        empty={
+          rules.length === 0 ? (
+            <SectionEmpty
+              title="No group DNS rules"
+              description="Every machine resolves names the same way."
+            />
+          ) : null
+        }
+      >
+        {rules.map((rule) => (
+          <RuleRow
+            key={rule.id}
+            rule={rule}
+            groups={groups}
+            canEdit={canEdit}
+            onEdit={() => {
+              setDialog({ edit: rule });
+            }}
+            onRemove={() => {
+              setDialog({ remove: rule });
+            }}
+          />
+        ))}
+      </ListTable>
       <DnsRuleDialog
         key={editing?.id ?? "new"}
         rule={editing}
@@ -104,10 +104,13 @@ export function DnsRulesSection({
         open={removing !== undefined}
         onOpenChange={close}
         title="Delete DNS rule?"
-        description={
-          removing === undefined
-            ? ""
-            : `The machines in its groups stop using ${removing.name}'s nameservers for ${removing.domains.join(", ")}.`
+        description="The machines in its groups stop using its nameservers for these domains."
+        summary={
+          removing === undefined ? undefined : (
+            <ConfirmSummary name={removing.name}>
+              <span className="font-mono text-xs">{removing.domains.join(", ")}</span>
+            </ConfirmSummary>
+          )
         }
         confirmLabel="Delete"
         loading={mutations.remove.isPending}
@@ -129,30 +132,54 @@ export function DnsRulesSection({
   );
 }
 
-function RuleSummary({
+/** One group DNS rule: its name and state, domains, resolvers, groups and menu. */
+function RuleRow({
   rule,
   groups,
+  canEdit,
+  onEdit,
+  onRemove,
 }: {
   readonly rule: DnsRule;
   readonly groups: readonly Group[];
+  readonly canEdit: boolean;
+  readonly onEdit: () => void;
+  readonly onRemove: () => void;
 }): ReactElement {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <span className="flex items-center gap-2">
-        <span className="truncate font-medium text-kumo-strong">{rule.name}</span>
-        {rule.enabled ? null : <span className="text-xs text-kumo-subtle">Disabled</span>}
-      </span>
-      <div className="grid min-w-0 gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-        <span className="flex min-w-0 flex-wrap gap-1">
+    <ListRow>
+      <ListCell>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate font-medium text-kumo-default">{rule.name}</span>
+          {rule.enabled ? null : <span className="text-xs text-kumo-subtle">Disabled</span>}
+        </span>
+      </ListCell>
+      <ListCell>
+        <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
           {rule.domains.map((domain) => (
             <Domain key={domain} domain={domain} />
           ))}
         </span>
-        <span className="min-w-0 font-mono text-sm break-all text-kumo-subtle">
-          {rule.nameservers.join(", ")}
-        </span>
-      </div>
-      <GroupNames ids={rule.groupIds} groups={groups} emptyLabel="No group" />
-    </div>
+      </ListCell>
+      <ListCell className="font-mono text-sm text-kumo-subtle">
+        <AddressList addresses={rule.nameservers} />
+      </ListCell>
+      <ListCell>
+        <GroupNames ids={rule.groupIds} groups={groups} emptyLabel="No group" />
+      </ListCell>
+      {canEdit ? (
+        <ListCell actions>
+          <RowMenu label={`Actions for DNS rule ${rule.name}`}>
+            <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
+              Edit…
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item icon={TrashIcon} variant="danger" onClick={onRemove}>
+              Delete…
+            </DropdownMenu.Item>
+          </RowMenu>
+        </ListCell>
+      ) : null}
+    </ListRow>
   );
 }

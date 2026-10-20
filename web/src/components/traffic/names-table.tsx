@@ -4,6 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { NameGrouping, TrafficName } from "~/api/traffic.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import type { ColumnChoice } from "~/components/table/log-view.tsx";
 import { formatCount, shareLabel } from "~/components/traffic/format.ts";
 import { trafficNodeLabel, trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
@@ -129,6 +130,19 @@ function columnsFor(
   ]);
 }
 
+/**
+ * The columns a grouping can show that a reader may switch off, for the toolbar's Columns menu. The
+ * key and the lookups, which the rows are sorted by, always show.
+ */
+export function nameColumnChoices(groupBy: NameGrouping, oneMachine: boolean): ColumnChoice[] {
+  return [
+    { id: "failed", label: "Failed" },
+    ...(groupBy === "name" && !oneMachine ? [{ id: "machines", label: "Machines" }] : []),
+  ];
+}
+
+const noneHidden: ReadonlySet<string> = new Set();
+
 /** The names machines looked up through the gateways' resolvers, or the machines that looked. */
 export function NamesTable({
   rows,
@@ -137,6 +151,8 @@ export function NamesTable({
   empty,
   oneMachine = false,
   onPick,
+  pageSize,
+  hidden = noneHidden,
 }: {
   readonly rows: readonly TrafficName[];
   readonly groupBy: NameGrouping;
@@ -145,6 +161,10 @@ export function NamesTable({
   readonly footer?: ReactNode;
   readonly empty?: ReactNode;
   readonly onPick?: (row: TrafficName) => void;
+  /** The rows per page the toolbar's Limit sets. */
+  readonly pageSize?: number;
+  /** The columns switched off in the toolbar's Columns menu. */
+  readonly hidden?: ReadonlySet<string>;
 }): ReactElement {
   const widths = useWidths();
   const byId = new Map(rows.map((row) => [nameKey(row, groupBy), row]));
@@ -156,14 +176,20 @@ export function NamesTable({
   };
   const table = useAppTable({
     data: rows,
-    columns: columnsFor(groupBy, oneMachine, widths),
+    columns: columnsFor(groupBy, oneMachine, widths).filter(
+      (column) => column.id === undefined || !hidden.has(column.id),
+    ),
     getRowId: (row) => nameKey(row, groupBy),
-    initialState: { sorting: [{ id: "queries", desc: true }] },
+    initialState: {
+      sorting: [{ id: "queries", desc: true }],
+      ...(pageSize === undefined ? {} : { pagination: { pageIndex: 0, pageSize } }),
+    },
   });
 
   return (
     <DataTable
       table={table}
+      {...(pageSize === undefined ? {} : { pageSize })}
       empty={
         empty ?? (
           <SectionEmpty

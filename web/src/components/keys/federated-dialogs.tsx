@@ -35,6 +35,7 @@ import {
   DialogFooter,
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { TagField } from "~/components/ui/tag-field.tsx";
 
@@ -113,7 +114,7 @@ export function FederatedIdentityFields({
           value={issuer}
           placeholder="https://token.actions.githubusercontent.com"
           description="The https URL of the OIDC provider that signs workload tokens."
-          {...(issuerError === undefined ? {} : { error: issuerError })}
+          {...fieldError(issuerError)}
           onChange={(event) => {
             onIssuerChange(event.target.value);
           }}
@@ -250,10 +251,10 @@ function CreateFederatedIdentityForm({
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
       <DialogFooter submitDisabled={!canSubmit || create.isPending}>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" disabled={!canSubmit} loading={create.isPending}>
           Create identity
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

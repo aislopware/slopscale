@@ -102,7 +102,7 @@
       }
     },
     {
-      "files": ["src/routes/**/*.tsx"],
+      "files": ["src/routes/**/*.tsx", "src/auth/guard.ts"],
       "rules": { "typescript/only-throw-error": "off" }
     },
     {

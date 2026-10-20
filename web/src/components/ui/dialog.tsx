@@ -12,27 +12,25 @@ export const DialogTrigger = Dialog.Trigger;
 export const DialogClose = Dialog.Close;
 
 /**
- * The dialog is a Frame: Kumo's dialog surface is the tinted band, with the 4px inset and the
- * 12px/8px radii of a Frame. Kumo pins it 2rem (4rem from sm) below the top edge with no height
- * limit, so a long form on a short screen would run off the bottom; the panel's body scrolls
+ * Kumo's dialog as the Cloudflare dashboard's form dialog (Add DNS record): a white panel 64px from
+ * the top over the light recessed wash Kumo already draws, 12px corners, 32px of padding. Kumo sets
+ * no height limit, so a long form on a short screen would run off the bottom; the body scrolls
  * instead, and the dialog stops the same distance from the bottom edge as it starts from the top.
  */
 export const dialogFrameClass =
-  "flex max-h-[calc(100svh-4rem)] flex-col bg-kumo-elevated p-1 ring-kumo-hairline sm:max-h-[calc(100svh-8rem)]";
+  "flex max-h-[calc(100svh-4rem)] flex-col sm:max-h-[calc(100svh-8rem)]";
 
-/** The inset panel: the header and the body, on the band. */
-export const dialogPanelClass =
-  "flex min-h-0 flex-col overflow-hidden rounded-lg bg-kumo-base shadow-xs ring ring-kumo-line";
+/** The header and the body, above the actions. */
+export const dialogPanelClass = "flex min-h-0 flex-col";
 
-export const dialogHeaderClass =
-  "flex items-center justify-between gap-4 border-b border-kumo-line px-6 py-4";
+/** The 24px title with the close button at its right, 32px in from the panel's edges. */
+export const dialogHeaderClass = "flex items-start justify-between gap-4 px-8 pt-8 pb-2";
 
 /**
- * The actions, on the band under the panel, the way a Frame's band carries what belongs to the
- * panel but is not its content. px-6 plus the band's 4px puts the last button's edge under the edge
- * of the panel's text, which sits 24px inside the panel.
+ * The actions, under the body and outside its scroll: left-aligned, the primary first and Cancel
+ * after it, each at least 96px wide, as the dashboard's form dialogs have them.
  */
-export const dialogActionsClass = "flex justify-end gap-3 px-6 pt-3 pb-2";
+export const dialogActionsClass = "flex flex-wrap justify-start gap-2 px-8 pt-4 pb-8 *:min-w-24";
 
 export interface DialogContentProps {
   readonly title: string;
@@ -42,13 +40,13 @@ export interface DialogContentProps {
   readonly children: ReactNode;
 }
 
-/** Where a {@link DialogFooter} lands: the band under the panel, once it exists. */
+/** Where a {@link DialogFooter} lands: the actions row under the body, once it exists. */
 const FooterSlotContext = createContext<HTMLDivElement | null>(null);
 
 /**
- * Kumo's dialog framed: the header and the body on an inset panel, the {@link DialogFooter} on the
- * band under it. Always render it, driven by `open` on the root, so the open/close animation
- * plays.
+ * Kumo's dialog with the dashboard's form-dialog layout: the title and the close button, the body,
+ * and the {@link DialogFooter} under the body where a long form cannot scroll it away. Always render
+ * it, driven by `open` on the root, so the open/close animation plays.
  */
 export function DialogContent({
   title,
@@ -58,7 +56,7 @@ export function DialogContent({
   children,
 }: DialogContentProps): ReactElement {
   // The slot exists before the first render, so the footer is in the first committed tree rather
-  // than one render later; the band adopts it on mount.
+  // than one render later; the actions row adopts it on mount.
   const slot = useMemo(() => {
     const node = document.createElement("div");
 
@@ -71,28 +69,19 @@ export function DialogContent({
     <Dialog size={size} className={cn(dialogFrameClass, className)}>
       <div className={dialogPanelClass}>
         <div className={dialogHeaderClass}>
-          <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
+          <Dialog.Title className="text-2xl font-semibold text-kumo-default">{title}</Dialog.Title>
           <Dialog.Close
-            render={
-              <Button
-                variant="ghost"
-                shape="square"
-                size="sm"
-                icon={XIcon}
-                aria-label="Close"
-                className="-m-1"
-              />
-            }
+            render={<Button variant="secondary" shape="square" icon={XIcon} aria-label="Close" />}
           />
         </div>
         <DialogBody description={description}>
           <FooterSlotContext value={slot}>{children}</FooterSlotContext>
         </DialogBody>
       </div>
-      {/* The footer is written inside the body and lands here through a portal. */}
+      {/* The footer is written inside the body and lands here, out of its scroll, through a portal. */}
       <div
-        ref={(band) => {
-          band?.append(slot);
+        ref={(actions) => {
+          actions?.append(slot);
         }}
       />
     </Dialog>
@@ -100,9 +89,9 @@ export function DialogContent({
 }
 
 /**
- * The scrolling part of a dialog. When the form is taller than the screen, a hairline shadow under
- * the header and above the panel's bottom edge says so, because a body clipped flush against an
- * edge looks like the end of the form.
+ * The scrolling part of a dialog. When the form is taller than the screen, a soft shadow under the
+ * header and above the actions says so, because a body clipped flush against an edge looks like the
+ * end of the form.
  */
 function DialogBody({
   description,
@@ -115,7 +104,7 @@ function DialogBody({
 
   return (
     <div className="relative flex min-h-0 flex-col">
-      <div ref={ref} className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
+      <div ref={ref} className="flex min-h-0 flex-col gap-4 overflow-y-auto px-8 py-4">
         {description === undefined ? null : (
           <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
             {description}
@@ -189,10 +178,10 @@ function useScrollEdges(): ScrollEdges {
 }
 
 /**
- * Gives every submit button on the band the form the anchor belongs to. A button that left its form
- * when it moved to the band has no form owner, so the browser would not submit for it; with the
- * `form` attribute it is the form's own button again, submitter, validation and all. The click
- * listener catches a button that appeared after the effect ran, before its activation.
+ * Gives every submit button in the actions row the form the anchor belongs to. A button that left
+ * its form when it moved to the actions row has no form owner, so the browser would not submit for
+ * it; with the `form` attribute it is the form's own button again, submitter, validation and all.
+ * The click listener catches a button that appeared after the effect ran, before its activation.
  */
 function useFormOwner(
   actions: HTMLDivElement | null,
@@ -247,10 +236,10 @@ export interface DialogFooterProps extends ComponentProps<"div"> {
 }
 
 /**
- * The actions of a dialog. It is written inside the body, at the end of the form when there is one,
- * and shows on the band under the panel. A hidden submit button stays where it was written: as the
- * form's first submit button it is what Enter presses, and it says which form the buttons on the
- * band submit.
+ * The actions of a dialog, primary first and Cancel after it. It is written inside the body, at the
+ * end of the form when there is one, and shows under the body. A hidden submit button stays where
+ * it was written: as the form's first submit button it is what Enter presses, and it says which
+ * form the buttons on the actions row submit.
  */
 export function DialogFooter({
   className,

@@ -153,16 +153,7 @@ describe(NeedsAttention, () => {
 
 describe(GetStarted, () => {
   it("fills the server URL into the command", async () => {
-    const screen = await render(
-      app(
-        <GetStarted
-          me={admin}
-          onAddMachine={() => {
-            // The dialog belongs to the page.
-          }}
-        />,
-      ),
-    );
+    const screen = await render(app(<GetStarted me={admin} />));
 
     await expect
       .element(
@@ -174,20 +165,11 @@ describe(GetStarted, () => {
         ),
       )
       .toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Create key" })).toBeEnabled();
+    await expect.element(screen.getByRole("link", { name: "Create key" })).toBeVisible();
   });
 
   it("offers the sign-in command without the scope", async () => {
-    const screen = await render(
-      app(
-        <GetStarted
-          me={reader}
-          onAddMachine={() => {
-            // The dialog belongs to the page.
-          }}
-        />,
-      ),
-    );
+    const screen = await render(app(<GetStarted me={reader} />));
 
     await expect
       .element(
@@ -199,8 +181,6 @@ describe(GetStarted, () => {
         ),
       )
       .toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: "Create key" }))
-      .not.toBeInTheDocument();
+    await expect.element(screen.getByRole("link", { name: "Create key" })).not.toBeInTheDocument();
   });
 });

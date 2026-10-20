@@ -11,6 +11,8 @@ import { SSHRecordingSection } from "~/components/settings/ssh-recording-section
 import { TailnetIDSection } from "~/components/settings/tailnet-id-section.tsx";
 import { TailnetLockSection } from "~/components/settings/tailnet-lock-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { SettingsLayout } from "~/components/ui/settings-layout.tsx";
+import type { SettingsPart } from "~/components/ui/settings-layout.tsx";
 
 export const Route = createFileRoute("/_app/settings/tailnet")({
   loader: async ({ context }) => {
@@ -30,13 +32,25 @@ function TailnetSettingsPage(): ReactElement {
   const info = useSuspenseQuery(serverInfoQuery).data;
   const canEdit = can(me, "feature_settings");
 
+  const parts: SettingsPart[] = [
+    { id: "general", label: "General" },
+    { id: "approval", label: "Approval" },
+    { id: "device-trust", label: "Device trust" },
+    { id: "key-expiry", label: "Key expiry" },
+    { id: "route-selection", label: "Route selection" },
+    { id: "ssh-recording", label: "SSH recording" },
+    { id: "tailnet-lock", label: "Tailnet lock" },
+    ...(lock.enabled ? [{ id: "danger-zone", label: "Danger zone", danger: true }] : []),
+  ];
+
   return (
     <>
       <PageHeader
         title="Tailnet"
+        docs="ref/console"
         description="The tailnet's ID, who may join, what a machine must prove, how long a login lasts, which router each machine uses and whether SSH sessions are recorded."
       />
-      <div className="flex flex-col gap-6">
+      <SettingsLayout parts={parts}>
         <TailnetIDSection tailnetId={info.tailnetId} />
         <ApprovalSection settings={settings} canEdit={canEdit} />
         <DeviceTrustSection settings={settings} canEdit={canEdit} />
@@ -44,7 +58,7 @@ function TailnetSettingsPage(): ReactElement {
         <RouteSelectionSection settings={settings} canEdit={canEdit} />
         <SSHRecordingSection settings={settings} canEdit={canEdit} />
         <TailnetLockSection lock={lock} canEdit={canEdit} />
-      </div>
+      </SettingsLayout>
     </>
   );
 }

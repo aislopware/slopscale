@@ -218,6 +218,10 @@ export interface AuditFilters {
   readonly action: string;
   /** Keep events by this user id; "" for every actor. */
   readonly actorUserId: string;
+  /** Keep events about this kind of object (`node`, `user`); "" for every kind. */
+  readonly targetKind: string;
+  /** Keep events about the object with this id, of the kind above; "" for any. */
+  readonly targetId: string;
   readonly range: AuditRange;
 }
 
@@ -251,6 +255,8 @@ export function auditQuery(
             limit: auditPageSize,
             ...(filters.action === "" ? {} : { action: filters.action }),
             ...(filters.actorUserId === "" ? {} : { actorUserId: filters.actorUserId }),
+            ...(filters.targetKind === "" ? {} : { targetKind: filters.targetKind }),
+            ...(filters.targetId === "" ? {} : { targetId: filters.targetId }),
             ...(filters.range === "all" ? {} : { since: hoursAgo(rangeHours[filters.range]) }),
             ...(pageParam === "" ? {} : { before: pageParam }),
           },
@@ -500,6 +506,14 @@ export function auditExportUrl(filters: AuditFilters, format: AuditExportFormat)
 
   if (filters.actorUserId !== "") {
     query.set("actorUserId", filters.actorUserId);
+  }
+
+  if (filters.targetKind !== "") {
+    query.set("targetKind", filters.targetKind);
+  }
+
+  if (filters.targetId !== "") {
+    query.set("targetId", filters.targetId);
   }
 
   if (filters.range !== "all") {

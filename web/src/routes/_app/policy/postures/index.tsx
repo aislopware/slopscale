@@ -7,7 +7,7 @@ import { PosturesTab } from "~/components/access/postures-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/policy/postures")({
+export const Route = createFileRoute("/_app/policy/postures/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([
@@ -36,6 +36,7 @@ function PosturesPage(): ReactElement {
     <>
       <PageHeader
         title="Postures"
+        docs="ref/device-trust"
         description="Conditions a machine must meet before a rule applies to it, such as a current client, a known serial number or a weekly window."
         meta={postures.length === 1 ? "1 posture" : `${postures.length} postures`}
       />

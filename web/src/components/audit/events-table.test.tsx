@@ -8,8 +8,11 @@ import {
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
+import { userEvent } from "vitest/browser";
 
 import type { AuditEvent } from "~/api/queries.ts";
+import { logDate } from "~/components/audit/cells.tsx";
+import type { AuditColumnId } from "~/components/audit/columns.tsx";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import type { EventsTableProps } from "~/components/audit/events-table.tsx";
 import { formatAbsolute } from "~/lib/time.ts";
@@ -130,8 +133,8 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("Console session")).toBeVisible();
     await expect.element(screen.getByText("node.delete")).toBeVisible();
     await expect.element(screen.getByText("reason=retired")).toBeVisible();
-    await expect.element(screen.getByText("Success")).toBeVisible();
-    await expect.element(screen.getByText("Failed")).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "Success" })).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "Failed" })).toBeVisible();
   });
 
   it("reads the target kind as a label and keeps the status out of the cell", async () => {
@@ -142,7 +145,7 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("200")).not.toBeInTheDocument();
   });
 
-  it("counts the detail fields past the first two and opens the row to show them", async () => {
+  it("counts the detail fields past the first two and opens the sheet to show them", async () => {
     const screen = await render(app({ ...base, events: [manyFields] }));
 
     await expect.element(screen.getByText("reusable=yes")).toBeVisible();
@@ -150,11 +153,13 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText(/^expiration=/u)).not.toBeInTheDocument();
     await screen.getByRole("button", { name: "+1" }).click();
 
-    await expect.element(screen.getByText("expiration")).toBeVisible();
-    await expect.element(screen.getByText("2026-09-30T00:00:00Z")).not.toBeInTheDocument();
+    const sheet = screen.getByRole("dialog");
+
+    await expect.element(sheet.getByText("expiration")).toBeVisible();
+    await expect.element(sheet.getByText("2026-09-30T00:00:00Z")).not.toBeInTheDocument();
     const expiration = formatAbsolute(new Date("2026-09-30T00:00:00Z"));
 
-    await expect.element(screen.getByText(expiration)).toBeVisible();
+    await expect.element(sheet.getByText(expiration)).toBeVisible();
   });
 
   it("names the local socket after the tool that used it", async () => {
@@ -192,20 +197,37 @@ describe(EventsTable, () => {
       .toHaveAttribute("href", "/users?q=bob");
   });
 
-  it("opens a row to show every recorded field, the status and the remote address", async () => {
+  it("opens a sheet with every recorded field, the status and the remote address", async () => {
     const screen = await render(app({ ...base, events: [deletion] }));
 
     await expect.element(screen.getByText("Remote address")).not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "Expand row" }).click();
+    // The date is the row's link: a button in the link colour that says it opens a dialog.
+    const date = screen.getByRole("button", { name: logDate(new Date(deletion.createdAt)) });
 
-    await expect.element(screen.getByText("Remote address")).toBeVisible();
-    await expect.element(screen.getByText("10.0.0.1")).toBeVisible();
-    await expect.element(screen.getByText("HTTP status")).toBeVisible();
-    await expect.element(screen.getByText("200")).toBeVisible();
+    await expect.element(date).toHaveAttribute("aria-haspopup", "dialog");
+    await date.click();
+
+    const sheet = screen.getByRole("dialog");
+
+    await expect.element(sheet.getByText("Event details")).toBeVisible();
+    await expect.element(sheet.getByText("Remote address")).toBeVisible();
+    await expect.element(sheet.getByText("10.0.0.1")).toBeVisible();
+    await expect.element(sheet.getByText("HTTP status 200")).toBeVisible();
+    await expect.element(sheet.getByText("retired")).toBeVisible();
+  });
+
+  it("opens the sheet from a click anywhere on the row and closes it again", async () => {
+    const screen = await render(app({ ...base, events: [deletion] }));
+
+    await screen.getByText("Console session").click();
+    await expect.element(screen.getByRole("dialog")).toBeVisible();
+    await screen.getByRole("button", { name: "Close" }).click();
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows the empty state and no paging without events", async () => {
-    const screen = await render(app({ ...base, events: [], filtered: true }));
+    const paging = { ...onePage, loaded: 0 };
+    const screen = await render(app({ ...base, events: [], filtered: true, paging }));
 
     await expect.element(screen.getByText("No events match")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
@@ -237,10 +259,61 @@ describe(EventsTable, () => {
     await expect.element(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
   });
 
-  it("names the whole list once the server has no more", async () => {
+  it("counts the whole list once the server has no more", async () => {
     const screen = await render(app({ ...base, events: [deletion] }));
 
-    await expect.element(screen.getByText("Showing all 1 event")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    await expect.element(screen.getByText("Showing 1–1 of 1")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+  });
+
+  it("leaves the rows per page to the toolbar", async () => {
+    const screen = await render(app({ ...base, events: [deletion] }));
+
+    await expect.element(screen.getByText("Per page:")).not.toBeInTheDocument();
+  });
+
+  it("leaves out the columns switched off in the Columns menu", async () => {
+    const hidden = new Set(["actor", "result"] as const);
+    const screen = await render(app({ ...base, events: [deletion], hidden }));
+
+    await expect.element(screen.getByText("Target", { exact: true })).toBeVisible();
+    await expect.element(screen.getByText("Actor", { exact: true })).not.toBeInTheDocument();
+    await expect.element(screen.getByText("Success")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("ada")).not.toBeInTheDocument();
+  });
+
+  it("lays the columns out in the order given", async () => {
+    const order = ["actor", "time", "action", "target", "result", "details"] as const;
+    const screen = await render(app({ ...base, events: [deletion], order }));
+
+    await expect.element(screen.getByText("ada")).toBeVisible();
+
+    const heads = [...screen.container.querySelectorAll("thead th")].map((th) => th.textContent);
+
+    expect(heads.slice(0, 3)).toStrictEqual(["Actor", "Time", "Action"]);
+  });
+
+  it("moves a column with the arrow keys on its grip, past the hidden ones", async () => {
+    const onMove = vi.fn<(column: AuditColumnId, to: number) => void>();
+    const hidden = new Set(["target"] as const);
+    const screen = await render(app({ ...base, events: [deletion], hidden, onMove }));
+    const grip = screen.getByRole("button", { name: "Move the Actor column" });
+
+    await grip.click();
+    await userEvent.keyboard("{ArrowLeft}");
+    // Target is hidden, so a step left lands on Action, at index 1 of the full order.
+    expect(onMove).toHaveBeenLastCalledWith("actor", 1);
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(onMove).toHaveBeenLastCalledWith("actor", 4);
+  });
+
+  it("does not move the first column further left", async () => {
+    const onMove = vi.fn<(column: AuditColumnId, to: number) => void>();
+    const screen = await render(app({ ...base, events: [deletion], onMove }));
+
+    await screen.getByRole("button", { name: "Move the Time column" }).click();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(onMove).not.toHaveBeenCalled();
   });
 });

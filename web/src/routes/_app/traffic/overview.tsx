@@ -22,12 +22,12 @@ import {
   noDestinationFilters,
   pickDestination,
 } from "~/components/traffic/search.ts";
-import { TrafficSummaryPanel, emptySummary } from "~/components/traffic/summary.tsx";
+import { TrafficAnalytics, emptySummary } from "~/components/traffic/summary.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 
 /** How many machines and destinations the overview lists; the pages under it list the rest. */
 const topRows = 10;
@@ -111,7 +111,7 @@ function OverviewPage(): ReactElement {
       />
       {isRefusedWindow(error) ? null : (
         <>
-          <TrafficSummaryPanel
+          <TrafficAnalytics
             summary={data ?? emptySummary}
             loading={data === undefined && error === null}
             onZoom={(from, to) => {
@@ -150,10 +150,9 @@ function GatewaysSection({
   readonly onPick: (gateway: string) => void;
 }): ReactElement {
   return (
-    <Section
+    <PageSection
       title="Gateways"
       description="What went through each gateway. Pick one to see only its traffic."
-      panel={false}
     >
       <GatewayTrafficTable
         gateways={gateways}
@@ -167,7 +166,7 @@ function GatewaysSection({
           </TableFooter>
         }
       />
-    </Section>
+    </PageSection>
   );
 }
 
@@ -183,10 +182,9 @@ function TopMachinesSection({
   readonly search: OverviewSearch;
 }): ReactElement {
   return (
-    <Section
+    <PageSection
       title="Top machines"
       description="The machines that sent and received the most through the gateways."
-      panel={false}
     >
       <MachinesTable
         nodes={nodes}
@@ -207,7 +205,7 @@ function TopMachinesSection({
           </TableFooter>
         }
       />
-    </Section>
+    </PageSection>
   );
 }
 

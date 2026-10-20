@@ -1,27 +1,42 @@
 /*
  * Kumo owns the design tokens (colours, type scale, radii) and dark mode:
  * every colour is a light-dark() pair switched by `data-mode` on <html>,
- * so nothing here may use Tailwind's `dark:` variant or a raw palette
- * colour. Order matters: Kumo's @theme must be registered before Tailwind.
+ * so console code uses the semantic tokens, never Tailwind's `dark:` variant
+ * or a raw palette colour. Order matters: Kumo's @theme must be registered
+ * before Tailwind.
  */
 @source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
-@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/inter";
 
 /*
- * The type is Kumo's own stack, the platform's UI face. Inter was never loaded here, so it only
- * showed up on machines that had it installed, and it is the face every generated UI reaches for.
- *
- * The monospace face is bundled, because the platform one is not the same face twice: SF Mono
- * is wide and heavy beside the system sans, so every address and hostname read as bolder than
- * the label next to it, and Windows fell back to Consolas. Geist Mono is narrow, light and
- * neutral at 12px, and its subsets (Latin, Latin extended, Vietnamese, Cyrillic) load on demand.
+ * A few Kumo components still colour themselves with `dark:` utilities (the Switch's track and
+ * thumb). Tailwind's own `dark:` follows the operating system's preference, so a console set to
+ * dark on a light system drew light switches; it follows the same `data-mode` the tokens do.
  */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
+/*
+ * The type is the Cloudflare dashboard's: Inter with its open 4, flat-top 3 and open 6/9
+ * alternates (cv02-cv04), tracked in by 0.16px, and Paper Mono for addresses, keys and times.
+ * Inter is set without the alternates in most UIs; the alternates and the tracking are a large
+ * part of what makes the dashboard read as itself. Paper Mono is Geist Mono redrawn by Paper
+ * Design, under the SIL Open Font License (src/fonts/paper-mono/OFL.txt), vendored because no
+ * package publishes it; one variable file covers every weight.
+ */
+@font-face {
+  font-family: "Paper Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("./fonts/paper-mono/paper-mono-variable.woff2") format("woff2-variations");
+}
+
 @theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono:
-    "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
-    monospace;
+    "Paper Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   /* The bar that runs along the top while a page's data loads: a third of the width, left to right. */
   --animate-route-progress: route-progress 1.2s ease-in-out infinite;
 
@@ -36,18 +51,6 @@
 }
 
 @layer base {
-  /*
-   * A primary button carries `!text-white`, which is right on ink but not on the near-white ink of
-   * dark mode. The primary variant is the one whose inline emphasis colour is mixed from the brand
-   * token (the destructive variant mixes from the danger token), which is what the style attribute
-   * selector picks out; `primary-button.test.tsx` pins that Kumo still writes it that way. It
-   * lives in the base layer because important declarations cascade in reverse layer order, and
-   * base is the one layer whose `!important` outranks the utility's.
-   */
-  [data-mode="dark"] :is(button, a)[data-kumo-component][style*="--color-kumo-brand"] {
-    color: var(--color-kumo-canvas) !important;
-  }
-
   * {
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
@@ -56,6 +59,7 @@
 
   html {
     font-family: var(--font-sans);
+    font-feature-settings: "calt", "cv02", "cv03", "cv04";
     line-height: 1.5;
   }
 
@@ -65,30 +69,16 @@
     color: var(--text-color-kumo-default);
     font-size: var(--text-base);
     line-height: var(--text-base--line-height);
+    letter-spacing: -0.16px;
+  }
+
+  /* Monospaced figures keep their own spacing; the tracking is for Inter. */
+  :is(code, kbd, pre, samp, .font-mono) {
+    letter-spacing: normal;
   }
 }
 
 @layer components {
-  /*
-   * Kumo's focus ring on an emphasised button is the button's own colour a shade darker, invisible
-   * on ink; an offset outline in the focus colour shows on either theme.
-   */
-  :is(button, a)[data-kumo-component][style*="--color-kumo-brand"]:focus-visible {
-    outline: 2px solid var(--color-kumo-focus);
-    outline-offset: 2px;
-  }
-
-  /*
-   * Kumo halves the opacity of a disabled button and leaves its colour alone, so a disabled primary
-   * or destructive action keeps the accent gradient and still reads as the thing to press. Drain the
-   * colour instead: the label stays where it was, and the button reads as unavailable in both
-   * themes. Kumo sets the accent through inline custom properties, so this greys the painted result
-   * rather than the tokens behind it.
-   */
-  button[data-kumo-component="Button"]:disabled {
-    filter: grayscale(1);
-  }
-
   /*
    * Kumo's text input keeps the browser's intrinsic width (twenty characters, about 178px) as its
    * minimum, so in a grid column narrower than that, the Value field of a two-column form in a
@@ -101,31 +91,13 @@
 }
 
 /*
- * The accent is ink, not blue. Kumo paints its primary button, focus rings, the underline tab
- * indicator and the sidebar's drag handle from `--color-kumo-brand`; here the one coloured thing on
- * a page should be the thing that is wrong, so the token is the contrast colour (near-black in light
- * mode, near-white in dark) and blue is left to links, which have their own token. These rules sit
- * outside the cascade layers because a Tailwind utility on the element would otherwise win.
+ * Every Kumo Tooltip as the dashboard draws it (design spec §9): at most 300px wide so a long hint
+ * wraps instead of running across the page, 12px by 8px of padding, snug 13px lines, the large
+ * shadow and the fill outline. Kumo's own popup is 10px by 6px with no width cap; its classes are
+ * utilities, so the override sits in the same layer, after them.
  */
-:root {
-  --color-kumo-brand: var(--color-kumo-contrast);
-  --color-kumo-brand-hover: color-mix(
-    in oklch,
-    var(--color-kumo-contrast),
-    var(--color-kumo-canvas) 20%
-  );
-}
-
-/*
- * The switch does not read the token: Kumo paints a checked track blue-500 and, in dark mode, its
- * thumb blue-300. Ink for the track and the canvas colour for the thumb keeps the knob visible on
- * either theme.
- */
-[data-kumo-component="Switch"][data-checked] {
-  background-color: var(--color-kumo-contrast);
-  --tw-ring-color: var(--color-kumo-contrast);
-}
-
-[data-kumo-component="Switch"][data-checked] > div {
-  background-color: var(--color-kumo-canvas);
+@layer utilities {
+  .kumo-tooltip-popup {
+    @apply max-w-[300px] px-3 py-2 text-sm leading-snug shadow-lg outline-1 outline-kumo-fill;
+  }
 }

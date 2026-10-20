@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
@@ -42,6 +43,37 @@ const nas: TrafficDestination = { ...blank, host: "nas.office.lan", private: tru
 const remainder: TrafficDestination = { ...blank, rxBytes: 1024 };
 
 describe(DestinationsTable, () => {
+  // Design spec §13.15.13: a log's toolbar sets the rows per page and the columns, so the band
+  // leaves its own "Per page" out.
+  it("follows the toolbar's limit and leaves out the columns switched off", async () => {
+    const hosts = Array.from({ length: 30 }, (_, index) => ({
+      ...blank,
+      host: `host-${String(index).padStart(2, "0")}.example`,
+      rxBytes: 1024 * (100 - index),
+    }));
+    const table = (pageSize: number): ReactElement => (
+      <DestinationsTable
+        rows={hosts}
+        groupBy="host"
+        whole={1024 ** 2}
+        pageSize={pageSize}
+        hidden={new Set(["upload", "conns"])}
+      />
+    );
+    const screen = await render(table(25));
+
+    await expect.element(screen.getByText("Showing 1–25 of 30")).toBeVisible();
+    expect(screen.getByRole("row").elements()).toHaveLength(26);
+    await expect.element(screen.getByText("Per page")).not.toBeInTheDocument();
+    expect(
+      Array.from(screen.container.querySelectorAll("th"), (cell) => cell.textContent),
+    ).toStrictEqual(["Host", "Machines", "Total", "Download"]);
+
+    await screen.rerender(table(50));
+
+    await expect.element(screen.getByText("Showing 1–30 of 30")).toBeVisible();
+  });
+
   it("lists hosts busiest first, marks a LAN one, and picks a row but not the remainder", async () => {
     const onPick = vi.fn<(row: TrafficDestination) => void>();
     const screen = await render(

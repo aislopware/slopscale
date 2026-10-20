@@ -7,15 +7,16 @@ import type { Tone } from "~/components/ui/status.tsx";
 const tones: Tone[] = ["success", "warning", "danger", "info", "neutral"];
 
 describe(Badge, () => {
-  // The word and its tint carry the state; a dot or an icon in front of it is the tell of a
-  // generated UI, and the badge's own corner radius is the controls', not a pill's.
-  it.each(tones)("renders the %s state as a tinted word with nothing in front", async (tone) => {
+  // The word and its tint carry the state, on Kumo's pill.
+  it.each(tones)("renders the %s state as a tinted pill with nothing in front", async (tone) => {
     const view = await render(<Badge tone={tone}>State</Badge>);
     const badge = view.getByText("State").element();
 
     expect(view.container.textContent).toBe("State");
     expect(badge.querySelectorAll("svg, span[aria-hidden]")).toHaveLength(0);
-    expect(getComputedStyle(badge).borderRadius).not.toBe("9999px");
+    expect(Number(getComputedStyle(badge).borderRadius.replace("px", ""))).toBeGreaterThanOrEqual(
+      9,
+    );
   });
 
   it("tints each tone that wants something, and the tint is not the page", async () => {
@@ -36,9 +37,8 @@ describe(Badge, () => {
     }
   });
 
-  // A state column earns its width on the tables where nearly every row is fine, so a good or
-  // ordinary state steps back and the rows that want something keep the colour to themselves.
-  it("gives a good state the same quiet surface as an ordinary one", async () => {
+  // The dashboard tints a good state green (Healthy, Active) and leaves an ordinary one grey.
+  it("tints a good state apart from an ordinary one", async () => {
     const view = await render(
       <>
         <Badge tone="success">Approved</Badge>
@@ -49,7 +49,7 @@ describe(Badge, () => {
     const background = (text: string): string =>
       getComputedStyle(view.getByText(text).element()).backgroundColor;
 
-    expect(background("Approved")).toBe(background("Disconnected"));
+    expect(background("Approved")).not.toBe(background("Disconnected"));
     expect(background("Approved")).not.toBe(background("Needs approval"));
   });
 });
