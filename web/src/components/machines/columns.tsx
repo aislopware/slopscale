@@ -75,7 +75,7 @@ export const columns = helper.columns([
     header: "Owner",
     enableSorting: true,
     cell: ({ row }) => <OwnerCell node={row.original} />,
-    meta: { className: "w-[18%]" },
+    meta: { className: "w-[18%]", hideBelow: "sm" },
   }),
   // The hostname rides along here so a search matches it without a column of its own.
   helper.accessor((node) => [...node.ipAddresses, node.name].join(" "), {
@@ -144,7 +144,11 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
       {node.name === name ? null : (
         <span className={cn(cellSecondaryClass, "font-mono")}>{node.name}</span>
       )}
-      {/* A phone hides the Status column, so the state takes a line of its own. */}
+      {/* A phone hides the Owner and Status columns, so they take the lines under the name
+          instead of sitting half under the pinned actions column. */}
+      <span className={cn("pt-0.5", narrowOnlyClass)}>
+        <OwnerCell node={node} />
+      </span>
       <span className={cn("pt-0.5", narrowOnlyClass)}>
         <StatusCell node={node} />
       </span>

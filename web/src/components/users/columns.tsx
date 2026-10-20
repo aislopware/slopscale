@@ -42,7 +42,7 @@ export const columns = helper.columns([
     header: "Role",
     enableSorting: true,
     cell: ({ row }) => <RoleBadge role={row.original.role} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.accessor((user) => (user.approved ? 1 : 0), {
     id: "status",
@@ -111,8 +111,10 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
     <div className="flex max-w-80 min-w-0 flex-col gap-0.5" title={title}>
       <span className="truncate font-medium text-kumo-default">{label}</span>
       {parts.length === 0 ? null : <span className={cellSecondaryClass}>{parts.join(" · ")}</span>}
-      {/* A phone hides the Status column, so the state takes a line of its own. */}
-      <span className={cn("pt-0.5", narrowOnlyClass)}>
+      {/* A phone hides the Role and Status columns, so they take a line of their own instead
+          of sitting half under the pinned actions column. */}
+      <span className={cn("flex flex-wrap items-center gap-1.5 pt-0.5", narrowOnlyClass)}>
+        <RoleBadge role={user.role} />
         <UserStatus user={user} />
       </span>
     </div>
