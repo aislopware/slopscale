@@ -1,15 +1,13 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { groupColumns, toGroupRows } from "~/components/access/group-columns.tsx";
-import { GroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isBuiltin } from "~/components/access/model.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
@@ -100,39 +98,17 @@ export function GroupsTab({
 
 /**
  * The groups page's create action, in its page header beside the title as the dashboard's "Add a
- * policy" is, with the dialog it opens.
+ * policy" is. It opens the group editor page.
  */
-export function NewGroupButton({
-  me,
-  nodes,
-  users,
-}: {
-  readonly me: Me;
-  readonly nodes: readonly Node[] | undefined;
-  readonly users: readonly User[] | undefined;
-}): ReactElement {
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
-
+export function NewGroupButton({ me }: { readonly me: Me }): ReactElement {
   return (
-    <>
-      <Button
-        variant="primary"
-        icon={PlusIcon}
-        disabled={!can(me, "policy_file")}
-        onClick={() => {
-          setCreating(true);
-        }}
-      >
-        New group
-      </Button>
-      <GroupDialog
-        nodes={nodes ?? []}
-        users={users ?? []}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
-    </>
+    <LinkButton
+      href="/policy/groups/new"
+      variant="primary"
+      icon={PlusIcon}
+      disabled={!can(me, "policy_file")}
+    >
+      New group
+    </LinkButton>
   );
 }

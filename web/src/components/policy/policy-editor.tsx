@@ -10,6 +10,7 @@ import { useImperativeHandle, useMemo, useRef } from "react";
 import type { ReactElement, ReactNode, Ref } from "react";
 
 import { policyLanguage } from "~/components/policy/policy-language.ts";
+import { ProblemsPanel } from "~/components/policy/problems-panel.tsx";
 import { CodeEditor } from "~/components/ui/code-editor.tsx";
 import { Tray, TrayBand, TrayPanel } from "~/components/ui/section.tsx";
 import type { EditorProblem } from "~/lib/editor/problems.ts";
@@ -31,10 +32,10 @@ const starterSnippet = `{
 }`;
 
 /**
- * The editor follows the window: 70vh, and never under 400px, so a laptop shows the file without
- * the page scrolling and a short window still has room to type in.
+ * The editor follows the window: 60vh, and never under 400px, so a laptop shows the file and the
+ * top of the Problems list without scrolling, and a short window still has room to type in.
  */
-const editorHeightClass = "h-[70vh] min-h-[400px]";
+const editorHeightClass = "h-[60vh] min-h-[400px]";
 
 function lineCount(text: string): number {
   return text === "" ? 0 : text.split("\n").length;
@@ -50,24 +51,29 @@ export interface PolicyEditorHandle {
  * CodeMirror owns the DOM inside the host, so the view is found through it rather than through a
  * prop: `~/components/ui/code-editor.tsx` stays a plain controlled textarea from the outside.
  */
-function reveal(host: HTMLElement | null, text: string): void {
-  const view = host === null ? null : EditorView.findFromDOM(host);
+function viewIn(host: HTMLElement | null): EditorView | null {
+  return host === null ? null : EditorView.findFromDOM(host);
+}
 
-  if (view === null) {
-    return;
-  }
-
-  const start = view.state.doc.toString().indexOf(text);
-
-  if (start === -1) {
-    return;
-  }
+function selectRange(view: EditorView, from: number, to: number): void {
+  const { length } = view.state.doc;
 
   view.dispatch({
-    selection: { anchor: start, head: start + text.length },
+    selection: { anchor: Math.min(from, length), head: Math.min(Math.max(from, to), length) },
     scrollIntoView: true,
   });
   view.focus();
+}
+
+function reveal(host: HTMLElement | null, text: string): void {
+  const view = viewIn(host);
+  const start = view === null ? -1 : view.state.doc.toString().indexOf(text);
+
+  if (view === null || start === -1) {
+    return;
+  }
+
+  selectRange(view, start, start + text.length);
 }
 
 export interface PolicyEditorProps {
@@ -134,7 +140,8 @@ function ProblemsSummary({
 
 /**
  * The HuJSON editor on its own surface, under a slim toolbar that names the file the policy would
- * be on disk and counts its lines, so the card reads as an editor rather than another panel.
+ * be on disk and counts its lines, so the card reads as an editor rather than another panel. The
+ * problems of the draft are listed under it, as a code editor's Problems panel lists them.
  */
 export function PolicyEditor({
   value,
@@ -203,6 +210,17 @@ export function PolicyEditor({
           />
         </div>
       </TrayPanel>
+      <ProblemsPanel
+        text={value}
+        problems={problems}
+        onSelect={(problem) => {
+          const view = viewIn(host.current);
+
+          if (view !== null) {
+            selectRange(view, problem.from, problem.to);
+          }
+        }}
+      />
     </Tray>
   );
 }
