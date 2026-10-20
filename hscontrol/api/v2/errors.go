@@ -85,6 +85,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrUnknownSetting),
 		errors.Is(err, types.ErrDNSSettingsInvalid),
 		errors.Is(err, types.ErrKeyExpiryOutOfRange),
+		errors.Is(err, types.ErrRouteSelectionUnknown),
 		errors.Is(err, types.ErrWebhookURLInvalid),
 		errors.Is(err, types.ErrWebhookNoSubscriptions),
 		errors.Is(err, types.ErrWebhookEventUnknown),

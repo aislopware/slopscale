@@ -55,7 +55,7 @@ func TestAPIv2OAuthScopes(t *testing.T) {
 	// end. devices:routes and feature_settings are proven exhaustively by the Go
 	// matrix (apiv2_oauth_matrix_test.go), not here: the provider's routes
 	// resource issues a cross-family device read a routes-only token would lack,
-	// and the server's settings endpoint is read-only.
+	// and TestAPIv2TailnetSettingsWrite drives the settings resource.
 	deviceID := srv.CreateRegisteredNode(t, owner).StringID()
 	deviceAuthorizeConfig := `
 resource "tailscale_device_authorization" "d" {

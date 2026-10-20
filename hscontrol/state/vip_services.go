@@ -57,16 +57,22 @@ func (s *State) loadVIPServices() (change.Change, error) {
 
 	s.vipServices.Store(&services)
 
+	// The host election reads the addresses, so a new or renumbered
+	// service moves hosts even when the policy sees nothing new.
+	elected := s.nodeStore.SetServices(servicePrefixes(services))
+
 	changed, err := s.polMan.SetVIPServices(services)
 	if err != nil {
 		return change.Change{}, fmt.Errorf("updating policy manager services: %w", err)
 	}
 
-	if !changed {
+	if !changed && !elected {
 		return change.Change{}, nil
 	}
 
-	s.nodeStore.RebuildPeerMaps()
+	if changed {
+		s.nodeStore.RebuildPeerMaps()
+	}
 
 	return serviceChange(), nil
 }
@@ -271,6 +277,11 @@ func (s *State) SetApprovedServices(nodeID types.NodeID, names []string) (types.
 func (s *State) storeApprovedServices(nodeID types.NodeID, approved []string) error {
 	_, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		node.ApprovedServices = approved
+		// A node left without anything to serve is no HA candidate; drop
+		// a stale Unhealthy bit (as SetApprovedRoutes does).
+		if !haCandidate(node) {
+			node.Unhealthy = false
+		}
 	})
 	if !ok {
 		return fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
@@ -385,6 +396,10 @@ func (s *State) setNodeServices(nodeID types.NodeID, services *types.NodeService
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		before = *node
 		node.Services = services
+
+		if !haCandidate(node) {
+			node.Unhealthy = false
+		}
 	})
 	if !ok {
 		return change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
@@ -417,89 +432,23 @@ func (s *State) setNodeServices(nodeID types.NodeID, services *types.NodeService
 	return c, nil
 }
 
-// ServiceHosts elects one host per service: among the nodes approved
-// for it that advertise it, an online one before an offline one, then
-// the lowest ID, so every peer routes the service's addresses to the
-// same node until it goes away.
+// ServiceHosts returns the tailnet-wide host of every service that has
+// one; see service_hosts.go for the election.
 func (s *State) ServiceHosts() map[tailcfg.ServiceName]types.NodeID {
-	services := s.VIPServices()
-	if len(services) == 0 {
-		return nil
-	}
-
-	known := make(map[tailcfg.ServiceName]struct{}, len(services))
-	for _, svc := range services {
-		known[svc.Name] = struct{}{}
-	}
-
-	type candidate struct {
-		id     types.NodeID
-		online bool
-	}
-
-	best := make(map[tailcfg.ServiceName]candidate)
-
-	for _, node := range s.nodeStore.ListNodes().All() {
-		if !node.IsAdmitted() || node.IsExpired() {
-			continue
-		}
-
-		online := node.IsOnline().Valid() && node.IsOnline().Get()
-
-		for _, name := range node.HostedServices() {
-			if _, ok := known[name]; !ok {
-				continue
-			}
-
-			if _, active := node.HostsService(name); !active {
-				continue
-			}
-
-			current, ok := best[name]
-			if !ok || (online && !current.online) || (online == current.online && node.ID() < current.id) {
-				best[name] = candidate{id: node.ID(), online: online}
-			}
-		}
-	}
-
-	out := make(map[tailcfg.ServiceName]types.NodeID, len(best))
-	for name, c := range best {
-		out[name] = c.id
-	}
-
-	return out
+	return s.nodeStore.ServiceHosts()
 }
 
-// ServiceRoutesFor returns the addresses of the services the node is the
-// elected host of, as single-address prefixes for its AllowedIPs.
-func (s *State) ServiceRoutesFor(nodeID types.NodeID, hosts map[tailcfg.ServiceName]types.NodeID) []netip.Prefix {
-	if len(hosts) == 0 {
-		return nil
-	}
+// ServiceRoutesForNode returns the addresses of the services the node is
+// the tailnet-wide host of, for its own AllowedIPs.
+func (s *State) ServiceRoutesForNode(nodeID types.NodeID) []netip.Prefix {
+	return s.nodeStore.ServiceRoutesForNode(nodeID)
+}
 
-	var names []tailcfg.ServiceName
-
-	for name, id := range hosts {
-		if id == nodeID {
-			names = append(names, name)
-		}
-	}
-
-	if len(names) == 0 {
-		return nil
-	}
-
-	slices.Sort(names)
-
-	var out []netip.Prefix
-
-	for _, svc := range s.VIPServices() {
-		if slices.Contains(names, svc.Name) {
-			out = append(out, svc.Prefixes()...)
-		}
-	}
-
-	return out
+// ServiceRoutesByHost returns, by host, the addresses of the services
+// the viewer reaches through that host, for the hosts' AllowedIPs in the
+// viewer's map. The result must not be mutated.
+func (s *State) ServiceRoutesByHost(viewer types.NodeView) map[types.NodeID][]netip.Prefix {
+	return s.nodeStore.ServiceRoutesByHost(viewerSiteOf(viewer))
 }
 
 // ServiceDNSRecords are the MagicDNS records of the services that have a

@@ -387,6 +387,7 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	s.settings.Store(&settings)
+	nodeStore.SetRouteSelection(settings.RouteSelection)
 
 	s.tailnetID, err = loadTailnetID(db)
 	if err != nil {
@@ -1207,7 +1208,7 @@ func (s *State) SetApprovedRoutes(nodeID types.NodeID, routes []netip.Prefix) (t
 		// A node with no approved routes is no longer an HA
 		// candidate; drop any stale Unhealthy bit (mirrors the
 		// legacy routes.SetRoutes(empty) auto-clear).
-		if len(node.AllApprovedRoutes()) == 0 {
+		if !haCandidate(node) {
 			node.Unhealthy = false
 		}
 	})
@@ -1791,15 +1792,21 @@ var haHealthUpdates = promauto.NewCounterVec(prometheus.CounterOpts{
 		"or rejected because the node left candidacy.",
 }, []string{"result"})
 
+// haCandidate reports whether the HA prober may judge n: it serves
+// approved routes or reports services it is approved to host.
+func haCandidate(n *types.Node) bool {
+	return len(n.AllApprovedRoutes()) > 0 || (len(n.ApprovedServices) > 0 && n.Services != nil)
+}
+
 // healthSetter returns an UpdateNodeFunc that flips n.Unhealthy to
 // the inverse of healthy, with the same gate as [State.SetNodeHealth]:
 // an unhealthy mark only sticks when the node is still online and
-// still advertises approved routes, so a node that left HA candidacy
+// still a candidate ([haCandidate]), so a node that left HA candidacy
 // between probe dispatch and result does not carry a stale bit.
 func healthSetter(healthy bool) UpdateNodeFunc {
 	return func(n *types.Node) {
 		if !healthy {
-			if !n.Online() || len(n.AllApprovedRoutes()) == 0 {
+			if !n.Online() || !haCandidate(n) {
 				haHealthUpdates.WithLabelValues("rejected").Inc()
 
 				return
@@ -2896,7 +2903,7 @@ func (s *State) UpdateNodeFromMapRequest(
 		// update that shrinks the announced set can drop the node
 		// out of HA candidacy without touching ApprovedRoutes.
 		// Clear any stale Unhealthy bit in that case.
-		if len(currentNode.AllApprovedRoutes()) == 0 {
+		if !haCandidate(currentNode) {
 			currentNode.Unhealthy = false
 		}
 	})
@@ -4024,7 +4031,7 @@ func (s *State) autoApproveNodes() ([]change.Change, error) {
 
 			// A node with no approved routes is no longer an HA candidate;
 			// drop any stale Unhealthy bit (mirrors SetApprovedRoutes).
-			if len(n.AllApprovedRoutes()) == 0 {
+			if !haCandidate(n) {
 				n.Unhealthy = false
 			}
 		}

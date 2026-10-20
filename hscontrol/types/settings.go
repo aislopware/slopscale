@@ -91,4 +91,7 @@ type Settings struct {
 	// DeviceAttributesOn lets machines set their own custom posture
 	// attributes; see [SettingDeviceAttributesOn].
 	DeviceAttributesOn bool
+	// RouteSelection is how machines choose among routers serving the
+	// same prefix; empty is the default, see [RouteSelection.OrDefault].
+	RouteSelection RouteSelection
 }

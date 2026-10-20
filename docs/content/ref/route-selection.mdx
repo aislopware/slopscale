@@ -1,0 +1,91 @@
+---
+title: "Route selection"
+description: "Choose how machines pick among subnet routers and app connectors that serve the same prefix: one primary for everyone, per region, or per machine by round trip."
+---
+
+When two or more healthy machines serve the same prefix, each client has to
+use one of them. Route selection is the tailnet-wide setting that decides
+which. It applies to [subnet routers](/ref/routes#subnet-router),
+[app connectors](/ref/apps) and the hosts of a [service](/ref/services), and
+it decides whether [global exit nodes](/ref/routes#global-exit-node) are
+reordered per client. Clients need nothing new: the server puts each prefix
+in the `AllowedIPs` of the router that client should use, so every Tailscale
+client follows it.
+
+The setting takes the names Tailscale's API uses for its `routeSelection`
+field, so a Terraform configuration or script written for Tailscale keeps
+working:
+
+| Value                       | Each client uses                                                                                                                         |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `active-passive-failover`   | the tailnet-wide primary, the same machine for everyone                                                                                  |
+| `regional-routing`          | the machine nearest it by measured round trip, else the primary of its home DERP region, else the tailnet-wide primary. **The default.** |
+| `regional-routing-failover` | the primary of its home DERP region, else the tailnet-wide primary                                                                       |
+| `magicroute`                | the same as `regional-routing`                                                                                                           |
+
+## The modes
+
+**Active-passive failover.** Every client uses the tailnet-wide primary. The
+first healthy router to serve a prefix becomes its primary and keeps it as
+long as it stays online and healthy, so a router that comes back does not
+take the traffic back. When it goes away, the next healthy router by node ID,
+which is the oldest, takes over. Global exit nodes keep the priority you gave
+them, the same order for every client. Choose this when every router must
+see the same clients, for example behind a stateful firewall.
+
+**Regional routing**, the default and what slopscale did before the setting
+existed. A client is steered to the healthy router nearest it, measured as
+the round trip to the DERP region each router is homed in; for an internet
+prefix, clients that are equally near several routers are spread over them
+by a stable hash. A client without measurements uses the
+primary of its own DERP region, else the tailnet-wide primary. The global
+exit nodes nearest a client are lifted above the others in its map. The
+details are under [Regional routing](/ref/routes#regional-routing).
+
+**Regional routing with in-region failover.** Routers are grouped by the DERP
+region they are homed in. A client uses its own region's primary, which is
+kept while healthy and otherwise the oldest healthy router in the region, and
+falls back to the tailnet-wide primary when its region has none. Round trips
+are not used, so a client never leaves its region while the region has a
+working router, and global exit nodes keep your order.
+
+**MagicRoute** is Tailscale's name for choosing a router per client by a
+latency score. Slopscale accepts the value and steers exactly as regional
+routing does, which already scores routers per client by round trip; a
+tailnet moved from Tailscale with `magicroute` keeps its behaviour as close as
+slopscale can make it.
+
+Health and stickiness are the same in every mode: an unhealthy router, one
+the [high availability](/ref/routes#high-availability) prober found not
+answering, is never chosen while a healthy one serves the prefix, and a
+primary is kept until it stops being a candidate.
+
+A service's hosts are chosen the same way, with one difference: clients
+equally near several hosts are always spread over them, whatever the
+service's addresses, because the host ends the connection and there is no
+return path to keep on one machine.
+
+## Changing it
+
+```console
+$ slopscale settings set --route-selection active-passive-failover
+$ slopscale settings get
+```
+
+The console has a _Route selection_ section under _Settings_, _Tailnet_. The
+same setting is `routeSelection` in `GET` and `POST /api/v1/settings`, and in
+the Tailscale-compatible `GET` and `PATCH /api/v2/tailnet/-/settings`, which
+also takes the older `regionalRoutingOn` field: `true` selects
+`regional-routing`, `false` selects `active-passive-failover`, and a request
+that carries both fields is refused. `regionalRoutingOn` reads `true` only
+while the setting is `regional-routing`. With the Terraform provider:
+
+```hcl
+resource "tailscale_tailnet_settings" "s" {
+  regional_routing_on = false # active-passive failover
+}
+```
+
+A change reaches every client at once: each one is sent its peers again with
+the routers it should use now. Moving a client to another router ends its
+open connections through the old one.

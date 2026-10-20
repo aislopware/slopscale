@@ -50,6 +50,9 @@ type Settings struct {
 	// node, which is always a default recorder; see ssh_recording in the
 	// configuration.
 	EmbeddedRecorder bool `json:"embeddedRecorder"`
+	// RouteSelection is how machines choose among routers, app connectors
+	// and service hosts that serve the same prefix, by Tailscale's names.
+	RouteSelection string `enum:"active-passive-failover,regional-routing,regional-routing-failover,magicroute" json:"routeSelection"` //nolint:lll // struct tag
 }
 
 // UpdateSettingsRequestBody carries the switches to change; absent ones
@@ -65,6 +68,9 @@ type UpdateSettingsRequestBody struct {
 	// them. SSHRecordingEnforce is applied alongside when given.
 	SSHRecorders        *[]string `json:"sshRecorders,omitempty"`
 	SSHRecordingEnforce *bool     `json:"sshRecordingEnforce,omitempty"`
+	// RouteSelection changes how machines choose among routers; every
+	// machine is sent its peers again.
+	RouteSelection *string `enum:"active-passive-failover,regional-routing,regional-routing-failover,magicroute" json:"routeSelection,omitempty"` //nolint:lll // struct tag
 }
 
 type (
@@ -102,6 +108,7 @@ func settingsFrom(s types.Settings, cfg *types.Config) Settings {
 		KeyExpiryDays:       int(s.KeyExpiry / day),
 		SSHRecorders:        append([]string{}, s.SSHRecorders...),
 		SSHRecordingEnforce: s.SSHRecordingEnforce,
+		RouteSelection:      string(s.RouteSelection.OrDefault()),
 	}
 
 	if cfg != nil {
@@ -182,7 +189,8 @@ func registerApproval(api huma.API, b Backend) {
 		Path:        "/api/v1/settings",
 		Summary:     "Update settings",
 		Description: "Changes the given switches. Switching device or users approval off " +
-			"approves every node or user that was waiting.",
+			"approves every node or user that was waiting; changing the route selection sends " +
+			"every machine its peers again.",
 		Tags:     []string{tagSettings},
 		Security: bearerAuth,
 	}, scope.FeatureSettings), "settings.set", "", ""), func(
@@ -222,30 +230,66 @@ func registerApproval(api huma.API, b Backend) {
 			audit.Detail(ctx, string(types.SettingKeyExpiry), *in.Body.KeyExpiryDays)
 		}
 
-		if in.Body.SSHRecorders != nil || in.Body.SSHRecordingEnforce != nil {
-			current := b.State.Settings()
-			recorders := current.SSHRecorders
+		err := setSSHRecording(ctx, b, in.Body.SSHRecorders, in.Body.SSHRecordingEnforce)
+		if err != nil {
+			return nil, err
+		}
 
-			if in.Body.SSHRecorders != nil {
-				recorders = *in.Body.SSHRecorders
-			}
-
-			enforce := current.SSHRecordingEnforce
-			if in.Body.SSHRecordingEnforce != nil {
-				enforce = *in.Body.SSHRecordingEnforce
-			}
-
-			c, err := b.State.SetSSHRecording(recorders, enforce)
-			if err != nil {
-				return nil, mapError("updating settings", err)
-			}
-
-			audit.Detail(ctx, string(types.SettingSSHRecorders), recorders)
-			audit.Detail(ctx, string(types.SettingSSHRecordingEnforce), enforce)
-
-			b.Change(c)
+		err = setRouteSelection(ctx, b, in.Body.RouteSelection)
+		if err != nil {
+			return nil, err
 		}
 
 		return &settingsOutput{Body: settingsFrom(b.State.Settings(), b.Cfg)}, nil
 	})
+}
+
+// setSSHRecording applies the requested recorders and enforcement, when
+// either is given, keeping the current value of the other.
+func setSSHRecording(ctx context.Context, b Backend, recorders *[]string, enforce *bool) error {
+	if recorders == nil && enforce == nil {
+		return nil
+	}
+
+	current := b.State.Settings()
+	nextRecorders, nextEnforce := current.SSHRecorders, current.SSHRecordingEnforce
+
+	if recorders != nil {
+		nextRecorders = *recorders
+	}
+
+	if enforce != nil {
+		nextEnforce = *enforce
+	}
+
+	c, err := b.State.SetSSHRecording(nextRecorders, nextEnforce)
+	if err != nil {
+		return mapError("updating settings", err)
+	}
+
+	audit.Detail(ctx, string(types.SettingSSHRecorders), nextRecorders)
+	audit.Detail(ctx, string(types.SettingSSHRecordingEnforce), nextEnforce)
+
+	b.Change(c)
+
+	return nil
+}
+
+// setRouteSelection applies a requested route selection, when there is
+// one, and dispatches the change it makes.
+func setRouteSelection(ctx context.Context, b Backend, selection *string) error {
+	if selection == nil {
+		return nil
+	}
+
+	c, err := b.State.SetRouteSelection(types.RouteSelection(*selection))
+	if err != nil {
+		return mapError("updating settings", err)
+	}
+
+	audit.Detail(ctx, string(types.SettingRouteSelection), *selection)
+
+	b.Change(c)
+
+	return nil
 }

@@ -273,6 +273,54 @@ func (e PostureProviderAttributeType) Valid() bool {
 	}
 }
 
+// Defines values for SettingsRouteSelection.
+const (
+	SettingsRouteSelectionActivePassiveFailover   SettingsRouteSelection = "active-passive-failover"
+	SettingsRouteSelectionMagicroute              SettingsRouteSelection = "magicroute"
+	SettingsRouteSelectionRegionalRouting         SettingsRouteSelection = "regional-routing"
+	SettingsRouteSelectionRegionalRoutingFailover SettingsRouteSelection = "regional-routing-failover"
+)
+
+// Valid indicates whether the value is a known member of the SettingsRouteSelection enum.
+func (e SettingsRouteSelection) Valid() bool {
+	switch e {
+	case SettingsRouteSelectionActivePassiveFailover:
+		return true
+	case SettingsRouteSelectionMagicroute:
+		return true
+	case SettingsRouteSelectionRegionalRouting:
+		return true
+	case SettingsRouteSelectionRegionalRoutingFailover:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateSettingsRequestBodyRouteSelection.
+const (
+	UpdateSettingsRequestBodyRouteSelectionActivePassiveFailover   UpdateSettingsRequestBodyRouteSelection = "active-passive-failover"
+	UpdateSettingsRequestBodyRouteSelectionMagicroute              UpdateSettingsRequestBodyRouteSelection = "magicroute"
+	UpdateSettingsRequestBodyRouteSelectionRegionalRouting         UpdateSettingsRequestBodyRouteSelection = "regional-routing"
+	UpdateSettingsRequestBodyRouteSelectionRegionalRoutingFailover UpdateSettingsRequestBodyRouteSelection = "regional-routing-failover"
+)
+
+// Valid indicates whether the value is a known member of the UpdateSettingsRequestBodyRouteSelection enum.
+func (e UpdateSettingsRequestBodyRouteSelection) Valid() bool {
+	switch e {
+	case UpdateSettingsRequestBodyRouteSelectionActivePassiveFailover:
+		return true
+	case UpdateSettingsRequestBodyRouteSelectionMagicroute:
+		return true
+	case UpdateSettingsRequestBodyRouteSelectionRegionalRouting:
+		return true
+	case UpdateSettingsRequestBodyRouteSelectionRegionalRoutingFailover:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WebhookRequestBodyProviderType.
 const (
 	WebhookRequestBodyProviderTypeDiscord    WebhookRequestBodyProviderType = "discord"
@@ -2348,16 +2396,20 @@ type Settings struct {
 	DeviceAttributesOn   bool  `json:"deviceAttributesOn"`
 
 	// DevicesApprovalOn New nodes wait for an administrator unless they register with a preauthorized key.
-	DevicesApprovalOn   bool     `json:"devicesApprovalOn"`
-	EmbeddedRecorder    bool     `json:"embeddedRecorder"`
-	KeyExpiryDays       int64    `json:"keyExpiryDays"`
-	PostureIdentityOn   bool     `json:"postureIdentityOn"`
-	SshRecorders        []string `json:"sshRecorders"`
-	SshRecordingEnforce bool     `json:"sshRecordingEnforce"`
+	DevicesApprovalOn   bool                   `json:"devicesApprovalOn"`
+	EmbeddedRecorder    bool                   `json:"embeddedRecorder"`
+	KeyExpiryDays       int64                  `json:"keyExpiryDays"`
+	PostureIdentityOn   bool                   `json:"postureIdentityOn"`
+	RouteSelection      SettingsRouteSelection `json:"routeSelection"`
+	SshRecorders        []string               `json:"sshRecorders"`
+	SshRecordingEnforce bool                   `json:"sshRecordingEnforce"`
 
 	// UsersApprovalOn Users created by OIDC login wait for an administrator before registering nodes.
 	UsersApprovalOn bool `json:"usersApprovalOn"`
 }
+
+// SettingsRouteSelection defines model for Settings.RouteSelection.
+type SettingsRouteSelection string
 
 // ShareNodeRequestBody defines model for ShareNodeRequestBody.
 type ShareNodeRequestBody struct {
@@ -2703,14 +2755,18 @@ type UpdateServiceRequestBody struct {
 
 // UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
 type UpdateSettingsRequestBody struct {
-	DeviceAttributesOn  *bool     `json:"deviceAttributesOn,omitempty"`
-	DevicesApprovalOn   *bool     `json:"devicesApprovalOn,omitempty"`
-	KeyExpiryDays       *int64    `json:"keyExpiryDays,omitempty"`
-	PostureIdentityOn   *bool     `json:"postureIdentityOn,omitempty"`
-	SshRecorders        *[]string `json:"sshRecorders,omitempty"`
-	SshRecordingEnforce *bool     `json:"sshRecordingEnforce,omitempty"`
-	UsersApprovalOn     *bool     `json:"usersApprovalOn,omitempty"`
+	DeviceAttributesOn  *bool                                    `json:"deviceAttributesOn,omitempty"`
+	DevicesApprovalOn   *bool                                    `json:"devicesApprovalOn,omitempty"`
+	KeyExpiryDays       *int64                                   `json:"keyExpiryDays,omitempty"`
+	PostureIdentityOn   *bool                                    `json:"postureIdentityOn,omitempty"`
+	RouteSelection      *UpdateSettingsRequestBodyRouteSelection `json:"routeSelection,omitempty"`
+	SshRecorders        *[]string                                `json:"sshRecorders,omitempty"`
+	SshRecordingEnforce *bool                                    `json:"sshRecordingEnforce,omitempty"`
+	UsersApprovalOn     *bool                                    `json:"usersApprovalOn,omitempty"`
 }
+
+// UpdateSettingsRequestBodyRouteSelection defines model for UpdateSettingsRequestBody.RouteSelection.
+type UpdateSettingsRequestBodyRouteSelection string
 
 // UpdateUserRequestBody defines model for UpdateUserRequestBody.
 type UpdateUserRequestBody struct {
@@ -5073,7 +5129,7 @@ type ClientInterface interface {
 
 	// UpdateSettingsWithBody Update settings
 	//
-	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -5084,7 +5140,7 @@ type ClientInterface interface {
 
 	// UpdateSettings Update settings
 	//
-	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -9168,7 +9224,7 @@ func (c *Client) GetSettings(ctx context.Context, reqEditors ...RequestEditorFn)
 
 // UpdateSettingsWithBody Update settings
 //
-// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -9189,7 +9245,7 @@ func (c *Client) UpdateSettingsWithBody(ctx context.Context, contentType string,
 
 // UpdateSettings Update settings
 //
-// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -19041,7 +19097,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSettingsWithBodyWithResponse Update settings
 	//
-	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -19052,7 +19108,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSettingsWithResponse Update settings
 	//
-	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -30722,7 +30778,7 @@ func (c *ClientWithResponses) GetSettingsWithResponse(ctx context.Context, reqEd
 
 // UpdateSettingsWithBodyWithResponse Update settings
 //
-// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -30739,7 +30795,7 @@ func (c *ClientWithResponses) UpdateSettingsWithBodyWithResponse(ctx context.Con
 
 // UpdateSettingsWithResponse Update settings
 //
-// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
