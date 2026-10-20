@@ -1,86 +1,153 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { ColumnsIcon } from "@phosphor-icons/react";
+import { GearSixIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
+
+/** Every audit column, in the order the table starts with. */
+export const auditColumns = ["time", "action", "target", "actor", "result", "details"] as const;
+
+export type AuditColumnId = (typeof auditColumns)[number];
 
 /** The audit columns a reader may hide. Time and Action name the event, so they always show. */
 export const optionalAuditColumns = ["target", "actor", "result", "details"] as const;
 
 export type AuditColumn = (typeof optionalAuditColumns)[number];
 
-const columnLabels: Record<AuditColumn, string> = {
+export const auditColumnLabels: Record<AuditColumnId, string> = {
+  time: "Time",
+  action: "Action",
   target: "Target",
   actor: "Actor",
   result: "Result",
   details: "Details",
 };
 
-const storageKey = "slopscale-admin.audit.hidden-columns";
+const hiddenKey = "slopscale-admin.audit.hidden-columns";
+const orderKey = "slopscale-admin.audit.column-order";
 
 function isColumn(value: unknown): value is AuditColumn {
   return (optionalAuditColumns as readonly unknown[]).includes(value);
 }
 
-function readHidden(): ReadonlySet<AuditColumn> {
+function isColumnId(value: unknown): value is AuditColumnId {
+  return (auditColumns as readonly unknown[]).includes(value);
+}
+
+function readStored(key: string): unknown[] {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
+    const stored: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
 
-    return new Set(Array.isArray(stored) ? stored.filter((value) => isColumn(value)) : []);
+    return Array.isArray(stored) ? stored : [];
   } catch {
-    return new Set();
+    return [];
   }
 }
 
-/** The hidden columns, kept in the browser so the choice outlives the visit. */
-export function useHiddenColumns(): [ReadonlySet<AuditColumn>, (column: AuditColumn) => void] {
-  const [hidden, setHidden] = useState(readHidden);
-
-  function toggle(column: AuditColumn): void {
-    const next = new Set(hidden);
-
-    if (next.has(column)) {
-      next.delete(column);
-    } else {
-      next.add(column);
-    }
-
-    setHidden(next);
-    localStorage.setItem(storageKey, JSON.stringify([...next]));
-  }
-
-  return [hidden, toggle];
+function readHidden(): ReadonlySet<AuditColumn> {
+  return new Set(readStored(hiddenKey).filter((value) => isColumn(value)));
 }
 
-/** The log toolbar's Columns chooser: one tick per optional column, the menu stays open. */
-export function ColumnsMenu({
-  hidden,
-  onToggle,
-}: {
+/**
+ * The stored order, kept only as far as it names real columns once each; a column the stored order
+ * does not know (one added since) goes where the default order puts it, at the end.
+ */
+export function readOrder(stored: readonly unknown[] = readStored(orderKey)): AuditColumnId[] {
+  const known = [...new Set(stored.filter((value) => isColumnId(value)))];
+
+  return [...known, ...auditColumns.filter((column) => !known.includes(column))];
+}
+
+/** The column moved to the place another one held, the rest keeping their order. */
+export function moveColumn(
+  order: readonly AuditColumnId[],
+  column: AuditColumnId,
+  to: number,
+): AuditColumnId[] {
+  const rest = order.filter((candidate) => candidate !== column);
+  const at = Math.max(0, Math.min(to, rest.length));
+
+  return [...rest.slice(0, at), column, ...rest.slice(at)];
+}
+
+export interface AuditColumns {
+  readonly order: readonly AuditColumnId[];
   readonly hidden: ReadonlySet<AuditColumn>;
-  readonly onToggle: (column: AuditColumn) => void;
-}): ReactElement {
+  readonly toggle: (column: AuditColumn) => void;
+  /** Puts the column at this index of the full order. */
+  readonly move: (column: AuditColumnId, to: number) => void;
+  readonly reset: () => void;
+}
+
+/** Which columns show and in what order, kept in the browser so the choice outlives the visit. */
+export function useAuditColumns(): AuditColumns {
+  const [hidden, setHidden] = useState(readHidden);
+  const [order, setOrder] = useState(() => readOrder());
+
+  return {
+    order,
+    hidden,
+    toggle: (column) => {
+      const next = new Set(hidden);
+
+      if (next.has(column)) {
+        next.delete(column);
+      } else {
+        next.add(column);
+      }
+
+      setHidden(next);
+      localStorage.setItem(hiddenKey, JSON.stringify([...next]));
+    },
+    move: (column, to) => {
+      const next = moveColumn(order, column, to);
+
+      setOrder(next);
+      localStorage.setItem(orderKey, JSON.stringify(next));
+    },
+    reset: () => {
+      setHidden(new Set());
+      setOrder([...auditColumns]);
+      localStorage.removeItem(hiddenKey);
+      localStorage.removeItem(orderKey);
+    },
+  };
+}
+
+/**
+ * The log toolbar's Columns chooser: one tick per optional column in the table's order, the menu
+ * stays open; the last item puts back every column in its first place.
+ */
+export function ColumnsMenu({ columns }: { readonly columns: AuditColumns }): ReactElement {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger
         render={
-          <Button variant="secondary" icon={ColumnsIcon}>
-            Columns
+          <Button variant="secondary" icon={GearSixIcon} aria-label="Columns">
+            <span className="max-sm:hidden">Columns</span>
           </Button>
         }
       />
       <DropdownMenu.Content align="end">
-        {optionalAuditColumns.map((column) => (
+        {columns.order.filter(isColumn).map((column) => (
           <DropdownMenu.CheckboxItem
             key={column}
-            checked={!hidden.has(column)}
+            checked={!columns.hidden.has(column)}
             onCheckedChange={() => {
-              onToggle(column);
+              columns.toggle(column);
             }}
           >
-            {columnLabels[column]}
+            {auditColumnLabels[column]}
           </DropdownMenu.CheckboxItem>
         ))}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          onClick={() => {
+            columns.reset();
+          }}
+        >
+          Reset columns
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu>
   );

@@ -8,8 +8,11 @@ import {
 import type { ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
+import { userEvent } from "vitest/browser";
 
 import type { AuditEvent } from "~/api/queries.ts";
+import { logDate } from "~/components/audit/cells.tsx";
+import type { AuditColumnId } from "~/components/audit/columns.tsx";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import type { EventsTableProps } from "~/components/audit/events-table.tsx";
 import { formatAbsolute } from "~/lib/time.ts";
@@ -198,7 +201,11 @@ describe(EventsTable, () => {
     const screen = await render(app({ ...base, events: [deletion] }));
 
     await expect.element(screen.getByText("Remote address")).not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "Show details" }).click();
+    // The date is the row's link: a button in the link colour that says it opens a dialog.
+    const date = screen.getByRole("button", { name: logDate(new Date(deletion.createdAt)) });
+
+    await expect.element(date).toHaveAttribute("aria-haspopup", "dialog");
+    await date.click();
 
     const sheet = screen.getByRole("dialog");
 
@@ -266,5 +273,40 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("Actor", { exact: true })).not.toBeInTheDocument();
     await expect.element(screen.getByText("Success")).not.toBeInTheDocument();
     await expect.element(screen.getByText("ada")).not.toBeInTheDocument();
+  });
+
+  it("lays the columns out in the order given", async () => {
+    const order = ["actor", "time", "action", "target", "result", "details"] as const;
+    const screen = await render(app({ ...base, events: [deletion], order }));
+
+    await expect.element(screen.getByText("ada")).toBeVisible();
+
+    const heads = [...screen.container.querySelectorAll("thead th")].map((th) => th.textContent);
+
+    expect(heads.slice(0, 3)).toStrictEqual(["Actor", "Time", "Action"]);
+  });
+
+  it("moves a column with the arrow keys on its grip, past the hidden ones", async () => {
+    const onMove = vi.fn<(column: AuditColumnId, to: number) => void>();
+    const hidden = new Set(["target"] as const);
+    const screen = await render(app({ ...base, events: [deletion], hidden, onMove }));
+    const grip = screen.getByRole("button", { name: "Move the Actor column" });
+
+    await grip.click();
+    await userEvent.keyboard("{ArrowLeft}");
+    // Target is hidden, so a step left lands on Action, at index 1 of the full order.
+    expect(onMove).toHaveBeenLastCalledWith("actor", 1);
+
+    await userEvent.keyboard("{ArrowRight}");
+    expect(onMove).toHaveBeenLastCalledWith("actor", 4);
+  });
+
+  it("does not move the first column further left", async () => {
+    const onMove = vi.fn<(column: AuditColumnId, to: number) => void>();
+    const screen = await render(app({ ...base, events: [deletion], onMove }));
+
+    await screen.getByRole("button", { name: "Move the Time column" }).click();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(onMove).not.toHaveBeenCalled();
   });
 });

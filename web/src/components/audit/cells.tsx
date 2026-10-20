@@ -17,9 +17,8 @@ import type { MachineOwner } from "~/api/schema.gen.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
-import { Timestamp } from "~/components/ui/timestamp.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
-import { formatAbsolute, parseTime } from "~/lib/time.ts";
+import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
 
 /** How the API names each kind of actor, in the console's words. */
 const actorKinds: Record<string, string> = {
@@ -140,9 +139,52 @@ export function ActorCell({ event }: { readonly event: AuditEvent }): ReactEleme
   );
 }
 
-/** When the event was recorded, as the dashboard's audit log writes it. */
-export function TimeCell({ event }: { readonly event: AuditEvent }): ReactElement {
-  return <Timestamp value={event.createdAt} />;
+const longDate = new Intl.DateTimeFormat(undefined, {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+const clockTime = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+const exactTime = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "long" });
+
+/** "October 20, 2026 • 04:33 AM", the Zero Trust admin log's date. */
+export function logDate(date: Date): string {
+  return `${longDate.format(date)} • ${clockTime.format(date)}`;
+}
+
+/**
+ * When the event was recorded, as the Zero Trust admin log writes it: a 14px human date that is the
+ * row's link, in the link colour, opening the event's sheet. The exact moment, to the second and
+ * with the zone, and how long ago it was are in the tooltip.
+ */
+export function TimeCell({
+  event,
+  onOpen,
+}: {
+  readonly event: AuditEvent;
+  readonly onOpen: () => void;
+}): ReactElement {
+  const at = parseTime(event.createdAt);
+
+  if (at === null) {
+    return <span className="text-kumo-subtle">{event.createdAt}</span>;
+  }
+
+  return (
+    <Tooltip
+      content={`${exactTime.format(at)} (${formatRelative(at)})`}
+      render={
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          className="block max-w-full cursor-pointer truncate rounded-sm text-left font-semibold text-kumo-link hover:underline focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
+          onClick={onOpen}
+        >
+          <time dateTime={at.toISOString()}>{logDate(at)}</time>
+        </button>
+      }
+    />
+  );
 }
 
 /**
