@@ -213,52 +213,8 @@ func reduceCapGrantRule(
 	subnetRoutes := node.SubnetRoutes()
 
 	for _, cg := range rule.CapGrant {
-		// Collect the node's IPs that fall within any of this
-		// CapGrant's Dsts. Broad prefixes are narrowed to specific
-		// /32 and /128 entries for the node.
-		var matchingDsts []netip.Prefix
-
-		for _, dst := range cg.Dsts {
-			if dst.IsSingleIP() {
-				// Already a specific IP — keep it if it matches
-				// any of the node's IPs.
-				if slices.Contains(nodeIPs, dst.Addr()) {
-					matchingDsts = append(matchingDsts, dst)
-				}
-			} else {
-				// Broad prefix — narrow to node's specific IPs.
-				for _, ip := range nodeIPs {
-					if dst.Contains(ip) {
-						matchingDsts = append(matchingDsts, netip.PrefixFrom(ip, ip.BitLen()))
-					}
-				}
-			}
-		}
-
-		// Asymmetric on purpose: the IP-match loop above narrows broad
-		// prefixes to node-specific /32 or /128 so peers receive only
-		// the minimum routing surface. The route-match loop below
-		// preserves the original prefix so the subnet-serving node
-		// receives the full CapGrant scope. [types.NodeView.SubnetRoutes]
-		// excludes both unapproved and exit routes, matching Tailscale
-		// SaaS behavior.
-		for _, dst := range cg.Dsts {
-			for _, subnetRoute := range subnetRoutes {
-				if dst.Overlaps(subnetRoute) {
-					// For route overlaps, keep the original prefix.
-					matchingDsts = append(matchingDsts, dst)
-				}
-			}
-		}
-
+		matchingDsts := capGrantDstsForNode(cg.Dsts, nodeIPs, subnetRoutes)
 		if len(matchingDsts) > 0 {
-			// A Dst can be appended twice when a broad prefix both
-			// contains a node IP and overlaps one of its approved
-			// subnet routes. Sort + Compact dedups; [netip.Prefix] is
-			// comparable so Compact works with ==.
-			slices.SortFunc(matchingDsts, netip.Prefix.Compare)
-			matchingDsts = slices.Compact(matchingDsts)
-
 			capGrants = append(capGrants, tailcfg.CapGrant{
 				Dsts:   matchingDsts,
 				CapMap: cg.CapMap,
@@ -274,4 +230,56 @@ func reduceCapGrantRule(
 		SrcIPs:   rule.SrcIPs,
 		CapGrant: capGrants,
 	}
+}
+
+// capGrantDstsForNode collects the Dsts of one [tailcfg.CapGrant] that
+// reach the node, sorted and without duplicates. Broad prefixes are
+// narrowed to specific /32 and /128 entries for the node.
+func capGrantDstsForNode(
+	dsts []netip.Prefix,
+	nodeIPs []netip.Addr,
+	subnetRoutes []netip.Prefix,
+) []netip.Prefix {
+	var matchingDsts []netip.Prefix
+
+	for _, dst := range dsts {
+		if dst.IsSingleIP() {
+			// Already a specific IP — keep it if it matches
+			// any of the node's IPs.
+			if slices.Contains(nodeIPs, dst.Addr()) {
+				matchingDsts = append(matchingDsts, dst)
+			}
+		} else {
+			// Broad prefix — narrow to node's specific IPs.
+			for _, ip := range nodeIPs {
+				if dst.Contains(ip) {
+					matchingDsts = append(matchingDsts, netip.PrefixFrom(ip, ip.BitLen()))
+				}
+			}
+		}
+	}
+
+	// Asymmetric on purpose: the IP-match loop above narrows broad
+	// prefixes to node-specific /32 or /128 so peers receive only
+	// the minimum routing surface. The route-match loop below
+	// preserves the original prefix so the subnet-serving node
+	// receives the full CapGrant scope. [types.NodeView.SubnetRoutes]
+	// excludes both unapproved and exit routes, matching Tailscale
+	// SaaS behavior.
+	for _, dst := range dsts {
+		for _, subnetRoute := range subnetRoutes {
+			if dst.Overlaps(subnetRoute) {
+				// For route overlaps, keep the original prefix.
+				matchingDsts = append(matchingDsts, dst)
+			}
+		}
+	}
+
+	// A Dst can be appended twice when a broad prefix both
+	// contains a node IP and overlaps one of its approved
+	// subnet routes. Sort + Compact dedups; [netip.Prefix] is
+	// comparable so Compact works with ==.
+	slices.SortFunc(matchingDsts, netip.Prefix.Compare)
+
+	return slices.Compact(matchingDsts)
 }

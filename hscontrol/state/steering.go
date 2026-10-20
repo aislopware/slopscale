@@ -36,10 +36,10 @@ import (
 // machine does, not with every netcheck.
 
 // nearSlack is how much further than the nearest router another may be and
-// still count as equally near: nearSlackMin, or a nearSlackDivisor-th of
+// still count as equally near: minNearSlack, or a nearSlackDivisor-th of
 // the nearest round trip (10%) when that is more.
 const (
-	nearSlackMin     = 20 * time.Millisecond
+	minNearSlack     = 20 * time.Millisecond
 	nearSlackDivisor = 10
 )
 
@@ -140,7 +140,7 @@ func nearest(sites []site, viewer viewerSite) []site {
 		return nil
 	}
 
-	limit := best + max(nearSlackMin, best/nearSlackDivisor)
+	limit := best + max(minNearSlack, best/nearSlackDivisor)
 
 	var out []site
 

@@ -237,6 +237,9 @@ linters:
         - errors.Unwrap(
         - .Wrap(
         - .Wrapf(
+        # huma's ErrorNNN constructors build the HTTP error the API
+        # returns; they take the cause as an argument and wrap it.
+        - github.com/danielgtaylor/huma/v2.Error
         - (context.Context).Err()
     thelper:
       # Table-driven cases are closures that take *testing.T; they are not
