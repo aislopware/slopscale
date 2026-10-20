@@ -142,11 +142,18 @@ function cloneRegion(region: DerpCustomRegion): DerpCustomRegion {
 }
 
 export function withUrl(settings: DerpSettings, url: string): SetDerpRequestBody {
+  return withUrls(settings, [url]);
+}
+
+/** The settings with the URLs appended in order, skipping any the list already has. */
+export function withUrls(settings: DerpSettings, added: readonly string[]): SetDerpRequestBody {
   const next = cloneSettings(settings);
   const urls = next.urls ?? [];
 
-  if (!urls.includes(url)) {
-    urls.push(url);
+  for (const url of added) {
+    if (!urls.includes(url)) {
+      urls.push(url);
+    }
   }
 
   next.urls = urls;

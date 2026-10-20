@@ -14,12 +14,12 @@ import {
   urlError,
   withAutoUpdate,
   withFrequency,
-  withUrl,
+  withUrls,
   withoutUrl,
 } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { EntryList } from "~/components/dns/entry-list.tsx";
-import { ValueDialog } from "~/components/dns/value-dialog.tsx";
+import { StagedAddPanel } from "~/components/dns/staged-add-panel.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
@@ -42,6 +42,24 @@ export function SourcesSection({
 
   return (
     <>
+      {adding ? (
+        <StagedAddPanel
+          title="Add map URLs"
+          description="Each a DERP map in Tailscale's JSON format, merged after the ones already listed."
+          label="Map URL"
+          placeholder={tailscaleMapUrl}
+          validate={urlError}
+          existing={settings.urls}
+          successMessage={(count) => (count === 1 ? "Map URL added" : `${count} map URLs added`)}
+          mutation={mutations.set}
+          onClose={() => {
+            setAdding(false);
+          }}
+          onSubmit={(values, done) => {
+            mutations.set.mutate({ body: withUrls(settings, values) }, { onSuccess: done });
+          }}
+        />
+      ) : null}
       <Section
         title="Map sources"
         description="Maps of relays, fetched and merged in order. A later map's region replaces an earlier one with the same id."
@@ -65,6 +83,7 @@ export function SourcesSection({
                     variant="secondary"
                     size="sm"
                     icon={PlusIcon}
+                    disabled={adding}
                     onClick={() => {
                       setAdding(true);
                     }}
@@ -109,20 +128,6 @@ export function SourcesSection({
             </ul>
           </SectionRow>
         )}
-        <ValueDialog
-          open={adding}
-          onOpenChange={setAdding}
-          title="Add map URL"
-          description="A DERP map in Tailscale's JSON format."
-          label="Map URL"
-          placeholder={tailscaleMapUrl}
-          validate={urlError}
-          successMessage="Map URL added"
-          mutation={mutations.set}
-          onSubmit={(value, done) => {
-            mutations.set.mutate({ body: withUrl(settings, value) }, { onSuccess: done });
-          }}
-        />
       </Section>
       <SettingsCard>
         <RefetchRows derp={derp} canEdit={canEdit} mutations={mutations} />

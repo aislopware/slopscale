@@ -15,7 +15,7 @@ import {
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FromFileBadge } from "~/components/dns/source.tsx";
-import { ValueDialog } from "~/components/dns/value-dialog.tsx";
+import { StagedAddPanel } from "~/components/dns/staged-add-panel.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
 import { Section } from "~/components/ui/section.tsx";
@@ -53,57 +53,68 @@ export function SearchDomainsSection({
   }
 
   return (
-    <Section
-      title="Search domains"
-      description="Suffixes machines try for short names. The base domain is always first."
-      bodyClassName="p-0"
-      {...(canEdit
-        ? {
-            actions: (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={PlusIcon}
-                onClick={() => {
-                  mutations.set.reset();
-                  setAdding(true);
-                }}
-              >
-                Add search domain
-              </Button>
-            ),
+    <>
+      {adding ? (
+        <StagedAddPanel
+          title="Add search domains"
+          description={
+            <>
+              Machines append each to names without a dot, so <Code>db</Code> also tries{" "}
+              <Code>db.corp.example.com</Code>.
+            </>
           }
-        : {})}
-    >
-      <EntryList
-        canEdit={canEdit}
-        pending={mutations.set.isPending}
-        empty={{
-          title: "No search domains",
-          description: "Only the base domain is tried for a short name.",
-        }}
-        entries={entries}
-      />
-      <ValueDialog
-        open={adding}
-        onOpenChange={setAdding}
-        title="Add search domain"
-        description={
-          <>
-            Machines append it to names without a dot, so <Code>db</Code> also tries{" "}
-            <Code>db.corp.example.com</Code>.
-          </>
-        }
-        label="Domain"
-        placeholder="corp.example.com"
-        normalize={normalizeDomain}
-        validate={domainError}
-        successMessage="Search domain added"
-        mutation={mutations.set}
-        onSubmit={(value, done) => {
-          mutations.set.mutate({ body: withSearchDomain(settings, value) }, { onSuccess: done });
-        }}
-      />
-    </Section>
+          label="Domain"
+          placeholder="corp.example.com"
+          normalize={normalizeDomain}
+          validate={domainError}
+          existing={settings.searchDomains}
+          successMessage={(count) =>
+            count === 1 ? "Search domain added" : `${count} search domains added`
+          }
+          mutation={mutations.set}
+          onClose={() => {
+            setAdding(false);
+          }}
+          onSubmit={(values, done) => {
+            mutations.set.mutate(
+              { body: values.reduce((next, domain) => withSearchDomain(next, domain), settings) },
+              { onSuccess: done },
+            );
+          }}
+        />
+      ) : null}
+      <Section
+        title="Search domains"
+        description="Suffixes machines try for short names. The base domain is always first."
+        bodyClassName="p-0"
+        {...(canEdit
+          ? {
+              actions: (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={PlusIcon}
+                  disabled={adding}
+                  onClick={() => {
+                    setAdding(true);
+                  }}
+                >
+                  Add search domain
+                </Button>
+              ),
+            }
+          : {})}
+      >
+        <EntryList
+          canEdit={canEdit}
+          pending={mutations.set.isPending}
+          empty={{
+            title: "No search domains",
+            description: "Only the base domain is tried for a short name.",
+          }}
+          entries={entries}
+        />
+      </Section>
+    </>
   );
 }
