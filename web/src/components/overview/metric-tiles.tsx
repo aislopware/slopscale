@@ -8,23 +8,15 @@ import { activeCount, pendingCount } from "~/components/access/request-model.ts"
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { cardClass } from "~/components/ui/card.tsx";
+import { StatTile } from "~/components/ui/stat-tile.tsx";
 import { isExitNode, nodeLabel } from "~/lib/node.ts";
 
-/** Column count by tile count, so a shorter strip still fills its row. */
-const columnsFor: readonly string[] = [
-  "grid-cols-1",
-  "grid-cols-1",
-  "grid-cols-1 sm:grid-cols-2",
-  "grid-cols-1 lg:grid-cols-3",
-  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
-  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5",
-];
-
-/** Each tile is a card of its own, 16px from the next. */
-const tileClass = cn(
-  cardClass,
-  "flex flex-col gap-1.5 px-5 py-4 text-kumo-default no-underline hover:bg-kumo-tint focus-visible:bg-kumo-tint",
-);
+/**
+ * A tile is the dashboard's rail stat tile (Workers' usage figures) made a link to the page that
+ * owns the number: the tile tints on hover and the focus ring goes round the whole of it.
+ */
+const tileLinkClass =
+  "group/tile flex min-w-0 rounded-lg text-kumo-default no-underline outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus [&>div]:w-full [&>div]:hover:bg-kumo-tint";
 
 type Tone = "neutral" | "warning";
 
@@ -41,7 +33,7 @@ function Meter({ share, of }: { readonly share: number; readonly of: number }): 
   return (
     <span
       aria-hidden
-      className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-kumo-recessed"
+      className="mt-1.5 block h-1 w-full overflow-hidden rounded-full bg-kumo-recessed"
     >
       <span className="block h-full rounded-full bg-kumo-brand" style={{ width: `${width}%` }} />
     </span>
@@ -64,19 +56,17 @@ function TileBody({
   readonly share?: number;
 }): ReactElement {
   return (
-    <>
-      <span className="truncate text-kumo-subtle">{label}</span>
-      <span
-        className={cn(
-          "text-2xl font-semibold tabular-nums",
-          tone === "warning" ? "text-kumo-warning" : "text-kumo-strong",
-        )}
-      >
-        {value}
-      </span>
-      <span className="truncate text-xs text-kumo-subtle">{context}</span>
-      {share === undefined ? null : <Meter share={share} of={value} />}
-    </>
+    <StatTile
+      label={label}
+      value={value}
+      tone={tone === "warning" ? "warning" : "default"}
+      hint={
+        <>
+          <span className="block truncate">{context}</span>
+          {share === undefined ? null : <Meter share={share} of={value} />}
+        </>
+      }
+    />
   );
 }
 
@@ -84,7 +74,7 @@ function MachinesTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElem
   const online = nodes.filter((node) => node.online).length;
 
   return (
-    <Link to="/machines" className={tileClass}>
+    <Link to="/machines" className={tileLinkClass}>
       <TileBody
         label="Machines"
         value={nodes.length}
@@ -106,7 +96,7 @@ function ApprovalTile({
   const pending = pendingNodes + pendingUsers;
 
   return (
-    <Link to="/machines" search={{ status: "pending" }} className={tileClass}>
+    <Link to="/machines" search={{ status: "pending" }} className={tileLinkClass}>
       <TileBody
         label="Needs approval"
         value={pending}
@@ -135,7 +125,7 @@ function UsersTile({
   readonly pending: number;
 }): ReactElement {
   return (
-    <Link to="/users" search={allUsers} className={tileClass}>
+    <Link to="/users" search={allUsers} className={tileLinkClass}>
       <TileBody
         label="Users"
         value={users.length}
@@ -184,7 +174,7 @@ function ExitTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElement 
   }
 
   return (
-    <Link to="/machines" className={tileClass}>
+    <Link to="/machines" className={tileLinkClass}>
       <TileBody label="Exit nodes" value={count} context={context} />
     </Link>
   );
@@ -199,7 +189,7 @@ function AccessTile({ requests }: { readonly requests: readonly AccessRequest[] 
   const pending = pendingCount(requests);
 
   return (
-    <Link to="/policy/requests" className={tileClass}>
+    <Link to="/policy/requests" className={tileLinkClass}>
       <TileBody
         label="Temporary access"
         value={active}
@@ -212,8 +202,8 @@ function AccessTile({ requests }: { readonly requests: readonly AccessRequest[] 
 
 function TileSkeleton(): ReactElement {
   return (
-    <div aria-busy className={tileClass}>
-      <SkeletonLine blockHeight={24} minWidth={35} maxWidth={55} />
+    <div aria-busy className={cn(cardClass, "flex flex-col gap-1.5 p-4")}>
+      <SkeletonLine blockHeight={16} minWidth={35} maxWidth={55} />
       <SkeletonLine blockHeight={32} minWidth={20} maxWidth={30} />
       <SkeletonLine blockHeight={16} minWidth={40} maxWidth={70} />
     </div>
@@ -230,9 +220,9 @@ export interface MetricTilesProps {
 }
 
 /**
- * The numbers at the top of the overview. Every tile is a link to the page that owns it, and a tile
- * only appears once its data can be read, so a caller without a scope sees a shorter strip rather
- * than an empty box.
+ * The tailnet's numbers, two to a row in the overview's rail as the Workers list shows its usage.
+ * Every tile is a link to the page that owns it, and a tile only appears once its data can be read,
+ * so a caller without a scope sees fewer tiles rather than an empty box.
  */
 export function MetricTiles({
   nodes,
@@ -279,5 +269,5 @@ export function MetricTiles({
     return null;
   }
 
-  return <div className={cn("grid gap-4", columnsFor[tiles.length])}>{tiles}</div>;
+  return <div className="grid grid-cols-2 gap-2.5">{tiles}</div>;
 }
