@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -11,10 +10,10 @@ import { requestNames, toRequestRows } from "~/components/access/request-model.t
 import type { RequestRow } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 import { useNow } from "~/lib/use-now.ts";
 
 const filters = ["pending", "active", "all"] as const;
@@ -128,9 +127,7 @@ export function RequestsTab({
         <DataTable
           table={table}
           empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
+            <SectionEmpty
               title={emptyFor(filter, search !== "").title}
               description={emptyFor(filter, search !== "").description}
               contents={

@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
 import { PlusIcon } from "@phosphor-icons/react";
@@ -27,10 +26,10 @@ import type { StatusFilter } from "~/components/keys/status.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import type { AppTableInstance, RowData } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 
 const preAuthStatusTabs: readonly { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -96,9 +95,7 @@ export function PreAuthPanel({
         shown={table.getRowModel().rows.length}
         noun="pre-auth key"
         firstEmpty={
-          <Empty
-            className={tableEmptyClass}
-            size="sm"
+          <SectionEmpty
             title="No pre-auth keys"
             description="A pre-auth key lets a machine register without anyone signing in on it."
           />
@@ -147,9 +144,7 @@ export function ApiPanel({
         shown={table.getRowModel().rows.length}
         noun="API key"
         firstEmpty={
-          <Empty
-            className={tableEmptyClass}
-            size="sm"
+          <SectionEmpty
             title="No API keys"
             description="An API key authenticates scripts and other tools against the v1 API."
           />
@@ -209,9 +204,7 @@ export function OAuthPanel({
         shown={table.getRowModel().rows.length}
         noun="OAuth client"
         firstEmpty={
-          <Empty
-            className={tableEmptyClass}
-            size="sm"
+          <SectionEmpty
             title="No OAuth clients"
             description="An OAuth client or federated identity lets automation get short-lived v2 API tokens."
           />
@@ -306,9 +299,7 @@ function PanelTable<TData extends RowData>({
         total === 0 ? (
           firstEmpty
         ) : (
-          <Empty
-            className={tableEmptyClass}
-            size="sm"
+          <SectionEmpty
             title="No keys match"
             contents={
               <Button variant="secondary" onClick={controls.handleClear}>

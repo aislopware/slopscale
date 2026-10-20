@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -13,10 +12,10 @@ import { requestColumns } from "~/components/access/request-columns.tsx";
 import { toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 
 export const Route = createFileRoute("/_app/access")({
   loader: async ({ context }) => {
@@ -103,9 +102,7 @@ function MyAccessPage(): ReactElement {
         <DataTable
           table={table}
           empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
+            <SectionEmpty
               title="No requests"
               description={emptyText(me.user !== undefined, options.groups.length > 0)}
             />
