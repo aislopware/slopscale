@@ -89,11 +89,11 @@ function LoginPage(): ReactElement {
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-24">
         <div className="flex w-full max-w-sm flex-col gap-4">
-          <Card className="gap-6 rounded-xl p-8">
+          <Card className="gap-6 p-8">
             <div className="flex flex-col gap-3">
               <BrandMark markClassName="size-8" logoClassName="h-8 max-w-56" />
               <div className="flex flex-col gap-1">
-                <h1 className="text-xl font-semibold text-kumo-strong">
+                <h1 className="text-[20px] leading-[25px] font-semibold text-kumo-default">
                   Sign in to {branding.title}
                 </h1>
                 <p className="text-kumo-subtle">
@@ -123,7 +123,6 @@ function LoginPage(): ReactElement {
             ) : (
               <Button
                 variant="primary"
-                size="lg"
                 className="w-full"
                 icon={SignInIcon}
                 onClick={() => {

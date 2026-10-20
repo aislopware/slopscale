@@ -58,6 +58,9 @@ import { Route as AppTrafficIndexRouteImport } from './routes/_app/traffic/index
 import { Route as AppTrafficDestinationsRouteImport } from './routes/_app/traffic/destinations'
 import { Route as AppTrafficDnsRouteImport } from './routes/_app/traffic/dns'
 import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/overview'
+import { Route as AppKeysApiNewRouteImport } from './routes/_app/keys/api_.new'
+import { Route as AppKeysOauthNewRouteImport } from './routes/_app/keys/oauth_.new'
+import { Route as AppKeysPreAuthNewRouteImport } from './routes/_app/keys/pre-auth_.new'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
 import { Route as AppSettingsTrafficIndexRouteImport } from './routes/_app/settings/traffic/index'
 import { Route as AppSettingsTrafficCollectionRouteImport } from './routes/_app/settings/traffic/collection'
@@ -310,6 +313,21 @@ const AppTrafficOverviewRoute = AppTrafficOverviewRouteImport.update({
   path: '/traffic/overview',
   getParentRoute: () => AppRoute,
 } as any)
+const AppKeysApiNewRoute = AppKeysApiNewRouteImport.update({
+  id: '/keys/api_/new',
+  path: '/keys/api/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKeysOauthNewRoute = AppKeysOauthNewRouteImport.update({
+  id: '/keys/oauth_/new',
+  path: '/keys/oauth/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppKeysPreAuthNewRoute = AppKeysPreAuthNewRouteImport.update({
+  id: '/keys/pre-auth_/new',
+  path: '/keys/pre-auth/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
   id: '/machines/$nodeId_/ssh',
   path: '/machines/$nodeId/ssh',
@@ -393,6 +411,9 @@ export interface FileRoutesByFullPath {
   '/services/': typeof AppServicesIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/traffic/': typeof AppTrafficIndexRoute
+  '/keys/api/new': typeof AppKeysApiNewRoute
+  '/keys/oauth/new': typeof AppKeysOauthNewRoute
+  '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
@@ -449,6 +470,9 @@ export interface FileRoutesByTo {
   '/services': typeof AppServicesIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/traffic': typeof AppTrafficIndexRoute
+  '/keys/api/new': typeof AppKeysApiNewRoute
+  '/keys/oauth/new': typeof AppKeysOauthNewRoute
+  '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
@@ -507,6 +531,9 @@ export interface FileRoutesById {
   '/_app/services/': typeof AppServicesIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/traffic/': typeof AppTrafficIndexRoute
+  '/_app/keys/api_/new': typeof AppKeysApiNewRoute
+  '/_app/keys/oauth_/new': typeof AppKeysOauthNewRoute
+  '/_app/keys/pre-auth_/new': typeof AppKeysPreAuthNewRoute
   '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
   '/_app/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/_app/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
@@ -565,6 +592,9 @@ export interface FileRouteTypes {
     | '/services/'
     | '/settings/'
     | '/traffic/'
+    | '/keys/api/new'
+    | '/keys/oauth/new'
+    | '/keys/pre-auth/new'
     | '/machines/$nodeId/ssh'
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
@@ -621,6 +651,9 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/traffic'
+    | '/keys/api/new'
+    | '/keys/oauth/new'
+    | '/keys/pre-auth/new'
     | '/machines/$nodeId/ssh'
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
@@ -678,6 +711,9 @@ export interface FileRouteTypes {
     | '/_app/services/'
     | '/_app/settings/'
     | '/_app/traffic/'
+    | '/_app/keys/api_/new'
+    | '/_app/keys/oauth_/new'
+    | '/_app/keys/pre-auth_/new'
     | '/_app/machines/$nodeId_/ssh'
     | '/_app/settings/traffic/collection'
     | '/_app/settings/traffic/gateways'
@@ -1036,6 +1072,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrafficOverviewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/keys/api_/new': {
+      id: '/_app/keys/api_/new'
+      path: '/keys/api/new'
+      fullPath: '/keys/api/new'
+      preLoaderRoute: typeof AppKeysApiNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/keys/oauth_/new': {
+      id: '/_app/keys/oauth_/new'
+      path: '/keys/oauth/new'
+      fullPath: '/keys/oauth/new'
+      preLoaderRoute: typeof AppKeysOauthNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/keys/pre-auth_/new': {
+      id: '/_app/keys/pre-auth_/new'
+      path: '/keys/pre-auth/new'
+      fullPath: '/keys/pre-auth/new'
+      preLoaderRoute: typeof AppKeysPreAuthNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/machines/$nodeId_/ssh': {
       id: '/_app/machines/$nodeId_/ssh'
       path: '/machines/$nodeId/ssh'
@@ -1129,6 +1186,9 @@ interface AppRouteChildren {
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppTrafficIndexRoute: typeof AppTrafficIndexRoute
+  AppKeysApiNewRoute: typeof AppKeysApiNewRoute
+  AppKeysOauthNewRoute: typeof AppKeysOauthNewRoute
+  AppKeysPreAuthNewRoute: typeof AppKeysPreAuthNewRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
   AppSettingsTrafficCollectionRoute: typeof AppSettingsTrafficCollectionRoute
   AppSettingsTrafficGatewaysRoute: typeof AppSettingsTrafficGatewaysRoute
@@ -1185,6 +1245,9 @@ const AppRouteChildren: AppRouteChildren = {
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppTrafficIndexRoute: AppTrafficIndexRoute,
+  AppKeysApiNewRoute: AppKeysApiNewRoute,
+  AppKeysOauthNewRoute: AppKeysOauthNewRoute,
+  AppKeysPreAuthNewRoute: AppKeysPreAuthNewRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
   AppSettingsTrafficCollectionRoute: AppSettingsTrafficCollectionRoute,
   AppSettingsTrafficGatewaysRoute: AppSettingsTrafficGatewaysRoute,

@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { preAuthKeysQuery } from "~/api/queries.ts";
+import { can } from "~/auth/me.ts";
+import { CreateKeyLink } from "~/components/keys/create-link.tsx";
 import { PreAuthPanel } from "~/components/keys/panels.tsx";
 import { keyControls, keysSearchSchema } from "~/components/keys/search.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -29,6 +31,13 @@ function PreAuthKeysPage(): ReactElement {
         title="Pre-auth keys"
         docs="ref/registration"
         description="Register machines without a login. A key sets the user or tags the machine joins as."
+        actions={
+          <CreateKeyLink
+            to="/keys/pre-auth/new"
+            label="Create key"
+            allowed={can(me, "auth_keys")}
+          />
+        }
       />
       <PreAuthPanel me={me} controls={controls} />
     </>

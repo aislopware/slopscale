@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -14,9 +13,9 @@ import { useAccessMutations } from "~/components/access/mutations.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 
 export interface GroupsTabProps {
   readonly me: Me;
@@ -39,10 +38,7 @@ export function GroupsTab({
   search,
   onSearchChange,
 }: GroupsTabProps): ReactElement {
-  const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
   const rows = useMemo(() => toGroupRows(groups, nodes), [groups, nodes]);
 
   const table = useAppTable({
@@ -64,20 +60,7 @@ export function GroupsTab({
 
   return (
     <>
-      <TableToolbar
-        actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New group
-          </Button>
-        }
-      >
+      <TableToolbar>
         <SearchInput
           value={search}
           placeholder="Search by name or description"
@@ -88,9 +71,7 @@ export function GroupsTab({
         <DataTable
           table={table}
           empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
+            <SectionEmpty
               title="No groups match"
               contents={
                 <Button
@@ -113,6 +94,38 @@ export function GroupsTab({
           }
         />
       </TableGroup>
+    </>
+  );
+}
+
+/**
+ * The groups page's create action, in its page header beside the title as the dashboard's "Add a
+ * policy" is, with the dialog it opens.
+ */
+export function NewGroupButton({
+  me,
+  nodes,
+  users,
+}: {
+  readonly me: Me;
+  readonly nodes: readonly Node[] | undefined;
+  readonly users: readonly User[] | undefined;
+}): ReactElement {
+  const [creating, setCreating] = useState(false);
+  const mutations = useAccessMutations();
+
+  return (
+    <>
+      <Button
+        variant="primary"
+        icon={PlusIcon}
+        disabled={!can(me, "policy_file")}
+        onClick={() => {
+          setCreating(true);
+        }}
+      >
+        New group
+      </Button>
       <GroupDialog
         nodes={nodes ?? []}
         users={users ?? []}
