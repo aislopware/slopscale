@@ -58,6 +58,10 @@ import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/ov
 import { Route as AppKeysApiNewRouteImport } from './routes/_app/keys/api_.new'
 import { Route as AppKeysOauthNewRouteImport } from './routes/_app/keys/oauth_.new'
 import { Route as AppKeysPreAuthNewRouteImport } from './routes/_app/keys/pre-auth_.new'
+import { Route as AppMachinesNodeIdIndexRouteImport } from './routes/_app/machines/$nodeId.index'
+import { Route as AppMachinesNodeIdDiagnosticsRouteImport } from './routes/_app/machines/$nodeId.diagnostics'
+import { Route as AppMachinesNodeIdRoutesRouteImport } from './routes/_app/machines/$nodeId.routes'
+import { Route as AppMachinesNodeIdSettingsRouteImport } from './routes/_app/machines/$nodeId.settings'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
 import { Route as AppPolicyGroupsIndexRouteImport } from './routes/_app/policy/groups/index'
 import { Route as AppPolicyGroupsGroupIdRouteImport } from './routes/_app/policy/groups/$groupId'
@@ -319,6 +323,28 @@ const AppKeysPreAuthNewRoute = AppKeysPreAuthNewRouteImport.update({
   path: '/keys/pre-auth/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMachinesNodeIdIndexRoute = AppMachinesNodeIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppMachinesNodeIdRoute,
+} as any)
+const AppMachinesNodeIdDiagnosticsRoute =
+  AppMachinesNodeIdDiagnosticsRouteImport.update({
+    id: '/diagnostics',
+    path: '/diagnostics',
+    getParentRoute: () => AppMachinesNodeIdRoute,
+  } as any)
+const AppMachinesNodeIdRoutesRoute = AppMachinesNodeIdRoutesRouteImport.update({
+  id: '/routes',
+  path: '/routes',
+  getParentRoute: () => AppMachinesNodeIdRoute,
+} as any)
+const AppMachinesNodeIdSettingsRoute =
+  AppMachinesNodeIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AppMachinesNodeIdRoute,
+  } as any)
 const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
   id: '/machines/$nodeId_/ssh',
   path: '/machines/$nodeId/ssh',
@@ -420,7 +446,7 @@ export interface FileRoutesByFullPath {
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
-  '/machines/$nodeId': typeof AppMachinesNodeIdRoute
+  '/machines/$nodeId': typeof AppMachinesNodeIdRouteWithChildren
   '/machines/add': typeof AppMachinesAddRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
@@ -448,6 +474,9 @@ export interface FileRoutesByFullPath {
   '/keys/api/new': typeof AppKeysApiNewRoute
   '/keys/oauth/new': typeof AppKeysOauthNewRoute
   '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
+  '/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
+  '/machines/$nodeId/routes': typeof AppMachinesNodeIdRoutesRoute
+  '/machines/$nodeId/settings': typeof AppMachinesNodeIdSettingsRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
   '/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
   '/policy/groups/new': typeof AppPolicyGroupsNewRoute
@@ -458,6 +487,7 @@ export interface FileRoutesByFullPath {
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/machines/$nodeId/': typeof AppMachinesNodeIdIndexRoute
   '/policy/groups/': typeof AppPolicyGroupsIndexRoute
   '/policy/postures/': typeof AppPolicyPosturesIndexRoute
   '/policy/rules/': typeof AppPolicyRulesIndexRoute
@@ -485,7 +515,6 @@ export interface FileRoutesByTo {
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
-  '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/machines/add': typeof AppMachinesAddRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
@@ -513,6 +542,9 @@ export interface FileRoutesByTo {
   '/keys/api/new': typeof AppKeysApiNewRoute
   '/keys/oauth/new': typeof AppKeysOauthNewRoute
   '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
+  '/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
+  '/machines/$nodeId/routes': typeof AppMachinesNodeIdRoutesRoute
+  '/machines/$nodeId/settings': typeof AppMachinesNodeIdSettingsRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
   '/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
   '/policy/groups/new': typeof AppPolicyGroupsNewRoute
@@ -523,6 +555,7 @@ export interface FileRoutesByTo {
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/machines/$nodeId': typeof AppMachinesNodeIdIndexRoute
   '/policy/groups': typeof AppPolicyGroupsIndexRoute
   '/policy/postures': typeof AppPolicyPosturesIndexRoute
   '/policy/rules': typeof AppPolicyRulesIndexRoute
@@ -552,7 +585,7 @@ export interface FileRoutesById {
   '/_app/keys/api': typeof AppKeysApiRoute
   '/_app/keys/oauth': typeof AppKeysOauthRoute
   '/_app/keys/pre-auth': typeof AppKeysPreAuthRoute
-  '/_app/machines/$nodeId': typeof AppMachinesNodeIdRoute
+  '/_app/machines/$nodeId': typeof AppMachinesNodeIdRouteWithChildren
   '/_app/machines/add': typeof AppMachinesAddRoute
   '/_app/policy/file': typeof AppPolicyFileRoute
   '/_app/policy/graph': typeof AppPolicyGraphRoute
@@ -580,6 +613,9 @@ export interface FileRoutesById {
   '/_app/keys/api_/new': typeof AppKeysApiNewRoute
   '/_app/keys/oauth_/new': typeof AppKeysOauthNewRoute
   '/_app/keys/pre-auth_/new': typeof AppKeysPreAuthNewRoute
+  '/_app/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
+  '/_app/machines/$nodeId/routes': typeof AppMachinesNodeIdRoutesRoute
+  '/_app/machines/$nodeId/settings': typeof AppMachinesNodeIdSettingsRoute
   '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
   '/_app/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
   '/_app/policy/groups/new': typeof AppPolicyGroupsNewRoute
@@ -590,6 +626,7 @@ export interface FileRoutesById {
   '/_app/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/_app/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/_app/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/_app/machines/$nodeId/': typeof AppMachinesNodeIdIndexRoute
   '/_app/policy/groups/': typeof AppPolicyGroupsIndexRoute
   '/_app/policy/postures/': typeof AppPolicyPosturesIndexRoute
   '/_app/policy/rules/': typeof AppPolicyRulesIndexRoute
@@ -647,6 +684,9 @@ export interface FileRouteTypes {
     | '/keys/api/new'
     | '/keys/oauth/new'
     | '/keys/pre-auth/new'
+    | '/machines/$nodeId/diagnostics'
+    | '/machines/$nodeId/routes'
+    | '/machines/$nodeId/settings'
     | '/machines/$nodeId/ssh'
     | '/policy/groups/$groupId'
     | '/policy/groups/new'
@@ -657,6 +697,7 @@ export interface FileRouteTypes {
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/machines/$nodeId/'
     | '/policy/groups/'
     | '/policy/postures/'
     | '/policy/rules/'
@@ -684,7 +725,6 @@ export interface FileRouteTypes {
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
-    | '/machines/$nodeId'
     | '/machines/add'
     | '/policy/file'
     | '/policy/graph'
@@ -712,6 +752,9 @@ export interface FileRouteTypes {
     | '/keys/api/new'
     | '/keys/oauth/new'
     | '/keys/pre-auth/new'
+    | '/machines/$nodeId/diagnostics'
+    | '/machines/$nodeId/routes'
+    | '/machines/$nodeId/settings'
     | '/machines/$nodeId/ssh'
     | '/policy/groups/$groupId'
     | '/policy/groups/new'
@@ -722,6 +765,7 @@ export interface FileRouteTypes {
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/machines/$nodeId'
     | '/policy/groups'
     | '/policy/postures'
     | '/policy/rules'
@@ -778,6 +822,9 @@ export interface FileRouteTypes {
     | '/_app/keys/api_/new'
     | '/_app/keys/oauth_/new'
     | '/_app/keys/pre-auth_/new'
+    | '/_app/machines/$nodeId/diagnostics'
+    | '/_app/machines/$nodeId/routes'
+    | '/_app/machines/$nodeId/settings'
     | '/_app/machines/$nodeId_/ssh'
     | '/_app/policy/groups/$groupId'
     | '/_app/policy/groups/new'
@@ -788,6 +835,7 @@ export interface FileRouteTypes {
     | '/_app/settings/traffic/collection'
     | '/_app/settings/traffic/gateways'
     | '/_app/traffic/machines/$nodeId'
+    | '/_app/machines/$nodeId/'
     | '/_app/policy/groups/'
     | '/_app/policy/postures/'
     | '/_app/policy/rules/'
@@ -1145,6 +1193,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKeysPreAuthNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/machines/$nodeId/': {
+      id: '/_app/machines/$nodeId/'
+      path: '/'
+      fullPath: '/machines/$nodeId/'
+      preLoaderRoute: typeof AppMachinesNodeIdIndexRouteImport
+      parentRoute: typeof AppMachinesNodeIdRoute
+    }
+    '/_app/machines/$nodeId/diagnostics': {
+      id: '/_app/machines/$nodeId/diagnostics'
+      path: '/diagnostics'
+      fullPath: '/machines/$nodeId/diagnostics'
+      preLoaderRoute: typeof AppMachinesNodeIdDiagnosticsRouteImport
+      parentRoute: typeof AppMachinesNodeIdRoute
+    }
+    '/_app/machines/$nodeId/routes': {
+      id: '/_app/machines/$nodeId/routes'
+      path: '/routes'
+      fullPath: '/machines/$nodeId/routes'
+      preLoaderRoute: typeof AppMachinesNodeIdRoutesRouteImport
+      parentRoute: typeof AppMachinesNodeIdRoute
+    }
+    '/_app/machines/$nodeId/settings': {
+      id: '/_app/machines/$nodeId/settings'
+      path: '/settings'
+      fullPath: '/machines/$nodeId/settings'
+      preLoaderRoute: typeof AppMachinesNodeIdSettingsRouteImport
+      parentRoute: typeof AppMachinesNodeIdRoute
+    }
     '/_app/machines/$nodeId_/ssh': {
       id: '/_app/machines/$nodeId_/ssh'
       path: '/machines/$nodeId/ssh'
@@ -1253,6 +1329,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AppMachinesNodeIdRouteChildren {
+  AppMachinesNodeIdDiagnosticsRoute: typeof AppMachinesNodeIdDiagnosticsRoute
+  AppMachinesNodeIdRoutesRoute: typeof AppMachinesNodeIdRoutesRoute
+  AppMachinesNodeIdSettingsRoute: typeof AppMachinesNodeIdSettingsRoute
+  AppMachinesNodeIdIndexRoute: typeof AppMachinesNodeIdIndexRoute
+}
+
+const AppMachinesNodeIdRouteChildren: AppMachinesNodeIdRouteChildren = {
+  AppMachinesNodeIdDiagnosticsRoute: AppMachinesNodeIdDiagnosticsRoute,
+  AppMachinesNodeIdRoutesRoute: AppMachinesNodeIdRoutesRoute,
+  AppMachinesNodeIdSettingsRoute: AppMachinesNodeIdSettingsRoute,
+  AppMachinesNodeIdIndexRoute: AppMachinesNodeIdIndexRoute,
+}
+
+const AppMachinesNodeIdRouteWithChildren =
+  AppMachinesNodeIdRoute._addFileChildren(AppMachinesNodeIdRouteChildren)
+
 interface AppRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppAccessRoute: typeof AppAccessRoute
@@ -1273,7 +1366,7 @@ interface AppRouteChildren {
   AppKeysApiRoute: typeof AppKeysApiRoute
   AppKeysOauthRoute: typeof AppKeysOauthRoute
   AppKeysPreAuthRoute: typeof AppKeysPreAuthRoute
-  AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRoute
+  AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRouteWithChildren
   AppMachinesAddRoute: typeof AppMachinesAddRoute
   AppPolicyFileRoute: typeof AppPolicyFileRoute
   AppPolicyGraphRoute: typeof AppPolicyGraphRoute
@@ -1338,7 +1431,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKeysApiRoute: AppKeysApiRoute,
   AppKeysOauthRoute: AppKeysOauthRoute,
   AppKeysPreAuthRoute: AppKeysPreAuthRoute,
-  AppMachinesNodeIdRoute: AppMachinesNodeIdRoute,
+  AppMachinesNodeIdRoute: AppMachinesNodeIdRouteWithChildren,
   AppMachinesAddRoute: AppMachinesAddRoute,
   AppPolicyFileRoute: AppPolicyFileRoute,
   AppPolicyGraphRoute: AppPolicyGraphRoute,

@@ -1,3 +1,4 @@
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -25,33 +26,56 @@ import { Status, StatusDetail } from "~/components/ui/status.tsx";
  * region it homes on, and what its own network report says about the path out. The client sends the
  * report, so it is what the machine believes rather than something the server measured.
  */
-export function ConnectivitySection({ node }: { readonly node: Node }): ReactElement {
+export function ConnectivitySection({
+  node,
+  preview = false,
+}: {
+  readonly node: Node;
+  /**
+   * The Overview tab's compact card: the report's facts alone, without the certificate (a live
+   * round trip to the client) or the other regions, and a link to the Diagnostics tab for both.
+   */
+  readonly preview?: boolean;
+}): ReactElement {
   // Any machine may hold a certificate for its own name: ordinary HTTPS Serve fetches one without
   // Funnel or a VIP service, and one fetched by hand is a certificate all the same. Only a
   // connected machine is asked, because the question is a live round trip to the client, which
   // answers "no certificate" as cheaply as it answers with one.
-  const cert = useQuery({ ...nodeTlsCertQuery(node.id), enabled: node.online });
+  const cert = useQuery({ ...nodeTlsCertQuery(node.id), enabled: node.online && !preview });
   const { netInfo } = node;
   const others = netInfo === undefined ? [] : otherLatencies(netInfo);
 
-  const tls: Fact[] = node.online
-    ? [
-        {
-          key: "tls",
-          label: "TLS certificate",
-          value: (
-            <CertStatus
-              status={cert.data}
-              loading={cert.isPending}
-              error={cert.isError ? errorMessage(cert.error) : undefined}
-            />
-          ),
-        },
-      ]
-    : [];
+  const tls: Fact[] =
+    node.online && !preview
+      ? [
+          {
+            key: "tls",
+            label: "TLS certificate",
+            value: (
+              <CertStatus
+                status={cert.data}
+                loading={cert.isPending}
+                error={cert.isError ? errorMessage(cert.error) : undefined}
+              />
+            ),
+          },
+        ]
+      : [];
 
   return (
-    <Section title="Connection" bodyClassName="p-0">
+    <Section
+      title="Connection"
+      bodyClassName="p-0"
+      {...(preview
+        ? {
+            actions: (
+              <LinkButton href={`/machines/${node.id}/diagnostics`} variant="ghost" size="xs">
+                View diagnostics
+              </LinkButton>
+            ),
+          }
+        : {})}
+    >
       {netInfo === undefined ? (
         <SectionEmpty
           title="No network report yet"
@@ -61,7 +85,7 @@ export function ConnectivitySection({ node }: { readonly node: Node }): ReactEle
         <FactGrid facts={[...facts(netInfo), ...tls]} />
       )}
       {netInfo === undefined && tls.length > 0 ? <FactGrid facts={tls} /> : null}
-      {others.length === 0 ? null : <OtherRegions regions={others} />}
+      {preview || others.length === 0 ? null : <OtherRegions regions={others} />}
     </Section>
   );
 }

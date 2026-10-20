@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Collapsible } from "@cloudflare/kumo/components/collapsible";
-import { ArrowsClockwiseIcon, CaretRightIcon, DownloadSimpleIcon } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, DownloadSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -24,7 +23,6 @@ import { toast } from "~/components/ui/toast.ts";
 import { downloadFile } from "~/lib/download.ts";
 import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
 
-const caretSize = 14;
 const buttonIconSize = 12;
 
 /**
@@ -33,13 +31,7 @@ const buttonIconSize = 12;
  * client over its control connection rather than from anything the server stored. An offline
  * machine has nothing to answer with, so nothing is asked.
  */
-export function ClientHealthSection({
-  node,
-  me,
-}: {
-  readonly node: Node;
-  readonly me: Me;
-}): ReactElement {
+export function ClientHealthSection({ node }: { readonly node: Node }): ReactElement {
   const health = useQuery({ ...nodeHealthQuery(node.id), enabled: node.online });
 
   return (
@@ -73,7 +65,6 @@ export function ClientHealthSection({
           Connect the machine to check its health.
         </SectionRow>
       )}
-      {can(me, "devices:core") ? <Diagnostics node={node} /> : null}
     </Section>
   );
 }
@@ -170,11 +161,21 @@ function WarningDetail({ warning }: { readonly warning: NodeClientWarning }): Re
 }
 
 /**
- * The dumps a client hands over for support, folded away: they are files for an issue report rather
- * than something an operator reads on the page, and six buttons at full width would outweigh the
- * warnings above them.
+ * The dumps a client hands over for support, on the Diagnostics tab under the health report: files
+ * for an issue report rather than something an operator reads on the page. Only a caller who may
+ * manage machines gets them, since they carry the client's whole view of the network.
  */
-function Diagnostics({ node }: { readonly node: Node }): ReactElement {
+export function DiagnosticFilesSection({
+  node,
+  me,
+}: {
+  readonly node: Node;
+  readonly me: Me;
+}): ReactElement | null {
+  return can(me, "devices:core") ? <DiagnosticFiles node={node} /> : null;
+}
+
+function DiagnosticFiles({ node }: { readonly node: Node }): ReactElement {
   const [running, setRunning] = useState<NodeDiagnosticKind | null>(null);
 
   async function download(kind: NodeDiagnosticKind): Promise<void> {
@@ -192,35 +193,31 @@ function Diagnostics({ node }: { readonly node: Node }): ReactElement {
   }
 
   return (
-    <Collapsible.Root className="border-t border-kumo-hairline">
-      <Collapsible.Trigger className="group flex w-full items-center gap-1.5 px-5 py-2.5 text-left text-kumo-subtle hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none">
-        <CaretRightIcon size={caretSize} className="group-data-[panel-open]:rotate-90" />
-        Diagnostics
-      </Collapsible.Trigger>
-      <Collapsible.Panel>
-        <div className="flex flex-col gap-2 border-t border-kumo-hairline px-5 py-3">
-          <p className="text-kumo-subtle">
-            What the client would hand over for a support request, as it writes it.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {nodeDiagnosticKinds.map((kind) => (
-              <Button
-                key={kind}
-                variant="secondary"
-                size="sm"
-                disabled={!node.online || (running !== null && running !== kind)}
-                loading={running === kind}
-                icon={<DownloadSimpleIcon size={buttonIconSize} />}
-                onClick={() => {
-                  void download(kind);
-                }}
-              >
-                {diagnosticLabels[kind]}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </Collapsible.Panel>
-    </Collapsible.Root>
+    <Section
+      title="Diagnostic files"
+      description="What the client would hand over for a support request, as it writes it."
+      bodyClassName="flex flex-col gap-3 p-4"
+    >
+      {node.online ? null : (
+        <p className="text-kumo-subtle">Connect the machine to download its files.</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {nodeDiagnosticKinds.map((kind) => (
+          <Button
+            key={kind}
+            variant="secondary"
+            size="sm"
+            disabled={!node.online || (running !== null && running !== kind)}
+            loading={running === kind}
+            icon={<DownloadSimpleIcon size={buttonIconSize} />}
+            onClick={() => {
+              void download(kind);
+            }}
+          >
+            {diagnosticLabels[kind]}
+          </Button>
+        ))}
+      </div>
+    </Section>
   );
 }

@@ -1,4 +1,5 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { CheckIcon, TerminalWindowIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
@@ -8,34 +9,71 @@ import type { Me } from "~/auth/me.ts";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { PageHeader } from "~/components/ui/page-header.tsx";
-import { nodeName } from "~/lib/node.ts";
+import { FullBleed } from "~/components/ui/page.tsx";
+import { AppLink } from "~/lib/link.tsx";
+
+/** The machine page's tabs, each an address of its own under the machine's. */
+export const machineTabs = ["overview", "routes", "diagnostics", "settings"] as const;
+export type MachineTab = (typeof machineTabs)[number];
+
+const tabLabels: Record<MachineTab, string> = {
+  overview: "Overview",
+  routes: "Routes",
+  diagnostics: "Diagnostics",
+  settings: "Settings",
+};
+
+/** The tab an address under a machine is, from its last segment: Overview for the machine's own. */
+export function machineTabOf(pathname: string): MachineTab {
+  const last = pathname.split("/").findLast((segment) => segment !== "");
+
+  return machineTabs.find((tab) => tab !== "overview" && tab === last) ?? "overview";
+}
+
+function tabHref(nodeId: string, tab: MachineTab): string {
+  return tab === "overview" ? `/machines/${nodeId}` : `/machines/${nodeId}/${tab}`;
+}
 
 /**
- * The machine page's title row: its name with the docs pill, and what can be done to it on the
- * right. How it is doing (state, owner, address) is the summary strip under the rule.
+ * The machine page's bar under the top bar, as a Zero Trust detail page draws it: Kumo's segmented
+ * Tabs on the left, one link per tab so each is an address, and what can be done to the machine on
+ * the right. It spans the page edge to edge with a rule under it and stays put while the tab
+ * scrolls; on a phone the actions wrap under the tabs and the bar scrolls away with the page.
  */
-export function MachineHeader({
+export function MachineTabBar({
   node,
   me,
   users,
+  tab,
 }: {
   readonly node: Node;
   readonly me: Me;
   readonly users: readonly User[];
+  readonly tab: MachineTab;
 }): ReactElement {
   return (
-    <PageHeader
-      title={nodeName(node)}
-      docs="ref/device-management"
-      actions={
-        <>
+    <FullBleed className="-mt-8 grid grid-cols-subgrid border-b border-kumo-line bg-kumo-canvas md:sticky md:top-(--app-header-height,0px) md:z-5">
+      <nav
+        aria-label="Machine"
+        className="col-start-2 flex min-h-[58px] min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5"
+      >
+        <Tabs
+          variant="segmented"
+          value={tab}
+          tabs={machineTabs.map((value) => ({
+            value,
+            label: tabLabels[value],
+            nativeButton: false,
+            render: <AppLink href={tabHref(node.id, value)} />,
+          }))}
+        />
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           <SSHButton node={node} me={me} />
           <MachineMenu node={node} me={me} users={users} labelled hideDestructive />
           {!node.approved && can(me, "devices:core") ? <ApproveButton node={node} /> : null}
-        </>
-      }
-    />
+        </div>
+      </nav>
+    </FullBleed>
   );
 }
 
