@@ -7,7 +7,7 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { DnsSettings } from "~/api/schema.gen.ts";
-import { ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
+import { AddressList, ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import {
   domainError,
   nameserversError,
@@ -263,8 +263,8 @@ function SplitRow({
           <Domain domain={domain} />
         </span>
       </ListCell>
-      <ListCell className="font-mono text-sm break-all text-kumo-subtle">
-        {servers.join(", ")}
+      <ListCell className="font-mono text-sm text-kumo-subtle">
+        <AddressList addresses={servers} />
       </ListCell>
       <ListCell>
         <ExitNodeToggle
