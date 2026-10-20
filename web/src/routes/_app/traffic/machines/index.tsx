@@ -7,7 +7,7 @@ import { trafficReportersQuery, trafficSummaryQuery } from "~/api/traffic.ts";
 import type { TrafficScope } from "~/api/traffic.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { MachinesTable, trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { optionalText, trafficWindowEntries, windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
@@ -95,15 +95,6 @@ function MachinesPage(): ReactElement {
                   title="No machine matches"
                   description={`None of the ${plural(nodes.length, "machine")} in the window is called that.`}
                 />
-              )
-            }
-            footer={
-              nodes.length === 0 ? undefined : (
-                <TableFooter>
-                  {shown.length === nodes.length
-                    ? `Showing ${plural(nodes.length, "machine")}`
-                    : `Showing ${shown.length} of ${plural(nodes.length, "machine")}`}
-                </TableFooter>
               )
             }
           />

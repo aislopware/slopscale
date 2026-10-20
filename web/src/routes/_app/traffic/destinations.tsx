@@ -9,10 +9,9 @@ import { trafficDestinationsQuery, trafficReportersQuery } from "~/api/traffic.t
 import type { TrafficDestination, TrafficScope } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
-import { plural } from "~/components/overview/plural.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
-import { DestinationsTable, groupingLabels } from "~/components/traffic/destinations-table.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
+import { DestinationsTable } from "~/components/traffic/destinations-table.tsx";
 import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import { useSearchDraft } from "~/components/traffic/search-draft.ts";
@@ -173,15 +172,6 @@ function DestinationsFrame({
               description="No destination in the window matches these filters."
               onClear={clear}
             />
-          )
-        }
-        footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter>
-              {rows.length >= allRows
-                ? `The ${allRows} busiest ${groupingLabels[search.by].toLowerCase()} rows`
-                : `Showing ${plural(rows.length, "row")}`}
-            </TableFooter>
           )
         }
         onPick={(row) => {

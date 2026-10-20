@@ -60,6 +60,7 @@ export function DestinationsSection({
   groupBy,
   whole,
   footer,
+  actions,
   oneMachine = false,
   onGroupChange,
   onPick,
@@ -70,6 +71,8 @@ export function DestinationsSection({
   readonly groupBy: DestinationGrouping;
   readonly whole: number;
   readonly footer?: ReactNode;
+  /** Links beside the grouping, such as one to the whole list. */
+  readonly actions?: ReactNode;
   readonly oneMachine?: boolean;
   readonly onGroupChange: (by: DestinationGrouping) => void;
   readonly onPick: (row: TrafficDestination) => void;
@@ -78,7 +81,12 @@ export function DestinationsSection({
     <PageSection
       title={title}
       description={description}
-      actions={<GroupingPicker tabs={whereTabs} value={groupBy} onChange={onGroupChange} />}
+      actions={
+        <div className="flex items-center gap-4">
+          {actions}
+          <GroupingPicker tabs={whereTabs} value={groupBy} onChange={onGroupChange} />
+        </div>
+      }
     >
       <DestinationsTable
         rows={rows}

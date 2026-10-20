@@ -3,10 +3,8 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { MachineOwner } from "~/api/schema.gen.ts";
 import type { TrafficNode } from "~/api/traffic.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
 import { BytesCell, VolumeCell } from "~/components/traffic/cells.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
 import { gatewayName } from "~/components/traffic/gateway-traffic-table.tsx";
@@ -168,7 +166,7 @@ export function MachinesTable({
   /** Upload plus download over the whole window. */
   readonly whole: number;
   readonly search: TrafficWindowSearch;
-  /** The band under the table; a count by default. */
+  /** A preview's own line for the band at the foot of the card, such as "The 10 busiest". */
   readonly footer?: ReactNode;
   readonly empty?: ReactNode;
 }): ReactElement {
@@ -194,12 +192,7 @@ export function MachinesTable({
           />
         )
       }
-      footer={
-        footer ??
-        (nodes.length === 0 ? undefined : (
-          <TableFooter>{`Showing ${plural(nodes.length, "machine")}`}</TableFooter>
-        ))
-      }
+      footer={footer}
       onRowClick={(nodeId) => {
         void navigate({
           to: "/traffic/machines/$nodeId",

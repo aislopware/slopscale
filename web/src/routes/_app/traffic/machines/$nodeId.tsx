@@ -13,7 +13,6 @@ import {
   trafficSettingsQuery,
 } from "~/api/traffic.ts";
 import type { DestinationGrouping, TrafficNode, TrafficScope } from "~/api/traffic.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { VolumeCell } from "~/components/traffic/cells.tsx";
 import { DestinationsSection, whereGrouping } from "~/components/traffic/destinations-section.tsx";
@@ -170,21 +169,13 @@ function MachineDestinationsSection({
       groupBy={groupBy}
       whole={whole}
       oneMachine
-      footer={
-        rows.length === 0 ? undefined : (
-          <TableFooter
-            actions={
-              <TextLink
-                to="/traffic/destinations"
-                search={{ ...windowOf(search), ...noDestinationFilters, by: groupBy, node: nodeId }}
-              >
-                Open in destinations
-              </TextLink>
-            }
-          >
-            {`Showing ${plural(rows.length, "row")}`}
-          </TableFooter>
-        )
+      actions={
+        <TextLink
+          to="/traffic/destinations"
+          search={{ ...windowOf(search), ...noDestinationFilters, by: groupBy, node: nodeId }}
+        >
+          Open in destinations
+        </TextLink>
       }
       onGroupChange={(by) => {
         void navigate({ search: (previous) => ({ ...previous, by }), replace: true });
@@ -252,6 +243,14 @@ function MachineNamesSection({
     <PageSection
       title="DNS lookups"
       description="The names this machine looked up through the gateways' resolvers, most asked first."
+      actions={
+        <TextLink
+          to="/traffic/dns"
+          search={{ ...windowOf(search), by: "name", q: "", name: "", node: nodeId }}
+        >
+          All lookups
+        </TextLink>
+      }
     >
       <NamesTable
         rows={rows}
@@ -259,21 +258,8 @@ function MachineNamesSection({
         oneMachine
         empty={settings.data?.dnsLogging === false ? <DnsLoggingOff /> : undefined}
         footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter
-              actions={
-                <TextLink
-                  to="/traffic/dns"
-                  search={{ ...windowOf(search), by: "name", q: "", name: "", node: nodeId }}
-                >
-                  All lookups
-                </TextLink>
-              }
-            >
-              {rows.length >= nameRows
-                ? `The ${nameRows} most asked`
-                : `Showing ${plural(rows.length, "name")}`}
-            </TableFooter>
+          rows.length < nameRows ? undefined : (
+            <TableFooter>{`The ${nameRows} most asked`}</TableFooter>
           )
         }
         onPick={(row) => {

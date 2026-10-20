@@ -12,9 +12,8 @@ import type { NameFilters, TrafficName, TrafficScope } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
 import type { LogFilter } from "~/components/audit/log-filters.tsx";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
-import { plural } from "~/components/overview/plural.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { DnsLoggingOff, DnsLoggingOffNote } from "~/components/traffic/dns-logging-off.tsx";
 import { NamesTable } from "~/components/traffic/names-table.tsx";
 import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
@@ -238,15 +237,6 @@ function NamesFrame({
           groupBy={search.by}
           empty={empty}
           oneMachine={search.node !== ""}
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>
-                {rows.length >= allRows
-                  ? `The ${allRows} most asked`
-                  : `Showing ${plural(rows.length, search.by === "node" ? "machine" : "name")}`}
-              </TableFooter>
-            )
-          }
           onPick={(row) => {
             onSearch({ ...search, ...pickName(row, search.by) });
           }}
