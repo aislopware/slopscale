@@ -47,13 +47,22 @@ func (e CreateWebhookRequestProviderType) Valid() bool {
 
 // Defines values for TailnetSettingsRouteSelection.
 const (
-	TailnetSettingsRouteSelectionRegionalRouting TailnetSettingsRouteSelection = "regional-routing"
+	TailnetSettingsRouteSelectionActivePassiveFailover   TailnetSettingsRouteSelection = "active-passive-failover"
+	TailnetSettingsRouteSelectionMagicroute              TailnetSettingsRouteSelection = "magicroute"
+	TailnetSettingsRouteSelectionRegionalRouting         TailnetSettingsRouteSelection = "regional-routing"
+	TailnetSettingsRouteSelectionRegionalRoutingFailover TailnetSettingsRouteSelection = "regional-routing-failover"
 )
 
 // Valid indicates whether the value is a known member of the TailnetSettingsRouteSelection enum.
 func (e TailnetSettingsRouteSelection) Valid() bool {
 	switch e {
+	case TailnetSettingsRouteSelectionActivePassiveFailover:
+		return true
+	case TailnetSettingsRouteSelectionMagicroute:
+		return true
 	case TailnetSettingsRouteSelectionRegionalRouting:
+		return true
+	case TailnetSettingsRouteSelectionRegionalRoutingFailover:
 		return true
 	default:
 		return false
@@ -1407,7 +1416,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettingsWithBody Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1418,7 +1427,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettings Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -2731,7 +2740,7 @@ func (c *Client) GetTailnetSettings(ctx context.Context, tailnet string, reqEdit
 
 // UpdateTailnetSettingsWithBody Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -2752,7 +2761,7 @@ func (c *Client) UpdateTailnetSettingsWithBody(ctx context.Context, tailnet stri
 
 // UpdateTailnetSettings Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -6400,7 +6409,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -6411,7 +6420,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithResponse Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+	// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -12123,7 +12132,7 @@ func (c *ClientWithResponses) GetTailnetSettingsWithResponse(ctx context.Context
 
 // UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -12140,7 +12149,7 @@ func (c *ClientWithResponses) UpdateTailnetSettingsWithBodyWithResponse(ctx cont
 
 // UpdateTailnetSettingsWithResponse Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field. regionalRoutingOn and routeSelection cannot both be set.
+// Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is regional-routing, false active-passive-failover; a request carries one of the two). The other settings are file-based in Slopscale: a request may carry them as null or with the value GET reports, anything else is a 400 naming the field.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //

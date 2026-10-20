@@ -3752,6 +3752,13 @@ components:
           type: integer
         postureIdentityOn:
           type: boolean
+        routeSelection:
+          enum:
+            - active-passive-failover
+            - regional-routing
+            - regional-routing-failover
+            - magicroute
+          type: string
         sshRecorders:
           items:
             type: string
@@ -3771,6 +3778,7 @@ components:
         - sshRecorders
         - sshRecordingEnforce
         - embeddedRecorder
+        - routeSelection
       type: object
     ShareNodeRequestBody:
       additionalProperties: false
@@ -4469,6 +4477,13 @@ components:
           type: integer
         postureIdentityOn:
           type: boolean
+        routeSelection:
+          enum:
+            - active-passive-failover
+            - regional-routing
+            - regional-routing-failover
+            - magicroute
+          type: string
         sshRecorders:
           items:
             type: string
@@ -9150,7 +9165,7 @@ paths:
       x-required-scope: feature_settings:read
     post:
       description: |-
-        Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+        Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
 
         Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateSettings
