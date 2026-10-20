@@ -1,4 +1,4 @@
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { DownloadSimpleIcon, KeyIcon, PlusIcon, ShareNetworkIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -98,13 +98,7 @@ function TailnetSketch(): ReactElement {
  * The Mesh empty state's head: the sketch, what a machine is, and the one action that adds the
  * first. A caller who may not mint keys gets no button; the steps below say how to sign in.
  */
-function EmptyTailnet({
-  withKey,
-  onAddMachine,
-}: {
-  readonly withKey: boolean;
-  readonly onAddMachine: () => void;
-}): ReactElement {
+function EmptyTailnet({ withKey }: { readonly withKey: boolean }): ReactElement {
   return (
     <div className="flex flex-col items-center gap-4 rounded-lg bg-kumo-base px-6 py-8 text-center ring ring-kumo-line">
       <TailnetSketch />
@@ -115,9 +109,9 @@ function EmptyTailnet({
         directly wherever it can.
       </p>
       {withKey ? (
-        <Button variant="primary" icon={PlusIcon} onClick={onAddMachine}>
+        <LinkButton href="/machines/add" variant="primary" icon={PlusIcon}>
           Add your first machine
-        </Button>
+        </LinkButton>
       ) : null}
     </div>
   );
@@ -125,7 +119,6 @@ function EmptyTailnet({
 
 export interface GetStartedProps {
   readonly me: Me;
-  readonly onAddMachine: () => void;
 }
 
 /**
@@ -134,12 +127,12 @@ export interface GetStartedProps {
  * pre-auth keys gets the key flow; anyone else, a member with no machine of their own included,
  * signs in on the machine instead.
  */
-export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement {
+export function GetStarted({ me }: GetStartedProps): ReactElement {
   const withKey = can(me, "auth_keys");
 
   return (
     <div className="flex flex-col gap-4">
-      <EmptyTailnet withKey={withKey} onAddMachine={onAddMachine} />
+      <EmptyTailnet withKey={withKey} />
       <Section
         title="Connect your first machine"
         description={withKey ? "No machine has joined yet." : "No machine of yours has joined yet."}
@@ -164,9 +157,9 @@ export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement 
               index={2}
               title="Create a pre-auth key"
               action={
-                <Button variant="secondary" icon={KeyIcon} onClick={onAddMachine}>
+                <LinkButton href="/keys/pre-auth/new" variant="secondary" icon={KeyIcon}>
                   Create key
-                </Button>
+                </LinkButton>
               }
             >
               <p className="text-kumo-subtle">

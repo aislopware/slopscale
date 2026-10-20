@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { accessRequestsQuery, groupsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
@@ -12,7 +11,6 @@ import {
 } from "~/api/traffic.ts";
 import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { GetStarted } from "~/components/overview/get-started.tsx";
 import { MetricTiles } from "~/components/overview/metric-tiles.tsx";
 import { NeedsAttention } from "~/components/overview/needs-attention.tsx";
@@ -85,15 +83,10 @@ function OverviewPage(): ReactElement {
     enabled: hasGateways,
   });
   const navigate = useNavigate();
-  const [addingMachine, setAddingMachine] = useState(false);
   const nodeList = nodes.data?.nodes;
   const userList = users.data?.users;
   const requestList = requests.data?.requests;
   const groupList = groups.data?.groups;
-
-  function addMachine(): void {
-    setAddingMachine(true);
-  }
 
   const tiles = (
     <MetricTiles
@@ -112,9 +105,9 @@ function OverviewPage(): ReactElement {
         docs="ref/console"
         description="What waits for a decision, what is connected and where traffic goes."
         meta={<SignedIn me={me} />}
-        actions={<QuickActions me={me} onAddMachine={addMachine} />}
+        actions={<QuickActions me={me} />}
       />
-      {nodeList?.length === 0 ? <GetStarted me={me} onAddMachine={addMachine} /> : null}
+      {nodeList?.length === 0 ? <GetStarted me={me} /> : null}
       <NeedsAttention
         nodes={nodeList ?? noNodes}
         users={userList ?? noUsers}
@@ -136,12 +129,6 @@ function OverviewPage(): ReactElement {
           }}
         />
       ) : null}
-      <CreatePreAuthKeyDialog
-        me={me}
-        intent="add-machine"
-        open={addingMachine}
-        onOpenChange={setAddingMachine}
-      />
     </PageWithRail>
   );
 }

@@ -1,4 +1,4 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { PlusIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -10,7 +10,6 @@ import { useUserMutations } from "~/components/users/mutations.ts";
 
 export interface QuickActionsProps {
   readonly me: Me;
-  readonly onAddMachine: () => void;
 }
 
 /**
@@ -19,7 +18,7 @@ export interface QuickActionsProps {
  * as the dashboard pairs its header actions. Each one is hidden rather than disabled when the
  * caller has no scope for it, so the row never offers a dead end.
  */
-export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElement {
+export function QuickActions({ me }: QuickActionsProps): ReactElement {
   const [userOpen, setUserOpen] = useState(false);
   const userMutations = useUserMutations();
 
@@ -40,9 +39,9 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
         </>
       ) : null}
       {can(me, "auth_keys") ? (
-        <Button variant="primary" icon={PlusIcon} onClick={onAddMachine}>
+        <LinkButton href="/machines/add" variant="primary" icon={PlusIcon}>
           Add machine
-        </Button>
+        </LinkButton>
       ) : null}
     </>
   );
