@@ -262,7 +262,7 @@ carries it.
 | `tailscale_posture_integration`   | Partial     | `falcon`, `sentinelone`, `intune`, `jamfpro`, `kandji` and `kolide` are wired to Slopscale's [posture integrations](/ref/device-trust). `fleet` and `huntress` are refused by name. |
 | `tailscale_service`               | Supported   | Maps onto [Tailscale Services](/ref/services).                                                                                                                                 |
 | `tailscale_tailnet_key`           | Supported   | Slopscale's pre-auth keys. `DELETE` revokes; the key stays readable as `invalid` until it is reaped.                                                                            |
-| `tailscale_tailnet_settings`      | Partial     | `devicesApprovalOn`, `usersApprovalOn`, `postureIdentityCollectionOn` and `devicesKeyDurationDays` can be changed. The rest are read-only here because they come from the configuration file or do not exist. |
+| `tailscale_tailnet_settings`      | Partial     | `devicesApprovalOn`, `usersApprovalOn`, `postureIdentityCollectionOn` and `devicesKeyDurationDays` can be changed. The rest come from the configuration file or do not exist here: a plan that repeats the value in force succeeds, one that changes it is refused with a `400` naming the field. |
 | `tailscale_webhook`               | Supported   | See [Webhooks](/ref/webhooks).                                                                                                                                                 |
 
 | Data source         | Support   | Notes                                                                                     |

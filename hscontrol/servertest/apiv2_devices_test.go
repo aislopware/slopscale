@@ -220,7 +220,8 @@ func apiv2ACLGoClient(t *testing.T, baseURL, apiKey string) {
 	assert.Contains(t, updated.HuJSON, "tag:ci")
 }
 
-// apiv2SettingsGoClient reads the tailnet settings (write is unsupported).
+// apiv2SettingsGoClient reads the tailnet settings; TestAPIv2TailnetSettingsWrite
+// covers writes.
 func apiv2SettingsGoClient(t *testing.T, baseURL, apiKey string) {
 	t.Helper()
 

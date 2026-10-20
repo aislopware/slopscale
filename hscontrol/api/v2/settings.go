@@ -65,13 +65,122 @@ type (
 
 // UpdateTailnetSettings carries the settings a PATCH may change; absent
 // fields keep their value. Switching an approval off approves everything
-// that was waiting. The other Tailscale settings are file-based here and
-// are rejected.
+// that was waiting.
+//
+// It takes every field of Tailscale's request, because the Tailscale Go
+// client sends aclsExternallyManagedOn and aclsExternalLink on every write
+// (null when unset) and the Terraform provider writes whatever its
+// configuration names. The settings slopscale does not let the API change
+// accept null or the value GET reports; anything else is a 400 naming the
+// field.
 type UpdateTailnetSettings struct {
-	DevicesApprovalOn           *bool `json:"devicesApprovalOn,omitempty"`
-	DevicesKeyDurationDays      *int  `doc:"0 leaves the config file and the client in charge." json:"devicesKeyDurationDays,omitempty" maximum:"365" minimum:"0"` //nolint:lll // struct tag
-	UsersApprovalOn             *bool `json:"usersApprovalOn,omitempty"`
+	ACLsExternallyManagedOn *bool   `json:"aclsExternallyManagedOn,omitempty" nullable:"true"`
+	ACLsExternalLink        *string `json:"aclsExternalLink,omitempty"        nullable:"true"`
+
+	DevicesApprovalOn      *bool `json:"devicesApprovalOn,omitempty"`
+	DevicesAutoUpdatesOn   *bool `json:"devicesAutoUpdatesOn,omitempty"`
+	DevicesKeyDurationDays *int  `doc:"0 leaves the config file and the client in charge." json:"devicesKeyDurationDays,omitempty" maximum:"365" minimum:"0"` //nolint:lll // struct tag
+
+	UsersApprovalOn                        *bool   `json:"usersApprovalOn,omitempty"`
+	UsersRoleAllowedToJoinExternalTailnets *string `enum:"none,member,admin"         json:"usersRoleAllowedToJoinExternalTailnets,omitempty"` //nolint:lll // struct tag
+
+	NetworkFlowLoggingOn *bool `json:"networkFlowLoggingOn,omitempty"`
+	// RegionalRoutingOn is the older form of RouteSelection; a request
+	// carries one of the two, never both.
+	RegionalRoutingOn           *bool `json:"regionalRoutingOn,omitempty"`
 	PostureIdentityCollectionOn *bool `json:"postureIdentityCollectionOn,omitempty"`
+	HTTPSEnabled                *bool `json:"httpsEnabled,omitempty"`
+	// RouteSelection is how machines choose among routers that serve the
+	// same prefix.
+	RouteSelection *string `enum:"active-passive-failover,regional-routing,regional-routing-failover,magicroute" json:"routeSelection,omitempty"` //nolint:lll // struct tag
+}
+
+// errBothRouteSelections is the hosted API's rule: regionalRoutingOn and
+// routeSelection set the same thing, so a request names one of them.
+var errBothRouteSelections = settingsBadRequest(
+	"regionalRoutingOn and routeSelection cannot both be set; send routeSelection",
+)
+
+// settingsBadRequest is a 400 whose message is detail. It is built as a
+// value rather than through huma's helpers so the status error is ours
+// to return.
+func settingsBadRequest(detail string) *huma.ErrorModel {
+	return &huma.ErrorModel{
+		Status: http.StatusBadRequest,
+		Title:  http.StatusText(http.StatusBadRequest),
+		Detail: detail,
+	}
+}
+
+// fixedSetting is a setting the API cannot change, with whether the
+// request leaves it as it is and why it is fixed.
+type fixedSetting struct {
+	field string
+	same  bool
+	why   string
+}
+
+// checkFixedSettings refuses a request that asks for a value of a setting
+// slopscale does not let the API change. A field that is absent, null or
+// equal to what GET reports passes, so a client that writes back what it
+// read, or sends every field, is accepted.
+func checkFixedSettings(body UpdateTailnetSettings, current TailnetSettings) error {
+	if body.RegionalRoutingOn != nil && body.RouteSelection != nil {
+		return errBothRouteSelections
+	}
+
+	fixed := []fixedSetting{
+		{
+			"aclsExternallyManagedOn",
+			unchanged(body.ACLsExternallyManagedOn, current.ACLsExternallyManagedOn),
+			"it follows policy.mode in the config file",
+		},
+		{"aclsExternalLink", unchanged(body.ACLsExternalLink, current.ACLsExternalLink), "Slopscale has no such link"},
+		{
+			"devicesAutoUpdatesOn",
+			unchanged(body.DevicesAutoUpdatesOn, current.DevicesAutoUpdatesOn),
+			"Slopscale does not push client updates",
+		},
+		{
+			"usersRoleAllowedToJoinExternalTailnets",
+			unchanged(body.UsersRoleAllowedToJoinExternalTailnets, current.UsersRoleAllowedToJoinExternalTailnets),
+			"Slopscale serves a single tailnet",
+		},
+		{
+			"networkFlowLoggingOn",
+			unchanged(body.NetworkFlowLoggingOn, current.NetworkFlowLoggingOn),
+			"Slopscale has no network flow logging to switch on",
+		},
+		{
+			"httpsEnabled",
+			unchanged(body.HTTPSEnabled, current.HTTPSEnabled),
+			"certificates follow the tls settings in the config file",
+		},
+		{
+			"regionalRoutingOn",
+			unchanged(body.RegionalRoutingOn, current.RegionalRoutingOn),
+			"Slopscale always uses regional routing",
+		},
+		{
+			"routeSelection",
+			unchanged(body.RouteSelection, current.RouteSelection),
+			"Slopscale always uses regional routing",
+		},
+	}
+
+	for _, f := range fixed {
+		if !f.same {
+			return settingsBadRequest(f.field + " cannot be changed: " + f.why)
+		}
+	}
+
+	return nil
+}
+
+// unchanged reports whether a request field leaves a setting as it is:
+// absent, null, or the current value.
+func unchanged[T comparable](requested *T, current T) bool {
+	return requested == nil || *requested == current
 }
 
 func tailnetSettings(b Backend) TailnetSettings {
@@ -119,8 +228,10 @@ func registerSettings(api huma.API, b Backend) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
 		Summary:     "Update tailnet settings",
-		Description: "Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the " +
-			"other settings are file-based in Slopscale and cannot be changed here.",
+		Description: "Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and " +
+			"devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may " +
+			"carry them as null or with the value GET reports, anything else is a 400 naming the " +
+			"field. regionalRoutingOn and routeSelection cannot both be set.",
 		Tags:     settingsTags,
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
@@ -128,6 +239,11 @@ func registerSettings(api huma.API, b Backend) {
 		ctx context.Context, in *patchSettingsInput,
 	) (*settingsOutput, error) {
 		err := b.requireTailnet(in.Tailnet)
+		if err != nil {
+			return nil, err
+		}
+
+		err = checkFixedSettings(in.Body, tailnetSettings(b))
 		if err != nil {
 			return nil, err
 		}

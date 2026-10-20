@@ -172,6 +172,15 @@ the GitHub Action. User-facing setup is in `docs/content/ref/api.mdx`.
   `subnetTraffic` for private destinations and `exitTraffic` for the rest.
   Folded remainder rows are left out, the range may cover at most a week, and
   nothing is recorded between two nodes. Scope `logs:network:read`.
+- **Tailnet settings** `GET`/`PATCH /api/v2/tailnet/-/settings`
+  (`settings.go`). The PATCH body takes every field of Tailscale's
+  `UpdateTailnetSettingsRequest`: the Go client always sends
+  `aclsExternallyManagedOn` and `aclsExternalLink`, as `null` when unset, and
+  huma refuses unknown members, so leaving one out broke every client write.
+  A setting slopscale does not let the API change passes when it is absent,
+  `null` or the value `GET` reports, and is otherwise a `400` naming the
+  field (`checkFixedSettings`). `regionalRoutingOn` and `routeSelection` in
+  one request is a `400`, as on the hosted API.
 - **`fields=all` on a device** (`devices_fields.go`) adds
   `blocksIncomingConnections`, `isExternal` (always false: slopscale has no
   shared-in devices), `connectedToControl`, `tailnetLockKey`,

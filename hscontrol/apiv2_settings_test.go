@@ -2,6 +2,7 @@ package hscontrol
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"testing"
 	"time"
@@ -158,6 +159,75 @@ func TestAPIv2SettingsPatch(t *testing.T) {
 	got = getSettings(t, api)
 	assert.False(t, got.DevicesApprovalOn)
 	assert.True(t, got.UsersApprovalOn)
+}
+
+// TestAPIv2SettingsPatchFixedFields pins how a PATCH treats the settings the
+// API cannot change: the Tailscale Go client sends aclsExternallyManagedOn and
+// aclsExternalLink as null on every write, and Terraform writes what it was
+// configured with, so null and the reported value must pass; another value is
+// a 400 that names the field, and nothing is applied.
+func TestAPIv2SettingsPatchFixedFields(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	api := registerAPIV2(t, app)
+	current := getSettings(t, api)
+
+	accepted := []map[string]any{
+		{"aclsExternallyManagedOn": nil, "aclsExternalLink": nil, "devicesApprovalOn": true},
+		{
+			"aclsExternallyManagedOn":                current.ACLsExternallyManagedOn,
+			"aclsExternalLink":                       current.ACLsExternalLink,
+			"devicesAutoUpdatesOn":                   current.DevicesAutoUpdatesOn,
+			"usersRoleAllowedToJoinExternalTailnets": current.UsersRoleAllowedToJoinExternalTailnets,
+			"networkFlowLoggingOn":                   current.NetworkFlowLoggingOn,
+			"httpsEnabled":                           current.HTTPSEnabled,
+			"regionalRoutingOn":                      current.RegionalRoutingOn,
+		},
+		{"routeSelection": current.RouteSelection},
+	}
+
+	for _, body := range accepted {
+		resp := api.Patch("/api/v2/tailnet/-/settings", body)
+		assert.Equalf(t, http.StatusOK, resp.Code, "%v: %s", body, resp.Body)
+	}
+
+	assert.True(t, getSettings(t, api).DevicesApprovalOn, "the null fields did not stop the real change")
+
+	refused := []struct {
+		body  map[string]any
+		field string
+	}{
+		{map[string]any{"aclsExternallyManagedOn": !current.ACLsExternallyManagedOn}, "aclsExternallyManagedOn"},
+		{map[string]any{"aclsExternalLink": "https://example.com/acl"}, "aclsExternalLink"},
+		{map[string]any{"devicesAutoUpdatesOn": true}, "devicesAutoUpdatesOn"},
+		{map[string]any{"usersRoleAllowedToJoinExternalTailnets": "admin"}, "usersRoleAllowedToJoinExternalTailnets"},
+		{map[string]any{"networkFlowLoggingOn": true}, "networkFlowLoggingOn"},
+		{map[string]any{"httpsEnabled": !current.HTTPSEnabled}, "httpsEnabled"},
+		{
+			map[string]any{"regionalRoutingOn": true, "routeSelection": "regional-routing"},
+			"regionalRoutingOn and routeSelection",
+		},
+	}
+
+	for _, tc := range refused {
+		body := maps.Clone(tc.body)
+		body["devicesApprovalOn"] = false
+
+		resp := api.Patch("/api/v2/tailnet/-/settings", body)
+		require.Equalf(t, http.StatusBadRequest, resp.Code, "%v: %s", tc.body, resp.Body)
+
+		var apiErr struct {
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal(resp.Body.Bytes(), &apiErr))
+		assert.Contains(t, apiErr.Message, tc.field)
+	}
+
+	assert.True(t, getSettings(t, api).DevicesApprovalOn, "a refused request changes nothing")
+
+	unknown := api.Patch("/api/v2/tailnet/-/settings", map[string]any{"routeSelection": "nearest"})
+	assert.Equal(t, http.StatusUnprocessableEntity, unknown.Code, "an unknown route selection is not a value")
 }
 
 // TestAPIv2SettingsNonDefaultTailnet404 — the tailnet check runs first, so a
