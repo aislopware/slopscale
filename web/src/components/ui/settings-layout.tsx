@@ -46,11 +46,9 @@ export function SettingsLayout({
         aria-label="On this page"
         className="hidden self-start @5xl:sticky @5xl:top-[calc(var(--app-header-height,0px)+2rem)] @5xl:block"
       >
-        {/* Kumo sets the label in small capitals; the console writes every heading in sentence
-            case. */}
-        <TableOfContents.Title className="tracking-normal normal-case">
-          On this page
-        </TableOfContents.Title>
+        {/* Kumo's own label, "ON THIS PAGE" in 12px tracked capitals, as Zero Trust's settings
+            page draws it (design spec §13.10). */}
+        <TableOfContents.Title>On this page</TableOfContents.Title>
         <TableOfContents.List>
           {parts.map((part) => (
             <TableOfContents.Item
