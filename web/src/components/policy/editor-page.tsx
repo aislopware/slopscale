@@ -106,29 +106,29 @@ export function useDraft<Draft extends object>(
 const focusableSelector = "input, textarea, [contenteditable='true'], button";
 
 /**
- * Moves to the first field that says what is wrong, so a long form never fails out of sight. Kumo's
- * fields mark neither the control nor the field invalid, only the message (in the danger colour,
- * named by the control's aria-describedby), so the message is what is looked for and the control
- * that it describes, or else the first one beside it, takes the focus.
+ * Moves to the first field that says what is wrong, so a long form never fails out of sight. Every
+ * field with an error carries `aria-invalid` (`fieldError`, the pickers, the expression editor), so
+ * that is what is looked for. A message that belongs to no single field (a whole condition group
+ * left empty) is found by its danger colour as a last resort, and the first control beside it takes
+ * the focus.
  */
 function focusFirstError(form: HTMLFormElement): void {
   requestAnimationFrame(() => {
-    const message = form.querySelector<HTMLElement>("[aria-invalid='true'], .text-kumo-danger");
+    const invalid = form.querySelector<HTMLElement>("[aria-invalid='true']");
 
-    if (message === null) {
+    if (invalid !== null) {
+      invalid.scrollIntoView({ block: "center" });
+      invalid.focus({ preventScroll: true });
+
       return;
     }
 
-    const described =
-      message.id === ""
-        ? null
-        : form.querySelector<HTMLElement>(`[aria-describedby~="${CSS.escape(message.id)}"]`);
-    const control = message.matches(focusableSelector)
-      ? message
-      : (described ?? message.parentElement?.querySelector<HTMLElement>(focusableSelector));
+    const message = form.querySelector<HTMLElement>(".text-kumo-danger");
 
-    message.scrollIntoView({ block: "center" });
-    control?.focus({ preventScroll: true });
+    message?.scrollIntoView({ block: "center" });
+    message?.parentElement?.querySelector<HTMLElement>(focusableSelector)?.focus({
+      preventScroll: true,
+    });
   });
 }
 

@@ -23,6 +23,7 @@ import type { FieldErrors, RelayDraft } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogError } from "~/components/ui/dialog.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
 import { toast } from "~/components/ui/toast.ts";
 
 const iconSize = 16;
@@ -221,7 +222,7 @@ function RegionFields({
         inputMode="numeric"
         autoComplete="off"
         description="Use 900 or above to keep clear of Tailscale's regions."
-        {...(errors.id === null ? {} : { error: errors.id })}
+        {...fieldError(errors.id ?? undefined)}
         onChange={(event) => {
           onId(event.target.value);
         }}
@@ -235,7 +236,7 @@ function RegionFields({
         spellCheck={false}
         autoComplete="off"
         description="The short code clients show."
-        {...(errors.code === null ? {} : { error: errors.code })}
+        {...fieldError(errors.code ?? undefined)}
         onChange={(event) => {
           onCode(event.target.value);
         }}

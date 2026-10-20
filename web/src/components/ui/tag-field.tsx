@@ -3,6 +3,7 @@ import { cn } from "@cloudflare/kumo/utils";
 import { useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
+import { fieldError } from "~/components/ui/field-error.ts";
 import { Tag, TagText, tagChipClass } from "~/components/ui/tag.tsx";
 import { normalizeTag, parseTagList, splitTag, tagError } from "~/lib/tag.ts";
 
@@ -114,7 +115,7 @@ export function TagField({
       required={required}
       label={label}
       {...(description === undefined ? {} : { description })}
-      {...(issue === null ? {} : { error: issue })}
+      {...fieldError(issue ?? undefined)}
       // The rows are ranked here, so the list is not filtered again by the text.
       filter={null}
       autoHighlight

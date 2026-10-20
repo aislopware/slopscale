@@ -11,6 +11,7 @@ import {
   weekdays,
 } from "~/components/access/posture-model.ts";
 import type { Weekday } from "~/components/access/posture-model.ts";
+import { fieldError } from "~/components/ui/field-error.ts";
 
 const tileIconSize = 20;
 
@@ -122,7 +123,7 @@ export function ScheduleFields({
           value={draft.start}
           placeholder="09:00"
           spellCheck={false}
-          {...(isClock(draft.start) ? {} : { error: "Use HH:MM, such as 09:00." })}
+          {...fieldError(isClock(draft.start) ? undefined : "Use HH:MM, such as 09:00.")}
           onChange={(event) => {
             onChange({ start: event.target.value });
           }}
@@ -133,7 +134,7 @@ export function ScheduleFields({
           value={draft.end}
           placeholder="18:00"
           spellCheck={false}
-          {...(isClock(draft.end) ? {} : { error: "Use HH:MM, such as 18:00." })}
+          {...fieldError(isClock(draft.end) ? undefined : "Use HH:MM, such as 18:00.")}
           onChange={(event) => {
             onChange({ end: event.target.value });
           }}

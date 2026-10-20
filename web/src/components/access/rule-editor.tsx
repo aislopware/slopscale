@@ -14,6 +14,7 @@ import type { RuleDraft, RuleDraftErrors } from "~/components/access/rule-draft.
 import { previewColumns } from "~/components/access/rule-preview.tsx";
 import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import { BuilderHeading, RulePreview, SettingToggle } from "~/components/policy/rule-builder.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -103,7 +104,7 @@ function DetailsSection({
           spellCheck={false}
           autoComplete="off"
           placeholder="Engineering to production"
-          {...(errors.name === undefined ? {} : { error: errors.name })}
+          {...fieldError(errors.name)}
           onChange={(event) => {
             onChange({ name: event.target.value });
           }}

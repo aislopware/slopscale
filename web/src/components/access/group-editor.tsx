@@ -9,7 +9,6 @@ import { DeleteGroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isSynced } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { nodeItems, userItems } from "~/components/access/pickers.ts";
-import { ConditionPicker } from "~/components/policy/condition-picker.tsx";
 import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import {
   ConditionRow,
@@ -17,6 +16,8 @@ import {
   SettingToggle,
   conditionLabel,
 } from "~/components/policy/rule-builder.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
+import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -66,7 +67,7 @@ function BasicSection({
           spellCheck={false}
           autoComplete="off"
           placeholder="Engineering"
-          {...(nameError === undefined ? {} : { error: nameError })}
+          {...fieldError(nameError)}
           onChange={(event) => {
             onChange({ name: event.target.value });
           }}
@@ -121,7 +122,8 @@ function MembersSection({
           {synced ? (
             <SyncedUsers ids={draft.userIds} users={users} />
           ) : (
-            <ConditionPicker
+            <MultiPicker
+              triggerClassName="bg-kumo-control"
               label={conditionLabel("Owner", "is one of")}
               placeholder="Users whose machines are members…"
               items={userItems(users)}
@@ -139,7 +141,8 @@ function MembersSection({
           </p>
         </ConditionRow>
         <ConditionRow>
-          <ConditionPicker
+          <MultiPicker
+            triggerClassName="bg-kumo-control"
             label={conditionLabel("Machine", "is one of")}
             placeholder="Machines added on their own…"
             items={nodeItems(nodes)}

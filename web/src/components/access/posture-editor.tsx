@@ -16,6 +16,7 @@ import { isClock, isWeekday, parseExpressions } from "~/components/access/postur
 import type { Weekday } from "~/components/access/posture-model.ts";
 import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import { SettingToggle } from "~/components/policy/rule-builder.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
@@ -193,7 +194,7 @@ function BasicSection({
           spellCheck={false}
           autoComplete="off"
           placeholder="Managed laptops"
-          {...(nameError === undefined ? {} : { error: nameError })}
+          {...fieldError(nameError)}
           onChange={(event) => {
             onChange({ name: event.target.value });
           }}

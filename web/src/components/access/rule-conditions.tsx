@@ -9,7 +9,6 @@ import type { Group, Posture } from "~/api/queries.ts";
 import { hasPorts, protocolLabel, protocols, toProtocol } from "~/components/access/model.ts";
 import { groupItems, postureItems } from "~/components/access/pickers.ts";
 import type { RuleDraft, RuleDraftErrors } from "~/components/access/rule-draft.ts";
-import { ConditionPicker } from "~/components/policy/condition-picker.tsx";
 import {
   AddCondition,
   ConditionList,
@@ -20,6 +19,8 @@ import {
   conditionLabel,
 } from "~/components/policy/rule-builder.tsx";
 import { DateTimeField } from "~/components/ui/date-time-field.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
+import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 
 type Change = (patch: Partial<RuleDraft>) => void;
 
@@ -46,7 +47,7 @@ function TrafficSlot({
           autoComplete="off"
           placeholder="22, 443, 8000-8100"
           description="Leave it empty for every port."
-          {...(errors.ports === undefined ? {} : { error: errors.ports })}
+          {...fieldError(errors.ports)}
           onChange={(event) => {
             onChange({ ports: event.target.value });
           }}
@@ -66,7 +67,8 @@ function TrafficSlot({
             key: "destination",
             row: (
               <ConditionRow>
-                <ConditionPicker
+                <MultiPicker
+                  triggerClassName="bg-kumo-control"
                   label={conditionLabel("Destination group", "is in")}
                   placeholder="Groups that accept the connection…"
                   items={groupItems(groups, "destination")}
@@ -153,7 +155,8 @@ function PostureSlot({
             onChange({ postures: [] });
           }}
         >
-          <ConditionPicker
+          <MultiPicker
+            triggerClassName="bg-kumo-control"
             label={conditionLabel("Posture", "passes one of")}
             placeholder="Postures the source must meet…"
             items={postureItems(postures)}
@@ -192,7 +195,8 @@ export function RuleConditions({
         description="Machines in these groups may open the connection."
       >
         <ConditionRow>
-          <ConditionPicker
+          <MultiPicker
+            triggerClassName="bg-kumo-control"
             label={conditionLabel("Source group", "is in")}
             placeholder="Groups that open the connection…"
             items={groupItems(groups, "members")}
