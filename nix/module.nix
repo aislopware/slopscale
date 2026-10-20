@@ -522,50 +522,68 @@ in
               };
             };
 
-            tls_letsencrypt_hostname = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = "";
-              description = ''
-                Domain name to request a TLS certificate for.
-              '';
-            };
+            # The nested options default to null or empty so slopscale falls
+            # back to the flat tls_* keys still set in older configurations.
+            tls = {
+              cert_path = lib.mkOption {
+                type = lib.types.nullOr lib.types.path;
+                default = null;
+                description = ''
+                  Path to already created certificate.
+                '';
+              };
 
-            tls_letsencrypt_challenge_type = lib.mkOption {
-              type = lib.types.enum [
-                "TLS-ALPN-01"
-                "HTTP-01"
-              ];
-              default = "HTTP-01";
-              description = ''
-                Type of ACME challenge to use, currently supported types:
-                `HTTP-01` or `TLS-ALPN-01`.
-              '';
-            };
+              key_path = lib.mkOption {
+                type = lib.types.nullOr lib.types.path;
+                default = null;
+                description = ''
+                  Path to key for already created certificate.
+                '';
+              };
 
-            tls_letsencrypt_listen = lib.mkOption {
-              type = lib.types.nullOr lib.types.str;
-              default = ":http";
-              description = ''
-                When HTTP-01 challenge is chosen, letsencrypt must set up a
-                verification endpoint, and it will be listening on:
-                `:http = port 80`.
-              '';
-            };
+              acme = {
+                hostname = lib.mkOption {
+                  type = lib.types.str;
+                  default = "";
+                  description = ''
+                    Domain name to request a TLS certificate for.
+                  '';
+                };
 
-            tls_cert_path = lib.mkOption {
-              type = lib.types.nullOr lib.types.path;
-              default = null;
-              description = ''
-                Path to already created certificate.
-              '';
-            };
+                challenge_type = lib.mkOption {
+                  type = lib.types.nullOr (
+                    lib.types.enum [
+                      "TLS-ALPN-01"
+                      "HTTP-01"
+                      "DNS-01"
+                    ]
+                  );
+                  default = null;
+                  description = ''
+                    Type of ACME challenge to use: `HTTP-01` (default),
+                    `TLS-ALPN-01`, or `DNS-01` through the
+                    {option}`https_certificates` provider.
+                  '';
+                };
 
-            tls_key_path = lib.mkOption {
-              type = lib.types.nullOr lib.types.path;
-              default = null;
-              description = ''
-                Path to key for already created certificate.
-              '';
+                http_listen = lib.mkOption {
+                  type = lib.types.nullOr lib.types.str;
+                  default = null;
+                  description = ''
+                    When HTTP-01 challenge is chosen, letsencrypt must set up a
+                    verification endpoint, and it will be listening on:
+                    `:http = port 80` (default).
+                  '';
+                };
+
+                cache_dir = lib.mkOption {
+                  type = lib.types.str;
+                  default = "${dataDir}/.cache";
+                  description = ''
+                    Where the certificate and the ACME account are kept.
+                  '';
+                };
+              };
             };
 
             policy = {
@@ -643,23 +661,23 @@ in
     )
     (mkRenamedOptionModule
       [ "services" "slopscale" "tls" "certFile" ]
-      [ "services" "slopscale" "settings" "tls_cert_path" ]
+      [ "services" "slopscale" "settings" "tls" "cert_path" ]
     )
     (mkRenamedOptionModule
       [ "services" "slopscale" "tls" "keyFile" ]
-      [ "services" "slopscale" "settings" "tls_key_path" ]
+      [ "services" "slopscale" "settings" "tls" "key_path" ]
     )
     (mkRenamedOptionModule
       [ "services" "slopscale" "tls" "letsencrypt" "challengeType" ]
-      [ "services" "slopscale" "settings" "tls_letsencrypt_challenge_type" ]
+      [ "services" "slopscale" "settings" "tls" "acme" "challenge_type" ]
     )
     (mkRenamedOptionModule
       [ "services" "slopscale" "tls" "letsencrypt" "hostname" ]
-      [ "services" "slopscale" "settings" "tls_letsencrypt_hostname" ]
+      [ "services" "slopscale" "settings" "tls" "acme" "hostname" ]
     )
     (mkRenamedOptionModule
       [ "services" "slopscale" "tls" "letsencrypt" "httpListen" ]
-      [ "services" "slopscale" "settings" "tls_letsencrypt_listen" ]
+      [ "services" "slopscale" "settings" "tls" "acme" "http_listen" ]
     )
 
     (mkRemovedOptionModule [ "services" "slopscale" "openIdConnect" "domainMap" ] ''
@@ -711,8 +729,6 @@ in
       cliConfig
       {
         listen_addr = lib.mkDefault "${cfg.address}:${toString cfg.port}";
-
-        tls_letsencrypt_cache_dir = "${dataDir}/.cache";
       }
     ];
 
