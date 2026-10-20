@@ -72,15 +72,16 @@ function MachinesPage(): ReactElement {
         onChange={(next) => {
           void navigate({ search: (previous) => ({ ...previous, ...next }) });
         }}
-      >
-        <SearchInput
-          value={search.q}
-          placeholder="Search machines"
-          onValueChange={(q) => {
-            void navigate({ search: (previous) => ({ ...previous, q }), replace: true });
-          }}
-        />
-      </WindowToolbar>
+        query={
+          <SearchInput
+            value={search.q}
+            placeholder="Search machines"
+            onValueChange={(q) => {
+              void navigate({ search: (previous) => ({ ...previous, q }), replace: true });
+            }}
+          />
+        }
+      />
       {isRefusedWindow(error) ? null : (
         <TableGroup>
           <MachinesTable
