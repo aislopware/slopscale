@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 
-import { CommandBox, ShellText } from "~/components/ui/command-text.tsx";
+import { CommandBox, ShellText, maskSecret } from "~/components/ui/command-text.tsx";
 
 const docker = "docker run -d \\\n  -e TS_AUTHKEY=<key> \\\n  tailscale/tailscale";
 
@@ -12,6 +12,17 @@ describe(ShellText, () => {
     await expect.element(screen.getByText("tailscale")).toHaveClass("font-semibold");
     await expect.element(screen.getByText("--authkey")).toHaveClass("text-kumo-link");
     await expect.element(screen.getByText("<key>")).toHaveClass("text-kumo-warning");
+  });
+});
+
+describe(maskSecret, () => {
+  it("keeps a pre-auth key's public prefix and dots out the secret", () => {
+    expect(maskSecret("hskey-auth-abc123-s3cr3t")).toBe(`hskey-auth-abc123-${"•".repeat(16)}`);
+  });
+
+  it("keeps a few leading characters of a secret without a prefix", () => {
+    expect(maskSecret("abcdefghijklmnopqrstuvwxyz")).toBe(`abcdef${"•".repeat(16)}`);
+    expect(maskSecret("abc")).toBe(`a${"•".repeat(16)}`);
   });
 });
 

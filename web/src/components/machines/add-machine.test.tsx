@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { CreatedKey } from "~/components/keys/created-key.tsx";
@@ -14,9 +14,12 @@ describe(connectCommand, () => {
 
 describe(CreatedKey, () => {
   it("hands over the join command per platform with a QR code", async () => {
+    const key = "hskey-auth-abc123-s3cr3tv4lu3";
+    const masked = `hskey-auth-abc123-${"•".repeat(16)}`;
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue();
     const screen = await render(
       <CreatedKey
-        value="secret"
+        value={key}
         note="Shown once."
         join
         onDone={() => {
@@ -25,16 +28,22 @@ describe(CreatedKey, () => {
       />,
     );
 
+    // Design spec §13.15.12: the command shows the key masked and copies it whole.
     await expect
-      .element(screen.getByText(`sudo ${connectCommand("secret")}`, { exact: false }))
+      .element(screen.getByText(`sudo ${connectCommand(masked)}`, { exact: false }))
       .toBeVisible();
+    expect(screen.container.querySelector("code")?.textContent).not.toContain("s3cr3t");
+
+    await screen.getByRole("button", { name: "Copy command" }).click();
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining(connectCommand(key)));
     await expect
       .element(screen.getByRole("img", { name: "QR code with the server address" }))
       .not.toBeInTheDocument();
 
     await screen.getByRole("tab", { name: "Docker" }).click();
 
-    await expect.element(screen.getByText("TS_AUTHKEY=secret", { exact: false })).toBeVisible();
+    await expect.element(screen.getByText(`TS_AUTHKEY=${masked}`, { exact: false })).toBeVisible();
 
     await screen.getByRole("tab", { name: "iOS and Android" }).click();
 

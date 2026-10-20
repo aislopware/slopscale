@@ -63,6 +63,31 @@ export function ShellText({
   );
 }
 
+/**
+ * How many dots stand for a masked secret, the same whatever its length so the length leaks
+ * nothing.
+ */
+const maskLength = 16;
+
+/** How much of a secret without a public prefix stays readable: at most six characters, a third. */
+const keptCharacters = 6;
+const keptShare = 3;
+
+/**
+ * A secret as an install command shows it (design spec §13.15.12): the public part kept so the
+ * reader can tell which key it is, the rest dots. A pre-auth key keeps `hskey-auth-<prefix>-`, the
+ * prefix its list shows anyway; any other secret keeps its first six characters.
+ */
+export function maskSecret(secret: string): string {
+  const cut = secret.lastIndexOf("-");
+  const kept =
+    cut > 0
+      ? secret.slice(0, cut + 1)
+      : secret.slice(0, Math.min(keptCharacters, Math.floor(secret.length / keptShare)));
+
+  return `${kept}${"•".repeat(maskLength)}`;
+}
+
 /** The box's inset: the copy button at the end sits 6px or 8px in from the ring. */
 const sizes = {
   sm: "py-1.5 pr-1.5 pl-3",
@@ -75,16 +100,20 @@ const sizes = {
  * screen, which has no hover to reveal an icon, can copy it too. A wrapped box keeps the line
  * breaks the command was written with, so a multi-line Docker command shows as the lines it will be
  * pasted as, and the button stays on the first line; the words themselves stay whole. A command on
- * one line is cut short with an ellipsis, and the button copies all of it.
+ * one line is cut short with an ellipsis, and the button copies all of it. A `secret` in the
+ * command is shown masked, the way the dashboard masks a connector token, and copied whole.
  */
 export function CommandBox({
   command,
+  secret,
   size = "base",
   wrap = false,
   label = "Copy command",
   className,
 }: {
   readonly command: string;
+  /** A credential inside the command: masked on screen, whole on the clipboard. */
+  readonly secret?: string;
   readonly size?: keyof typeof sizes;
   readonly wrap?: boolean;
   /** The accessible name of the copy button. */
@@ -101,7 +130,11 @@ export function CommandBox({
       )}
     >
       <ShellText
-        command={command}
+        command={
+          secret === undefined || secret === ""
+            ? command
+            : command.replaceAll(secret, maskSecret(secret))
+        }
         wrap={wrap}
         className={cn(
           "block min-w-0 flex-1 text-[0.9em]",

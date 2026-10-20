@@ -122,7 +122,7 @@ function InstallStep({
   return (
     <StepCard
       title="Install and connect"
-      description="Run this on the machine. It installs Tailscale where it can, points it at this server and joins with the key. The key is shown only once."
+      description="Run this on the machine. It installs Tailscale where it can, points it at this server and joins with the key. The copy button copies the whole key, which is not shown again."
       footer={
         <>
           <output className="mr-auto flex items-center gap-2 pl-2 text-sm text-kumo-subtle">
