@@ -8,9 +8,9 @@ import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { TrafficReporter } from "~/api/traffic.ts";
-import { LogFilters } from "~/components/audit/log-filters.tsx";
-import type { LogFilter } from "~/components/audit/log-filters.tsx";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
+import { LogFilters } from "~/components/table/log-filters.tsx";
+import type { LogFilter } from "~/components/table/log-filters.tsx";
 import {
   defaultTrafficNetwork,
   defaultTrafficRange,
