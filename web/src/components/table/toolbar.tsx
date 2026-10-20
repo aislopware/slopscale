@@ -7,8 +7,10 @@ import type { ReactElement, ReactNode } from "react";
  * and filters on the left (join them into one ringed group with Kumo's `Toolbar` and `SearchInput
  * joined`), the list's primary action on the right. The row sticks under the top bar while the list
  * scrolls, and once it is stuck it gains the elevated frame the dashboard's toolbar animates in, so
- * it reads as lifted off the rows sliding under it. It belongs with the list under it, so it pulls
- * the next block up from the page's 28px to 16px.
+ * it reads as lifted off the rows sliding under it. The frame's 8px padding is taken back by
+ * negative margins, so the controls sit where the block would (12px under facet chips in a
+ * `TableGroup`, 28px under a page header); it belongs with the list under it, so the next block
+ * comes 16px under the controls instead of the page's 28px.
  */
 export function TableToolbar({
   children,
@@ -31,7 +33,7 @@ export function TableToolbar({
         // can tell it from one merely passing by. The shell sets the bar's height; outside it (a
         // test, say) there is no bar, and a 57px top would push a toolbar at the page's top down
         // over the rows. On a phone the controls wrap onto several lines, too tall to keep on screen.
-        "z-5 -mx-2 -mb-3 flex flex-wrap items-start gap-2 rounded-xl p-2 ring ring-transparent transition-[background-color,box-shadow] duration-150 md:sticky md:top-[calc(var(--app-header-height,0px)-1px)]",
+        "z-5 -mx-2 -mt-2 -mb-5 flex flex-wrap items-start gap-2 rounded-xl p-2 ring ring-transparent transition-[background-color,box-shadow] duration-150 md:sticky md:top-[calc(var(--app-header-height,0px)-1px)]",
         "md:data-stuck:bg-kumo-elevated md:data-stuck:ring-kumo-hairline",
         className,
       )}

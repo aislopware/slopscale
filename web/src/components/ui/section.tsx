@@ -112,7 +112,15 @@ export function Section({
           <div className="flex shrink-0 items-center gap-2">{actions}</div>
         )}
       </div>
-      {panel ? <TrayPanel className={bodyClassName}>{children}</TrayPanel> : children}
+      {panel ? (
+        <TrayPanel className={bodyClassName}>{children}</TrayPanel>
+      ) : (
+        // A table that draws its own card sits flush on the band; the count under that card
+        // takes the band's 16px inset, so it lines up with the title instead of the tray's edge.
+        <div className="flex min-w-0 flex-col [&_[data-slot=table-footer]]:px-4 [&_[data-slot=table-footer]]:pb-2">
+          {children}
+        </div>
+      )}
       {footer === undefined ? null : (
         <div className="flex items-center justify-end gap-2 px-4 py-2">{footer}</div>
       )}

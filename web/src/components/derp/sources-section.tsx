@@ -19,11 +19,11 @@ import {
 } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { EntryList } from "~/components/dns/entry-list.tsx";
-import { StagedAddPanel } from "~/components/dns/staged-add-panel.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { StagedAddPanel } from "~/components/ui/staged-add-panel.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 
 /** The maps the server fetches and merges, and how often. */

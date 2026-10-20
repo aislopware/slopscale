@@ -39,10 +39,16 @@ export function MachineDetails({
   readonly node: Node;
   readonly me: Me;
 }): ReactElement {
+  const [editing, setEditing] = useState(false);
+
   return (
     <Section title="Machine details" bodyClassName="py-1">
-      <NameRow node={node} editable={mayManageNode(me, node)} />
-      <KeyValueList className="border-t border-kumo-line" items={facts(node)} />
+      <KeyValueList
+        items={[
+          nameRow({ node, editable: mayManageNode(me, node), editing, setEditing }),
+          ...facts(node),
+        ]}
+      />
     </Section>
   );
 }
@@ -100,48 +106,57 @@ function Timestamp({ value }: { readonly value: string | null }): ReactElement {
  * dashboard renames a tunnel from its details rail. Saving an unchanged or empty name just closes
  * the input; a name that cannot be a DNS label says why under it before anything is sent.
  */
-function NameRow({
+function nameRow({
   node,
   editable,
+  editing,
+  setEditing,
 }: {
   readonly node: Node;
   readonly editable: boolean;
-}): ReactElement {
-  const [editing, setEditing] = useState(false);
-  const name = nodeName(node);
-
-  return (
-    <div className="grid gap-1 px-4 py-3">
-      <span className="text-sm text-kumo-subtle">Name</span>
-      {editing ? (
+  readonly editing: boolean;
+  readonly setEditing: (editing: boolean) => void;
+}): KeyValue {
+  if (editing) {
+    return {
+      key: "name",
+      label: "Name",
+      wrap: true,
+      value: (
         <RenameForm
           node={node}
           onDone={() => {
             setEditing(false);
           }}
         />
-      ) : (
-        <div className="flex min-w-0 items-center justify-between gap-2 text-sm text-kumo-default">
-          <span className="min-w-0 truncate">{name}</span>
-          {editable ? (
+      ),
+    };
+  }
+
+  return {
+    key: "name",
+    label: "Name",
+    value: nodeName(node),
+    ...(editable
+      ? {
+          control: (
             <Button
               variant="ghost"
               shape="square"
               size="sm"
               aria-label="Rename machine"
               title="Rename machine"
-              className="shrink-0 text-kumo-subtle"
+              className="text-kumo-subtle"
               onClick={() => {
                 setEditing(true);
               }}
             >
               <PencilSimpleIcon size={iconSize} aria-hidden />
             </Button>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
+          ),
+        }
+      : {}),
+  };
 }
 
 function RenameForm({
@@ -189,7 +204,7 @@ function RenameForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-1.5">
+    <form onSubmit={submit} className="flex w-full flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
         <Input
           size="sm"

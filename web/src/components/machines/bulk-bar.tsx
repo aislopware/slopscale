@@ -75,7 +75,7 @@ export function MachineBulkBar({
           <div
             role="toolbar"
             aria-label="Actions for the selected machines"
-            className="flex items-center gap-2 pl-3 font-normal text-kumo-default"
+            className="flex w-full items-center gap-2 pl-3 font-normal text-kumo-default"
           >
             <span className="text-base tabular-nums">
               <span className="@3xl:hidden">{`${ids.length} selected`}</span>
@@ -90,43 +90,44 @@ export function MachineBulkBar({
                 selection.clear();
               }}
             />
-            <span aria-hidden className="h-5 border-l border-kumo-line" />
-            <BulkButton
-              icon={CheckIcon}
-              label="Approve"
-              disabled={busy}
-              loading={bulk.running === "approve"}
-              onClick={() => {
-                void run("approve");
-              }}
-            />
-            <BulkButton
-              icon={ArrowsClockwiseIcon}
-              label="Update clients…"
-              disabled={busy || plan.eligible.length === 0}
-              loading={updates.running}
-              onClick={() => {
-                setUpdating(true);
-              }}
-            />
-            <BulkButton
-              icon={SignOutIcon}
-              label="Expire"
-              disabled={busy}
-              loading={bulk.running === "expire"}
-              onClick={() => {
-                void run("expire");
-              }}
-            />
-            <BulkButton
-              variant="destructive"
-              icon={TrashIcon}
-              label={`Remove ${ids.length} selected`}
-              disabled={busy}
-              onClick={() => {
-                setConfirming(true);
-              }}
-            />
+            <span className="ms-auto flex items-center gap-2">
+              <BulkButton
+                icon={CheckIcon}
+                label="Approve"
+                disabled={busy}
+                loading={bulk.running === "approve"}
+                onClick={() => {
+                  void run("approve");
+                }}
+              />
+              <BulkButton
+                icon={ArrowsClockwiseIcon}
+                label="Update clients…"
+                disabled={busy || plan.eligible.length === 0}
+                loading={updates.running}
+                onClick={() => {
+                  setUpdating(true);
+                }}
+              />
+              <BulkButton
+                icon={SignOutIcon}
+                label="Expire"
+                disabled={busy}
+                loading={bulk.running === "expire"}
+                onClick={() => {
+                  void run("expire");
+                }}
+              />
+              <BulkButton
+                variant="destructive"
+                icon={TrashIcon}
+                label={`Remove ${ids.length} selected`}
+                disabled={busy}
+                onClick={() => {
+                  setConfirming(true);
+                }}
+              />
+            </span>
           </div>
           <ConfirmDialog
             open={confirming}

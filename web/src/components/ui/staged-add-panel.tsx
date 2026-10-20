@@ -6,11 +6,18 @@ import { useEffect, useState } from "react";
 import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { PendingMutation } from "~/components/dns/value-dialog.tsx";
 import { DialogError } from "~/components/ui/dialog.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { Note } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
+
+/** What a form needs to know about the request it sends. */
+export interface PendingMutation {
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly error: unknown;
+  readonly reset?: () => void;
+}
 
 export interface StagedAddPanelProps {
   readonly title: string;

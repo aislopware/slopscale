@@ -61,7 +61,7 @@ export function DefinitionList({
                 className={cn(
                   "flex min-w-0 items-center justify-end gap-2 *:min-w-0",
                   (item.wrap ?? wrap)
-                    ? "*:break-all"
+                    ? "*:[overflow-wrap:anywhere]"
                     : "*:overflow-clip *:text-ellipsis *:whitespace-nowrap *:[overflow-clip-margin:4px]",
                 )}
               >
@@ -90,13 +90,23 @@ export interface KeyValue {
   readonly copy?: string;
   /** The copy button's accessible name: "Copy tailnet ID". */
   readonly copyLabel?: string;
+  /**
+   * A small control at the end of the value, such as the pencil that renames a machine in place (a
+   * ghost `size="sm"` square button).
+   */
+  readonly control?: ReactNode;
+  /**
+   * Gives the value the whole row and lets it wrap instead of cutting it, for a value that is a
+   * form of its own (the rename box) or runs to several lines.
+   */
+  readonly wrap?: boolean;
   readonly key?: string;
 }
 
 /**
  * The dashboard's stacked key-value list (a zone's API card, Zero Trust's details rail): each pair
  * a 13px subtle label over the 13px value, rows divided by lines, and a 26px ghost copy button at
- * the end of a copyable value such as an ID.
+ * the end of a copyable value such as an ID, or a control there such as a rename pencil.
  */
 export function KeyValueList({
   items,
@@ -111,9 +121,14 @@ export function KeyValueList({
         <div key={item.key ?? index} className="grid gap-1 py-3">
           <dt className="truncate text-sm text-kumo-subtle">{item.label}</dt>
           <dd className="flex min-w-0 items-center justify-between gap-2 text-sm text-kumo-default">
-            <span className="min-w-0 truncate">{item.value}</span>
+            <span className={cn("min-w-0", item.wrap === true ? "flex-1" : "truncate")}>
+              {item.value}
+            </span>
             {item.copy === undefined ? null : (
               <CopyButton value={item.copy} label={item.copyLabel ?? `Copy ${item.copy}`} />
+            )}
+            {item.control === undefined ? null : (
+              <span className="flex shrink-0 items-center">{item.control}</span>
             )}
           </dd>
         </div>

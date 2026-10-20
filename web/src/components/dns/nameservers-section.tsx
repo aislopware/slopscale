@@ -15,9 +15,9 @@ import {
   withoutNameserver,
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
-import { StagedAddPanel } from "~/components/dns/staged-add-panel.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { StagedAddPanel } from "~/components/ui/staged-add-panel.tsx";
 
 /** The id of the override paragraph, which explains why a disabled toggle is disabled. */
 const overrideHelpId = "dns-override-local-help";

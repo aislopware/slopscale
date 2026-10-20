@@ -15,8 +15,8 @@ import {
   portMapLabel,
   yesNo,
 } from "~/components/derp/latency-model.ts";
-import { FactGrid } from "~/components/machines/fact-grid.tsx";
-import type { Fact } from "~/components/machines/fact-grid.tsx";
+import { FactGrid } from "~/components/ui/fact-grid.tsx";
+import type { Fact } from "~/components/ui/fact-grid.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
 

@@ -15,10 +15,10 @@ import {
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FromFileBadge } from "~/components/dns/source.tsx";
-import { StagedAddPanel } from "~/components/dns/staged-add-panel.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { StagedAddPanel } from "~/components/ui/staged-add-panel.tsx";
 
 export function SearchDomainsSection({
   dns,

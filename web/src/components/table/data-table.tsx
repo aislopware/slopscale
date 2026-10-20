@@ -23,6 +23,12 @@ export interface DataTableProps<TData extends RowData> {
    * the page size and the paging controls there instead.
    */
   readonly footer?: ReactNode;
+  /**
+   * Where the footer and the pager go: under the card (`below`, the account-level DataTable of
+   * §4.A) or in a band inside its frame (`inside`, the Zero Trust list of §13.3, for a list that is
+   * the page's subject, such as Machines).
+   */
+  readonly footerPlacement?: "below" | "inside";
   /** Adds a click handler and pointer cursor to every row. */
   readonly onRowClick?: ((rowId: string) => void) | undefined;
   /**
@@ -53,6 +59,7 @@ export function DataTable<TData extends RowData>({
   table,
   empty,
   footer,
+  footerPlacement = "below",
   onRowClick,
   isRowClickable,
   headerOverlay,
@@ -79,9 +86,17 @@ export function DataTable<TData extends RowData>({
     }
   }, [shows, setPageIndex]);
 
+  const band = pageBand(table, footer);
+  const inside = footerPlacement === "inside";
+
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <TableScroll pinnedRight={pinnedRight} below={rows.length === 0 ? empty : null}>
+    // A container while there is a header overlay, so the overlay can reach the card's right edge.
+    <div className={cn("flex min-w-0 flex-col gap-2", headerOverlay !== undefined && "@container")}>
+      <TableScroll
+        pinnedRight={pinnedRight}
+        below={rows.length === 0 ? empty : null}
+        footer={inside ? band : null}
+      >
         {(overflowing) => (
           <Table className={tableClass}>
             <Table.Header>
@@ -113,9 +128,9 @@ export function DataTable<TData extends RowData>({
                           </HeaderContent>
                         )}
                         {index === 0 && headerOverlay !== undefined ? (
-                          // w-max, because an absolute box left at the cell's edge would otherwise
-                          // shrink to the room left inside the cell, which is none.
-                          <div className="absolute inset-y-0 left-full flex w-max items-center">
+                          // As wide as the card left of the cell's edge (100cqw is the card, 100% the
+                          // cell), so the overlay can put its actions at the right end of the row.
+                          <div className="absolute inset-y-0 left-full flex w-[calc(100cqw-100%)] items-center pr-4">
                             {headerOverlay}
                           </div>
                         ) : null}
@@ -171,7 +186,9 @@ export function DataTable<TData extends RowData>({
           </Table>
         )}
       </TableScroll>
-      <PageBand table={table} fallback={footer} />
+      {inside || band === null || band === undefined ? null : (
+        <div data-slot="table-footer">{band}</div>
+      )}
     </div>
   );
 }
@@ -196,13 +213,10 @@ function cellClass(
  * The band under the panel: the page's own count while the rows fit the smallest page, and the
  * range with the page size and the paging controls once there are enough rows to page.
  */
-function PageBand<TData extends RowData>({
-  table,
-  fallback,
-}: {
-  readonly table: AppTableInstance<TData>;
-  readonly fallback: ReactNode;
-}): ReactNode {
+function pageBand<TData extends RowData>(
+  table: AppTableInstance<TData>,
+  fallback: ReactNode,
+): ReactNode {
   const total = table.getRowCount();
 
   if (total <= smallestPageSize) {

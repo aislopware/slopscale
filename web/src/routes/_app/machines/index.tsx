@@ -211,6 +211,7 @@ function MachinesList(): ReactElement {
               <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
             }
             overlayShown={selection.selected.size > 0}
+            footerPlacement="inside"
             onRowClick={(nodeId) => {
               void navigate({ to: "/machines/$nodeId", params: { nodeId } });
             }}

@@ -5,10 +5,10 @@ import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
 import type { NodeHardwareAttestation, NodeTpm } from "~/api/schema.gen.ts";
-import { FactGrid } from "~/components/machines/fact-grid.tsx";
-import type { Fact } from "~/components/machines/fact-grid.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
+import { FactGrid } from "~/components/ui/fact-grid.tsx";
+import type { Fact } from "~/components/ui/fact-grid.tsx";
 import { OsMark } from "~/components/ui/os-mark.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";

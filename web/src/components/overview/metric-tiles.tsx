@@ -269,5 +269,6 @@ export function MetricTiles({
     return null;
   }
 
-  return <div className="grid grid-cols-2 gap-2.5">{tiles}</div>;
+  // auto-rows-fr: every row as tall as the tallest, so a tile without a meter is not shorter.
+  return <div className="grid auto-rows-fr grid-cols-2 gap-2.5">{tiles}</div>;
 }

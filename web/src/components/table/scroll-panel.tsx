@@ -17,6 +17,11 @@ export interface TableScrollProps {
   readonly below?: ReactNode;
   /** Whether the table pins a column to its right edge, which then draws that edge itself. */
   readonly pinnedRight?: boolean;
+  /**
+   * A band at the foot of the card, inside its frame: Zero Trust's list footer ("Showing 1-2 of 2",
+   * the page size and the pager) on the elevated fill under a line.
+   */
+  readonly footer?: ReactNode;
 }
 
 /**
@@ -30,6 +35,7 @@ export function TableScroll({
   children,
   below,
   pinnedRight = false,
+  footer,
 }: TableScrollProps): ReactElement {
   const { ref, edges } = useOverflowEdges();
   const overflowing = edges.left || edges.right;
@@ -49,6 +55,9 @@ export function TableScroll({
       </div>
       {below === null || below === undefined ? null : (
         <div className="border-t border-kumo-line">{below}</div>
+      )}
+      {footer === null || footer === undefined ? null : (
+        <div className="border-t border-kumo-line bg-kumo-elevated px-4 py-2">{footer}</div>
       )}
       {edges.left ? <ScrollFade side="left" /> : null}
       {edges.right && !pinnedRight ? <ScrollFade side="right" /> : null}
