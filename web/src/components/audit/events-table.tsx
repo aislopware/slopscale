@@ -2,9 +2,9 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
-import { SidebarSimpleIcon } from "@phosphor-icons/react";
+import { DotsSixVerticalIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import type { MouseEvent, ReactElement } from "react";
+import type { DragEvent, KeyboardEvent, MouseEvent, ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import {
@@ -15,18 +15,14 @@ import {
   TargetCell,
   TimeCell,
 } from "~/components/audit/cells.tsx";
-import type { AuditColumn } from "~/components/audit/columns.tsx";
+import { auditColumnLabels, auditColumns } from "~/components/audit/columns.tsx";
+import type { AuditColumn, AuditColumnId } from "~/components/audit/columns.tsx";
 import { EventSheet } from "~/components/audit/event-sheet.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import {
-  actionsColumnClass,
-  pinnedEdgeClass,
-  tableClass,
-  tableRowClass,
-} from "~/components/table/styles.ts";
+import { tableClass, tableRowClass } from "~/components/table/styles.ts";
 
 /** A click on a control inside the row belongs to the control, not to the row. */
 function onControl(event: MouseEvent<HTMLElement>): boolean {
@@ -38,17 +34,39 @@ function onControl(event: MouseEvent<HTMLElement>): boolean {
 
 const noneHidden: ReadonlySet<AuditColumn> = new Set();
 
+/**
+ * Each column's width. The table is fixed-layout, so every column but Details has one and Details
+ * takes what is left; a cell in a fixed column truncates or wraps, never pushes the next one.
+ */
+const columnClass: Record<AuditColumnId, string> = {
+  time: "w-60",
+  action: "w-52",
+  target: "w-40",
+  actor: "w-44",
+  result: "w-24",
+  details: "hidden lg:table-cell",
+};
+
+type CellOf = (event: AuditEvent, onOpen: () => void) => ReactNode;
+
+/** What each column shows of an event; `onOpen` opens the event's sheet. */
+const cells: Record<AuditColumnId, CellOf> = {
+  time: (event, onOpen) => <TimeCell event={event} onOpen={onOpen} />,
+  action: (event) => <ActionCell event={event} />,
+  target: (event) => <TargetCell event={event} />,
+  actor: (event) => <ActorCell event={event} />,
+  result: (event) => <ResultCell event={event} />,
+  details: (event, onOpen) => <DetailCell event={event} onOpen={onOpen} />,
+};
+
 function EventRow({
   event,
-  hidden,
-  overflowing,
+  columns,
   open,
   onOpen,
 }: {
   readonly event: AuditEvent;
-  readonly hidden: ReadonlySet<AuditColumn>;
-  /** Whether the columns run past the panel, so the pinned last column draws its edge. */
-  readonly overflowing: boolean;
+  readonly columns: readonly AuditColumnId[];
   /** Whether this event is the one in the sheet. */
   readonly open: boolean;
   readonly onOpen: () => void;
@@ -63,46 +81,98 @@ function EventRow({
         }
       }}
     >
-      <Table.Cell className="whitespace-nowrap">
-        <TimeCell event={event} />
-      </Table.Cell>
-      <Table.Cell>
-        <ActionCell event={event} />
-      </Table.Cell>
-      {hidden.has("target") ? null : (
-        <Table.Cell>
-          <TargetCell event={event} />
+      {columns.map((column) => (
+        <Table.Cell key={column} className={columnClass[column]}>
+          {cells[column](event, onOpen)}
         </Table.Cell>
-      )}
-      {hidden.has("actor") ? null : (
-        <Table.Cell>
-          <ActorCell event={event} />
-        </Table.Cell>
-      )}
-      {hidden.has("result") ? null : (
-        <Table.Cell>
-          <ResultCell event={event} />
-        </Table.Cell>
-      )}
-      {hidden.has("details") ? null : (
-        <Table.Cell className="hidden lg:table-cell">
-          <DetailCell event={event} onOpen={onOpen} />
-        </Table.Cell>
-      )}
-      <Table.Cell sticky="right" className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}>
-        {/* The row's own control: it says the row opens a sheet, and gives the keyboard the same
-            reach as the click on the row. */}
-        <Button
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon={SidebarSimpleIcon}
-          aria-haspopup="dialog"
-          aria-label="Show details"
-          onClick={onOpen}
-        />
-      </Table.Cell>
+      ))}
     </Table.Row>
+  );
+}
+
+const dragType = "application/x-slopscale-audit-column";
+
+/** A shown column's place in the full order, or nothing past either end. */
+function neighbour(
+  order: readonly AuditColumnId[],
+  column: AuditColumnId | undefined,
+): number | undefined {
+  return column === undefined ? undefined : order.indexOf(column);
+}
+
+/**
+ * A header that can be dragged to another place, the Zero Trust log's six-dot grip in front of its
+ * name. The grip is also a button: with it focused, the arrow keys move the column a place left or
+ * right, so the order is not the mouse's alone.
+ */
+function ColumnHead({
+  column,
+  index,
+  left,
+  right,
+  onMove,
+}: {
+  readonly column: AuditColumnId;
+  /** The column's place in the full order, hidden columns included: where a drop puts a column. */
+  readonly index: number;
+  /** Where the arrow keys move it: the places of the shown columns either side, if any. */
+  readonly left: number | undefined;
+  readonly right: number | undefined;
+  readonly onMove: (column: AuditColumnId, to: number) => void;
+}): ReactElement {
+  const [over, setOver] = useState(false);
+  const label = auditColumnLabels[column];
+
+  return (
+    <Table.Head
+      className={cn(columnClass[column], over && "bg-kumo-tint")}
+      draggable
+      onDragStart={(drag: DragEvent<HTMLTableCellElement>) => {
+        drag.dataTransfer.setData(dragType, column);
+        drag.dataTransfer.effectAllowed = "move";
+      }}
+      onDragOver={(drag: DragEvent<HTMLTableCellElement>) => {
+        if (drag.dataTransfer.types.includes(dragType)) {
+          drag.preventDefault();
+          setOver(true);
+        }
+      }}
+      onDragLeave={() => {
+        setOver(false);
+      }}
+      onDrop={(drag: DragEvent<HTMLTableCellElement>) => {
+        drag.preventDefault();
+        setOver(false);
+
+        const moved = drag.dataTransfer.getData(dragType);
+        const known = auditColumns.find((candidate) => candidate === moved);
+
+        if (known !== undefined && known !== column) {
+          onMove(known, index);
+        }
+      }}
+    >
+      <span className="flex items-center gap-1">
+        <button
+          type="button"
+          aria-label={`Move the ${label} column`}
+          aria-keyshortcuts="ArrowLeft ArrowRight"
+          className="-ml-1.5 flex size-5 shrink-0 cursor-grab items-center justify-center rounded-sm text-kumo-subtle hover:text-kumo-default focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
+          onKeyDown={(key: KeyboardEvent<HTMLButtonElement>) => {
+            if (key.key === "ArrowLeft" && left !== undefined) {
+              key.preventDefault();
+              onMove(column, left);
+            } else if (key.key === "ArrowRight" && right !== undefined) {
+              key.preventDefault();
+              onMove(column, right);
+            }
+          }}
+        >
+          <DotsSixVerticalIcon aria-hidden className="size-3.5" />
+        </button>
+        <span className="truncate">{label}</span>
+      </span>
+    </Table.Head>
   );
 }
 
@@ -118,12 +188,18 @@ export interface EventsTableProps {
   readonly paging: CursorPaging;
   /** The columns the reader switched off in the Columns menu. */
   readonly hidden?: ReadonlySet<AuditColumn>;
+  /** Every column in the reader's order, hidden ones included. */
+  readonly order?: readonly AuditColumnId[];
+  /** Moves a column to another place in the order; without it the headers do not move. */
+  readonly onMove?: (column: AuditColumnId, to: number) => void;
 }
 
 /**
- * The audit list, as the dashboard's audit logs table: server-ordered (newest first) and
- * server-paged, so the table neither sorts nor filters. A row opens a sheet at the right edge with
- * every recorded field, as the Zero Trust admin log does; the band below walks the pages.
+ * The audit list, as the Zero Trust admin activity log: server-ordered (newest first) and
+ * server-paged, so the table neither sorts nor filters. The date is the row's link and opens a
+ * sheet at the right edge with every recorded field; a click anywhere else on the row does the
+ * same. The headers can be dragged into another order, and the band inside the frame walks the
+ * pages.
  */
 export function EventsTable({
   events,
@@ -131,43 +207,51 @@ export function EventsTable({
   onClearFilters,
   paging,
   hidden = noneHidden,
+  order = auditColumns,
+  onMove,
 }: EventsTableProps): ReactElement {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = events.find((event) => event.id === openId) ?? null;
+  const shown = order.filter((column) => !(hidden as ReadonlySet<AuditColumnId>).has(column));
 
   return (
     <>
       <TableScroll
-        pinnedRight
         below={
           events.length === 0 ? (
             <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
           ) : null
         }
+        footer={
+          paging.loaded === 0 ? null : (
+            // The page size is the toolbar's "Limit", so the band leaves its own out.
+            <div className="[&_[data-slot=pagination-page-size]]:hidden">
+              <CursorBand paging={paging} noun="event" />
+            </div>
+          )
+        }
       >
-        {(overflowing) => (
-          // Fixed layout: every column but Details has a set width, so Details takes what is left
-          // of the panel and its lines cut at that width instead of stretching the table past the
-          // panel. A fixed column does not grow for its content, so every cell in one either
-          // truncates or wraps; a value that does neither runs into the next column. The minimum
-          // keeps the columns readable on a phone, where the panel scrolls.
-          <Table className={cn(tableClass, "min-w-[800px] table-fixed")}>
+        {() => (
+          // The minimum keeps the columns readable on a phone, where the panel scrolls sideways.
+          <Table className={cn(tableClass, "min-w-[880px] table-fixed")}>
             <Table.Header>
               <Table.Row>
-                <Table.Head className="w-32">Time</Table.Head>
-                <Table.Head className="w-56">Action</Table.Head>
-                {hidden.has("target") ? null : <Table.Head className="w-40">Target</Table.Head>}
-                {hidden.has("actor") ? null : <Table.Head className="w-44">Actor</Table.Head>}
-                {hidden.has("result") ? null : <Table.Head className="w-24">Result</Table.Head>}
-                {hidden.has("details") ? null : (
-                  <Table.Head className="hidden lg:table-cell">Details</Table.Head>
+                {shown.map((column, at) =>
+                  onMove === undefined ? (
+                    <Table.Head key={column} className={columnClass[column]}>
+                      {auditColumnLabels[column]}
+                    </Table.Head>
+                  ) : (
+                    <ColumnHead
+                      key={column}
+                      column={column}
+                      index={order.indexOf(column)}
+                      left={neighbour(order, shown[at - 1])}
+                      right={neighbour(order, shown[at + 1])}
+                      onMove={onMove}
+                    />
+                  ),
                 )}
-                <Table.Head
-                  sticky="right"
-                  className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
-                >
-                  <span className="sr-only">Details</span>
-                </Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -175,8 +259,7 @@ export function EventsTable({
                 <EventRow
                   key={event.id}
                   event={event}
-                  hidden={hidden}
-                  overflowing={overflowing}
+                  columns={shown}
                   open={openId === event.id}
                   onOpen={() => {
                     setOpenId(event.id);
@@ -187,7 +270,6 @@ export function EventsTable({
           </Table>
         )}
       </TableScroll>
-      <CursorBand paging={paging} noun="event" />
       <EventSheet
         event={open}
         onClose={() => {

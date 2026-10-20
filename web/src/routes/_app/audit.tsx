@@ -1,26 +1,26 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
-import { Toolbar } from "@cloudflare/kumo/components/toolbar";
-import { cn } from "@cloudflare/kumo/utils";
-import { ArrowClockwiseIcon, CalendarBlankIcon, XIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, ClockIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { fallback, object, optional, picklist, pipe, transform, unknown } from "valibot";
 
-import { auditQuery, auditRanges, usersQuery } from "~/api/queries.ts";
+import { auditPageSize, auditQuery, auditRanges, usersQuery } from "~/api/queries.ts";
 import type { AuditFilters, AuditRange, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import { ColumnsMenu, useHiddenColumns } from "~/components/audit/columns.tsx";
+import { ColumnsMenu, useAuditColumns } from "~/components/audit/columns.tsx";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import { ExportMenu } from "~/components/audit/export-menu.tsx";
+import { LogFilters } from "~/components/audit/log-filters.tsx";
+import type { LogFilter } from "~/components/audit/log-filters.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
-import { SearchInput } from "~/components/table/search-input.tsx";
+import { smallestPageSize } from "~/components/table/paging.tsx";
 import { TableGroup } from "~/components/table/toolbar.tsx";
-import { Badge } from "~/components/ui/badge.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
@@ -71,7 +71,7 @@ export const Route = createFileRoute("/_app/audit")({
   component: AuditPage,
 });
 
-/** The date-range button's choices, as the dashboard's audit log words them. */
+/** The time range button's choices, as the Zero Trust logs word them. */
 const rangeLabels: Record<AuditRange, string> = {
   "1h": "Last hour",
   "24h": "Last 24 hours",
@@ -81,10 +81,10 @@ const rangeLabels: Record<AuditRange, string> = {
 };
 
 /**
- * A Kumo Select as a segment of a Toolbar group: the group draws the ring and the dividers, so the
- * select drops its own.
+ * The rows a page of the table holds, the log toolbar's "Limit": up to one page of what the server
+ * sends at a time, so stepping on always shows a whole page.
  */
-const joinedSelectClass = "rounded-none bg-transparent shadow-none ring-0";
+const limits: readonly number[] = [smallestPageSize, tablePageSize, auditPageSize];
 
 function isRange(value: string): value is AuditRange {
   return (auditRanges as readonly string[]).includes(value);
@@ -101,7 +101,7 @@ function isFiltered(search: AuditSearch): boolean {
 
 const actionSettleMs = 300;
 
-/** The search box's own text, reset whenever the address changes it from outside. */
+/** The action box's own text, reset whenever the address changes it from outside. */
 function useDraft(fromSearch: string): [string, (next: string) => void] {
   const [draft, setDraft] = useState(fromSearch);
   const [seen, setSeen] = useState(fromSearch);
@@ -121,93 +121,94 @@ function userOptions(users: readonly User[]): { value: string; label: string }[]
   ];
 }
 
-/** The log toolbar's filter count: how many filters narrow the list, and the × that drops them all. */
-function FilterCount({
-  count,
-  onClear,
-}: {
-  readonly count: number;
-  readonly onClear: () => void;
-}): ReactElement | null {
-  if (count === 0) {
-    return null;
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      aria-label={`Clear ${String(count)} ${count === 1 ? "filter" : "filters"}`}
-      onClick={onClear}
-    >
-      Filters
-      <Badge tone="neutral">{count}</Badge>
-      <XIcon aria-hidden className="size-3.5 text-kumo-subtle" />
-    </Button>
-  );
-}
-
-/** The date-range button with its calendar icon, the Columns chooser and the refresh. */
-function RangeControls({
+/** The time range as the log toolbar's clock button. */
+function RangeSelect({
   since,
-  refreshing,
-  columns,
-  onSinceChange,
-  onRefresh,
+  onChange,
 }: {
   readonly since: AuditRange;
-  readonly refreshing: boolean;
-  readonly columns: ReactElement;
-  readonly onSinceChange: (since: AuditRange) => void;
-  readonly onRefresh: () => void;
+  readonly onChange: (since: AuditRange) => void;
 }): ReactElement {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Select
-        aria-label="Time range"
-        className="w-44"
-        value={since}
-        renderValue={(value) => (
-          <span className="flex items-center gap-2">
-            <CalendarBlankIcon aria-hidden className="size-4 text-kumo-subtle" />
-            {isRange(value) ? rangeLabels[value] : rangeLabels[defaultRange]}
-          </span>
-        )}
-        onValueChange={(value) => {
-          onSinceChange(typeof value === "string" && isRange(value) ? value : defaultRange);
-        }}
-      >
-        {auditRanges.map((range) => (
-          <Select.Option key={range} value={range}>
-            {rangeLabels[range]}
-          </Select.Option>
-        ))}
-      </Select>
-      {columns}
-      <Button
-        variant="secondary"
-        shape="square"
-        icon={ArrowClockwiseIcon}
-        aria-label="Refresh"
-        loading={refreshing}
-        onClick={onRefresh}
-      />
-    </div>
+    <Select
+      aria-label="Time range"
+      className="w-40"
+      value={since}
+      renderValue={(value) => (
+        <span className="flex items-center gap-2">
+          <ClockIcon aria-hidden className="size-4 text-kumo-subtle" />
+          {isRange(value) ? rangeLabels[value] : rangeLabels[defaultRange]}
+        </span>
+      )}
+      onValueChange={(value) => {
+        onChange(typeof value === "string" && isRange(value) ? value : defaultRange);
+      }}
+    >
+      {auditRanges.map((range) => (
+        <Select.Option key={range} value={range}>
+          {rangeLabels[range]}
+        </Select.Option>
+      ))}
+    </Select>
   );
 }
 
-function AuditPage(): ReactElement {
-  const { me } = Route.useRouteContext();
+/** "Limit: 50", the rows one page of the table holds. */
+function LimitSelect({
+  value,
+  onChange,
+}: {
+  readonly value: number;
+  readonly onChange: (size: number) => void;
+}): ReactElement {
+  return (
+    <Select
+      aria-label="Rows per page"
+      className="w-20 sm:w-28"
+      value={value}
+      renderValue={(size) => (
+        <span>
+          <span className="max-sm:hidden">Limit: </span>
+          {String(size)}
+        </span>
+      )}
+      onValueChange={(size) => {
+        if (typeof size === "number") {
+          onChange(size);
+        }
+      }}
+    >
+      {limits.map((size) => (
+        <Select.Option key={size} value={size}>
+          {size}
+        </Select.Option>
+      ))}
+    </Select>
+  );
+}
+
+interface AuditFilterRows {
+  /** The rows of the Filters popover. */
+  readonly filters: LogFilter[];
+  /** Drops the action and the user, keeping the range. */
+  readonly onClear: () => void;
+  /** Puts every control back where the page starts, the range included. */
+  readonly onReset: () => void;
+}
+
+/**
+ * The audit log's filters as the popover's rows: the action prefix, typed, and the user, picked
+ * when the caller may list users. The typed prefix reaches the address, and so the server, once it
+ * stops changing.
+ */
+function useAuditFilters(users: readonly User[] | undefined): AuditFilterRows {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
-  const filters = filtersOf(search);
   const [actionDraft, setActionDraft] = useDraft(search.action);
   const settledAction = useDebounced(actionDraft, actionSettleMs);
-  const events = useInfiniteQuery(auditQuery(filters));
 
-  // The typed prefix reaches the address, and so the server, once it stops changing. A draft that
-  // is still moving stays local, so clearing the filters elsewhere cannot be undone by a stale one.
+  // A draft that is still moving stays local, so clearing the filters elsewhere cannot be undone by
+  // a stale one.
   useEffect(() => {
     if (settledAction === actionDraft && settledAction !== search.action) {
       void navigate({
@@ -216,6 +217,76 @@ function AuditPage(): ReactElement {
       });
     }
   }, [settledAction, actionDraft, search.action, navigate]);
+
+  const filters: LogFilter[] = [
+    {
+      id: "action",
+      label: "Action",
+      operator: "starts with",
+      value: (
+        <Input
+          aria-label="Action starts with"
+          placeholder="node. or node.delete"
+          value={actionDraft}
+          onChange={(event) => {
+            setActionDraft(event.target.value);
+          }}
+        />
+      ),
+      active: search.action !== "",
+      addable: true,
+      onRemove: () => {
+        setActionDraft("");
+        void navigate({ search: (previous) => ({ ...previous, action: "" }) });
+      },
+    },
+  ];
+
+  if (users !== undefined || search.actor !== "") {
+    filters.push({
+      id: "actor",
+      label: "User",
+      operator: "is",
+      value: (
+        <Select
+          aria-label="User is"
+          className="w-full min-w-0"
+          value={search.actor}
+          items={userOptions(users ?? [])}
+          onValueChange={(value) => {
+            void navigate({ search: (previous) => ({ ...previous, actor: value ?? "" }) });
+          }}
+        />
+      ),
+      active: search.actor !== "",
+      addable: users !== undefined,
+      onRemove: () => {
+        void navigate({ search: (previous) => ({ ...previous, actor: "" }) });
+      },
+    });
+  }
+
+  return {
+    filters,
+    onClear: () => {
+      setActionDraft("");
+      void navigate({ search: (previous) => ({ ...previous, action: "", actor: "" }) });
+    },
+    onReset: () => {
+      setActionDraft("");
+      void navigate({ search: () => ({ ...clearedSearch }) });
+    },
+  };
+}
+
+function AuditPage(): ReactElement {
+  const { me } = Route.useRouteContext();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+  const filters = filtersOf(search);
+  const events = useInfiniteQuery(auditQuery(filters));
+  const columns = useAuditColumns();
   const rows = events.data?.pages.flatMap((page) => page.events) ?? [];
   const window = usePageWindow({
     rows,
@@ -228,9 +299,7 @@ function AuditPage(): ReactElement {
     },
     resetKey: JSON.stringify(filters),
   });
-
-  const filterCount = (search.action === "" ? 0 : 1) + (search.actor === "" ? 0 : 1);
-  const [hidden, toggleColumn] = useHiddenColumns();
+  const logFilters = useAuditFilters(users.data?.users);
 
   return (
     <>
@@ -240,61 +309,57 @@ function AuditPage(): ReactElement {
         description="Who changed what through the API and the console."
         actions={<ExportMenu filters={filtersOf(search)} />}
       />
-      <TableGroup className="gap-4">
-        {/* The dashboard's audit filter row: the filters joined in one ringed group on the left
-            with their count and the × that clears them; the date range, the Columns chooser and a refresh
-            on the right. The per-page limit sits in the band under the table. */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 basis-80 flex-wrap items-center gap-2">
-            <Toolbar aria-label="Filters" className="w-full max-w-[560px]">
-              <SearchInput
-                joined
-                value={actionDraft}
-                placeholder="Filter by action prefix"
-                onValueChange={setActionDraft}
-              />
-              {users.data === undefined ? null : (
-                <Select
-                  aria-label="Filter by user"
-                  className={cn(joinedSelectClass, "w-44")}
-                  value={search.actor}
-                  items={userOptions(users.data.users)}
-                  onValueChange={(value) => {
-                    void navigate({ search: (previous) => ({ ...previous, actor: value ?? "" }) });
-                  }}
-                />
-              )}
-            </Toolbar>
-            <FilterCount
-              count={filterCount}
-              onClear={() => {
-                void navigate({ search: (previous) => ({ ...previous, action: "", actor: "" }) });
-              }}
-            />
-          </div>
-          <RangeControls
+      <AuditStats events={rows} />
+      <TableGroup>
+        {/* The Zero Trust log toolbar, right-aligned over the table it narrows: the filters with
+            their count and the × that clears them, the time range, the page size and the columns,
+            then a refresh. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <LogFilters
+            filters={logFilters.filters}
+            onClear={() => {
+              logFilters.onClear();
+            }}
+          />
+          <RangeSelect
             since={search.since}
-            refreshing={events.isRefetching && !events.isFetchingNextPage}
-            columns={<ColumnsMenu hidden={hidden} onToggle={toggleColumn} />}
-            onSinceChange={(since) => {
+            onChange={(since) => {
               void navigate({ search: (previous) => ({ ...previous, since }) });
             }}
-            onRefresh={() => {
+          />
+          <LimitSelect
+            value={window.pageSize}
+            onChange={(size) => {
+              window.setPageSize(size);
+            }}
+          />
+          <ColumnsMenu columns={columns} />
+          {/* A phone keeps the toolbar on one line without it; the list refetches when the tab
+              comes back into focus anyway. */}
+          <Button
+            className="max-sm:hidden"
+            variant="secondary"
+            shape="square"
+            icon={ArrowClockwiseIcon}
+            aria-label="Refresh"
+            loading={events.isRefetching && !events.isFetchingNextPage}
+            onClick={() => {
               void events.refetch();
             }}
           />
         </div>
-        <AuditStats events={rows} />
-      </TableGroup>
-      <TableGroup>
         <EventsTable
           events={window.rows}
           filtered={isFiltered(search)}
           onClearFilters={() => {
-            void navigate({ search: () => ({ ...clearedSearch }) });
+            logFilters.onReset();
           }}
           paging={window}
-          hidden={hidden}
+          hidden={columns.hidden}
+          order={columns.order}
+          onMove={(column, to) => {
+            columns.move(column, to);
+          }}
         />
       </TableGroup>
     </>
