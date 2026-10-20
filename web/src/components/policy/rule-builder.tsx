@@ -243,8 +243,8 @@ export function SettingToggle({
 
   return (
     <div className="flex flex-col gap-3 border-t border-kumo-line pt-4 first:border-t-0 first:pt-0">
-      <div className="flex items-start justify-between gap-6">
-        <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex items-start justify-between gap-4 sm:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span id={`${id}-title`} className="font-medium text-kumo-default">
             {title}
           </span>
@@ -252,13 +252,16 @@ export function SettingToggle({
             {description}
           </span>
         </div>
-        <Switch
-          checked={checked}
-          disabled={disabled}
-          aria-labelledby={`${id}-title`}
-          aria-describedby={`${id}-description`}
-          onCheckedChange={onCheckedChange}
-        />
+        {/* A long description squeezed the switch into a square at a phone's width. */}
+        <span className="flex min-h-lh shrink-0 items-center">
+          <Switch
+            checked={checked}
+            disabled={disabled}
+            aria-labelledby={`${id}-title`}
+            aria-describedby={`${id}-description`}
+            onCheckedChange={onCheckedChange}
+          />
+        </span>
       </div>
       {children}
     </div>
