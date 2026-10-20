@@ -9,7 +9,6 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { SSHRecording } from "~/api/queries.ts";
 import { sshRecordingCastUrl } from "~/api/queries.ts";
-import { Timestamp } from "~/components/audit/timestamp.tsx";
 import {
   castFileName,
   formatBytes,
@@ -36,6 +35,7 @@ import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
+import { Timestamp } from "~/components/ui/timestamp.tsx";
 import { machineLabel } from "~/lib/node.ts";
 
 const stateTones: Record<RecordingState, { tone: Tone; label: string }> = {

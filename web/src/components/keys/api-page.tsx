@@ -14,16 +14,16 @@ import { managesAllKeys, userOptions } from "~/components/keys/api-dialogs.tsx";
 import { RevealedSecret } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
+import { useApiKeyMutations } from "~/components/keys/mutations.ts";
+import { scopeItems } from "~/components/keys/scopes.ts";
 import {
   ChoiceChips,
   FormError,
   FormFooter,
   FormSection,
   SelectionCards,
-} from "~/components/keys/form-page.tsx";
-import type { SelectionCard } from "~/components/keys/form-page.tsx";
-import { useApiKeyMutations } from "~/components/keys/mutations.ts";
-import { scopeItems } from "~/components/keys/scopes.ts";
+} from "~/components/ui/form-page.tsx";
+import type { SelectionCard } from "~/components/ui/form-page.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -166,7 +166,10 @@ function ApiKeyForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <FormError message={create.isError ? errorMessage(create.error) : undefined} />
+      <FormError
+        title="The key was not created"
+        message={create.isError ? errorMessage(create.error) : undefined}
+      />
       <FormSection title="Key description" info="What the key is for, so it can be told apart.">
         <Input
           aria-label="Key description"

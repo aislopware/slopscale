@@ -5,12 +5,12 @@ import type { ReactElement, ReactNode } from "react";
 
 import { api } from "~/api/client.ts";
 import type { ServerInfo } from "~/api/queries.ts";
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { Card } from "~/components/ui/card.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 

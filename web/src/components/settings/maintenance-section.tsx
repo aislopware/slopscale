@@ -7,10 +7,9 @@ import type { ReactElement } from "react";
 import { api } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import { invalidate } from "~/api/queries.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
-import { SettingsCard } from "~/components/ui/settings-card.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** Server-side repairs an operator runs on purpose, each behind a confirmation. */
@@ -36,7 +35,7 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
       description="Repairs that touch every machine. Each asks before it runs."
     >
       <SettingsCard>
-        <SettingRow
+        <SettingsRow
           title="Backfill IP addresses"
           description="Gives every machine an address in each family the server config enables, and removes addresses in a family that is no longer enabled."
           control={

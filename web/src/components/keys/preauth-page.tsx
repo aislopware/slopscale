@@ -1,6 +1,4 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { Input } from "@cloudflare/kumo/components/input";
-import { Switch } from "@cloudflare/kumo/components/switch";
 import { KeyIcon, RepeatIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -8,29 +6,23 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import { groupsQuery, usersQuery } from "~/api/queries.ts";
-import type { Group, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { groupItems } from "~/components/access/pickers.ts";
 import { RevealedSecret } from "~/components/keys/created-key.tsx";
-import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
-import type { ExpiryChoice } from "~/components/keys/expiration.ts";
-import {
-  ChoiceChips,
-  FormError,
-  FormFooter,
-  FormSection,
-  SelectionCards,
-} from "~/components/keys/form-page.tsx";
-import type { SelectionCard } from "~/components/keys/form-page.tsx";
+import { expirationFor } from "~/components/keys/expiration.ts";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
-import { UserSelect } from "~/components/keys/preauth-dialogs.tsx";
+import {
+  ExpiryChoices,
+  MachineSettingsRows,
+  OwnerField,
+  TagsAndGroupsFields,
+} from "~/components/keys/preauth-fields.tsx";
+import type { PreAuthKeyChoices } from "~/components/keys/preauth-fields.tsx";
 import { JoinCommand } from "~/components/machines/join-command.tsx";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import { MultiPicker } from "~/components/ui/multi-picker.tsx";
+import { FormError, FormFooter, FormSection, SelectionCards } from "~/components/ui/form-page.tsx";
+import type { SelectionCard } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { SettingsRow } from "~/components/ui/settings-card.tsx";
-import { TagField } from "~/components/ui/tag-field.tsx";
 
 const listPath = "/keys/pre-auth";
 
@@ -51,14 +43,8 @@ const usageCards: readonly SelectionCard<Usage>[] = [
   },
 ];
 
-interface Draft {
-  readonly userId: string;
+interface Draft extends PreAuthKeyChoices {
   readonly usage: Usage;
-  readonly expiry: ExpiryChoice;
-  readonly ephemeral: boolean;
-  readonly preauthorized: boolean;
-  readonly tags: readonly string[];
-  readonly groupIds: readonly string[];
 }
 
 /**
@@ -163,14 +149,22 @@ function PreAuthKeyForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <FormError message={create.isError ? errorMessage(create.error) : undefined} />
-      <OwnerSection
-        users={mayListUsers ? userList : undefined}
-        userId={mayListUsers ? userId : draft.userId}
-        onChange={(next) => {
-          update({ userId: next });
-        }}
+      <FormError
+        title="The key was not created"
+        message={create.isError ? errorMessage(create.error) : undefined}
       />
+      <FormSection
+        title="Owner"
+        info="A machine registered with the key belongs to this user, unless the key tags it."
+      >
+        <div className="max-w-[450px]">
+          <OwnerField
+            users={mayListUsers ? userList : undefined}
+            userId={mayListUsers ? userId : draft.userId}
+            onChange={update}
+          />
+        </div>
+      </FormSection>
       <FormSection title="Key usage" info="How many machines may register with the key.">
         <SelectionCards
           label="Key usage"
@@ -181,147 +175,33 @@ function PreAuthKeyForm({
           }}
         />
       </FormSection>
-      <MachineSettingsSection draft={draft} onChange={update} />
-      <FormSection title="Key expiration" info="After this the key registers nothing more.">
-        <ChoiceChips
-          label="Key expiration"
-          value={draft.expiry}
-          options={expiryOptions}
-          onValueChange={(expiry) => {
-            update({ expiry });
-          }}
+      <FormSection title="Machine settings" flush>
+        <MachineSettingsRows
+          ephemeral={draft.ephemeral}
+          preauthorized={draft.preauthorized}
+          onChange={update}
         />
       </FormSection>
-      <TagsSection
-        draft={draft}
-        groups={groups.data?.groups}
-        knownTags={knownTags}
-        onChange={update}
-      />
+      <FormSection title="Key expiration" info="After this the key registers nothing more.">
+        <ExpiryChoices value={draft.expiry} onChange={update} />
+      </FormSection>
+      <FormSection
+        title="Tags and groups"
+        info="A tagged machine belongs to its tags, not the user. Every machine registered with the key joins the groups."
+      >
+        <TagsAndGroupsFields
+          tags={draft.tags}
+          groupIds={draft.groupIds}
+          groups={groups.data?.groups}
+          knownTags={knownTags}
+          onChange={update}
+        />
+      </FormSection>
       <FormFooter cancelTo={listPath}>
         <Button type="submit" variant="primary" loading={create.isPending} disabled={userId === ""}>
           Create key
         </Button>
       </FormFooter>
     </form>
-  );
-}
-
-/** Whose the machines are: a user picked by name, or by id for a caller who may not list users. */
-function OwnerSection({
-  users,
-  userId,
-  onChange,
-}: {
-  /** The users to choose from, or undefined when the caller may not list them. */
-  readonly users: readonly User[] | undefined;
-  readonly userId: string;
-  readonly onChange: (userId: string) => void;
-}): ReactElement {
-  return (
-    <FormSection
-      title="Owner"
-      info="A machine registered with the key belongs to this user, unless the key tags it."
-    >
-      <div className="max-w-[450px]">
-        {users === undefined ? (
-          <Input
-            label="User id"
-            description="Which user the key belongs to."
-            value={userId}
-            spellCheck={false}
-            onChange={(event) => {
-              onChange(event.target.value);
-            }}
-          />
-        ) : (
-          <UserSelect users={users} value={userId} onChange={onChange} />
-        )}
-      </div>
-    </FormSection>
-  );
-}
-
-/** What a registered machine is: one that goes away with its session, and one that skips approval. */
-function MachineSettingsSection({
-  draft,
-  onChange,
-}: {
-  readonly draft: Draft;
-  readonly onChange: (patch: Partial<Draft>) => void;
-}): ReactElement {
-  return (
-    <FormSection title="Machine settings" flush>
-      <SettingsRow
-        title="Ephemeral"
-        description="The machine is deleted when it logs out or goes offline."
-        control={
-          <Switch
-            aria-label="Ephemeral"
-            checked={draft.ephemeral}
-            onCheckedChange={(ephemeral) => {
-              onChange({ ephemeral });
-            }}
-          />
-        }
-      />
-      <SettingsRow
-        title="Pre-authorized"
-        description="The machine skips approval."
-        control={
-          <Switch
-            aria-label="Pre-authorized"
-            checked={draft.preauthorized}
-            onCheckedChange={(preauthorized) => {
-              onChange({ preauthorized });
-            }}
-          />
-        }
-      />
-    </FormSection>
-  );
-}
-
-/** The tags that make a machine tagged rather than the user's, and the groups it joins. */
-function TagsSection({
-  draft,
-  groups,
-  knownTags,
-  onChange,
-}: {
-  readonly draft: Draft;
-  /** The groups a registered machine may join, or undefined when the caller may not list them. */
-  readonly groups: readonly Group[] | undefined;
-  readonly knownTags: readonly string[];
-  readonly onChange: (patch: Partial<Draft>) => void;
-}): ReactElement {
-  return (
-    <FormSection
-      title="Tags and groups"
-      info="A tagged machine belongs to its tags, not the user. Every machine registered with the key joins the groups."
-    >
-      <TagField
-        description="A tagged machine belongs to its tags, not the user."
-        placeholder="tag:server"
-        value={draft.tags}
-        suggestions={knownTags}
-        onValueChange={(tags) => {
-          onChange({ tags });
-        }}
-      />
-      {groups === undefined ? null : (
-        <MultiPicker
-          label="Groups"
-          description="Every machine registered with this key joins these groups."
-          placeholder="Add groups…"
-          items={groupItems(groups, "membership")}
-          value={draft.groupIds}
-          onValueChange={(groupIds) => {
-            onChange({ groupIds });
-          }}
-          empty="No group matches. Create one under Access controls."
-        />
-      )}
-    </FormSection>
   );
 }

@@ -4,14 +4,14 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
 import type { Derp } from "~/api/queries.ts";
-import { FacetChips } from "~/components/derp/facet-chips.tsx";
-import type { Facet } from "~/components/derp/facet-chips.tsx";
 import { sourceLabels } from "~/components/derp/model.ts";
 import type { RegionSource } from "~/components/derp/model.ts";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { tableClass, tableRowClass } from "~/components/table/styles.ts";
 import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { FacetChips } from "~/components/ui/facet-chips.tsx";
+import type { Facet } from "~/components/ui/facet-chips.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 
 type Region = Derp["regions"][number];

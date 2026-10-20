@@ -14,10 +14,10 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import type { MachineOwner } from "~/api/schema.gen.ts";
-import { Timestamp } from "~/components/audit/timestamp.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
+import { Timestamp } from "~/components/ui/timestamp.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 

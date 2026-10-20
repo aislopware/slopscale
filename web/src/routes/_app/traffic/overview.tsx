@@ -23,11 +23,11 @@ import {
   pickDestination,
 } from "~/components/traffic/search.ts";
 import { TrafficAnalytics, emptySummary } from "~/components/traffic/summary.tsx";
-import { TableSection } from "~/components/traffic/table-section.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 
 /** How many machines and destinations the overview lists; the pages under it list the rest. */
 const topRows = 10;
@@ -150,7 +150,7 @@ function GatewaysSection({
   readonly onPick: (gateway: string) => void;
 }): ReactElement {
   return (
-    <TableSection
+    <PageSection
       title="Gateways"
       description="What went through each gateway. Pick one to see only its traffic."
     >
@@ -166,7 +166,7 @@ function GatewaysSection({
           </TableFooter>
         }
       />
-    </TableSection>
+    </PageSection>
   );
 }
 
@@ -182,7 +182,7 @@ function TopMachinesSection({
   readonly search: OverviewSearch;
 }): ReactElement {
   return (
-    <TableSection
+    <PageSection
       title="Top machines"
       description="The machines that sent and received the most through the gateways."
     >
@@ -205,7 +205,7 @@ function TopMachinesSection({
           </TableFooter>
         }
       />
-    </TableSection>
+    </PageSection>
   );
 }
 

@@ -6,9 +6,9 @@ import { serverInfoQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { MaintenanceSection } from "~/components/settings/maintenance-section.tsx";
 import { ServerSection, serverParts } from "~/components/settings/server-section.tsx";
-import { SettingsLayout } from "~/components/settings/settings-page.tsx";
-import type { SettingsPart } from "~/components/settings/settings-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { SettingsLayout } from "~/components/ui/settings-layout.tsx";
+import type { SettingsPart } from "~/components/ui/settings-layout.tsx";
 
 export const Route = createFileRoute("/_app/settings/server")({
   loader: async ({ context }) => {

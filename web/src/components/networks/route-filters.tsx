@@ -1,10 +1,10 @@
-import { cn } from "@cloudflare/kumo/utils";
 import { ClockIcon, GlobeIcon, LightningIcon, PathIcon, StackIcon } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 import { routeFilterLabels, routeFilters } from "~/components/networks/routes-model.ts";
 import type { RouteFilter, RouteFilterState } from "~/components/networks/routes-model.ts";
+import { FacetChip } from "~/components/ui/facet-chips.tsx";
 
 const icons: Record<RouteFilter, Icon> = {
   pending: ClockIcon,
@@ -12,8 +12,6 @@ const icons: Record<RouteFilter, Icon> = {
   learned: LightningIcon,
   networks: StackIcon,
 };
-
-const iconSize = 14;
 
 /**
  * The facet chips over the dashboard's Routes table ("6 routes", "System 6", "CIDR 6"): a pill per
@@ -40,12 +38,12 @@ export function RouteFilterChips({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Chip pressed={none} onClick={onClear} icon={PathIcon}>
+      <FacetChip pressed={none} onClick={onClear} icon={PathIcon}>
         {total === 1 ? "1 route" : `${total} routes`}
-      </Chip>
+      </FacetChip>
       <span aria-hidden className="h-5 border-l border-kumo-line" />
       {routeFilters.map((filter) => (
-        <Chip
+        <FacetChip
           key={filter}
           pressed={state[filter]}
           icon={icons[filter]}
@@ -55,44 +53,8 @@ export function RouteFilterChips({
           }}
         >
           {routeFilterLabels[filter]}
-        </Chip>
+        </FacetChip>
       ))}
     </div>
-  );
-}
-
-function Chip({
-  pressed,
-  icon: ChipIcon,
-  count,
-  onClick,
-  children,
-}: {
-  readonly pressed: boolean;
-  readonly icon: Icon;
-  readonly count?: number;
-  readonly onClick: () => void;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-sm text-kumo-default ring outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus",
-        pressed
-          ? "bg-kumo-fill font-medium ring-kumo-interact"
-          : "bg-kumo-base ring-kumo-hairline hover:ring-kumo-interact",
-      )}
-    >
-      <ChipIcon size={iconSize} aria-hidden className="text-kumo-subtle" />
-      {children}
-      {count === undefined ? null : (
-        <span className="inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-1 text-xs text-kumo-subtle tabular-nums ring ring-kumo-line">
-          {count}
-        </span>
-      )}
-    </button>
   );
 }

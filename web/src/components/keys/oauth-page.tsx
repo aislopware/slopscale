@@ -6,10 +6,10 @@ import type { ReactElement, SubmitEvent } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { Me } from "~/auth/me.ts";
 import { RevealedSecret } from "~/components/keys/created-key.tsx";
-import { FormError, FormFooter, FormSection } from "~/components/keys/form-page.tsx";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
 import { needsTags, scopeItems } from "~/components/keys/scopes.ts";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
+import { FormError, FormFooter, FormSection } from "~/components/ui/form-page.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { TagField } from "~/components/ui/tag-field.tsx";
@@ -94,7 +94,10 @@ function OAuthClientForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <FormError message={create.isError ? errorMessage(create.error) : undefined} />
+      <FormError
+        title="The client was not created"
+        message={create.isError ? errorMessage(create.error) : undefined}
+      />
       <FormSection
         title="Client description"
         info="What the client is for, so it can be told apart."

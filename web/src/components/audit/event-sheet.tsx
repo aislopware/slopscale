@@ -1,9 +1,5 @@
-import { Button } from "@cloudflare/kumo/components/button";
-import { Dialog } from "@cloudflare/kumo/components/dialog";
-import { cn } from "@cloudflare/kumo/utils";
-import { XIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import {
@@ -16,51 +12,8 @@ import {
   actorKindLabel,
 } from "~/components/audit/cells.tsx";
 import { CopyButton, CopyText } from "~/components/ui/copy-text.tsx";
+import { Sheet, SheetFact, SheetSection } from "~/components/ui/sheet.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
-
-/**
- * Kumo's dialog turned into the Zero Trust log's detail sheet: pinned to the right edge at full
- * height, 432px wide (at most three quarters of a tablet's width, the whole of a phone's), sliding
- * in from the right over 300ms instead of scaling up in the middle.
- */
-const sheetClass = cn(
-  "inset-y-0 top-0 right-0 left-auto flex h-dvh translate-x-0 flex-col rounded-none sm:top-0",
-  "w-full max-w-full sm:w-[432px] md:max-w-[75%]",
-  "border-l border-kumo-line shadow-lg ring-0 duration-300",
-  "data-starting-style:translate-x-full data-starting-style:scale-100 data-starting-style:opacity-100",
-  "data-ending-style:translate-x-full data-ending-style:scale-100 data-ending-style:opacity-100",
-);
-
-/** One fact in the sheet: a 12px semibold label over its 14px value, a line under it. */
-function Fact({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5 border-b border-kumo-line py-3">
-      <dt className="text-xs font-semibold text-kumo-default">{label}</dt>
-      <dd className="min-w-0 [overflow-wrap:anywhere] text-kumo-default">{children}</dd>
-    </div>
-  );
-}
-
-function FactGroup({
-  title,
-  children,
-}: {
-  readonly title: string;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <section className="flex flex-col gap-1">
-      <h3 className="text-lg font-semibold text-kumo-default">{title}</h3>
-      <dl className="flex flex-col">{children}</dl>
-    </section>
-  );
-}
 
 function SheetBody({ event }: { readonly event: AuditEvent }): ReactElement {
   const at = parseTime(event.createdAt);
@@ -69,57 +22,57 @@ function SheetBody({ event }: { readonly event: AuditEvent }): ReactElement {
   const json = JSON.stringify(event.detail, null, 2);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-6 py-6">
-      <FactGroup title="Basic information">
-        <Fact label="Time">
+    <>
+      <SheetSection title="Basic information">
+        <SheetFact label="Time">
           {at === null ? (
             event.createdAt
           ) : (
             <time dateTime={at.toISOString()}>{formatAbsolute(at)}</time>
           )}
-        </Fact>
-        <Fact label="Actor">
+        </SheetFact>
+        <SheetFact label="Actor">
           <span className="flex flex-col gap-0.5">
             <span>{actorName(event)}</span>
             {actorKind === null ? null : (
               <span className="text-xs text-kumo-subtle">{actorKind}</span>
             )}
           </span>
-        </Fact>
-        <Fact label="Action">
+        </SheetFact>
+        <SheetFact label="Action">
           <ActionCell event={event} />
-        </Fact>
+        </SheetFact>
         {event.targetKind === "" && event.targetId === "" && event.targetName === "" ? null : (
-          <Fact label="Target">
+          <SheetFact label="Target">
             <TargetCell event={event} />
-          </Fact>
+          </SheetFact>
         )}
-        <Fact label="Result">
+        <SheetFact label="Result">
           <span className="flex items-center gap-2">
             <ResultCell event={event} />
             <span className="text-kumo-subtle">HTTP status {event.outcome}</span>
           </span>
-        </Fact>
+        </SheetFact>
         {event.remoteAddr === "" ? null : (
-          <Fact label="Remote address">
+          <SheetFact label="Remote address">
             <CopyText value={event.remoteAddr} label="Copy the remote address" />
-          </Fact>
+          </SheetFact>
         )}
-        <Fact label="Audit record">
+        <SheetFact label="Audit record">
           <CopyText value={event.id} label="Copy the audit record ID" />
-        </Fact>
-      </FactGroup>
+        </SheetFact>
+      </SheetSection>
       {fields.length === 0 ? null : (
-        <FactGroup title="Details">
+        <SheetSection title="Details">
           {fields.map(([key, value]) => (
-            <Fact key={key} label={key}>
+            <SheetFact key={key} label={key}>
               <CopyText
                 value={detailText(value)}
                 copy={rawText(value)}
                 wrap
                 label={`Copy ${key}`}
               />
-            </Fact>
+            </SheetFact>
           ))}
           <div className="flex flex-col gap-1.5 py-3">
             <div className="flex items-center justify-between gap-2">
@@ -130,9 +83,9 @@ function SheetBody({ event }: { readonly event: AuditEvent }): ReactElement {
               {json}
             </pre>
           </div>
-        </FactGroup>
+        </SheetSection>
       )}
-    </div>
+    </>
   );
 }
 
@@ -157,30 +110,17 @@ export function EventSheet({
   }
 
   return (
-    <Dialog.Root
+    <Sheet
       open={event !== null}
       onOpenChange={(open) => {
         if (!open) {
           onClose();
         }
       }}
+      title="Event details"
+      description={shown === null ? "" : shown.action}
     >
-      <Dialog className={sheetClass} style={{ transitionProperty: "translate" }}>
-        <div className="flex items-start justify-between gap-4 border-b border-kumo-line px-6 py-5">
-          <div className="flex min-w-0 flex-col gap-1">
-            <Dialog.Title className="text-2xl font-semibold text-kumo-default">
-              Event details
-            </Dialog.Title>
-            <Dialog.Description className="truncate text-kumo-subtle">
-              {shown === null ? "" : shown.action}
-            </Dialog.Description>
-          </div>
-          <Dialog.Close
-            render={<Button variant="ghost" shape="square" icon={XIcon} aria-label="Close" />}
-          />
-        </div>
-        {shown === null ? null : <SheetBody event={shown} />}
-      </Dialog>
-    </Dialog.Root>
+      {shown === null ? null : <SheetBody event={shown} />}
+    </Sheet>
   );
 }

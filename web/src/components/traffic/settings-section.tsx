@@ -5,12 +5,12 @@ import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import type { TrafficReporters, TrafficSettings } from "~/api/traffic.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { useTrafficSettingsMutation } from "~/components/traffic/mutations.ts";
 import { TextLink } from "~/components/traffic/window-header.tsx";
 import { refusalOf } from "~/components/traffic/window-refusal.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { Note } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { ValueList } from "~/components/ui/value-list.tsx";
@@ -90,25 +90,27 @@ export function TrafficSettingsSections({
 }): ReactElement {
   return (
     <>
-      <Section
+      <SettingsGroup
+        id="names"
         title="Names and lookups"
         description="What the agents on the gateways look at besides the connections themselves."
-        bodyClassName="p-0"
       >
-        <SniRow settings={settings} canEdit={canEdit} />
-        <DnsRow settings={settings} reporters={reporters} canEdit={canEditDns} />
-        <SettingRow
-          title="Network names"
-          description="Each destination's network and country, from iptoasn.com's table. The server loads it once a gateway has reported and downloads a newer one daily; the configuration file sets where from."
-          control={
-            <span className="text-kumo-subtle tabular-nums">
-              {reporters.asnRanges === 0
-                ? "Not loaded yet"
-                : `${reporters.asnRanges.toLocaleString()} address ranges`}
-            </span>
-          }
-        />
-      </Section>
+        <SettingsCard>
+          <SniRow settings={settings} canEdit={canEdit} />
+          <DnsRow settings={settings} reporters={reporters} canEdit={canEditDns} />
+          <SettingsRow
+            title="Network names"
+            description="Each destination's network and country, from iptoasn.com's table. The server loads it once a gateway has reported and downloads a newer one daily; the configuration file sets where from."
+            control={
+              <span className="text-kumo-subtle tabular-nums">
+                {reporters.asnRanges === 0
+                  ? "Not loaded yet"
+                  : `${reporters.asnRanges.toLocaleString()} address ranges`}
+              </span>
+            }
+          />
+        </SettingsCard>
+      </SettingsGroup>
       <RetentionSection settings={settings} canEdit={canEdit} />
     </>
   );
@@ -124,7 +126,7 @@ function SniRow({
   const update = useTrafficSettingsMutation();
 
   return (
-    <SettingRow
+    <SettingsRow
       title="Name destinations from handshakes"
       description="Read the server name from each TLS and QUIC handshake that passes a gateway, so a destination shows as a host rather than an address. Nothing after the handshake is read."
       control={
@@ -166,7 +168,7 @@ function DnsRow({
   const update = useTrafficSettingsMutation({ quiet: true });
 
   return (
-    <SettingRow
+    <SettingsRow
       title="Log DNS lookups"
       description={
         <DnsLoggingDescription
@@ -287,55 +289,57 @@ function RetentionSection({
   };
 
   return (
-    <Section
+    <SettingsGroup
+      id="retention"
       title="Retention"
       description="How long each level of detail is kept. Lowering one removes what is older within the hour."
-      bodyClassName="p-0"
     >
-      <form onSubmit={save}>
-        {retentionKeys.map((key) => (
-          <SettingRow
-            key={key}
-            title={labels[key]}
-            description={descriptions[key]}
-            control={
-              <span className="flex items-center gap-2">
-                <Input
-                  aria-label={labels[key]}
-                  className="w-20 text-right tabular-nums"
-                  inputMode="numeric"
-                  value={draft[key]}
-                  disabled={!canEdit}
-                  onChange={(event) => {
-                    setDraft({ ...draft, [key]: event.target.value.trim() });
-                  }}
-                />
-                <span className="w-10 text-kumo-subtle">{retentionBounds[key].unit}</span>
-              </span>
-            }
-          />
-        ))}
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-kumo-hairline px-5 py-3">
-          {dirty && error !== null ? <Note>{error}</Note> : null}
-          <Button
-            variant="secondary"
-            disabled={!dirty}
-            onClick={() => {
-              setDraft(stored);
-            }}
-          >
-            Reset
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={!canEdit || !dirty || error !== null}
-            loading={update.isPending}
-          >
-            Save
-          </Button>
-        </div>
-      </form>
-    </Section>
+      <SettingsCard>
+        <form onSubmit={save}>
+          {retentionKeys.map((key) => (
+            <SettingsRow
+              key={key}
+              title={labels[key]}
+              description={descriptions[key]}
+              control={
+                <span className="flex items-center gap-2">
+                  <Input
+                    aria-label={labels[key]}
+                    className="w-20 text-right tabular-nums"
+                    inputMode="numeric"
+                    value={draft[key]}
+                    disabled={!canEdit}
+                    onChange={(event) => {
+                      setDraft({ ...draft, [key]: event.target.value.trim() });
+                    }}
+                  />
+                  <span className="w-10 text-kumo-subtle">{retentionBounds[key].unit}</span>
+                </span>
+              }
+            />
+          ))}
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-kumo-line px-4 py-3">
+            {dirty && error !== null ? <Note>{error}</Note> : null}
+            <Button
+              variant="secondary"
+              disabled={!dirty}
+              onClick={() => {
+                setDraft(stored);
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!canEdit || !dirty || error !== null}
+              loading={update.isPending}
+            >
+              Save
+            </Button>
+          </div>
+        </form>
+      </SettingsCard>
+    </SettingsGroup>
   );
 }

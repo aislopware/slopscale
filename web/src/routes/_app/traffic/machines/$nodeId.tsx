@@ -29,12 +29,12 @@ import {
   pickDestination,
 } from "~/components/traffic/search.ts";
 import { TrafficAnalytics, emptySummary } from "~/components/traffic/summary.tsx";
-import { TableSection } from "~/components/traffic/table-section.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
 /** How many destinations and names the machine's page lists; the pages it links to list the rest. */
@@ -249,7 +249,7 @@ function MachineNamesSection({
   const rows = names.data?.names ?? [];
 
   return (
-    <TableSection
+    <PageSection
       title="DNS lookups"
       description="The names this machine looked up through the gateways' resolvers, most asked first."
     >
@@ -283,6 +283,6 @@ function MachineNamesSection({
           });
         }}
       />
-    </TableSection>
+    </PageSection>
   );
 }

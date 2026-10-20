@@ -1,8 +1,8 @@
 import type { ReactElement } from "react";
 
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 
 const monoClass = "font-mono text-[0.9em]";
 

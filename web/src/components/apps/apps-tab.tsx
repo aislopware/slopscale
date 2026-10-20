@@ -13,14 +13,14 @@ import { AppDialog } from "~/components/apps/app-dialogs.tsx";
 import { useLearnedCounts } from "~/components/apps/learned.ts";
 import { connectorMachineCounts, countApps, totalPendingRoutes } from "~/components/apps/model.ts";
 import { useAppMutations } from "~/components/apps/mutations.ts";
-import { FacetChips } from "~/components/derp/facet-chips.tsx";
-import type { Facet } from "~/components/derp/facet-chips.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { FacetChips } from "~/components/ui/facet-chips.tsx";
+import type { Facet } from "~/components/ui/facet-chips.tsx";
 
 export interface AppsTabProps {
   readonly me: Me;

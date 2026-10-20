@@ -3,6 +3,7 @@ import {
   useTableOfContentsActiveId,
 } from "@cloudflare/kumo/components/table-of-contents";
 import { cn } from "@cloudflare/kumo/utils";
+import { useId } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { DocsBadge } from "~/components/ui/docs-badge.tsx";
@@ -45,7 +46,11 @@ export function SettingsLayout({
         aria-label="On this page"
         className="hidden self-start @5xl:sticky @5xl:top-[calc(var(--app-header-height,0px)+2rem)] @5xl:block"
       >
-        <TableOfContents.Title>On this page</TableOfContents.Title>
+        {/* Kumo sets the label in small capitals; the console writes every heading in sentence
+            case. */}
+        <TableOfContents.Title className="tracking-normal normal-case">
+          On this page
+        </TableOfContents.Title>
         <TableOfContents.List>
           {parts.map((part) => (
             <TableOfContents.Item
@@ -73,11 +78,13 @@ export function SettingsLayout({
 }
 
 /**
- * One part of a settings page: a 16px semibold heading with an optional "View docs" pill and a
- * subtle sentence under it, then its settings card. The heading sits on the page, not on a band, as
- * the dashboard's settings pages have it; the id is what the table of contents links to.
+ * A titled block on a page, the way Zero Trust heads the parts of a page that are not cards of
+ * their own: a 16px semibold heading with an optional "View docs" pill and a subtle sentence under
+ * it, small controls on the right, then the block itself (a settings card, a table in its own
+ * frame). The heading sits on the page, not on a band, so nothing wraps the block in a second
+ * frame. With an id it is a place a link or a table of contents can jump to.
  */
-export function SettingsGroup({
+export function PageSection({
   id,
   title,
   docs,
@@ -85,7 +92,7 @@ export function SettingsGroup({
   actions,
   children,
 }: {
-  readonly id: string;
+  readonly id?: string;
   readonly title: ReactNode;
   /** The documentation page that explains the part, under `docs/content`. */
   readonly docs?: string;
@@ -94,7 +101,8 @@ export function SettingsGroup({
   readonly actions?: ReactNode;
   readonly children: ReactNode;
 }): ReactElement {
-  const headingId = `${id}-heading`;
+  const generated = useId();
+  const headingId = `${id ?? generated}-heading`;
 
   return (
     <section
@@ -121,4 +129,14 @@ export function SettingsGroup({
       {children}
     </section>
   );
+}
+
+/**
+ * One part of a settings page: a `PageSection` over its settings card, with the id the table of
+ * contents links to.
+ */
+export function SettingsGroup(
+  props: Parameters<typeof PageSection>[0] & { readonly id: string },
+): ReactElement {
+  return <PageSection {...props} />;
 }

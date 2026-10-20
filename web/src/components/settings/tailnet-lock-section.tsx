@@ -6,7 +6,6 @@ import type { ReactElement, ReactNode } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { TailnetLock } from "~/api/queries.ts";
 import { useDisableTailnetLockMutation } from "~/components/settings/mutations.ts";
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { Card } from "~/components/ui/card.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
@@ -16,6 +15,7 @@ import type { Definition } from "~/components/ui/definition-list.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { Status } from "~/components/ui/status.tsx";
 
 const noSecretReason =

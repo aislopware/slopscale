@@ -16,7 +16,7 @@ import {
   TimeCell,
 } from "~/components/audit/cells.tsx";
 import type { AuditColumn } from "~/components/audit/columns.tsx";
-import { EventSheet } from "~/components/audit/detail-sheet.tsx";
+import { EventSheet } from "~/components/audit/event-sheet.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";

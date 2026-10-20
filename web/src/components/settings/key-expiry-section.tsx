@@ -3,9 +3,8 @@ import type { ReactElement } from "react";
 
 import type { Settings } from "~/api/queries.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
-import { SettingsCard } from "~/components/ui/settings-card.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 const week = 7;
@@ -58,7 +57,7 @@ export function KeyExpirySection({
       description="How long a login stays valid."
     >
       <SettingsCard>
-        <SettingRow
+        <SettingsRow
           title="Maximum"
           description={
             current > 0

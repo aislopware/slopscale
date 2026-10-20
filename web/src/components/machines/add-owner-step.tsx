@@ -1,7 +1,4 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { Input } from "@cloudflare/kumo/components/input";
-import { Select } from "@cloudflare/kumo/components/select";
-import { Switch } from "@cloudflare/kumo/components/switch";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
@@ -11,24 +8,21 @@ import { groupsQuery, usersQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { groupItems } from "~/components/access/pickers.ts";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
-import type { ExpiryChoice } from "~/components/keys/expiration.ts";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
+import {
+  ExpiryChoices,
+  MachineSettingsRows,
+  OwnerField,
+  TagsAndGroupsFields,
+} from "~/components/keys/preauth-fields.tsx";
+import type { PreAuthKeyChoices } from "~/components/keys/preauth-fields.tsx";
 import { StepCard } from "~/components/machines/add-step-card.tsx";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import { MultiPicker } from "~/components/ui/multi-picker.tsx";
-import { TagField } from "~/components/ui/tag-field.tsx";
+import { SettingsCard } from "~/components/ui/settings-card.tsx";
 import { userLabel } from "~/lib/node.ts";
 
-interface Draft {
-  readonly userId: string;
-  readonly expiry: ExpiryChoice;
-  readonly ephemeral: boolean;
-  readonly preauthorized: boolean;
-  readonly tags: readonly string[];
-  readonly groupIds: readonly string[];
-}
+type Draft = PreAuthKeyChoices;
 
 /**
  * Whose the machine is: the user its key belongs to, or its tags, plus how long the key lasts and
@@ -102,27 +96,11 @@ export function OwnerStep({
           </>
         }
       >
-        {mayListUsers ? (
-          <Select
-            className="w-full"
-            label="User"
-            value={userId}
-            items={userList.map((user) => ({ value: user.id, label: userLabel(user) }))}
-            onValueChange={(value: string | null) => {
-              update({ userId: value ?? "" });
-            }}
-          />
-        ) : (
-          <Input
-            label="User id"
-            description="Which user the key belongs to."
-            value={userId}
-            spellCheck={false}
-            onChange={(event) => {
-              update({ userId: event.target.value });
-            }}
-          />
-        )}
+        <OwnerField
+          users={mayListUsers ? userList : undefined}
+          userId={mayListUsers ? userId : draft.userId}
+          onChange={update}
+        />
         <KeyOptions me={me} draft={draft} update={update} />
         {create.isError ? (
           <p role="alert" className="text-sm leading-snug text-kumo-danger">
@@ -149,78 +127,28 @@ function KeyOptions({
 
   return (
     <>
-      <TagField
-        description="A tagged machine belongs to its tags, not the user: use this for servers."
-        placeholder="tag:server"
-        value={draft.tags}
-        suggestions={knownTags}
-        onValueChange={(tags) => {
-          update({ tags });
-        }}
+      <TagsAndGroupsFields
+        tags={draft.tags}
+        groupIds={draft.groupIds}
+        groups={groups.data?.groups}
+        knownTags={knownTags}
+        onChange={update}
       />
-      {groups.data === undefined ? null : (
-        <MultiPicker
-          label="Groups"
-          description="The machine joins these groups as it registers."
-          placeholder="Add groups…"
-          items={groupItems(groups.data.groups, "membership")}
-          value={draft.groupIds}
-          onValueChange={(groupIds) => {
-            update({ groupIds });
-          }}
-          empty="No group matches. Create one under Access controls."
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 font-medium text-kumo-default">Key expires in</legend>
+        <ExpiryChoices value={draft.expiry} onChange={update} />
+        <p className="text-sm text-kumo-subtle">
+          Only the key: the machine stays once it has joined.
+        </p>
+      </fieldset>
+      <SettingsCard>
+        <MachineSettingsRows
+          ephemeral={draft.ephemeral}
+          preauthorized={draft.preauthorized}
+          onChange={update}
         />
-      )}
-      <Select
-        className="w-full"
-        label="Key expires in"
-        description="Only the key: the machine stays once it has joined."
-        value={draft.expiry}
-        items={expiryOptions}
-        onValueChange={(expiry: ExpiryChoice | null) => {
-          if (expiry !== null) {
-            update({ expiry });
-          }
-        }}
-      />
-      <Switch.Group>
-        <Switch.Legend>Options</Switch.Legend>
-        <Switch
-          checked={draft.preauthorized}
-          onCheckedChange={(preauthorized) => {
-            update({ preauthorized });
-          }}
-          label={<Option label="Pre-authorized" description="The machine skips approval." />}
-        />
-        <Switch
-          checked={draft.ephemeral}
-          onCheckedChange={(ephemeral) => {
-            update({ ephemeral });
-          }}
-          label={
-            <Option
-              label="Ephemeral"
-              description="The machine is deleted when it logs out or goes offline."
-            />
-          }
-        />
-      </Switch.Group>
+      </SettingsCard>
     </>
-  );
-}
-
-function Option({
-  label,
-  description,
-}: {
-  readonly label: string;
-  readonly description: string;
-}): ReactElement {
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span className="font-medium text-kumo-default">{label}</span>
-      <span className="text-xs text-kumo-subtle">{description}</span>
-    </span>
   );
 }
 

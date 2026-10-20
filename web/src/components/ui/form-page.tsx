@@ -11,6 +11,9 @@ import type { ReactElement, ReactNode } from "react";
 import { HoverPopover } from "~/components/ui/hover-popover.tsx";
 
 /**
+ * The parts of a full-page form (create a key, add a machine), as the dashboard's "Create API
+ * token" page builds them.
+ *
  * One part of a create page, as the dashboard's "Create API token" page builds it: Kumo's layered
  * card, its 56px grey band carrying the part's name in 14px medium subtle text with an info icon
  * that holds the longer explanation, and the white panel with the fields resting in it. The cards
@@ -95,14 +98,21 @@ export function FormFooter({
  * held under the top bar so it is in view wherever the submit button was, in plain words, gone
  * again on the next edit.
  */
-export function FormError({ message }: { readonly message: string | undefined }): ReactNode {
+export function FormError({
+  title,
+  message,
+}: {
+  /** What did not happen, in the banner's title: "The key was not created". */
+  readonly title: string;
+  readonly message: string | undefined;
+}): ReactNode {
   if (message === undefined || message === "") {
     return null;
   }
 
   return (
     <div className="sticky top-[calc(var(--app-header-height,0px)+15px)] z-5 rounded-lg bg-kumo-base shadow-lg">
-      <Banner variant="error" title="The key was not created" description={message} />
+      <Banner variant="error" title={title} description={message} />
     </div>
   );
 }

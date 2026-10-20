@@ -6,10 +6,9 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import type { Settings } from "~/api/queries.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** Comma or whitespace separated recorder names, blanks dropped. */
@@ -135,7 +134,7 @@ export function SSHRecordingSection({
             )}
           </form>
         </SettingsRow>
-        <SettingRow
+        <SettingsRow
           title="Require recording"
           description="Refuse a session when no recorder can be reached, and end it if the recording stops. Off, the session continues unrecorded and the failure is logged."
           control={

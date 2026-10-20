@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { DestinationGrouping, TrafficDestination } from "~/api/traffic.ts";
 import { DestinationsTable } from "~/components/traffic/destinations-table.tsx";
 import { destinationTabs, toDestinationGrouping } from "~/components/traffic/search.ts";
-import { TableSection } from "~/components/traffic/table-section.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 
 /** The groupings a section offers: every view of "where", none of "who". */
 const whereTabs = destinationTabs
@@ -75,7 +75,7 @@ export function DestinationsSection({
   readonly onPick: (row: TrafficDestination) => void;
 }): ReactElement {
   return (
-    <TableSection
+    <PageSection
       title={title}
       description={description}
       actions={<GroupingPicker tabs={whereTabs} value={groupBy} onChange={onGroupChange} />}
@@ -88,6 +88,6 @@ export function DestinationsSection({
         oneMachine={oneMachine}
         onPick={onPick}
       />
-    </TableSection>
+    </PageSection>
   );
 }

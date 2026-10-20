@@ -6,12 +6,12 @@ import { serverInfoQuery, settingsQuery, tailnetLockQuery } from "~/api/queries.
 import { can } from "~/auth/me.ts";
 import { ApprovalSection, DeviceTrustSection } from "~/components/settings/approval-section.tsx";
 import { KeyExpirySection } from "~/components/settings/key-expiry-section.tsx";
-import { SettingsLayout } from "~/components/settings/settings-page.tsx";
-import type { SettingsPart } from "~/components/settings/settings-page.tsx";
 import { SSHRecordingSection } from "~/components/settings/ssh-recording-section.tsx";
 import { TailnetIDSection } from "~/components/settings/tailnet-id-section.tsx";
 import { TailnetLockSection } from "~/components/settings/tailnet-lock-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { SettingsLayout } from "~/components/ui/settings-layout.tsx";
+import type { SettingsPart } from "~/components/ui/settings-layout.tsx";
 
 export const Route = createFileRoute("/_app/settings/tailnet")({
   loader: async ({ context }) => {

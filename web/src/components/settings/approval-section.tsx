@@ -4,10 +4,9 @@ import type { ReactElement, ReactNode } from "react";
 import type { Settings } from "~/api/queries.ts";
 import type { UpdateSettingsRequestBody } from "~/api/schema.gen.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
-import { SettingsGroup } from "~/components/settings/settings-page.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { SettingsCard } from "~/components/ui/settings-card.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 interface ApprovalSwitch {
@@ -126,7 +125,7 @@ function SwitchSection({
     >
       <SettingsCard>
         {rows.map((row) => (
-          <SettingRow
+          <SettingsRow
             key={row.id}
             title={row.title}
             description={row.description}

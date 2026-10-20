@@ -1,8 +1,10 @@
 import type { ReactElement, ReactNode } from "react";
 
+import { Card } from "~/components/ui/card.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { SectionRow } from "~/components/ui/section.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 
 const releasesUrl = "https://github.com/aislopware/slopscale/releases/latest";
 const docsUrl = "https://aislopware.github.io/slopscale/ref/traffic/";
@@ -38,7 +40,7 @@ function Step({
  */
 export function InstallSection(): ReactElement {
   return (
-    <Section
+    <PageSection
       title="Add a gateway"
       description={
         <>
@@ -49,34 +51,35 @@ export function InstallSection(): ReactElement {
           </a>
         </>
       }
-      bodyClassName="p-0"
     >
-      <Step number={1} title="Pick a tagged Linux gateway">
-        <p className="max-w-prose text-kumo-subtle">
-          A tagged machine with approved exit or subnet routes, or one selected as an app connector.
-          The server refuses reports from any other machine.
-        </p>
-      </Step>
-      <Step number={2} title="Install the package on it">
-        <p className="max-w-prose text-kumo-subtle">
-          Download <Code>slopscale-flowd</Code> for the machine&apos;s architecture from the{" "}
-          <a className={linkClass} href={releasesUrl} target="_blank" rel="noreferrer">
-            latest release
-          </a>{" "}
-          and install it. It needs no configuration and starts at once.
-        </p>
-        <CommandBox
-          command="sudo apt install ./slopscale-flowd_*_linux_$(dpkg --print-architecture).deb"
-          size="sm"
-          wrap
-        />
-      </Step>
-      <Step number={3} title="Wait for the first report">
-        <p className="max-w-prose text-kumo-subtle">
-          The gateway shows up in the table above within a minute. If it does not, read{" "}
-          <Code>journalctl -u slopscale-flowd</Code> on the machine.
-        </p>
-      </Step>
-    </Section>
+      <Card>
+        <Step number={1} title="Pick a tagged Linux gateway">
+          <p className="max-w-prose text-kumo-subtle">
+            A tagged machine with approved exit or subnet routes, or one selected as an app
+            connector. The server refuses reports from any other machine.
+          </p>
+        </Step>
+        <Step number={2} title="Install the package on it">
+          <p className="max-w-prose text-kumo-subtle">
+            Download <Code>slopscale-flowd</Code> for the machine&apos;s architecture from the{" "}
+            <a className={linkClass} href={releasesUrl} target="_blank" rel="noreferrer">
+              latest release
+            </a>{" "}
+            and install it. It needs no configuration and starts at once.
+          </p>
+          <CommandBox
+            command="sudo apt install ./slopscale-flowd_*_linux_$(dpkg --print-architecture).deb"
+            size="sm"
+            wrap
+          />
+        </Step>
+        <Step number={3} title="Wait for the first report">
+          <p className="max-w-prose text-kumo-subtle">
+            The gateway shows up in the table above within a minute. If it does not, read{" "}
+            <Code>journalctl -u slopscale-flowd</Code> on the machine.
+          </p>
+        </Step>
+      </Card>
+    </PageSection>
   );
 }
