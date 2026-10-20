@@ -8,7 +8,7 @@ import { invalidate, webhooksQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { Card } from "~/components/ui/card.tsx";
+import { Callout } from "~/components/ui/callout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import {
   approversMailto,
@@ -59,30 +59,35 @@ export function ApproverNotice({ me }: { readonly me: Me }): ReactElement | null
     return null;
   }
 
+  // The dashboard's warning banner: the tint, the triangle, the sentence, and the fix at its end.
   return (
-    <Card className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-      <p className="text-kumo-subtle">{problem}</p>
-      {allowed && mailers.length === 0 && data.mailAvailable && data.approvers > 0 ? (
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={EnvelopeSimpleIcon}
-          loading={create.isPending}
-          onClick={() => {
-            create.mutate({
-              body: {
-                url: approversMailto,
-                providerType: "email",
-                description: "New access requests",
-                subscriptions: [newRequestEvent],
-              },
-            });
-          }}
-        >
-          Email the approvers
-        </Button>
-      ) : null}
-    </Card>
+    <Callout
+      tone="warning"
+      title="New requests reach nobody"
+      description={problem}
+      action={
+        allowed && mailers.length === 0 && data.mailAvailable && data.approvers > 0 ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={EnvelopeSimpleIcon}
+            loading={create.isPending}
+            onClick={() => {
+              create.mutate({
+                body: {
+                  url: approversMailto,
+                  providerType: "email",
+                  description: "New access requests",
+                  subscriptions: [newRequestEvent],
+                },
+              });
+            }}
+          >
+            Email the approvers
+          </Button>
+        ) : undefined
+      }
+    />
   );
 }
 
