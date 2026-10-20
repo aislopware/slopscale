@@ -17,11 +17,9 @@ const tones = {
 } as const;
 
 /**
- * A short notice about the state of things: an icon, a bold first line and a sentence or two.
- *
- * Kumo's Banner paints its whole body in the accent colour, which turns a two-line explanation into
- * something that reads as a link, and centres the icon against the block. Here the body keeps the
- * default text colour so only real links are coloured, and the icon sits on the first line.
+ * A short notice about the state of things, as Kumo's Banner draws it on the dashboard: the tone's
+ * tint, its icon on the first line, a bold first line and a sentence or two, all in the tone's
+ * colour (the info banner is blue throughout).
  */
 export function Callout({
   tone = "info",
@@ -55,7 +53,7 @@ export function Callout({
       title={title}
       description={description}
       action={action}
-      className={cn("items-start text-kumo-default", className)}
+      className={cn("items-start", className)}
     />
   );
 }

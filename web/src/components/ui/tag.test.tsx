@@ -19,12 +19,11 @@ describe(Tag, () => {
     expect(chip).not.toBeNull();
     expect(chip?.textContent).toBe("tag:server");
     expect(chip?.querySelector(".opacity-60")?.textContent).toBe("tag:");
-    expect(radiusOf(chip)).not.toBe("9999px");
+    expect(Number(radiusOf(chip).replace("px", ""))).toBeGreaterThanOrEqual(9);
   });
 
-  // The colour is a property of the name, so the same tag is the same colour on every page and two
-  // tags tell apart before they are read.
-  it("tints each tag by its name, the same name the same way", async () => {
+  // The dashboard draws every tag as the same blue pill; the name tells two tags apart, not a hue.
+  it("tints every tag the same info blue", async () => {
     const view = await render(
       <>
         <Tag tag="tag:web" />
@@ -35,7 +34,7 @@ describe(Tag, () => {
     const [web, ci, webAgain] = view.container.querySelectorAll("span[title]");
 
     expect(tint(web)).toBe(tint(webAgain));
-    expect(tint(web)).not.toBe(tint(ci));
+    expect(tint(web)).toBe(tint(ci));
     expect(tint(web)).not.toBe("rgba(0, 0, 0, 0)");
   });
 });

@@ -1,6 +1,5 @@
 import { Badge as KumoBadge } from "@cloudflare/kumo/components/badge";
 import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
-import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
 import type { Tone } from "~/components/ui/status.tsx";
@@ -14,17 +13,11 @@ const variants: Record<Tone, BadgeVariant> = {
 };
 
 /**
- * The state of a row's subject, in the tint of its tone: "Needs approval", "Expired", "Failed". A
- * good or ordinary state (Connected, Approved, Success) reads on the recessed surface instead, so
- * the colour in a state column belongs to the rows that want something. It goes in exactly two
- * places, a table's state column and the meta line of a page header, so a page carries one badge
- * per thing and the tint is what the eye scans for.
- *
- * A state that is a fact about a thing rather than the thing's own state (Funnel on, key valid, an
- * update available) stays a `Status` word, so a definition list is a list of words. Neither carries
- * a dot or an icon: the word and its tint already say it. The corner radius is the console's
- * control radius rather than a full pill, so a badge sits with the buttons and inputs around it
- * instead of reading as a tag.
+ * The state of a row's subject as Kumo's Badge, the dashboard's 20px pill in the tone's tint:
+ * "Active" and "Connected" in success green, "Disabled" and "Expired" in the neutral secondary
+ * fill, "Needs approval" in warning, "Failed" in error. It goes in a table's state column and the
+ * meta line of a page header, one per thing. A fact about a thing rather than its own state (Funnel
+ * on, key valid) is a `Status`: an icon and the word.
  */
 export function Badge({
   tone,
@@ -36,20 +29,7 @@ export function Badge({
   readonly className?: string;
 }): ReactElement {
   return (
-    <KumoBadge
-      variant={variants[tone]}
-      className={cn(
-        "rounded-md",
-        // Kumo's neutral fill is as loud as its tints; a state that is merely ordinary (Disconnected,
-        // Used, Off) steps back to the recessed surface and the subtle text, so the tinted ones are
-        // the rows to look at. Success goes with it: the tables where a state column earns its width
-        // are the ones where almost every row is fine (nine users Approved, eighty log lines
-        // Success), and a column of identical green pills points at nothing while making the one
-        // amber row compete with it.
-        (tone === "neutral" || tone === "success") && "bg-kumo-recessed text-kumo-subtle",
-        className,
-      )}
-    >
+    <KumoBadge variant={variants[tone]} {...(className === undefined ? {} : { className })}>
       {children}
     </KumoBadge>
   );
