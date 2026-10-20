@@ -1,15 +1,13 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 
 import type { AccessRule, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureColumns } from "~/components/access/posture-columns.tsx";
-import { PostureDialog } from "~/components/access/posture-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
@@ -36,8 +34,6 @@ export function PosturesTab({
 }: PosturesTabProps): ReactElement {
   const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
 
   const table = useAppTable({
     data: postures,
@@ -55,16 +51,14 @@ export function PosturesTab({
     <>
       <TableToolbar
         actions={
-          <Button
+          <LinkButton
+            href="/policy/postures/new"
             variant="primary"
             icon={PlusIcon}
             disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
           >
             New posture
-          </Button>
+          </LinkButton>
         }
       >
         <SearchInput
@@ -109,12 +103,6 @@ export function PosturesTab({
           }
         />
       </TableGroup>
-      <PostureDialog
-        geoIpAvailable={geoIpAvailable}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
     </>
   );
 }

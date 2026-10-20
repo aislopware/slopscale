@@ -1,9 +1,12 @@
+import { cn } from "@cloudflare/kumo/utils";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Posture } from "~/api/queries.ts";
 import { PostureMenu } from "~/components/access/posture-menu.tsx";
 import { rulesUsingPosture, scheduleSummary } from "~/components/access/posture-model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { ExpressionText } from "~/components/ui/expression-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
@@ -74,15 +77,10 @@ export const postureColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, rules, geoIpAvailable } = table.options.meta ?? {};
+      const { me, rules } = table.options.meta ?? {};
 
       return me === undefined ? null : (
-        <PostureMenu
-          posture={row.original}
-          rules={rules ?? []}
-          geoIpAvailable={geoIpAvailable ?? false}
-          me={me}
-        />
+        <PostureMenu posture={row.original} rules={rules ?? []} me={me} />
       );
     },
     meta: { className: "w-12 text-right", sticky: "right" },
@@ -92,7 +90,13 @@ export const postureColumns = helper.columns([
 function NameCell({ posture }: { readonly posture: Posture }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate font-medium text-kumo-default">{posture.name}</span>
+      <Link
+        to="/policy/postures/$postureId"
+        params={{ postureId: posture.id }}
+        className={cn("w-fit max-w-full truncate font-medium", rowLinkClass)}
+      >
+        {posture.name}
+      </Link>
       {posture.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{posture.description}</span>
       )}

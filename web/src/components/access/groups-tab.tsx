@@ -1,16 +1,14 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { groupColumns, toGroupRows } from "~/components/access/group-columns.tsx";
-import { GroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isBuiltin } from "~/components/access/model.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
@@ -41,8 +39,6 @@ export function GroupsTab({
 }: GroupsTabProps): ReactElement {
   const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
   const rows = useMemo(() => toGroupRows(groups, nodes), [groups, nodes]);
 
   const table = useAppTable({
@@ -66,16 +62,14 @@ export function GroupsTab({
     <>
       <TableToolbar
         actions={
-          <Button
+          <LinkButton
+            href="/policy/groups/new"
             variant="primary"
             icon={PlusIcon}
             disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
           >
             New group
-          </Button>
+          </LinkButton>
         }
       >
         <SearchInput
@@ -113,13 +107,6 @@ export function GroupsTab({
           }
         />
       </TableGroup>
-      <GroupDialog
-        nodes={nodes ?? []}
-        users={users ?? []}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
     </>
   );
 }

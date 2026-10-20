@@ -7,7 +7,7 @@ import { PosturesTab } from "~/components/access/postures-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/policy/postures")({
+export const Route = createFileRoute("/_app/policy/postures/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([

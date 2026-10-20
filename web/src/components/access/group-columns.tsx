@@ -1,4 +1,6 @@
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Group, Node } from "~/api/queries.ts";
@@ -11,6 +13,7 @@ import {
   rulesUsingGroup,
 } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { parseTime } from "~/lib/time.ts";
 
@@ -98,16 +101,10 @@ export const groupColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, nodes, users, rules } = table.options.meta ?? {};
+      const { me, rules } = table.options.meta ?? {};
 
       return me === undefined || isBuiltin(row.original) ? null : (
-        <GroupMenu
-          group={row.original}
-          nodes={nodes ?? []}
-          users={users ?? []}
-          rules={rules ?? []}
-          me={me}
-        />
+        <GroupMenu group={row.original} rules={rules ?? []} me={me} />
       );
     },
     meta: { className: "w-12 text-right", sticky: "right" },
@@ -120,7 +117,17 @@ function NameCell({ group }: { readonly group: Group }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-medium text-kumo-default">{group.name}</span>
+        {isBuiltin(group) ? (
+          <span className="truncate font-medium text-kumo-default">{group.name}</span>
+        ) : (
+          <Link
+            to="/policy/groups/$groupId"
+            params={{ groupId: group.id }}
+            className={cn("truncate font-medium", rowLinkClass)}
+          >
+            {group.name}
+          </Link>
+        )}
         {isBuiltin(group) ? <span className="text-xs text-kumo-subtle">Built-in</span> : null}
         {isSynced(group) ? (
           <span title="Users follow the identity provider's groups claim">

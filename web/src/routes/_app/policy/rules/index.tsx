@@ -7,7 +7,7 @@ import { RulesTab } from "~/components/access/rules-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/policy/rules")({
+export const Route = createFileRoute("/_app/policy/rules/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([

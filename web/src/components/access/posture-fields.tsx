@@ -1,0 +1,155 @@
+import { Checkbox } from "@cloudflare/kumo/components/checkbox";
+import { Input } from "@cloudflare/kumo/components/input";
+import type { Icon } from "@phosphor-icons/react";
+import { DesktopIcon, GlobeIcon, TagIcon } from "@phosphor-icons/react";
+import type { ReactElement } from "react";
+
+import {
+  expressionExamples,
+  isClock,
+  weekdayLabels,
+  weekdays,
+} from "~/components/access/posture-model.ts";
+import type { Weekday } from "~/components/access/posture-model.ts";
+
+const tileIconSize = 20;
+
+/** The weekly window of a posture as its editor holds it. */
+export interface ScheduleDraft {
+  readonly days: readonly Weekday[];
+  readonly start: string;
+  readonly end: string;
+  readonly timezone: string;
+}
+
+/** The kind of attribute an example reads, for its tile's icon. */
+function exampleIcon(expression: string): Icon {
+  if (expression.startsWith("ip:")) {
+    return GlobeIcon;
+  }
+
+  return expression.startsWith("custom:") ? TagIcon : DesktopIcon;
+}
+
+/**
+ * Ready-made expressions as the dashboard's attribute tiles: a grid of tinted tiles, each adding
+ * its expression to the editor. A country check needs a GeoIP database, and its tile says so.
+ */
+export function ExampleTiles({
+  geoIpAvailable,
+  onPick,
+}: {
+  readonly geoIpAvailable: boolean;
+  readonly onPick: (expression: string) => void;
+}): ReactElement {
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="text-sm font-medium text-kumo-default">Add an expression</h3>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {expressionExamples.map((example) => {
+          const needsGeo = example.expression.startsWith("ip:country");
+          const disabled = needsGeo && !geoIpAvailable;
+          const TileIcon = exampleIcon(example.expression);
+
+          return (
+            <button
+              key={example.label}
+              type="button"
+              disabled={disabled}
+              title={
+                disabled
+                  ? "Needs policy.geoip_database in the server configuration."
+                  : example.expression
+              }
+              className="flex min-h-[58px] min-w-0 items-center gap-3 rounded-lg bg-kumo-tint px-4 py-2 text-left hover:bg-kumo-fill focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => {
+                onPick(example.expression);
+              }}
+            >
+              <TileIcon size={tileIconSize} aria-hidden className="shrink-0 text-kumo-subtle" />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate font-medium text-kumo-default">{example.label}</span>
+                <span className="truncate font-mono text-xs text-kumo-subtle">
+                  {disabled ? "Needs a GeoIP database" : example.expression}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function ScheduleFields({
+  draft,
+  daysError,
+  onChange,
+}: {
+  readonly draft: ScheduleDraft;
+  readonly daysError: string | undefined;
+  readonly onChange: (patch: Partial<ScheduleDraft>) => void;
+}): ReactElement {
+  const toggle = (day: Weekday, checked: boolean): void => {
+    onChange({
+      days: weekdays.filter((known) => (known === day ? checked : draft.days.includes(known))),
+    });
+  };
+
+  return (
+    <div className="flex flex-col gap-4 rounded-md bg-kumo-tint p-3">
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 font-medium text-kumo-default">Days</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {weekdays.map((day) => (
+            <Checkbox
+              key={day}
+              label={weekdayLabels[day]}
+              checked={draft.days.includes(day)}
+              onCheckedChange={(checked) => {
+                toggle(day, checked);
+              }}
+            />
+          ))}
+        </div>
+        {daysError === undefined ? null : (
+          <p className="text-sm leading-snug text-kumo-danger">{daysError}</p>
+        )}
+      </fieldset>
+      <div className="grid items-start gap-4 sm:grid-cols-3">
+        <Input
+          label="From"
+          value={draft.start}
+          placeholder="09:00"
+          spellCheck={false}
+          {...(isClock(draft.start) ? {} : { error: "Use HH:MM, such as 09:00." })}
+          onChange={(event) => {
+            onChange({ start: event.target.value });
+          }}
+        />
+        <Input
+          label="To"
+          description="An end before the start runs past midnight."
+          value={draft.end}
+          placeholder="18:00"
+          spellCheck={false}
+          {...(isClock(draft.end) ? {} : { error: "Use HH:MM, such as 18:00." })}
+          onChange={(event) => {
+            onChange({ end: event.target.value });
+          }}
+        />
+        <Input
+          label="Time zone"
+          required={false}
+          description="An IANA name such as Europe/Berlin. Empty means UTC."
+          value={draft.timezone}
+          placeholder="Asia/Ho_Chi_Minh"
+          spellCheck={false}
+          onChange={(event) => {
+            onChange({ timezone: event.target.value });
+          }}
+        />
+      </div>
+    </div>
+  );
+}

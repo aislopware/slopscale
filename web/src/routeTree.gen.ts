@@ -38,10 +38,7 @@ import { Route as AppMachinesNodeIdRouteImport } from './routes/_app/machines/$n
 import { Route as AppPolicyIndexRouteImport } from './routes/_app/policy/index'
 import { Route as AppPolicyFileRouteImport } from './routes/_app/policy/file'
 import { Route as AppPolicyGraphRouteImport } from './routes/_app/policy/graph'
-import { Route as AppPolicyGroupsRouteImport } from './routes/_app/policy/groups'
-import { Route as AppPolicyPosturesRouteImport } from './routes/_app/policy/postures'
 import { Route as AppPolicyRequestsRouteImport } from './routes/_app/policy/requests'
-import { Route as AppPolicyRulesRouteImport } from './routes/_app/policy/rules'
 import { Route as AppRelaysIndexRouteImport } from './routes/_app/relays/index'
 import { Route as AppRelaysEmbeddedRouteImport } from './routes/_app/relays/embedded'
 import { Route as AppRelaysLatencyRouteImport } from './routes/_app/relays/latency'
@@ -58,6 +55,15 @@ import { Route as AppTrafficDestinationsRouteImport } from './routes/_app/traffi
 import { Route as AppTrafficDnsRouteImport } from './routes/_app/traffic/dns'
 import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/overview'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
+import { Route as AppPolicyGroupsIndexRouteImport } from './routes/_app/policy/groups/index'
+import { Route as AppPolicyGroupsGroupIdRouteImport } from './routes/_app/policy/groups/$groupId'
+import { Route as AppPolicyGroupsNewRouteImport } from './routes/_app/policy/groups/new'
+import { Route as AppPolicyPosturesIndexRouteImport } from './routes/_app/policy/postures/index'
+import { Route as AppPolicyPosturesPostureIdRouteImport } from './routes/_app/policy/postures/$postureId'
+import { Route as AppPolicyPosturesNewRouteImport } from './routes/_app/policy/postures/new'
+import { Route as AppPolicyRulesIndexRouteImport } from './routes/_app/policy/rules/index'
+import { Route as AppPolicyRulesRuleIdRouteImport } from './routes/_app/policy/rules/$ruleId'
+import { Route as AppPolicyRulesNewRouteImport } from './routes/_app/policy/rules/new'
 import { Route as AppSettingsTrafficIndexRouteImport } from './routes/_app/settings/traffic/index'
 import { Route as AppSettingsTrafficCollectionRouteImport } from './routes/_app/settings/traffic/collection'
 import { Route as AppSettingsTrafficGatewaysRouteImport } from './routes/_app/settings/traffic/gateways'
@@ -209,24 +215,9 @@ const AppPolicyGraphRoute = AppPolicyGraphRouteImport.update({
   path: '/policy/graph',
   getParentRoute: () => AppRoute,
 } as any)
-const AppPolicyGroupsRoute = AppPolicyGroupsRouteImport.update({
-  id: '/policy/groups',
-  path: '/policy/groups',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPolicyPosturesRoute = AppPolicyPosturesRouteImport.update({
-  id: '/policy/postures',
-  path: '/policy/postures',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppPolicyRequestsRoute = AppPolicyRequestsRouteImport.update({
   id: '/policy/requests',
   path: '/policy/requests',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppPolicyRulesRoute = AppPolicyRulesRouteImport.update({
-  id: '/policy/rules',
-  path: '/policy/rules',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRelaysIndexRoute = AppRelaysIndexRouteImport.update({
@@ -309,6 +300,52 @@ const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
   path: '/machines/$nodeId/ssh',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPolicyGroupsIndexRoute = AppPolicyGroupsIndexRouteImport.update({
+  id: '/policy/groups/',
+  path: '/policy/groups/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyGroupsGroupIdRoute = AppPolicyGroupsGroupIdRouteImport.update({
+  id: '/policy/groups/$groupId',
+  path: '/policy/groups/$groupId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyGroupsNewRoute = AppPolicyGroupsNewRouteImport.update({
+  id: '/policy/groups/new',
+  path: '/policy/groups/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyPosturesIndexRoute = AppPolicyPosturesIndexRouteImport.update({
+  id: '/policy/postures/',
+  path: '/policy/postures/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyPosturesPostureIdRoute =
+  AppPolicyPosturesPostureIdRouteImport.update({
+    id: '/policy/postures/$postureId',
+    path: '/policy/postures/$postureId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppPolicyPosturesNewRoute = AppPolicyPosturesNewRouteImport.update({
+  id: '/policy/postures/new',
+  path: '/policy/postures/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyRulesIndexRoute = AppPolicyRulesIndexRouteImport.update({
+  id: '/policy/rules/',
+  path: '/policy/rules/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyRulesRuleIdRoute = AppPolicyRulesRuleIdRouteImport.update({
+  id: '/policy/rules/$ruleId',
+  path: '/policy/rules/$ruleId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPolicyRulesNewRoute = AppPolicyRulesNewRouteImport.update({
+  id: '/policy/rules/new',
+  path: '/policy/rules/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsTrafficIndexRoute = AppSettingsTrafficIndexRouteImport.update({
   id: '/settings/traffic/',
   path: '/settings/traffic/',
@@ -362,10 +399,7 @@ export interface FileRoutesByFullPath {
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
-  '/policy/groups': typeof AppPolicyGroupsRoute
-  '/policy/postures': typeof AppPolicyPosturesRoute
   '/policy/requests': typeof AppPolicyRequestsRoute
-  '/policy/rules': typeof AppPolicyRulesRoute
   '/relays/embedded': typeof AppRelaysEmbeddedRoute
   '/relays/latency': typeof AppRelaysLatencyRoute
   '/relays/map': typeof AppRelaysMapRoute
@@ -387,9 +421,18 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AppSettingsIndexRoute
   '/traffic/': typeof AppTrafficIndexRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
+  '/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
+  '/policy/groups/new': typeof AppPolicyGroupsNewRoute
+  '/policy/postures/$postureId': typeof AppPolicyPosturesPostureIdRoute
+  '/policy/postures/new': typeof AppPolicyPosturesNewRoute
+  '/policy/rules/$ruleId': typeof AppPolicyRulesRuleIdRoute
+  '/policy/rules/new': typeof AppPolicyRulesNewRoute
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/policy/groups/': typeof AppPolicyGroupsIndexRoute
+  '/policy/postures/': typeof AppPolicyPosturesIndexRoute
+  '/policy/rules/': typeof AppPolicyRulesIndexRoute
   '/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines/': typeof AppTrafficMachinesIndexRoute
 }
@@ -417,10 +460,7 @@ export interface FileRoutesByTo {
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
-  '/policy/groups': typeof AppPolicyGroupsRoute
-  '/policy/postures': typeof AppPolicyPosturesRoute
   '/policy/requests': typeof AppPolicyRequestsRoute
-  '/policy/rules': typeof AppPolicyRulesRoute
   '/relays/embedded': typeof AppRelaysEmbeddedRoute
   '/relays/latency': typeof AppRelaysLatencyRoute
   '/relays/map': typeof AppRelaysMapRoute
@@ -442,9 +482,18 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsIndexRoute
   '/traffic': typeof AppTrafficIndexRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
+  '/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
+  '/policy/groups/new': typeof AppPolicyGroupsNewRoute
+  '/policy/postures/$postureId': typeof AppPolicyPosturesPostureIdRoute
+  '/policy/postures/new': typeof AppPolicyPosturesNewRoute
+  '/policy/rules/$ruleId': typeof AppPolicyRulesRuleIdRoute
+  '/policy/rules/new': typeof AppPolicyRulesNewRoute
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/policy/groups': typeof AppPolicyGroupsIndexRoute
+  '/policy/postures': typeof AppPolicyPosturesIndexRoute
+  '/policy/rules': typeof AppPolicyRulesIndexRoute
   '/settings/traffic': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines': typeof AppTrafficMachinesIndexRoute
 }
@@ -474,10 +523,7 @@ export interface FileRoutesById {
   '/_app/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/_app/policy/file': typeof AppPolicyFileRoute
   '/_app/policy/graph': typeof AppPolicyGraphRoute
-  '/_app/policy/groups': typeof AppPolicyGroupsRoute
-  '/_app/policy/postures': typeof AppPolicyPosturesRoute
   '/_app/policy/requests': typeof AppPolicyRequestsRoute
-  '/_app/policy/rules': typeof AppPolicyRulesRoute
   '/_app/relays/embedded': typeof AppRelaysEmbeddedRoute
   '/_app/relays/latency': typeof AppRelaysLatencyRoute
   '/_app/relays/map': typeof AppRelaysMapRoute
@@ -499,9 +545,18 @@ export interface FileRoutesById {
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/traffic/': typeof AppTrafficIndexRoute
   '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
+  '/_app/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
+  '/_app/policy/groups/new': typeof AppPolicyGroupsNewRoute
+  '/_app/policy/postures/$postureId': typeof AppPolicyPosturesPostureIdRoute
+  '/_app/policy/postures/new': typeof AppPolicyPosturesNewRoute
+  '/_app/policy/rules/$ruleId': typeof AppPolicyRulesRuleIdRoute
+  '/_app/policy/rules/new': typeof AppPolicyRulesNewRoute
   '/_app/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/_app/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/_app/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/_app/policy/groups/': typeof AppPolicyGroupsIndexRoute
+  '/_app/policy/postures/': typeof AppPolicyPosturesIndexRoute
+  '/_app/policy/rules/': typeof AppPolicyRulesIndexRoute
   '/_app/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/_app/traffic/machines/': typeof AppTrafficMachinesIndexRoute
 }
@@ -531,10 +586,7 @@ export interface FileRouteTypes {
     | '/machines/$nodeId'
     | '/policy/file'
     | '/policy/graph'
-    | '/policy/groups'
-    | '/policy/postures'
     | '/policy/requests'
-    | '/policy/rules'
     | '/relays/embedded'
     | '/relays/latency'
     | '/relays/map'
@@ -556,9 +608,18 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/traffic/'
     | '/machines/$nodeId/ssh'
+    | '/policy/groups/$groupId'
+    | '/policy/groups/new'
+    | '/policy/postures/$postureId'
+    | '/policy/postures/new'
+    | '/policy/rules/$ruleId'
+    | '/policy/rules/new'
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/policy/groups/'
+    | '/policy/postures/'
+    | '/policy/rules/'
     | '/settings/traffic/'
     | '/traffic/machines/'
   fileRoutesByTo: FileRoutesByTo
@@ -586,10 +647,7 @@ export interface FileRouteTypes {
     | '/machines/$nodeId'
     | '/policy/file'
     | '/policy/graph'
-    | '/policy/groups'
-    | '/policy/postures'
     | '/policy/requests'
-    | '/policy/rules'
     | '/relays/embedded'
     | '/relays/latency'
     | '/relays/map'
@@ -611,9 +669,18 @@ export interface FileRouteTypes {
     | '/settings'
     | '/traffic'
     | '/machines/$nodeId/ssh'
+    | '/policy/groups/$groupId'
+    | '/policy/groups/new'
+    | '/policy/postures/$postureId'
+    | '/policy/postures/new'
+    | '/policy/rules/$ruleId'
+    | '/policy/rules/new'
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/policy/groups'
+    | '/policy/postures'
+    | '/policy/rules'
     | '/settings/traffic'
     | '/traffic/machines'
   id:
@@ -642,10 +709,7 @@ export interface FileRouteTypes {
     | '/_app/machines/$nodeId'
     | '/_app/policy/file'
     | '/_app/policy/graph'
-    | '/_app/policy/groups'
-    | '/_app/policy/postures'
     | '/_app/policy/requests'
-    | '/_app/policy/rules'
     | '/_app/relays/embedded'
     | '/_app/relays/latency'
     | '/_app/relays/map'
@@ -667,9 +731,18 @@ export interface FileRouteTypes {
     | '/_app/settings/'
     | '/_app/traffic/'
     | '/_app/machines/$nodeId_/ssh'
+    | '/_app/policy/groups/$groupId'
+    | '/_app/policy/groups/new'
+    | '/_app/policy/postures/$postureId'
+    | '/_app/policy/postures/new'
+    | '/_app/policy/rules/$ruleId'
+    | '/_app/policy/rules/new'
     | '/_app/settings/traffic/collection'
     | '/_app/settings/traffic/gateways'
     | '/_app/traffic/machines/$nodeId'
+    | '/_app/policy/groups/'
+    | '/_app/policy/postures/'
+    | '/_app/policy/rules/'
     | '/_app/settings/traffic/'
     | '/_app/traffic/machines/'
   fileRoutesById: FileRoutesById
@@ -884,32 +957,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPolicyGraphRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/policy/groups': {
-      id: '/_app/policy/groups'
-      path: '/policy/groups'
-      fullPath: '/policy/groups'
-      preLoaderRoute: typeof AppPolicyGroupsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/policy/postures': {
-      id: '/_app/policy/postures'
-      path: '/policy/postures'
-      fullPath: '/policy/postures'
-      preLoaderRoute: typeof AppPolicyPosturesRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/policy/requests': {
       id: '/_app/policy/requests'
       path: '/policy/requests'
       fullPath: '/policy/requests'
       preLoaderRoute: typeof AppPolicyRequestsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/policy/rules': {
-      id: '/_app/policy/rules'
-      path: '/policy/rules'
-      fullPath: '/policy/rules'
-      preLoaderRoute: typeof AppPolicyRulesRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/relays/': {
@@ -1024,6 +1076,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMachinesNodeIdSshRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/policy/groups/': {
+      id: '/_app/policy/groups/'
+      path: '/policy/groups'
+      fullPath: '/policy/groups/'
+      preLoaderRoute: typeof AppPolicyGroupsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/groups/$groupId': {
+      id: '/_app/policy/groups/$groupId'
+      path: '/policy/groups/$groupId'
+      fullPath: '/policy/groups/$groupId'
+      preLoaderRoute: typeof AppPolicyGroupsGroupIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/groups/new': {
+      id: '/_app/policy/groups/new'
+      path: '/policy/groups/new'
+      fullPath: '/policy/groups/new'
+      preLoaderRoute: typeof AppPolicyGroupsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/postures/': {
+      id: '/_app/policy/postures/'
+      path: '/policy/postures'
+      fullPath: '/policy/postures/'
+      preLoaderRoute: typeof AppPolicyPosturesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/postures/$postureId': {
+      id: '/_app/policy/postures/$postureId'
+      path: '/policy/postures/$postureId'
+      fullPath: '/policy/postures/$postureId'
+      preLoaderRoute: typeof AppPolicyPosturesPostureIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/postures/new': {
+      id: '/_app/policy/postures/new'
+      path: '/policy/postures/new'
+      fullPath: '/policy/postures/new'
+      preLoaderRoute: typeof AppPolicyPosturesNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/rules/': {
+      id: '/_app/policy/rules/'
+      path: '/policy/rules'
+      fullPath: '/policy/rules/'
+      preLoaderRoute: typeof AppPolicyRulesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/rules/$ruleId': {
+      id: '/_app/policy/rules/$ruleId'
+      path: '/policy/rules/$ruleId'
+      fullPath: '/policy/rules/$ruleId'
+      preLoaderRoute: typeof AppPolicyRulesRuleIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/policy/rules/new': {
+      id: '/_app/policy/rules/new'
+      path: '/policy/rules/new'
+      fullPath: '/policy/rules/new'
+      preLoaderRoute: typeof AppPolicyRulesNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/traffic/': {
       id: '/_app/settings/traffic/'
       path: '/settings/traffic'
@@ -1085,10 +1200,7 @@ interface AppRouteChildren {
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRoute
   AppPolicyFileRoute: typeof AppPolicyFileRoute
   AppPolicyGraphRoute: typeof AppPolicyGraphRoute
-  AppPolicyGroupsRoute: typeof AppPolicyGroupsRoute
-  AppPolicyPosturesRoute: typeof AppPolicyPosturesRoute
   AppPolicyRequestsRoute: typeof AppPolicyRequestsRoute
-  AppPolicyRulesRoute: typeof AppPolicyRulesRoute
   AppRelaysEmbeddedRoute: typeof AppRelaysEmbeddedRoute
   AppRelaysLatencyRoute: typeof AppRelaysLatencyRoute
   AppRelaysMapRoute: typeof AppRelaysMapRoute
@@ -1110,9 +1222,18 @@ interface AppRouteChildren {
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppTrafficIndexRoute: typeof AppTrafficIndexRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
+  AppPolicyGroupsGroupIdRoute: typeof AppPolicyGroupsGroupIdRoute
+  AppPolicyGroupsNewRoute: typeof AppPolicyGroupsNewRoute
+  AppPolicyPosturesPostureIdRoute: typeof AppPolicyPosturesPostureIdRoute
+  AppPolicyPosturesNewRoute: typeof AppPolicyPosturesNewRoute
+  AppPolicyRulesRuleIdRoute: typeof AppPolicyRulesRuleIdRoute
+  AppPolicyRulesNewRoute: typeof AppPolicyRulesNewRoute
   AppSettingsTrafficCollectionRoute: typeof AppSettingsTrafficCollectionRoute
   AppSettingsTrafficGatewaysRoute: typeof AppSettingsTrafficGatewaysRoute
   AppTrafficMachinesNodeIdRoute: typeof AppTrafficMachinesNodeIdRoute
+  AppPolicyGroupsIndexRoute: typeof AppPolicyGroupsIndexRoute
+  AppPolicyPosturesIndexRoute: typeof AppPolicyPosturesIndexRoute
+  AppPolicyRulesIndexRoute: typeof AppPolicyRulesIndexRoute
   AppSettingsTrafficIndexRoute: typeof AppSettingsTrafficIndexRoute
   AppTrafficMachinesIndexRoute: typeof AppTrafficMachinesIndexRoute
 }
@@ -1140,10 +1261,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMachinesNodeIdRoute: AppMachinesNodeIdRoute,
   AppPolicyFileRoute: AppPolicyFileRoute,
   AppPolicyGraphRoute: AppPolicyGraphRoute,
-  AppPolicyGroupsRoute: AppPolicyGroupsRoute,
-  AppPolicyPosturesRoute: AppPolicyPosturesRoute,
   AppPolicyRequestsRoute: AppPolicyRequestsRoute,
-  AppPolicyRulesRoute: AppPolicyRulesRoute,
   AppRelaysEmbeddedRoute: AppRelaysEmbeddedRoute,
   AppRelaysLatencyRoute: AppRelaysLatencyRoute,
   AppRelaysMapRoute: AppRelaysMapRoute,
@@ -1165,9 +1283,18 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppTrafficIndexRoute: AppTrafficIndexRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
+  AppPolicyGroupsGroupIdRoute: AppPolicyGroupsGroupIdRoute,
+  AppPolicyGroupsNewRoute: AppPolicyGroupsNewRoute,
+  AppPolicyPosturesPostureIdRoute: AppPolicyPosturesPostureIdRoute,
+  AppPolicyPosturesNewRoute: AppPolicyPosturesNewRoute,
+  AppPolicyRulesRuleIdRoute: AppPolicyRulesRuleIdRoute,
+  AppPolicyRulesNewRoute: AppPolicyRulesNewRoute,
   AppSettingsTrafficCollectionRoute: AppSettingsTrafficCollectionRoute,
   AppSettingsTrafficGatewaysRoute: AppSettingsTrafficGatewaysRoute,
   AppTrafficMachinesNodeIdRoute: AppTrafficMachinesNodeIdRoute,
+  AppPolicyGroupsIndexRoute: AppPolicyGroupsIndexRoute,
+  AppPolicyPosturesIndexRoute: AppPolicyPosturesIndexRoute,
+  AppPolicyRulesIndexRoute: AppPolicyRulesIndexRoute,
   AppSettingsTrafficIndexRoute: AppSettingsTrafficIndexRoute,
   AppTrafficMachinesIndexRoute: AppTrafficMachinesIndexRoute,
 }

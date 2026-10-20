@@ -8,7 +8,7 @@ import { GroupsTab } from "~/components/access/groups-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/policy/groups")({
+export const Route = createFileRoute("/_app/policy/groups/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([
