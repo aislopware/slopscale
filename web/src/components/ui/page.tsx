@@ -8,14 +8,17 @@ import { AppLink } from "~/lib/link.tsx";
  * The Cloudflare dashboard's page grid: a 1200px column centred between two gutters of at least
  * 16px (32px from md), 32px above and below, 28px between blocks. Every child sits in the centre
  * column; a child marked `data-full-bleed` spans the gutters too, edge to edge, which is how the
- * rule under a page header reaches from the sidebar to the viewport. The shell lays every page out
- * on it, so a route returns its blocks as a fragment.
+ * rule under a page header and a branch's sub-navigation bar reach from the sidebar to the
+ * viewport. The shell lays every page out on it, so a route returns its blocks as a fragment.
  */
 export const pageGridClass = cn(
   "grid content-start gap-y-7 py-8",
   "[--page-max-width:1200px] [--page-padding-x:16px] md:[--page-padding-x:32px]",
   "grid-cols-[minmax(var(--page-padding-x),1fr)_minmax(0,var(--page-max-width))_minmax(var(--page-padding-x),1fr)]",
   "*:col-start-2 *:min-w-0 *:data-full-bleed:col-span-full",
+  // A branch's sub-navigation bar (53px) sits under the 58px top bar; whatever sticks inside the
+  // page comes to rest under both.
+  "has-[>[data-sub-nav]]:[--app-header-height:111px]",
 );
 
 /** A block that spans the page edge to edge instead of the centre column. */
