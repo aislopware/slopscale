@@ -171,7 +171,7 @@ export function SessionsTable({
     <TableScroll
       pinnedRight
       below={recordings.length === 0 ? <EmptySessions embeddedRecorder={embeddedRecorder} /> : null}
-      footer={<CursorBand paging={paging} />}
+      footer={paging.loaded === 0 ? null : <CursorBand paging={paging} />}
     >
       {(overflowing) => (
         <Table className={tableClass}>
