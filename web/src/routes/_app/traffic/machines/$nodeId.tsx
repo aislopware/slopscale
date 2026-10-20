@@ -28,7 +28,8 @@ import {
   noDestinationFilters,
   pickDestination,
 } from "~/components/traffic/search.ts";
-import { TrafficSummaryPanel, emptySummary } from "~/components/traffic/summary.tsx";
+import { TrafficAnalytics, emptySummary } from "~/components/traffic/summary.tsx";
+import { TableSection } from "~/components/traffic/table-section.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
@@ -128,7 +129,7 @@ function MachineTrafficPage(): ReactElement {
       />
       {isRefusedWindow(error) ? null : (
         <>
-          <TrafficSummaryPanel
+          <TrafficAnalytics
             summary={data ?? emptySummary}
             loading={data === undefined && error === null}
             onZoom={(from, to) => {
@@ -248,10 +249,9 @@ function MachineNamesSection({
   const rows = names.data?.names ?? [];
 
   return (
-    <Section
+    <TableSection
       title="DNS lookups"
       description="The names this machine looked up through the gateways' resolvers, most asked first."
-      panel={false}
     >
       <NamesTable
         rows={rows}
@@ -283,6 +283,6 @@ function MachineNamesSection({
           });
         }}
       />
-    </Section>
+    </TableSection>
   );
 }
