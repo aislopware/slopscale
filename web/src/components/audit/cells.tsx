@@ -14,6 +14,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import type { MachineOwner } from "~/api/schema.gen.ts";
+import { Timestamp } from "~/components/audit/timestamp.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
@@ -139,43 +140,9 @@ export function ActorCell({ event }: { readonly event: AuditEvent }): ReactEleme
   );
 }
 
-/**
- * When the event was recorded, as the dashboard's audit log writes it: the date over the time, in
- * Paper Mono with tabular figures, the time stepped back.
- */
+/** When the event was recorded, as the dashboard's audit log writes it. */
 export function TimeCell({ event }: { readonly event: AuditEvent }): ReactElement {
-  const at = parseTime(event.createdAt);
-
-  if (at === null) {
-    return <span className="text-kumo-subtle">{event.createdAt}</span>;
-  }
-
-  return (
-    <time
-      dateTime={at.toISOString()}
-      title={formatAbsolute(at)}
-      className="flex flex-col gap-0.5 font-mono tabular-nums"
-    >
-      <span className="text-sm text-kumo-default">{isoDate(at)}</span>
-      <span className="text-xs text-kumo-subtle">{isoTime(at)}</span>
-    </time>
-  );
-}
-
-const pad = 2;
-
-function twoDigits(value: number): string {
-  return String(value).padStart(pad, "0");
-}
-
-/** The local date as 2026-10-20: sortable, and the same width on every row. */
-function isoDate(date: Date): string {
-  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`;
-}
-
-/** The local time of day as 16:02:27. */
-function isoTime(date: Date): string {
-  return `${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}:${twoDigits(date.getSeconds())}`;
+  return <Timestamp value={event.createdAt} />;
 }
 
 /**

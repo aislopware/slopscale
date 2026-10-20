@@ -9,6 +9,7 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { SSHRecording } from "~/api/queries.ts";
 import { sshRecordingCastUrl } from "~/api/queries.ts";
+import { Timestamp } from "~/components/audit/timestamp.tsx";
 import {
   castFileName,
   formatBytes,
@@ -22,13 +23,17 @@ import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
+import {
+  actionsColumnClass,
+  pinnedEdgeClass,
+  tableClass,
+  tableRowClass,
+} from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import { machineLabel } from "~/lib/node.ts";
@@ -60,8 +65,8 @@ function RecordingRow({
 
   return (
     <Table.Row className={cn("align-top", tableRowClass)}>
-      <Table.Cell className="whitespace-nowrap text-kumo-subtle">
-        <RelativeTime value={recording.startedAt} />
+      <Table.Cell className="whitespace-nowrap">
+        <Timestamp value={recording.startedAt} />
       </Table.Cell>
       <Table.Cell>
         {/* A user-owned source already reads "alice on laptop"; a tagged one needs its tags. */}
@@ -80,13 +85,13 @@ function RecordingRow({
       <Table.Cell className="max-w-64 truncate font-mono text-sm text-kumo-subtle">
         {recording.command === "" ? "shell" : recording.command}
       </Table.Cell>
-      <Table.Cell className="whitespace-nowrap text-kumo-subtle">
+      <Table.Cell className="text-right whitespace-nowrap text-kumo-subtle tabular-nums">
         {formatBytes(recording.size)}
       </Table.Cell>
       <Table.Cell>
         <StateBadge recording={recording} />
       </Table.Cell>
-      <Table.Cell sticky="right" className={cn("w-12 text-right", overflowing && pinnedEdgeClass)}>
+      <Table.Cell sticky="right" className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}>
         <RowMenu
           label={`Actions for the recording of ${machineLabel(sessionTarget(recording), recording.dstOwner)}`}
         >
@@ -170,9 +175,12 @@ export function SessionsTable({
                 <Table.Head>From</Table.Head>
                 <Table.Head>To</Table.Head>
                 <Table.Head>Command</Table.Head>
-                <Table.Head>Size</Table.Head>
+                <Table.Head className="text-right">Size</Table.Head>
                 <Table.Head>Status</Table.Head>
-                <Table.Head sticky="right" className={cn("w-12", overflowing && pinnedEdgeClass)}>
+                <Table.Head
+                  sticky="right"
+                  className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
+                >
                   <span className="sr-only">Actions</span>
                 </Table.Head>
               </Table.Row>
