@@ -7,10 +7,11 @@ import { fallback, object, optional, picklist, pipe, transform, unknown } from "
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import { can, canListUsers } from "~/auth/me.ts";
+import type { Me } from "~/auth/me.ts";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { MachineBulkBar } from "~/components/machines/bulk-bar.tsx";
 import { columns, emptyUsers, selectableColumns } from "~/components/machines/columns.tsx";
-import { MachinesEmpty } from "~/components/machines/empty.tsx";
+import { MachinesEmpty, MachinesFirstRun } from "~/components/machines/empty.tsx";
 import { FilterChips, machineChips } from "~/components/machines/filter-chips.tsx";
 import {
   anyAttestation,
@@ -33,6 +34,8 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { PageWithRail, RailList, RailRow, RailSection } from "~/components/ui/page.tsx";
+import { docsUrl } from "~/lib/docs.ts";
 
 /**
  * The router parses a search value as JSON, so `?user=2` arrives as the number 2 while the user id
@@ -75,10 +78,53 @@ export const Route = createFileRoute("/_app/machines/")({
   component: MachinesPage,
 });
 
+/** What the page is, for a caller who sees every machine. */
+const machinesNote =
+  "Every device and server on the tailnet: who owns it, its tailnet addresses and whether it is connected. Approve, tag, share or remove one here.";
+
 /** What a caller who sees only their own machines is looking at. */
 const ownMachinesNote = "Your own machines, and the ones other users share with you.";
 
 function MachinesPage(): ReactElement {
+  const { me } = Route.useRouteContext();
+  const nodes = useSuspenseQuery({ ...nodesQuery, ...machinePolling });
+
+  // An empty tailnet gets Mesh's first-run page instead of an empty table: the picture, the card
+  // that offers the first machine, and what a tailnet is for in the rail. A member who sees only
+  // their own machines keeps the table, whose empty state says how theirs arrive.
+  return nodes.data.nodes.length === 0 && can(me, "devices:core:read") ? (
+    <FirstRunPage me={me} />
+  ) : (
+    <MachinesList />
+  );
+}
+
+function FirstRunPage({ me }: { readonly me: Me }): ReactElement {
+  const [addingMachine, setAddingMachine] = useState(false);
+
+  return (
+    <PageWithRail rail={<UseCases />}>
+      <PageHeader title="Machines" docs="ref/device-management" description={machinesNote} />
+      <MachinesFirstRun
+        onAddMachine={
+          can(me, "auth_keys")
+            ? () => {
+                setAddingMachine(true);
+              }
+            : undefined
+        }
+      />
+      <CreatePreAuthKeyDialog
+        me={me}
+        intent="add-machine"
+        open={addingMachine}
+        onOpenChange={setAddingMachine}
+      />
+    </PageWithRail>
+  );
+}
+
+function MachinesList(): ReactElement {
   const { me } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
@@ -129,7 +175,7 @@ function MachinesPage(): ReactElement {
       <PageHeader
         title="Machines"
         docs="ref/device-management"
-        description={can(me, "devices:core:read") ? undefined : ownMachinesNote}
+        description={can(me, "devices:core:read") ? machinesNote : ownMachinesNote}
         meta={summary(machines)}
       />
       <MachinesToolbar
@@ -206,6 +252,38 @@ function MachinesPage(): ReactElement {
         onOpenChange={setAddingMachine}
       />
     </>
+  );
+}
+
+/** The rail beside an empty tailnet: what people join machines for, each with its guide. */
+function UseCases(): ReactElement {
+  return (
+    <RailSection title="Common use cases" size="lg">
+      <p className="-mt-1 text-kumo-subtle">
+        How a tailnet fits into the machines you already run.
+      </p>
+      <RailList>
+        <RailRow
+          title="Connect your devices"
+          description="Install Tailscale on a laptop or phone and sign in to this server."
+          link={{
+            href: docsUrl("usage/getting-started"),
+            label: "Getting started",
+            external: true,
+          }}
+        />
+        <RailRow
+          title="Reach a private network"
+          description="Let one machine route a subnet, so the rest reach it without a client of their own."
+          link={{ href: docsUrl("ref/routes"), label: "Subnet routes", external: true }}
+        />
+        <RailRow
+          title="Join servers without a person"
+          description="Hand a server a pre-auth key and a tag, so it belongs to the tailnet rather than a user."
+          link={{ href: docsUrl("ref/tags"), label: "Tags", external: true }}
+        />
+      </RailList>
+    </RailSection>
   );
 }
 
