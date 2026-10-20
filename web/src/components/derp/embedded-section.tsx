@@ -114,6 +114,8 @@ function facts(derp: Derp): readonly Definition[] {
           ) : null}
         </span>
       ),
+      // The note is a sentence; cut on one line it lost its start at a phone's width.
+      wrap: true,
     },
     { label: "Reached at", value: derp.serverUrl, copy: derp.serverUrl },
     regionFact(derp),

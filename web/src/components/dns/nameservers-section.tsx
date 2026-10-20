@@ -108,8 +108,8 @@ export function NameserversSection({
             },
           }))}
         />
-        <SectionRow className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-          <div className="flex min-w-0 flex-col gap-1">
+        <SectionRow className="flex items-start justify-between gap-4 sm:gap-6">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <span className="font-medium text-kumo-strong">Override local DNS</span>
             <p id={overrideHelpId} className="max-w-prose text-kumo-subtle">
               Machines use the nameservers above for every query, not only when their own resolvers
