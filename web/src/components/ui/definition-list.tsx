@@ -1,13 +1,15 @@
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
-import { CopyButton, CopyText } from "~/components/ui/copy-text.tsx";
+import { CopyButton } from "~/components/ui/copy-text.tsx";
 
 export interface Definition {
   readonly label: ReactNode;
   readonly value: ReactNode;
-  /** Renders the value as a click-to-copy monospace run putting this text on the clipboard. */
+  /** Renders the value in monospace with a copy button beside it that copies this text. */
   readonly copy?: string;
+  /** The copy button's accessible name: "Copy commit". */
+  readonly copyLabel?: string;
   /** Gives the row both columns of a two-column list, for a value a half row would cut off. */
   readonly wide?: boolean;
   /** Lets this value wrap onto several lines (a stacked pair, a sentence) whatever the list does. */
@@ -17,8 +19,9 @@ export interface Definition {
 
 /**
  * Label/value rows divided by lines, the dashboard's account-details rows: a 13px subtle label on
- * the left, the value right-aligned, 36px a row. Mono values are a CopyText: click to copy, the
- * icon showing on hover.
+ * the left, the value right-aligned, 36px a row. A copyable value is monospace with a ghost copy
+ * button after it that is always there, as Zero Trust's settings draw an ID, so a touch screen,
+ * which has no hover, can copy it too.
  *
  * A value is cut with an ellipsis when the row runs out of room, but the cut is `overflow-clip`
  * with a margin rather than `overflow-hidden`: hidden clips at the box edge, which took the focus
@@ -69,12 +72,23 @@ export function DefinitionList({
                 {typeof item.value === "string" ? <span>{item.value}</span> : item.value}
               </span>
             ) : (
-              <CopyText
-                value={typeof item.value === "string" ? item.value : item.copy}
-                {...(typeof item.value === "string" ? {} : { display: item.value })}
-                copy={item.copy}
-                wrap={item.wrap ?? wrap}
-              />
+              <span className="flex min-w-0 items-center justify-end gap-1">
+                <span
+                  className={cn(
+                    "min-w-0 font-mono text-[0.9em]",
+                    (item.wrap ?? wrap) ? "break-all" : "truncate",
+                  )}
+                >
+                  {item.value}
+                </span>
+                {/* The 26px button overhangs the 20px line into the row's padding, so a row with
+                    one stays as tall as a row without. */}
+                <CopyButton
+                  value={item.copy}
+                  label={item.copyLabel ?? `Copy ${item.copy}`}
+                  className="-my-1"
+                />
+              </span>
             )}
           </dd>
         </div>

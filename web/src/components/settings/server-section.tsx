@@ -6,7 +6,6 @@ import type { ReactElement, ReactNode } from "react";
 import { api } from "~/api/client.ts";
 import type { ServerInfo } from "~/api/queries.ts";
 import { Card } from "~/components/ui/card.tsx";
-import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -56,10 +55,23 @@ function Stacked({
   );
 }
 
+/** A full git hash is 40 characters, wider than a phone's row; 12 still names one commit. */
+const shortCommitLength = 12;
+
+/** The commit as git abbreviates it, a build string that is not a hash as it is. */
+function shortCommit(commit: string): string {
+  return /^[0-9a-f]{40}$/u.test(commit) ? commit.slice(0, shortCommitLength) : commit;
+}
+
 function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[] {
   return [
-    { label: "Version", value: info.version, copy: info.version },
-    { label: "Commit", value: info.commit, copy: info.commit },
+    { label: "Version", value: info.version, copy: info.version, copyLabel: "Copy version" },
+    {
+      label: "Commit",
+      value: <span title={info.commit}>{shortCommit(info.commit)}</span>,
+      copy: info.commit,
+      copyLabel: "Copy commit",
+    },
     {
       label: "Running since",
       value: <RelativeTime value={info.startedAt} />,
@@ -82,28 +94,50 @@ function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[]
 
 function networkItems(info: ServerInfo): readonly Definition[] {
   return [
-    { label: "Server URL", value: <UrlText url={info.serverUrl} />, copy: info.serverUrl },
-    { label: "Listening on", value: info.listenAddr, copy: info.listenAddr },
-    { label: "IPv4 range", value: info.ipv4Prefix, copy: info.ipv4Prefix },
-    { label: "IPv6 range", value: info.ipv6Prefix, copy: info.ipv6Prefix },
+    {
+      label: "Server URL",
+      value: <UrlText url={info.serverUrl} />,
+      copy: info.serverUrl,
+      copyLabel: "Copy server URL",
+    },
+    {
+      label: "Listening on",
+      value: info.listenAddr,
+      copy: info.listenAddr,
+      copyLabel: "Copy listen address",
+    },
+    {
+      label: "IPv4 range",
+      value: info.ipv4Prefix,
+      copy: info.ipv4Prefix,
+      copyLabel: "Copy IPv4 range",
+    },
+    {
+      label: "IPv6 range",
+      value: info.ipv6Prefix,
+      copy: info.ipv6Prefix,
+      copyLabel: "Copy IPv6 range",
+    },
     ...(info.baseDomain === ""
       ? [{ label: "Base domain", value: <Muted>None</Muted> }]
-      : [{ label: "Base domain", value: info.baseDomain, copy: info.baseDomain }]),
+      : [
+          {
+            label: "Base domain",
+            value: info.baseDomain,
+            copy: info.baseDomain,
+            copyLabel: "Copy base domain",
+          },
+        ]),
     { label: "MagicDNS", value: info.magicDns ? "On" : <Muted>Off</Muted> },
     { label: "TLS", value: tlsLabels[info.tls] ?? info.tls },
-    {
-      label: "Identity provider",
-      value:
-        info.oidcIssuer === "" ? (
-          <Muted>None. Users are created by hand.</Muted>
-        ) : (
-          <CopyText
-            value={info.oidcIssuer}
-            display={<UrlText url={info.oidcIssuer} />}
-            label="Copy the issuer URL"
-          />
-        ),
-    },
+    info.oidcIssuer === ""
+      ? { label: "Identity provider", value: <Muted>None. Users are created by hand.</Muted> }
+      : {
+          label: "Identity provider",
+          value: <UrlText url={info.oidcIssuer} />,
+          copy: info.oidcIssuer,
+          copyLabel: "Copy the issuer URL",
+        },
   ];
 }
 

@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { CopyText } from "~/components/ui/copy-text.tsx";
+import { CopyButton } from "~/components/ui/copy-text.tsx";
 import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
 import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 
@@ -27,7 +27,12 @@ export function TailnetIDSection({ tailnetId }: { readonly tailnetId: string }):
             </>
           }
         >
-          <CopyText value={tailnetId} className="w-fit" />
+          {/* The ID with a copy button that is always there, the way Zero Trust's settings show
+              an ID; it wraps rather than cut, since a phone is narrower than the ID. */}
+          <span className="flex min-w-0 items-center gap-1">
+            <span className="min-w-0 font-mono text-[0.9em] break-all">{tailnetId}</span>
+            <CopyButton value={tailnetId} label="Copy tailnet ID" />
+          </span>
         </SettingsRow>
       </SettingsCard>
     </SettingsGroup>
