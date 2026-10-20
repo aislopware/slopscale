@@ -69,6 +69,7 @@ var badRequestErrors = []error{
 	types.ErrGroupDNSRuleNoGroups,
 	types.ErrGroupDNSRuleReservedZone,
 	types.ErrKeyExpiryOutOfRange,
+	types.ErrRouteSelectionUnknown,
 	egress.ErrBlocked,
 	types.ErrWebhookURLInvalid,
 	types.ErrWebhookNoSubscriptions,

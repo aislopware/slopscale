@@ -41,6 +41,10 @@ const (
 	rebuildPeerMaps = 4
 	setName         = 5
 	updateMulti     = 6
+	// rebuildRoutes reruns the route election with new inputs and keeps
+	// the peer relationship; applyBatch has nothing to apply for it, the
+	// snapshot it builds reads the inputs.
+	rebuildRoutes = 7
 )
 
 const prometheusNamespace = "slopscale"
@@ -118,6 +122,11 @@ type NodeStore struct {
 
 	batchSize    int
 	batchTimeout time.Duration
+
+	// inputs is what the route election reads besides the nodes; nil
+	// is the zero [routeInputs]. inputsMu serialises its writers.
+	inputs   atomic.Pointer[routeInputs]
+	inputsMu sync.Mutex
 }
 
 // NewNodeStore builds a store whose peers come from a [PeersFunc] keyed by
@@ -141,7 +150,7 @@ func NewNodeStorePositional(
 		nodes[n.ID] = *n
 	}
 
-	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{}, nil)
+	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{})
 
 	store := &NodeStore{
 		peersFunc:    peersFunc,
@@ -660,16 +669,29 @@ func resolveGivenName(taken givenNames, selfName, base string) string {
 // snapshotFromNodes builds the index maps and primary-route table for
 // a new [Snapshot]. prevRoutes carries forward the previous primary
 // assignment so a still-valid choice survives unrelated batches.
+func snapshotFromNodes(
+	nodes map[types.NodeID]types.Node,
+	peersFunc PeerPositionsFunc,
+	prev PrimaryRouteLedger,
+) Snapshot {
+	return buildSnapshot(nodes, peersFunc, prev, nil, routeInputs{})
+}
+
+// buildSnapshot is [snapshotFromNodes] with the route election's other
+// inputs. The route selection decides which per-viewer structures are
+// built at all: active-passive failover needs neither the regional
+// primaries nor the steering sets, and regional failover no steering.
 //
 // keepPeers, when not nil, is the previous snapshot's peer relationship
 // over the same node set; the caller vouches that the batch changed no
 // input of it (see peerInputsChanged), so the policy scan is skipped and
 // the views are re-pointed at the new copies.
-func snapshotFromNodes(
+func buildSnapshot(
 	nodes map[types.NodeID]types.Node,
 	peersFunc PeerPositionsFunc,
 	prev PrimaryRouteLedger,
 	keepPeers [][]int32,
+	in routeInputs,
 ) Snapshot {
 	defer observeSince(nodeStoreSnapshotBuildDuration, time.Now())
 
@@ -692,8 +714,20 @@ func snapshotFromNodes(
 
 	advertisers := onlineAdvertisers(nodes)
 	routes, isPrimaryRoute := electPrimaryRoutes(nodes, advertisers, prev.Global)
-	regionalRoutes := electRegionalRoutes(nodes, advertisers, prev.Regional)
-	contested := contestedRoutes(nodes, advertisers)
+
+	var (
+		regionalRoutes map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+		contested      map[netip.Prefix][]site
+	)
+
+	if in.selection.Regional() {
+		regionalRoutes = electRegionalRoutes(nodes, advertisers, prev.Regional)
+	}
+
+	steerExits := in.selection.Nearest()
+	if steerExits {
+		contested = contestedRoutes(nodes, advertisers)
+	}
 
 	// The peer relationship is the expensive part: every pair of nodes
 	// through the policy. It is only recomputed when a batch changed an
@@ -720,7 +754,7 @@ func snapshotFromNodes(
 		isPrimaryRoute: isPrimaryRoute,
 		regionalRoutes: regionalRoutes,
 		contested:      contested,
-		steerable:      steerableNodes(contested),
+		steerable:      steerableNodes(contested, regionalRoutes),
 	}
 
 	// Build nodesByUser, nodesByNodeKey, and nodesByMachineKey maps
@@ -739,7 +773,7 @@ func snapshotFromNodes(
 		// Build machine key index
 		newSnap.nodesByMachineKey[n.MachineKey] = newSnap.nodesByMachineKey[n.MachineKey].add(userID, nodeView)
 
-		if n.GlobalExitNode && n.ExitNodePriority > 0 {
+		if steerExits && n.GlobalExitNode && n.ExitNodePriority > 0 {
 			newSnap.steeredExits = append(newSnap.steeredExits, exitSite{
 				id: n.ID, region: n.DERPRegion(),
 				priority: n.ExitNodePriority,
@@ -998,9 +1032,15 @@ func contestedRoutes(
 	return out
 }
 
-// steerableNodes returns the nodes contested lists.
-func steerableNodes(contested map[netip.Prefix][]site) map[types.NodeID]bool {
-	if len(contested) == 0 {
+// steerableNodes returns the nodes a viewer may be sent to instead of the
+// tailnet-wide primary: those contested lists and the regional primaries.
+// With steering on, every regional primary is also contested; under
+// regional failover only the regional primaries are.
+func steerableNodes[K comparable](
+	contested map[K][]site,
+	regional map[tailcfg.DERPRegionID]map[K]types.NodeID,
+) map[types.NodeID]bool {
+	if len(contested) == 0 && len(regional) == 0 {
 		return nil
 	}
 
@@ -1009,6 +1049,12 @@ func steerableNodes(contested map[netip.Prefix][]site) map[types.NodeID]bool {
 	for _, sites := range contested {
 		for _, s := range sites {
 			out[s.id] = true
+		}
+	}
+
+	for _, primaries := range regional {
+		for _, id := range primaries {
+			out[id] = true
 		}
 	}
 
@@ -1663,7 +1709,7 @@ func (s *NodeStore) nextSnapshot(prev *Snapshot, nodes map[types.NodeID]types.No
 		keepPeers = prev.peerPositions
 	}
 
-	return snapshotFromNodes(nodes, s.peersFunc, prev.ledger(), keepPeers)
+	return buildSnapshot(nodes, s.peersFunc, prev.ledger(), keepPeers, s.routeInputs())
 }
 
 // deliverBatchResults unblocks every writer waiting on the batch, after

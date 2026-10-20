@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"
@@ -227,4 +228,71 @@ func TestExitNodeSteering(t *testing.T) {
 	node, ok := srv.State().GetNodeByID(findNodeID(t, srv, "exit-eu"))
 	require.True(t, ok)
 	assert.Equal(t, 5, node.ExitNodePriority())
+}
+
+// TestRouteSelectionReachesClients changes the route selection under
+// connected clients and watches their netmaps follow: an internet address
+// served by the office connector in Hanoi (the tailnet-wide primary) and
+// an EU connector in Frankfurt, viewed from a laptop in Amsterdam and one
+// in Frankfurt.
+func TestRouteSelectionReachesClients(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "route-selection")
+
+	cloudflare := netip.MustParsePrefix("104.20.39.105/32")
+
+	office := servertest.NewClient(t, srv, "rs-office", servertest.WithUser(user))
+	eu := servertest.NewClient(t, srv, "rs-eu", servertest.WithUser(user))
+	ams := servertest.NewClient(t, srv, "rs-ams", servertest.WithUser(user))
+	fra := servertest.NewClient(t, srv, "rs-fra", servertest.WithUser(user))
+
+	for _, c := range []*servertest.TestClient{office, eu, ams, fra} {
+		c.WaitForPeers(t, 3, 10*time.Second)
+	}
+
+	advertiseAndApproveRoute(t, srv, office, cloudflare)
+	advertiseAndApproveRoute(t, srv, eu, cloudflare)
+
+	setNetInfo(t, office, steerOffice, map[tailcfg.DERPRegionID]float64{steerOffice: 0.5})
+	setNetInfo(t, eu, steerFra, map[tailcfg.DERPRegionID]float64{steerFra: 1.3})
+	setNetInfo(t, ams, steerAms, inAmsterdam)
+	setNetInfo(t, fra, steerFra, map[tailcfg.DERPRegionID]float64{steerFra: 1, steerOffice: 200})
+
+	via := func(c *servertest.TestClient, router, other string) {
+		t.Helper()
+
+		c.WaitForCondition(t, c.Name+" reaches the address through "+router, 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				return hasPeerPrimaryRoute(nm, router, cloudflare) && !hasPeerPrimaryRoute(nm, other, cloudflare)
+			})
+	}
+
+	selectRoutes := func(selection types.RouteSelection) {
+		t.Helper()
+
+		c, err := srv.State().SetRouteSelection(selection)
+		require.NoError(t, err)
+		require.False(t, c.IsEmpty(), "a new selection sends every node its peers")
+		srv.App.Change(c)
+	}
+
+	// Regional routing, the default: each laptop takes the nearest.
+	via(ams, "rs-eu", "rs-office")
+	via(fra, "rs-eu", "rs-office")
+
+	// Active-passive failover: both take the tailnet-wide primary.
+	selectRoutes(types.RouteSelectionActivePassive)
+	via(ams, "rs-office", "rs-eu")
+	via(fra, "rs-office", "rs-eu")
+
+	// Regional failover: Frankfurt has its own router, Amsterdam has none
+	// and round trips do not count, so it takes the tailnet-wide primary.
+	selectRoutes(types.RouteSelectionRegionalFailover)
+	via(ams, "rs-office", "rs-eu")
+	via(fra, "rs-eu", "rs-office")
+
+	selectRoutes(types.RouteSelectionRegional)
+	via(ams, "rs-eu", "rs-office")
 }

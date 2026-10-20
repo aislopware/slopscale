@@ -230,6 +230,43 @@ func TestAPIv2SettingsPatchFixedFields(t *testing.T) {
 	assert.Equal(t, http.StatusUnprocessableEntity, unknown.Code, "an unknown route selection is not a value")
 }
 
+// TestAPIv2SettingsRouteSelection writes the route selection through both
+// of Tailscale's fields: routeSelection by name, and the older
+// regionalRoutingOn, which reads true only for regional-routing.
+func TestAPIv2SettingsRouteSelection(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	api := registerAPIV2(t, app)
+
+	got := getSettings(t, api)
+	assert.Equal(t, "regional-routing", got.RouteSelection, "the default is what slopscale always did")
+	assert.True(t, got.RegionalRoutingOn)
+
+	steps := []struct {
+		body          map[string]any
+		wantSelection string
+		wantRegional  bool
+	}{
+		{map[string]any{"routeSelection": "magicroute"}, "magicroute", false},
+		{map[string]any{"regionalRoutingOn": true}, "regional-routing", true},
+		{map[string]any{"regionalRoutingOn": false}, "active-passive-failover", false},
+		{map[string]any{"routeSelection": "regional-routing-failover"}, "regional-routing-failover", false},
+		// Writing back what GET reports changes nothing.
+		{map[string]any{"regionalRoutingOn": false}, "active-passive-failover", false},
+	}
+
+	for _, step := range steps {
+		resp := api.Patch("/api/v2/tailnet/-/settings", step.body)
+		require.Equalf(t, http.StatusOK, resp.Code, "%v: %s", step.body, resp.Body)
+
+		got := getSettings(t, api)
+		assert.Equalf(t, step.wantSelection, got.RouteSelection, "%v", step.body)
+		assert.Equalf(t, step.wantRegional, got.RegionalRoutingOn, "%v", step.body)
+		assert.Equal(t, types.RouteSelection(step.wantSelection), app.state.RouteSelection())
+	}
+}
+
 // TestAPIv2SettingsNonDefaultTailnet404 — the tailnet check runs first, so a
 // bad tailnet is 404 on both verbs.
 func TestAPIv2SettingsNonDefaultTailnet404(t *testing.T) {

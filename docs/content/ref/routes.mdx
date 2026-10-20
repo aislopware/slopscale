@@ -378,7 +378,9 @@ This feature is enabled by default when at least two nodes advertise the same pr
 
 When several healthy routers serve the same prefix, slopscale steers each
 client to the router nearest it, the idea behind Tailscale's
-[regional routing](https://tailscale.com/blog/regional-routing). Nearness is
+[regional routing](https://tailscale.com/blog/regional-routing). This is the
+default [route selection](/ref/route-selection); the other modes give every
+client the same router, or keep each client in its home DERP region. Nearness is
 the round trip the client measured to the DERP region each router is homed
 in, which every client reports after its netcheck, so it needs no
 configuration beyond a [DERP map](/ref/derp) with more than one region. A

@@ -1,10 +1,14 @@
 package servertest_test
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	tsclient "tailscale.com/client/tailscale/v2"
@@ -33,9 +37,19 @@ func TestAPIv2TailnetSettingsWrite(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, got.DevicesApprovalOn)
 
-		// Writing back the route selection in force is accepted.
+		// The route selection is a real setting.
 		require.NoError(t, settings.Update(ctx, tsclient.UpdateTailnetSettingsRequest{
-			RouteSelection: new(got.RouteSelection),
+			RouteSelection: new(tsclient.RouteSelectionActivePassiveFailover),
+		}))
+		assert.Equal(t, types.RouteSelectionActivePassive, srv.State().RouteSelection())
+
+		got, err = settings.Get(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, tsclient.RouteSelectionActivePassiveFailover, got.RouteSelection)
+		assert.False(t, got.RegionalRoutingOn) //nolint:staticcheck // the legacy field must follow
+
+		require.NoError(t, settings.Update(ctx, tsclient.UpdateTailnetSettingsRequest{
+			RouteSelection: new(tsclient.RouteSelectionRegionalRouting),
 		}))
 
 		// The hosted API refuses both route selection fields at once.
@@ -62,7 +76,7 @@ func TestAPIv2TailnetSettingsWrite(t *testing.T) {
 	})
 
 	t.Run("Terraform", func(t *testing.T) {
-		tf := newTofu(t, srv.URL, apiKey, tailnetSettingsTFConfig)
+		tf := newTofu(t, srv.URL, apiKey, fmt.Sprintf(tailnetSettingsTFConfig, true))
 
 		tf.run("init", "-no-color", "-input=false")
 		tf.run("apply", "-auto-approve", "-no-color", "-input=false")
@@ -70,15 +84,25 @@ func TestAPIv2TailnetSettingsWrite(t *testing.T) {
 		current := srv.State().Settings()
 		assert.True(t, current.UsersApprovalOn)
 		assert.False(t, current.DevicesApprovalOn)
+		assert.Equal(t, types.RouteSelectionRegional, srv.State().RouteSelection(),
+			"regional_routing_on = true matches the default, so nothing drifts")
 
 		tf.assertNoDrift()
+
+		// regional_routing_on = false is active-passive failover.
+		require.NoError(t, os.WriteFile(filepath.Join(tf.cmd().Dir, "main.tf"),
+			[]byte(fmt.Sprintf(tailnetSettingsTFConfig, false)), 0o600))
+		tf.run("apply", "-auto-approve", "-no-color", "-input=false")
+		assert.Equal(t, types.RouteSelectionActivePassive, srv.State().RouteSelection())
+		tf.assertNoDrift()
+
 		tf.run("destroy", "-auto-approve", "-no-color", "-input=false")
 	})
 }
 
-// tailnetSettingsTFConfig sets the switches the API changes, and repeats
-// the regional routing Slopscale reports, as a configuration written for
-// the hosted control plane would.
+// tailnetSettingsTFConfig sets the switches the API changes and, through
+// %t, regional_routing_on, as a configuration written for the hosted
+// control plane would.
 const tailnetSettingsTFConfig = `
 terraform {
   required_providers {
@@ -94,7 +118,7 @@ provider "tailscale" {}
 resource "tailscale_tailnet_settings" "s" {
   devices_approval_on = false
   users_approval_on   = true
-  regional_routing_on = true
+  regional_routing_on = %t
 }
 `
 

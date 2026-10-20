@@ -37,18 +37,14 @@ type TailnetSettings struct {
 
 	NetworkFlowLoggingOn bool `json:"networkFlowLoggingOn"`
 	// RegionalRoutingOn is the older form of RouteSelection, which the
-	// hosted API still returns.
+	// hosted API still returns: true only for regional-routing.
 	RegionalRoutingOn           bool `json:"regionalRoutingOn"`
 	PostureIdentityCollectionOn bool `json:"postureIdentityCollectionOn"`
 	HTTPSEnabled                bool `json:"httpsEnabled"`
-	// RouteSelection is always regional routing: every machine is steered
-	// to the nearest healthy router, connector and exit node.
-	RouteSelection string `enum:"regional-routing" json:"routeSelection"`
+	// RouteSelection is how machines choose among routers, app connectors
+	// and service hosts that serve the same prefix.
+	RouteSelection string `enum:"active-passive-failover,regional-routing,regional-routing-failover,magicroute" json:"routeSelection"` //nolint:lll // struct tag
 }
-
-// routeSelectionRegional is the hosted API's name for the steering slopscale
-// always does.
-const routeSelectionRegional = "regional-routing"
 
 type (
 	getSettingsInput struct {
@@ -156,16 +152,6 @@ func checkFixedSettings(body UpdateTailnetSettings, current TailnetSettings) err
 			unchanged(body.HTTPSEnabled, current.HTTPSEnabled),
 			"certificates follow the tls settings in the config file",
 		},
-		{
-			"regionalRoutingOn",
-			unchanged(body.RegionalRoutingOn, current.RegionalRoutingOn),
-			"Slopscale always uses regional routing",
-		},
-		{
-			"routeSelection",
-			unchanged(body.RouteSelection, current.RouteSelection),
-			"Slopscale always uses regional routing",
-		},
 	}
 
 	for _, f := range fixed {
@@ -183,10 +169,27 @@ func unchanged[T comparable](requested *T, current T) bool {
 	return requested == nil || *requested == current
 }
 
+// requestedRouteSelection is the route selection a request asks for, nil
+// when it asks for none. The legacy regionalRoutingOn maps as on the
+// hosted API: true is regional-routing, false active-passive-failover.
+func requestedRouteSelection(body UpdateTailnetSettings) *types.RouteSelection {
+	switch {
+	case body.RouteSelection != nil:
+		return new(types.RouteSelection(*body.RouteSelection))
+	case body.RegionalRoutingOn == nil:
+		return nil
+	case *body.RegionalRoutingOn:
+		return new(types.RouteSelectionRegional)
+	default:
+		return new(types.RouteSelectionActivePassive)
+	}
+}
+
 func tailnetSettings(b Backend) TailnetSettings {
 	cfg := b.Cfg
 	current := b.State.Settings()
 	keyDuration := cmp.Or(current.KeyExpiry, cfg.Node.Expiry)
+	selection := current.RouteSelection.OrDefault()
 
 	return TailnetSettings{
 		// File-mode policy is genuinely externally managed (read-only via API).
@@ -196,8 +199,8 @@ func tailnetSettings(b Backend) TailnetSettings {
 		// Tailscale's toggle for machine certificates, not the server's own TLS.
 		HTTPSEnabled:                           cfg.HTTPSCerts.Enabled,
 		PostureIdentityCollectionOn:            current.PostureIdentityOn,
-		RegionalRoutingOn:                      true,
-		RouteSelection:                         routeSelectionRegional,
+		RegionalRoutingOn:                      selection == types.RouteSelectionRegional,
+		RouteSelection:                         string(selection),
 		UsersApprovalOn:                        current.UsersApprovalOn,
 		UsersRoleAllowedToJoinExternalTailnets: "none",
 	}
@@ -228,10 +231,11 @@ func registerSettings(api huma.API, b Backend) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
 		Summary:     "Update tailnet settings",
-		Description: "Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn and " +
-			"devicesKeyDurationDays. The other settings are file-based in Slopscale: a request may " +
-			"carry them as null or with the value GET reports, anything else is a 400 naming the " +
-			"field. regionalRoutingOn and routeSelection cannot both be set.",
+		Description: "Changes devicesApprovalOn, usersApprovalOn, postureIdentityCollectionOn, " +
+			"devicesKeyDurationDays and routeSelection (or the older regionalRoutingOn: true is " +
+			"regional-routing, false active-passive-failover; a request carries one of the two). The " +
+			"other settings are file-based in Slopscale: a request may carry them as null or with the " +
+			"value GET reports, anything else is a 400 naming the field.",
 		Tags:     settingsTags,
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
@@ -279,6 +283,17 @@ func registerSettings(api huma.API, b Backend) {
 			}
 
 			audit.Detail(ctx, string(types.SettingKeyExpiry), *days)
+		}
+
+		if selection := requestedRouteSelection(in.Body); selection != nil {
+			c, err := b.State.SetRouteSelection(*selection)
+			if err != nil {
+				return nil, mapError("updating tailnet settings", err)
+			}
+
+			audit.Detail(ctx, string(types.SettingRouteSelection), *selection)
+
+			b.Change(c)
 		}
 
 		return &settingsOutput{Body: tailnetSettings(b)}, nil

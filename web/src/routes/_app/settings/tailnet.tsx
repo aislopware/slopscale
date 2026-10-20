@@ -6,6 +6,7 @@ import { serverInfoQuery, settingsQuery, tailnetLockQuery } from "~/api/queries.
 import { can } from "~/auth/me.ts";
 import { ApprovalSection, DeviceTrustSection } from "~/components/settings/approval-section.tsx";
 import { KeyExpirySection } from "~/components/settings/key-expiry-section.tsx";
+import { RouteSelectionSection } from "~/components/settings/route-selection-section.tsx";
 import { SSHRecordingSection } from "~/components/settings/ssh-recording-section.tsx";
 import { TailnetIDSection } from "~/components/settings/tailnet-id-section.tsx";
 import { TailnetLockSection } from "~/components/settings/tailnet-lock-section.tsx";
@@ -33,13 +34,14 @@ function TailnetSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Tailnet"
-        description="The tailnet's ID, who may join, what a machine must prove, how long a login lasts and whether SSH sessions are recorded."
+        description="The tailnet's ID, who may join, what a machine must prove, how long a login lasts, which router each machine uses and whether SSH sessions are recorded."
       />
       <div className="flex flex-col gap-6">
         <TailnetIDSection tailnetId={info.tailnetId} />
         <ApprovalSection settings={settings} canEdit={canEdit} />
         <DeviceTrustSection settings={settings} canEdit={canEdit} />
         <KeyExpirySection settings={settings} canEdit={canEdit} />
+        <RouteSelectionSection settings={settings} canEdit={canEdit} />
         <SSHRecordingSection settings={settings} canEdit={canEdit} />
         <TailnetLockSection lock={lock} canEdit={canEdit} />
       </div>

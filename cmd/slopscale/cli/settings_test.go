@@ -15,6 +15,7 @@ func settingsFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("devices-approval", false, "")
 	cmd.Flags().Bool("users-approval", false, "")
 	cmd.Flags().Int64("key-expiry-days", 0, "")
+	cmd.Flags().String("route-selection", "", "")
 }
 
 func TestSettingsCommands(t *testing.T) {
@@ -108,6 +109,28 @@ func TestSettingsCommands(t *testing.T) {
 				},
 			},
 			wantIn: []string{"Key expiry", "30 days"},
+		},
+		{
+			name:  "set sends the route selection",
+			src:   setSettingsCmd,
+			flags: map[string]string{"route-selection": "active-passive-failover"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/settings": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.UpdateSettingsRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Nil(t, body.DevicesApprovalOn)
+
+					if assert.NotNil(t, body.RouteSelection) {
+						assert.Equal(t, "active-passive-failover", string(*body.RouteSelection))
+					}
+
+					writeJSON(t, w, clientv1.Settings{RouteSelection: "active-passive-failover"})
+				},
+			},
+			wantIn: []string{"Route selection", "active-passive-failover"},
 		},
 		{
 			name: "get names the config file default when there is no cap",

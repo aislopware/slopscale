@@ -387,6 +387,7 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	s.settings.Store(&settings)
+	nodeStore.SetRouteSelection(settings.RouteSelection)
 
 	s.tailnetID, err = loadTailnetID(db)
 	if err != nil {
