@@ -4,12 +4,14 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/capver"
 	"github.com/aislopware/slopscale/hscontrol/clientversion"
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
@@ -76,7 +78,14 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 	}
 
 	b.resp.TKAInfo = b.mapper.state.TKAInfo()
-	b.resp.DisplayMessages = displayMessages(nv, b.mapper.cfg.ServerURL)
+
+	messages := displayMessages(nv, b.mapper.cfg.ServerURL)
+	if b.capVer < capver.DisplayMessagesCapVer {
+		b.resp.Health = legacyHealth(messages)
+	} else {
+		b.resp.DisplayMessages = messages
+	}
+
 	b.resp.ControlDialPlan = b.mapper.cfg.DialPlan()
 
 	if hi := nv.Hostinfo(); hi.Valid() {
@@ -148,6 +157,25 @@ func suspensionMessages(nv types.NodeView) map[tailcfg.DisplayMessageID]*tailcfg
 			ImpactsConnectivity: true,
 		},
 	}
+}
+
+// legacyHealth is messages for a client older than
+// [capver.DisplayMessagesCapVer], which shows the control plane's health as
+// a list of strings it replaces whole (v1.84 shows only the last, which
+// orders suspension after approval): one entry per message the node has,
+// ordered by key, and an empty list, never nil, when it has none, because
+// nil would leave a message it no longer has on screen.
+// [mapSession.encodeMap] keeps the empty list on the wire.
+func legacyHealth(messages map[tailcfg.DisplayMessageID]*tailcfg.DisplayMessage) []string {
+	health := []string{}
+
+	for _, id := range slices.Sorted(maps.Keys(messages)) {
+		if msg := messages[id]; msg != nil {
+			health = append(health, msg.Title+". "+msg.Text)
+		}
+	}
+
+	return health
 }
 
 func (b *MapResponseBuilder) WithDebugType(t debugType) *MapResponseBuilder {

@@ -20,6 +20,12 @@ const minVersionParts = 2
 // (tailscale/tailscale#15660); v1.104 is the first release at or above it.
 const fullNetmapRemovalsCapVer tailcfg.CapabilityVersion = 148
 
+// DisplayMessagesCapVer is the first capability version whose clients read
+// [tailcfg.MapResponse.DisplayMessages]. Older ones (v1.84) only show the
+// control plane's [tailcfg.MapResponse.Health] strings, and tailcfg asks a
+// server to send one or the other, never both.
+const DisplayMessagesCapVer tailcfg.CapabilityVersion = 117
+
 // CanOldCodeBeCleanedUp is called at server startup to panic when
 // [MinSupportedCapabilityVersion] has crossed a threshold at which a
 // backwards-compat emit path can be deleted. Each entry pairs a
@@ -32,6 +38,14 @@ func CanOldCodeBeCleanedUp() {
 		panic(
 			"the tailscale/tailscale#15660 compat can be cleaned up: " +
 				"grep for it (hscontrol/mapper/batcher.go and its tests)",
+		)
+	}
+
+	if MinSupportedCapabilityVersion >= DisplayMessagesCapVer {
+		panic(
+			"every supported client reads DisplayMessages, the Health fallback can be cleaned up: " +
+				"grep for capver.DisplayMessagesCapVer (hscontrol/mapper/builder.go, " +
+				"hscontrol/poll.go and their tests)",
 		)
 	}
 }
