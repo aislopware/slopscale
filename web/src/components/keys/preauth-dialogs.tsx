@@ -277,7 +277,8 @@ function PreAuthKeyFields({
   );
 }
 
-function UserSelect({
+/** The user a key belongs to, each option the user's name over the hint that tells two apart. */
+export function UserSelect({
   users,
   value,
   onChange,

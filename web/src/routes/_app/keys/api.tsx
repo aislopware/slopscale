@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { apiKeysQuery } from "~/api/queries.ts";
+import { CreateKeyLink } from "~/components/keys/create-link.tsx";
 import { ApiPanel } from "~/components/keys/panels.tsx";
 import { keyControls, keysSearchSchema } from "~/components/keys/search.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -29,6 +30,8 @@ function ApiKeysPage(): ReactElement {
         title="API keys"
         docs="ref/api"
         description="Authenticate this console and automation against the v1 API. Rotating a key gives it a new secret, same id and scopes."
+        // Every caller may mint keys of their own, so the action is never off.
+        actions={<CreateKeyLink to="/keys/api/new" label="Create API key" allowed />}
       />
       <ApiPanel me={me} controls={controls} />
     </>
