@@ -160,46 +160,42 @@ export function SessionsTable({
   paging,
 }: SessionsTableProps): ReactElement {
   return (
-    <>
-      <TableScroll
-        pinnedRight
-        below={
-          recordings.length === 0 ? <EmptySessions embeddedRecorder={embeddedRecorder} /> : null
-        }
-      >
-        {(overflowing) => (
-          <Table className={tableClass}>
-            <Table.Header>
-              <Table.Row>
-                <Table.Head>Started</Table.Head>
-                <Table.Head>From</Table.Head>
-                <Table.Head>To</Table.Head>
-                <Table.Head>Command</Table.Head>
-                <Table.Head className="text-right">Size</Table.Head>
-                <Table.Head>Status</Table.Head>
-                <Table.Head
-                  sticky="right"
-                  className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
-                >
-                  <span className="sr-only">Actions</span>
-                </Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {recordings.map((recording) => (
-                <RecordingRow
-                  key={recording.id}
-                  recording={recording}
-                  writable={writable}
-                  overflowing={overflowing}
-                />
-              ))}
-            </Table.Body>
-          </Table>
-        )}
-      </TableScroll>
-      <CursorBand paging={paging} noun="recording" />
-    </>
+    <TableScroll
+      pinnedRight
+      below={recordings.length === 0 ? <EmptySessions embeddedRecorder={embeddedRecorder} /> : null}
+      footer={<CursorBand paging={paging} />}
+    >
+      {(overflowing) => (
+        <Table className={tableClass}>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>Started</Table.Head>
+              <Table.Head>From</Table.Head>
+              <Table.Head>To</Table.Head>
+              <Table.Head>Command</Table.Head>
+              <Table.Head className="text-right">Size</Table.Head>
+              <Table.Head>Status</Table.Head>
+              <Table.Head
+                sticky="right"
+                className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
+              >
+                <span className="sr-only">Actions</span>
+              </Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {recordings.map((recording) => (
+              <RecordingRow
+                key={recording.id}
+                recording={recording}
+                writable={writable}
+                overflowing={overflowing}
+              />
+            ))}
+          </Table.Body>
+        </Table>
+      )}
+    </TableScroll>
   );
 }
 

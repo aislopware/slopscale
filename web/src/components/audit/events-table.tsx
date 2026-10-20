@@ -225,9 +225,7 @@ export function EventsTable({
         footer={
           paging.loaded === 0 ? null : (
             // The page size is the toolbar's "Limit", so the band leaves its own out.
-            <div className="[&_[data-slot=pagination-page-size]]:hidden">
-              <CursorBand paging={paging} noun="event" />
-            </div>
+            <CursorBand paging={paging} hidePageSize />
           )
         }
       >

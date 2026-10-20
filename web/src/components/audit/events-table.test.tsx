@@ -226,7 +226,8 @@ describe(EventsTable, () => {
   });
 
   it("shows the empty state and no paging without events", async () => {
-    const screen = await render(app({ ...base, events: [], filtered: true }));
+    const paging = { ...onePage, loaded: 0 };
+    const screen = await render(app({ ...base, events: [], filtered: true, paging }));
 
     await expect.element(screen.getByText("No events match")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
@@ -258,11 +259,17 @@ describe(EventsTable, () => {
     await expect.element(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
   });
 
-  it("names the whole list once the server has no more", async () => {
+  it("counts the whole list once the server has no more", async () => {
     const screen = await render(app({ ...base, events: [deletion] }));
 
-    await expect.element(screen.getByText("Showing all 1 event")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+    await expect.element(screen.getByText("Showing 1–1 of 1")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+  });
+
+  it("leaves the rows per page to the toolbar", async () => {
+    const screen = await render(app({ ...base, events: [deletion] }));
+
+    await expect.element(screen.getByText("Per page:")).not.toBeInTheDocument();
   });
 
   it("leaves out the columns switched off in the Columns menu", async () => {
