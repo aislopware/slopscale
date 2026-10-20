@@ -4,7 +4,13 @@ import { auditExportUrl } from "~/api/queries.ts";
 import type { AuditFilters } from "~/api/queries.ts";
 import { auditExportFileName } from "~/components/audit/export.ts";
 
-const everything: AuditFilters = { action: "", actorUserId: "", range: "all" };
+const everything: AuditFilters = {
+  action: "",
+  actorUserId: "",
+  targetKind: "",
+  targetId: "",
+  range: "all",
+};
 
 function query(url: string): URLSearchParams {
   return new URLSearchParams(url.slice(url.indexOf("?")));
@@ -17,11 +23,18 @@ describe(auditExportUrl, () => {
   });
 
   it("carries the action and the actor the page is filtering by", () => {
-    const url = auditExportUrl({ action: "node.", actorUserId: "7", range: "all" }, "csv");
+    const url = auditExportUrl({ ...everything, action: "node.", actorUserId: "7" }, "csv");
 
     expect(query(url).get("action")).toBe("node.");
     expect(query(url).get("actorUserId")).toBe("7");
     expect(query(url).has("since")).toBe(false);
+  });
+
+  it("carries the target the page is filtering by", () => {
+    const url = auditExportUrl({ ...everything, targetKind: "node", targetId: "3" }, "csv");
+
+    expect(query(url).get("targetKind")).toBe("node");
+    expect(query(url).get("targetId")).toBe("3");
   });
 
   it("resolves the range preset to a lower bound, an hour back for 1h", () => {

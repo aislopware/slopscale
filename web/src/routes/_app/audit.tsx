@@ -4,7 +4,7 @@ import { Select } from "@cloudflare/kumo/components/select";
 import { ArrowClockwiseIcon, ClockIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ReactElement } from "react";
 import { fallback, object, optional, picklist, pipe, transform, unknown } from "valibot";
 
@@ -15,6 +15,7 @@ import { ColumnsMenu, useAuditColumns } from "~/components/audit/columns.tsx";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import { ExportMenu } from "~/components/audit/export-menu.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
+import { typingSettleMs, useDraft, useTargetFilter } from "~/components/audit/target-filter.tsx";
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { LogFilters } from "~/components/table/log-filters.tsx";
 import type { LogFilter } from "~/components/table/log-filters.tsx";
@@ -28,7 +29,13 @@ import { useDebounced } from "~/lib/use-debounced.ts";
 const defaultRange: AuditRange = "7d";
 
 /** Clearing the filters puts every control back where the page starts. */
-const clearedSearch = { action: "", actor: "", since: defaultRange } as const;
+const clearedSearch = {
+  action: "",
+  actor: "",
+  targetKind: "",
+  targetId: "",
+  since: defaultRange,
+} as const;
 
 /**
  * The router parses a search value as JSON, so `?actor=2` arrives as the number 2 while the user id
@@ -48,12 +55,16 @@ const optionalRange = optional(picklist(auditRanges), defaultRange);
 const searchSchema = object({
   action: fallback(optionalText, ""),
   actor: fallback(optionalText, ""),
+  targetKind: fallback(optionalText, ""),
+  targetId: fallback(optionalText, ""),
   since: fallback(optionalRange, defaultRange),
 });
 
 interface AuditSearch {
   readonly action: string;
   readonly actor: string;
+  readonly targetKind: string;
+  readonly targetId: string;
   readonly since: AuditRange;
 }
 
@@ -91,27 +102,24 @@ function isRange(value: string): value is AuditRange {
 }
 
 function filtersOf(search: AuditSearch): AuditFilters {
-  return { action: search.action, actorUserId: search.actor, range: search.since };
+  return {
+    action: search.action,
+    actorUserId: search.actor,
+    targetKind: search.targetKind,
+    targetId: search.targetId,
+    range: search.since,
+  };
 }
 
 /** Whether anything narrows the list, so an empty page means "nothing matched", not "nothing yet". */
 function isFiltered(search: AuditSearch): boolean {
-  return search.action !== "" || search.actor !== "" || search.since !== "all";
-}
-
-const actionSettleMs = 300;
-
-/** The action box's own text, reset whenever the address changes it from outside. */
-function useDraft(fromSearch: string): [string, (next: string) => void] {
-  const [draft, setDraft] = useState(fromSearch);
-  const [seen, setSeen] = useState(fromSearch);
-
-  if (seen !== fromSearch) {
-    setSeen(fromSearch);
-    setDraft(fromSearch);
-  }
-
-  return [draft, setDraft];
+  return (
+    search.action !== "" ||
+    search.actor !== "" ||
+    search.targetKind !== "" ||
+    search.targetId !== "" ||
+    search.since !== "all"
+  );
 }
 
 function userOptions(users: readonly User[]): { value: string; label: string }[] {
@@ -190,22 +198,29 @@ function LimitSelect({
 interface AuditFilterRows {
   /** The rows of the Filters popover. */
   readonly filters: LogFilter[];
-  /** Drops the action and the user, keeping the range. */
+  /** Drops the action, the user and the target, keeping the range. */
   readonly onClear: () => void;
   /** Puts every control back where the page starts, the range included. */
   readonly onReset: () => void;
 }
 
 /**
- * The audit log's filters as the popover's rows: the action prefix, typed, and the user, picked
- * when the caller may list users. The typed prefix reaches the address, and so the server, once it
- * stops changing.
+ * The audit log's filters as the popover's rows: the action prefix, typed, the user, picked when
+ * the caller may list users, and the target. The typed prefix reaches the address, and so the
+ * server, once it stops changing.
  */
 function useAuditFilters(users: readonly User[] | undefined): AuditFilterRows {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [actionDraft, setActionDraft] = useDraft(search.action);
-  const settledAction = useDebounced(actionDraft, actionSettleMs);
+  const settledAction = useDebounced(actionDraft, typingSettleMs);
+  const target = useTargetFilter({
+    targetKind: search.targetKind,
+    targetId: search.targetId,
+    onChange: (next, replace) => {
+      void navigate({ search: (previous) => ({ ...previous, ...next }), replace });
+    },
+  });
 
   // A draft that is still moving stays local, so clearing the filters elsewhere cannot be undone by
   // a stale one.
@@ -266,14 +281,26 @@ function useAuditFilters(users: readonly User[] | undefined): AuditFilterRows {
     });
   }
 
+  filters.push(target.filter);
+
   return {
     filters,
     onClear: () => {
       setActionDraft("");
-      void navigate({ search: (previous) => ({ ...previous, action: "", actor: "" }) });
+      target.clearDraft();
+      void navigate({
+        search: (previous) => ({
+          ...previous,
+          action: "",
+          actor: "",
+          targetKind: "",
+          targetId: "",
+        }),
+      });
     },
     onReset: () => {
       setActionDraft("");
+      target.clearDraft();
       void navigate({ search: () => ({ ...clearedSearch }) });
     },
   };

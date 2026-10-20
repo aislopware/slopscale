@@ -136,7 +136,7 @@ export function LogFilters({
         </Popover.Trigger>
         <Popover.Content
           align="end"
-          className="flex w-[min(32rem,calc(100vw-2rem))] flex-col gap-3 p-4"
+          className="flex w-[min(36rem,calc(100vw-2rem))] flex-col gap-3 p-4"
         >
           <div className="flex min-h-7 items-center justify-between gap-3">
             <Popover.Title className="text-sm font-semibold">Filters</Popover.Title>

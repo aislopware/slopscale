@@ -57,7 +57,7 @@ const destructiveVerbs: ReadonlySet<string> = new Set([
 ]);
 
 /** How the API names each kind of target, in the console's words. */
-const targetKinds: Record<string, string> = {
+export const targetKinds: Record<string, string> = {
   access_request: "Access request",
   access_rule: "Access rule",
   apikey: "API key",
