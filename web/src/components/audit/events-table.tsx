@@ -2,7 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
-import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { MouseEvent, ReactElement } from "react";
 
@@ -11,19 +11,21 @@ import {
   ActionCell,
   ActorCell,
   DetailCell,
-  EventDetail,
   ResultCell,
   TargetCell,
+  TimeCell,
 } from "~/components/audit/cells.tsx";
+import { EventSheet } from "~/components/audit/detail-sheet.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
-
-/** Every row spans this many columns when it opens. */
-const columnCount = 7;
+import {
+  actionsColumnClass,
+  pinnedEdgeClass,
+  tableClass,
+  tableRowClass,
+} from "~/components/table/styles.ts";
 
 /** A click on a control inside the row belongs to the control, not to the row. */
 function onControl(event: MouseEvent<HTMLElement>): boolean {
@@ -33,71 +35,61 @@ function onControl(event: MouseEvent<HTMLElement>): boolean {
   );
 }
 
-function EventRows({
+function EventRow({
   event,
   overflowing,
   open,
-  onToggle,
   onOpen,
 }: {
   readonly event: AuditEvent;
   /** Whether the columns run past the panel, so the pinned last column draws its edge. */
   readonly overflowing: boolean;
+  /** Whether this event is the one in the sheet. */
   readonly open: boolean;
-  readonly onToggle: () => void;
   readonly onOpen: () => void;
 }): ReactElement {
   return (
-    <>
-      <Table.Row
-        variant={open ? "selected" : "default"}
-        className={cn("cursor-pointer align-top", !open && tableRowClass)}
-        onClick={(click) => {
-          if (!onControl(click)) {
-            onToggle();
-          }
-        }}
-      >
-        <Table.Cell className="whitespace-nowrap text-kumo-subtle">
-          <RelativeTime value={event.createdAt} />
-        </Table.Cell>
-        <Table.Cell>
-          <ActorCell event={event} />
-        </Table.Cell>
-        <Table.Cell>
-          <ActionCell event={event} />
-        </Table.Cell>
-        <Table.Cell>
-          <TargetCell event={event} />
-        </Table.Cell>
-        <Table.Cell>
-          <ResultCell event={event} />
-        </Table.Cell>
-        <Table.Cell className="hidden lg:table-cell">
-          <DetailCell event={event} onOpen={onOpen} />
-        </Table.Cell>
-        <Table.Cell sticky="right" className={cn("text-right", overflowing && pinnedEdgeClass)}>
-          {/* The chevron is the row's own control, not a second "Show details" button beside it:
-              it says the row opens and gives the keyboard the same reach as the click. */}
-          <Button
-            variant="ghost"
-            shape="square"
-            size="sm"
-            icon={open ? CaretDownIcon : CaretRightIcon}
-            aria-expanded={open}
-            aria-label={open ? "Collapse row" : "Expand row"}
-            onClick={onToggle}
-          />
-        </Table.Cell>
-      </Table.Row>
-      {open ? (
-        <Table.Row variant="selected">
-          <Table.Cell colSpan={columnCount} className="p-0">
-            <EventDetail event={event} />
-          </Table.Cell>
-        </Table.Row>
-      ) : null}
-    </>
+    <Table.Row
+      variant={open ? "selected" : "default"}
+      className={cn("cursor-pointer align-top", !open && tableRowClass)}
+      onClick={(click) => {
+        if (!onControl(click)) {
+          onOpen();
+        }
+      }}
+    >
+      <Table.Cell className="whitespace-nowrap">
+        <TimeCell event={event} />
+      </Table.Cell>
+      <Table.Cell>
+        <ActionCell event={event} />
+      </Table.Cell>
+      <Table.Cell>
+        <TargetCell event={event} />
+      </Table.Cell>
+      <Table.Cell>
+        <ActorCell event={event} />
+      </Table.Cell>
+      <Table.Cell>
+        <ResultCell event={event} />
+      </Table.Cell>
+      <Table.Cell className="hidden lg:table-cell">
+        <DetailCell event={event} onOpen={onOpen} />
+      </Table.Cell>
+      <Table.Cell sticky="right" className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}>
+        {/* The row's own control: it says the row opens a sheet, and gives the keyboard the same
+            reach as the click on the row. */}
+        <Button
+          variant="ghost"
+          shape="square"
+          size="sm"
+          icon={SidebarSimpleIcon}
+          aria-haspopup="dialog"
+          aria-label="Show details"
+          onClick={onOpen}
+        />
+      </Table.Cell>
+    </Table.Row>
   );
 }
 
@@ -114,8 +106,9 @@ export interface EventsTableProps {
 }
 
 /**
- * The audit list: server-ordered (newest first) and server-paged, so the table neither sorts nor
- * filters. A row opens in place to show every recorded field; the band below walks the pages.
+ * The audit list, as the dashboard's audit logs table: server-ordered (newest first) and
+ * server-paged, so the table neither sorts nor filters. A row opens a sheet at the right edge with
+ * every recorded field, as the Zero Trust admin log does; the band below walks the pages.
  */
 export function EventsTable({
   events,
@@ -124,6 +117,7 @@ export function EventsTable({
   paging,
 }: EventsTableProps): ReactElement {
   const [openId, setOpenId] = useState<string | null>(null);
+  const open = events.find((event) => event.id === openId) ?? null;
 
   return (
     <>
@@ -145,26 +139,26 @@ export function EventsTable({
             <Table.Header>
               <Table.Row>
                 <Table.Head className="w-32">Time</Table.Head>
-                <Table.Head className="w-40">Actor</Table.Head>
                 <Table.Head className="w-56">Action</Table.Head>
                 <Table.Head className="w-40">Target</Table.Head>
+                <Table.Head className="w-44">Actor</Table.Head>
                 <Table.Head className="w-24">Result</Table.Head>
                 <Table.Head className="hidden lg:table-cell">Details</Table.Head>
-                <Table.Head sticky="right" className={cn("w-12", overflowing && pinnedEdgeClass)}>
+                <Table.Head
+                  sticky="right"
+                  className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
+                >
                   <span className="sr-only">Details</span>
                 </Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
               {events.map((event) => (
-                <EventRows
+                <EventRow
                   key={event.id}
                   event={event}
                   overflowing={overflowing}
                   open={openId === event.id}
-                  onToggle={() => {
-                    setOpenId((current) => (current === event.id ? null : event.id));
-                  }}
                   onOpen={() => {
                     setOpenId(event.id);
                   }}
@@ -175,6 +169,12 @@ export function EventsTable({
         )}
       </TableScroll>
       <CursorBand paging={paging} noun="event" />
+      <EventSheet
+        event={open}
+        onClose={() => {
+          setOpenId(null);
+        }}
+      />
     </>
   );
 }
