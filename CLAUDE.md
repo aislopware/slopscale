@@ -33,6 +33,7 @@ A version bump is never only the pin move. `go run ./tools/bump run` moves
 the pins on a local branch, one gated commit per area, and publishes
 nothing; its package doc lists the interlocks a bump by hand must keep too
 (gvisor and wireguard-windows at the versions tailscale.com pins,
+the libdns providers on certmagic's libdns major,
 `go run ./cmd/vendorhash update` after go.sum or the imported packages move,
 a `go` directive no newer than nixpkgs' Go, and lockfiles that nixpkgs'
 bun still installs). Then every moved item's changes between the two versions are
