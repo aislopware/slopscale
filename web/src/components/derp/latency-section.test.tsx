@@ -69,12 +69,12 @@ describe(LatencySection, () => {
 
     // The region names its own row and the home region of the machine below it.
     await expect.element(screen.getByText("Singapore").first()).toBeVisible();
-    await expect.element(screen.getByText("Showing 1 region")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–1 of 1").first()).toBeVisible();
     await expect
       .element(screen.getByRole("link", { name: "laptop" }))
       .toHaveAttribute("href", "/machines/1");
     await expect.element(screen.getByText("offline")).not.toBeInTheDocument();
-    await expect.element(screen.getByText("Showing 1 machine")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–1 of 1").last()).toBeVisible();
   });
 
   it("marks a machine that is no longer connected", async () => {

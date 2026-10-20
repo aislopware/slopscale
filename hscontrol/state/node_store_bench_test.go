@@ -62,7 +62,7 @@ func BenchmarkSnapshotFromNodes(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		snap := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), PrimaryRouteLedger{}, nil)
+		snap := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), PrimaryRouteLedger{})
 		_ = snap.allNodes
 	}
 }
@@ -156,14 +156,14 @@ func BenchmarkSnapshotFromNodesRouters(b *testing.B) {
 		nodes[id] = n
 	}
 
-	first := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), PrimaryRouteLedger{}, nil)
+	first := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), PrimaryRouteLedger{})
 	prev := first.ledger()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 
 	for b.Loop() {
-		snap := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), prev, nil)
+		snap := snapshotFromNodes(nodes, peerPositionsOf(noPeersFunc), prev)
 		_ = snap.allNodes
 	}
 }

@@ -7,9 +7,9 @@ import type { ReactElement } from "react";
 import { api } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import { invalidate } from "~/api/queries.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** Server-side repairs an operator runs on purpose, each behind a confirmation. */
@@ -29,28 +29,30 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
   });
 
   return (
-    <Section
+    <SettingsGroup
+      id="maintenance"
       title="Maintenance"
       description="Repairs that touch every machine. Each asks before it runs."
-      bodyClassName="p-0"
     >
-      <SettingRow
-        title="Backfill IP addresses"
-        description="Gives every machine an address in each family the server config enables, and removes addresses in a family that is no longer enabled."
-        control={
-          <Button
-            variant="secondary"
-            icon={ArrowsClockwiseIcon}
-            disabled={!canRun}
-            onClick={() => {
-              setConfirming(true);
-            }}
-          >
-            Backfill
-          </Button>
-        }
-      />
-      {changes === null ? null : <BackfillResult changes={changes} />}
+      <SettingsCard>
+        <SettingsRow
+          title="Backfill IP addresses"
+          description="Gives every machine an address in each family the server config enables, and removes addresses in a family that is no longer enabled."
+          control={
+            <Button
+              variant="secondary"
+              icon={ArrowsClockwiseIcon}
+              disabled={!canRun}
+              onClick={() => {
+                setConfirming(true);
+              }}
+            >
+              Backfill
+            </Button>
+          }
+        />
+        {changes === null ? null : <BackfillResult changes={changes} />}
+      </SettingsCard>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -63,7 +65,7 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
           backfill.mutate({ params: { query: { confirmed: true } } });
         }}
       />
-    </Section>
+    </SettingsGroup>
   );
 }
 
@@ -74,7 +76,7 @@ function changeCount(changes: readonly string[]): string {
 /** What the last run did, one line per address as the server reported it. */
 function BackfillResult({ changes }: { readonly changes: readonly string[] }): ReactElement {
   return (
-    <SectionRow className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 border-t border-kumo-line py-4 pr-6 pl-4">
       <span className="text-kumo-subtle">
         {changes.length === 0
           ? "The last run changed nothing. Every machine already matched."
@@ -87,6 +89,6 @@ function BackfillResult({ changes }: { readonly changes: readonly string[] }): R
           ))}
         </ul>
       )}
-    </SectionRow>
+    </div>
   );
 }

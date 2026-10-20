@@ -2108,7 +2108,7 @@ export interface paths {
         put?: never;
         /**
          * Update settings
-         * @description Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+         * @description Changes the given switches. Switching device or users approval off approves every node or user that was waiting; changing the route selection sends every machine its peers again.
          *
          *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -4250,6 +4250,8 @@ export interface components {
             /** Format: int64 */
             keyExpiryDays: number;
             postureIdentityOn: boolean;
+            /** @enum {string} */
+            routeSelection: "active-passive-failover" | "regional-routing" | "regional-routing-failover" | "magicroute";
             sshRecorders: string[];
             sshRecordingEnforce: boolean;
             /** @description Users created by OIDC login wait for an administrator before registering nodes. */
@@ -4663,6 +4665,8 @@ export interface components {
             /** Format: int64 */
             keyExpiryDays?: number;
             postureIdentityOn?: boolean;
+            /** @enum {string} */
+            routeSelection?: "active-passive-failover" | "regional-routing" | "regional-routing-failover" | "magicroute";
             sshRecorders?: string[];
             sshRecordingEnforce?: boolean;
             usersApprovalOn?: boolean;

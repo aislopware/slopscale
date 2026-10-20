@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Switch } from "@cloudflare/kumo/components/switch";
@@ -28,12 +27,15 @@ import {
 } from "~/components/posture-integrations/model.ts";
 import type { Draft } from "~/components/posture-integrations/model.ts";
 import type { PostureIntegrationMutations } from "~/components/posture-integrations/mutations.ts";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 export interface PostureIntegrationDialogProps {
   readonly integration?: PostureIntegration;
   readonly providers: readonly PostureProvider[];
+  /** The provider a new integration starts with, such as the tile the operator picked. */
+  readonly provider?: string | undefined;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly mutations: PostureIntegrationMutations;
@@ -59,12 +61,13 @@ export function PostureIntegrationDialog(props: PostureIntegrationDialogProps): 
 function PostureIntegrationForm({
   integration,
   providers,
+  provider,
   onOpenChange,
   mutations,
 }: Omit<PostureIntegrationDialogProps, "open">): ReactElement {
   const editing = integration !== undefined;
   const defaultProvider =
-    providers.find((item) => item.provider === integration?.provider) ?? providers[0];
+    providers.find((item) => item.provider === (integration?.provider ?? provider)) ?? providers[0];
   const [draft, setDraft] = useState<Draft>(() => draftFrom(integration, defaultProvider));
   const check = useCredentialCheck(mutations.check);
 
@@ -349,7 +352,7 @@ export function DeletePostureIntegrationDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="posture integration"

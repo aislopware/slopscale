@@ -266,8 +266,8 @@ type State struct {
 	// caller snapshot or resurrected by an update racing with deletion.
 	persistMu sync.Mutex
 
-	// selfRefresh holds nodes whose NextDNS device metadata changed, drained
-	// by [State.DrainSelfRefreshes].
+	// selfRefresh holds nodes whose own DNS config inputs changed (NextDNS
+	// device metadata, given name), drained by [State.DrainSelfRefreshes].
 	selfRefresh   []types.NodeID
 	selfRefreshMu sync.Mutex
 
@@ -387,6 +387,7 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	s.settings.Store(&settings)
+	nodeStore.SetRouteSelection(settings.RouteSelection)
 
 	s.tailnetID, err = loadTailnetID(db)
 	if err != nil {
@@ -483,7 +484,8 @@ func (s *State) SharedDERPMap() *tailcfg.DERPMap {
 
 // DrainSelfRefreshes returns a [change.SelfUpdate] for every node whose own
 // entry or DNS config changed since the last call: its policy CapMap, from
-// any policy, user or node update, or its NextDNS device metadata. Drained
+// any policy, user or node update, its NextDNS device metadata, or its
+// given name, which its CertDomains carry. Drained
 // where changes are dispatched, so no path has to return the refresh itself.
 func (s *State) DrainSelfRefreshes() []change.Change {
 	ids := s.polMan.NodesWithChangedCapMap()
@@ -530,7 +532,17 @@ func (s *State) ReloadPolicy() ([]change.Change, error) {
 	// uses the [policy.PolicyManager]'s filters. Without this, nodes won't see
 	// newly allowed peers until a node is added/removed, causing autogroup:self
 	// policies to not propagate correctly when switching between policy types.
-	s.nodeStore.RebuildPeerMaps()
+	//
+	// An unchanged policy leaves the matchers as they were, and the other
+	// inputs of the peer map rebuild it themselves (node writes in the
+	// [NodeStore], [State.updatePolicyManagerNodes] and
+	// [State.updatePolicyManagerUsers]), so the O(n^2) rebuild is skipped
+	// then. The policy API handlers always get here that way: they apply
+	// the policy with [State.SetPolicy], which rebuilds, store it, and
+	// reload the very same bytes.
+	if policyChanged {
+		s.nodeStore.RebuildPeerMaps()
+	}
 
 	// Nodes whose CapMap shifted get their self refresh from
 	// [State.DrainSelfRefreshes] when these changes are dispatched.
@@ -1196,7 +1208,7 @@ func (s *State) SetApprovedRoutes(nodeID types.NodeID, routes []netip.Prefix) (t
 		// A node with no approved routes is no longer an HA
 		// candidate; drop any stale Unhealthy bit (mirrors the
 		// legacy routes.SetRoutes(empty) auto-clear).
-		if len(node.AllApprovedRoutes()) == 0 {
+		if !haCandidate(node) {
 			node.Unhealthy = false
 		}
 	})
@@ -1238,6 +1250,10 @@ func (s *State) SetApprovedRoutes(nodeID types.NodeID, routes []netip.Prefix) (t
 // auto-sanitisation) and collisions error out rather than silently
 // bumping a user-facing label. See HOSTNAME.md for the CLI contract.
 func (s *State) RenameNode(nodeID types.NodeID, newName string) (types.NodeView, change.Change, error) {
+	// DNS is case-insensitive but uniqueness and the client's certificate
+	// name match are not, so "Foo" and "foo" would share one name.
+	newName = strings.ToLower(newName)
+
 	// Validate the label AND that the resulting FQDN fits MaxHostnameLength:
 	// a valid 63-char label can still overflow under a long base_domain, and
 	// an unmappable name would break this node and its peers (issue #3346).
@@ -1270,6 +1286,12 @@ func (s *State) RenameNode(nodeID types.NodeID, newName string) (types.NodeView,
 		// A rename is peer visible; resend the whole node.
 		c = change.NodeAdded(nodeID)
 	}
+
+	// The node's own DNS config carries its name (CertDomains), and the
+	// change above does not resend DNS config to the renamed node itself.
+	s.selfRefreshMu.Lock()
+	s.selfRefresh = append(s.selfRefresh, nodeID)
+	s.selfRefreshMu.Unlock()
 
 	return nodeView, c, nil
 }
@@ -1770,15 +1792,21 @@ var haHealthUpdates = promauto.NewCounterVec(prometheus.CounterOpts{
 		"or rejected because the node left candidacy.",
 }, []string{"result"})
 
+// haCandidate reports whether the HA prober may judge n: it serves
+// approved routes or reports services it is approved to host.
+func haCandidate(n *types.Node) bool {
+	return len(n.AllApprovedRoutes()) > 0 || (len(n.ApprovedServices) > 0 && n.Services != nil)
+}
+
 // healthSetter returns an UpdateNodeFunc that flips n.Unhealthy to
 // the inverse of healthy, with the same gate as [State.SetNodeHealth]:
 // an unhealthy mark only sticks when the node is still online and
-// still advertises approved routes, so a node that left HA candidacy
+// still a candidate ([haCandidate]), so a node that left HA candidacy
 // between probe dispatch and result does not carry a stale bit.
 func healthSetter(healthy bool) UpdateNodeFunc {
 	return func(n *types.Node) {
 		if !healthy {
-			if !n.Online() || len(n.AllApprovedRoutes()) == 0 {
+			if !n.Online() || !haCandidate(n) {
 				haHealthUpdates.WithLabelValues("rejected").Inc()
 
 				return
@@ -2875,7 +2903,7 @@ func (s *State) UpdateNodeFromMapRequest(
 		// update that shrinks the announced set can drop the node
 		// out of HA candidacy without touching ApprovedRoutes.
 		// Clear any stale Unhealthy bit in that case.
-		if len(currentNode.AllApprovedRoutes()) == 0 {
+		if !haCandidate(currentNode) {
 			currentNode.Unhealthy = false
 		}
 	})
@@ -4003,7 +4031,7 @@ func (s *State) autoApproveNodes() ([]change.Change, error) {
 
 			// A node with no approved routes is no longer an HA candidate;
 			// drop any stale Unhealthy bit (mirrors SetApprovedRoutes).
-			if len(n.AllApprovedRoutes()) == 0 {
+			if !haCandidate(n) {
 				n.Unhealthy = false
 			}
 		}

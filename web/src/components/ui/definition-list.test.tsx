@@ -30,6 +30,31 @@ describe(DefinitionList, () => {
     expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
   });
 
+  // Design spec §6 / §9: an identifier keeps a copy control in view, not only on hover.
+  it("shows a copy button beside a copyable value without a hover, at the row's height", async () => {
+    const view = await render(
+      <div className="w-[40rem]">
+        <DefinitionList
+          items={[
+            { label: "Version", value: "v1.2.3" },
+            {
+              label: "Commit",
+              value: "9226d41e335f",
+              copy: "9226d41e335fecab",
+              copyLabel: "Copy commit",
+            },
+          ]}
+        />
+      </div>,
+    );
+    const button = view.getByRole("button", { name: "Copy commit" });
+    const [plain, copyable] = view.container.querySelectorAll("dl > div");
+
+    await expect.element(button).toBeVisible();
+    expect(getComputedStyle(button.element()).opacity).toBe("1");
+    expect(copyable?.getBoundingClientRect().height).toBe(plain?.getBoundingClientRect().height);
+  });
+
   it("cuts a long node value with an ellipsis instead of pushing the label", async () => {
     const view = await render(
       <div className="w-64">

@@ -1,3 +1,4 @@
+import { cn } from "@cloudflare/kumo/utils";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -13,6 +14,7 @@ import { OAuthClientDetailsDialog } from "~/components/keys/oauth-details-dialog
 import { EditOAuthClientDialog } from "~/components/keys/oauth-dialogs.tsx";
 import { scopeLabel } from "~/components/keys/scopes.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
@@ -48,7 +50,7 @@ export const oauthClientColumns = helper.columns([
     header: "Scopes",
     enableSorting: false,
     cell: ({ row }) => <ValueList items={row.original.scopes} label={scopeLabel} />,
-    meta: { className: "min-w-32 align-top" },
+    meta: { className: "min-w-32 align-top", hideBelow: "sm" },
   }),
   helper.accessor((client) => client.tags.join(" "), {
     id: "tags",
@@ -156,6 +158,13 @@ function ClientCell({ client }: { readonly client: OAuthClient }): ReactElement 
           {client.description}
         </span>
       ) : null}
+      {/* The Scopes column is hidden on a phone, so the client names its scopes here. */}
+      <span
+        className={cn("truncate pt-0.5 text-sm text-kumo-default", narrowOnlyClass)}
+        title={client.scopes.map((scope) => scopeLabel(scope)).join(", ")}
+      >
+        {client.scopes.map((scope) => scopeLabel(scope)).join(" · ")}
+      </span>
       <OAuthClientDetailsDialog client={client} open={showing} onOpenChange={setShowing} />
     </div>
   );

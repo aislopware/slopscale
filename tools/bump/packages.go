@@ -18,11 +18,6 @@ import (
 // tests can point it at a fake registry.
 var npmRegistry = "https://registry.npmjs.org"
 
-// npmCooldown is how old a release has to be before it is adopted. Hijacked
-// npm releases are usually found and pulled within days; a pin that lags by
-// that much costs nothing.
-const npmCooldown = 3 * 24 * time.Hour
-
 // packageSet is one bun workspace: a lockfile, the manifests it covers, and the
 // make targets that prove a change to it.
 type packageSet struct {
@@ -72,7 +67,7 @@ var npmSpec = regexp.MustCompile(`^([~^]?)(\d+\.\d+\.\d+)$`)
 
 var (
 	errSpecNotUnique = errors.New("package spec is not unique in its manifest")
-	errNoCandidate   = errors.New("no release is old enough to adopt")
+	errNoCandidate   = errors.New("the registry has no usable latest release")
 )
 
 // readDeps lists every package this tool can move in a set's manifests.
@@ -149,9 +144,9 @@ func fetchPackument(ctx context.Context, name string) (packument, error) {
 }
 
 // pickVersion is the newest release that is no newer than the latest tag,
-// not a prerelease, old enough to trust, and on the current major when the
-// package is held. It returns have when nothing qualifies as newer.
-func pickVersion(doc packument, have string, held bool, now time.Time) (string, error) {
+// not a prerelease, and on the current major when the package is held. It
+// returns have when nothing qualifies as newer.
+func pickVersion(doc packument, have string, held bool) (string, error) {
 	latest := doc.DistTags["latest"]
 	if !semver.IsValid("v" + latest) {
 		return "", fmt.Errorf("%w: latest tag is %q", errNoCandidate, latest)
@@ -159,7 +154,7 @@ func pickVersion(doc packument, have string, held bool, now time.Time) (string, 
 
 	best := have
 
-	for version, published := range doc.Time {
+	for version := range doc.Time {
 		v := "v" + version
 
 		switch {
@@ -168,8 +163,6 @@ func pickVersion(doc packument, have string, held bool, now time.Time) (string, 
 		case semver.Compare(v, "v"+latest) > 0, semver.Compare(v, "v"+best) <= 0:
 			continue
 		case held && semver.Major(v) != semver.Major("v"+have):
-			continue
-		case now.Sub(published) < npmCooldown:
 			continue
 		}
 
@@ -188,7 +181,7 @@ func resolveDep(ctx context.Context, set packageSet, d dep) (string, error) {
 
 	_, held := set.Holds[d.File+":"+d.Name]
 
-	return pickVersion(doc, d.Version, held, time.Now())
+	return pickVersion(doc, d.Version, held)
 }
 
 // setSpec rewrites one package's spec in a manifest, keeping its range

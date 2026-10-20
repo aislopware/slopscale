@@ -1,11 +1,9 @@
 import { Pagination } from "@cloudflare/kumo/components/pagination";
 import type { ReactElement, ReactNode } from "react";
 
-import { plural } from "~/components/overview/plural.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
-import { FrameBand } from "~/components/ui/frame.tsx";
 
-/** The smallest page on offer. A table with fewer rows than this has nothing to page. */
+/** The smallest page on offer, the first of the band's "Per page" choices. */
 export const smallestPageSize = 25;
 
 const enDash = "–";
@@ -18,14 +16,14 @@ function rangeText(page: number, pageSize: number, count: number): string {
 }
 
 /**
- * The band under a table that pages: the range shown, how many rows a page holds and the way to the
- * other pages. The band and the frame's padding put the text where the rows' text starts.
+ * The band at a table's foot, Kumo's Pagination as the dashboard lays it out: "Showing 1-10 of 120"
+ * in 13px subtle figures, the rows per page, and the joined pager on the right.
  */
 function Band({ children }: { readonly children: ReactNode }): ReactElement {
   return (
-    <FrameBand className="px-5 [&_[data-slot=pagination-info]]:whitespace-nowrap">
+    <div className="text-sm text-kumo-subtle tabular-nums [&_[data-slot=pagination-info]]:whitespace-nowrap">
       {children}
-    </FrameBand>
+    </div>
   );
 }
 
@@ -35,33 +33,41 @@ export interface PagingBandProps {
   readonly total: number;
   readonly setPage: (page: number) => void;
   readonly setPageSize: (size: number) => void;
+  /** Leaves the band's "Per page" out, for a table whose toolbar sets it (a log's "Limit"). */
+  readonly hidePageSize?: boolean;
 }
 
-/** Paging over rows the browser already holds, so the total is known and every page is reachable. */
+/**
+ * Paging over rows the browser already holds, so the total is known and every page is reachable. It
+ * is the Zero Trust list footer of design spec §13.3: "Showing 1-5 of 5", a divider, "Per page:"
+ * and its select, and the joined pager on the right, the same on a list of five rows as on one of
+ * five hundred, so every list ends the same way. A phone keeps the range and the pager.
+ */
 export function PagingBand({
   page,
   pageSize,
   total,
   setPage,
   setPageSize,
+  hidePageSize = false,
 }: PagingBandProps): ReactElement {
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-
   return (
     <Band>
       <Pagination page={page} perPage={pageSize} totalCount={total} setPage={setPage}>
         <Pagination.Info>
           {() => `Showing ${rangeText(page, pageSize, total)} of ${total}`}
         </Pagination.Info>
-        <Pagination.PageSize
-          className="ml-auto max-sm:hidden"
-          label="Rows per page"
-          value={pageSize}
-          onChange={setPageSize}
-        />
-        {pages > 1 ? (
-          <Pagination.Controls controls="full" pageSelector="input" className="grow-0" />
-        ) : null}
+        {hidePageSize ? null : (
+          <>
+            <Pagination.Separator className="max-sm:hidden" />
+            <Pagination.PageSize
+              className="max-sm:hidden"
+              value={pageSize}
+              onChange={setPageSize}
+            />
+          </>
+        )}
+        <Pagination.Controls controls="full" pageSelector="input" className="ml-auto grow-0" />
       </Pagination>
     </Band>
   );
@@ -69,8 +75,11 @@ export function PagingBand({
 
 export interface CursorBandProps {
   readonly paging: CursorPaging;
-  /** What one row is, for the count: "event", "recording". */
-  readonly noun: string;
+  /**
+   * Leaves the band's "Per page" out, for a list whose toolbar already sets the rows per page (the
+   * audit log's "Limit").
+   */
+  readonly hidePageSize?: boolean;
 }
 
 /** What follows the range while more pages may exist: on their way, or not come. */
@@ -83,31 +92,21 @@ function moreText(fetching: boolean, failed: boolean): string {
 }
 
 /**
- * Paging over rows the server hands out a page at a time. Until the server says there are no more,
- * the total is unknown, so the band offers Previous and Next and names the range so far. The rows
- * per page are the reader's to pick, as on a table the browser holds whole.
+ * Paging over rows the server hands out a page at a time, in the same band as a table the browser
+ * holds whole: "Showing 1-25 of 25", "Per page:" and the pager, a short list included. Until the
+ * server says there are no more, the total is unknown, so the range names what has loaded and the
+ * pager offers Previous and Next.
  */
-export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | null {
+export function CursorBand({ paging, hidePageSize = false }: CursorBandProps): ReactElement | null {
   const { page, pageSize, loaded, hasMore, fetching, failed, setPage, setPageSize } = paging;
 
   if (loaded === 0) {
     return null;
   }
 
-  if (!hasMore && loaded <= smallestPageSize) {
-    return (
-      <Band>
-        <Pagination page={1} perPage={pageSize} totalCount={loaded} setPage={setPage}>
-          <Pagination.Info>{() => `Showing all ${plural(loaded, noun)}`}</Pagination.Info>
-        </Pagination>
-      </Band>
-    );
-  }
-
   const info = hasMore
     ? `Showing ${rangeText(page, pageSize, loaded)}${moreText(fetching, failed)}`
     : `Showing ${rangeText(page, pageSize, loaded)} of ${loaded}`;
-  const pages = Math.ceil(loaded / pageSize);
 
   return (
     <Band>
@@ -118,19 +117,21 @@ export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | nu
         setPage={setPage}
       >
         <Pagination.Info>{() => info}</Pagination.Info>
-        <Pagination.PageSize
-          className="ml-auto max-sm:hidden"
-          label="Rows per page"
-          value={pageSize}
-          onChange={setPageSize}
+        {hidePageSize ? null : (
+          <>
+            <Pagination.Separator className="max-sm:hidden" />
+            <Pagination.PageSize
+              className="max-sm:hidden"
+              value={pageSize}
+              onChange={setPageSize}
+            />
+          </>
+        )}
+        <Pagination.Controls
+          controls={hasMore ? "simple" : "full"}
+          pageSelector="input"
+          className="ml-auto grow-0"
         />
-        {hasMore || pages > 1 ? (
-          <Pagination.Controls
-            controls={hasMore ? "simple" : "full"}
-            pageSelector="input"
-            className="grow-0"
-          />
-        ) : null}
       </Pagination>
     </Band>
   );

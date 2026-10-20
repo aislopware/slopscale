@@ -14,8 +14,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export function LogStreamsTab({
   me,
@@ -43,7 +42,6 @@ export function LogStreamsTab({
   });
 
   const total = streams.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -67,7 +65,7 @@ export function LogStreamsTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -77,6 +75,19 @@ export function LogStreamsTab({
                 size="sm"
                 title="No log streams yet"
                 description="Ship the audit log to Splunk, Elasticsearch, Datadog, Axiom, Loki or any HTTP collector."
+                contents={
+                  canEdit ? (
+                    <Button
+                      variant="secondary"
+                      icon={PlusIcon}
+                      onClick={() => {
+                        setCreating(true);
+                      }}
+                    >
+                      Add your first log stream
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : (
               <Empty
@@ -96,13 +107,8 @@ export function LogStreamsTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countStreams(total)}`}</TableFooter>
-            )
-          }
         />
-      </Frame>
+      </TableGroup>
       <LogStreamDialog open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );

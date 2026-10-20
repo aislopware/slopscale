@@ -6,6 +6,7 @@ import type { ReactElement, ReactNode } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { TailnetLock } from "~/api/queries.ts";
 import { useDisableTailnetLockMutation } from "~/components/settings/mutations.ts";
+import { Card } from "~/components/ui/card.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
@@ -13,7 +14,8 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
+import { SettingsGroup } from "~/components/ui/settings-layout.tsx";
 import { Status } from "~/components/ui/status.tsx";
 
 const noSecretReason =
@@ -121,7 +123,11 @@ function buildDefinitions(lock: TailnetLock): readonly Definition[] {
   ];
 }
 
-/** Tailnet lock state, signing keys and machine signatures. */
+/**
+ * Tailnet lock state, signing keys and machine signatures as a card of facts, and while the lock is
+ * on, the page's danger zone with the way to switch it off: it drops every machine's lock state, so
+ * it sits apart at the bottom as the dashboard puts deleting a Worker.
+ */
 export function TailnetLockSection({
   lock,
   canEdit,
@@ -133,33 +139,46 @@ export function TailnetLockSection({
   const disable = useDisableTailnetLockMutation();
   const reason = disableReason(canEdit, lock);
 
-  const actions = lock.enabled ? (
-    <DisabledReason reason={reason}>
-      <Button
-        variant="destructive"
-        disabled={reason !== undefined || disable.isPending}
-        onClick={() => {
-          setConfirming(true);
-        }}
-      >
-        Switch off
-      </Button>
-    </DisabledReason>
-  ) : undefined;
-
   return (
-    <Section
-      title="Tailnet lock"
-      description={
-        <>
-          Nodes sign each other&apos;s keys so a compromised control server cannot add a machine.
-          The lock is switched on from a machine with <Code>tailscale lock init</Code>.
-        </>
-      }
-      actions={actions}
-      bodyClassName="p-0"
-    >
-      <DefinitionList items={buildDefinitions(lock)} />
+    <>
+      <SettingsGroup
+        id="tailnet-lock"
+        title="Tailnet lock"
+        docs="ref/tailnet-lock"
+        description={
+          <>
+            Nodes sign each other&apos;s keys so a compromised control server cannot add a machine.
+            The lock is switched on from a machine with <Code>tailscale lock init</Code>.
+          </>
+        }
+      >
+        <Card>
+          <DefinitionList items={buildDefinitions(lock)} />
+        </Card>
+      </SettingsGroup>
+      {lock.enabled ? (
+        <SettingsGroup id="danger-zone" title="Danger zone">
+          <SettingsCard>
+            <SettingsRow
+              title="Switch off tailnet lock"
+              description="Every machine drops its lock state and key signatures. Turning it back on starts again from a machine."
+              control={
+                <DisabledReason reason={reason}>
+                  <Button
+                    variant="destructive"
+                    disabled={reason !== undefined || disable.isPending}
+                    onClick={() => {
+                      setConfirming(true);
+                    }}
+                  >
+                    Switch off
+                  </Button>
+                </DisabledReason>
+              }
+            />
+          </SettingsCard>
+        </SettingsGroup>
+      ) : null}
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -176,6 +195,6 @@ export function TailnetLockSection({
           });
         }}
       />
-    </Section>
+    </>
   );
 }

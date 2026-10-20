@@ -8,7 +8,7 @@ import { invalidate, webhooksQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { Frame, FramePanel } from "~/components/ui/frame.tsx";
+import { Callout } from "~/components/ui/callout.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import {
   approversMailto,
@@ -59,11 +59,14 @@ export function ApproverNotice({ me }: { readonly me: Me }): ReactElement | null
     return null;
   }
 
+  // The dashboard's warning banner: the tint, the triangle, the sentence, and the fix at its end.
   return (
-    <Frame>
-      <FramePanel className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3">
-        <p className="text-kumo-subtle">{problem}</p>
-        {allowed && mailers.length === 0 && data.mailAvailable && data.approvers > 0 ? (
+    <Callout
+      tone="warning"
+      title="New requests reach nobody"
+      description={problem}
+      action={
+        allowed && mailers.length === 0 && data.mailAvailable && data.approvers > 0 ? (
           <Button
             size="sm"
             variant="secondary"
@@ -82,9 +85,9 @@ export function ApproverNotice({ me }: { readonly me: Me }): ReactElement | null
           >
             Email the approvers
           </Button>
-        ) : null}
-      </FramePanel>
-    </Frame>
+        ) : undefined
+      }
+    />
   );
 }
 

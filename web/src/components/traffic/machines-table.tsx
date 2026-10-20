@@ -3,10 +3,9 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { MachineOwner } from "~/api/schema.gen.ts";
 import type { TrafficNode } from "~/api/traffic.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
+import type { ColumnChoice } from "~/components/table/log-view.tsx";
 import { BytesCell, VolumeCell } from "~/components/traffic/cells.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
 import { gatewayName } from "~/components/traffic/gateway-traffic-table.tsx";
@@ -151,6 +150,22 @@ function gatewayNames(carried: readonly TrafficNode[]): ReadonlyMap<string, stri
 }
 
 /**
+ * The columns a reader may switch off, for the toolbar's Columns menu: the gateways only while
+ * there are several to tell apart. The machine and the total, which the rows are sorted by, always
+ * show.
+ */
+export function machineColumnChoices(gateways: readonly TrafficNode[]): ColumnChoice[] {
+  return [
+    ...(gateways.length < 2 ? [] : [{ id: "gateways", label: "Gateways" }]),
+    { id: "upload", label: "Upload" },
+    { id: "download", label: "Download" },
+    { id: "conns", label: "Connections" },
+  ];
+}
+
+const noneHidden: ReadonlySet<string> = new Set();
+
+/**
  * The machines that sent the most through the gateways, busiest first. The bar is against the
  * busiest machine on the list; hovering the total gives its share of the whole window.
  */
@@ -161,6 +176,8 @@ export function MachinesTable({
   search,
   footer,
   empty,
+  pageSize,
+  hidden = noneHidden,
 }: {
   readonly nodes: readonly TrafficNode[];
   /** The gateways that carried traffic in the window, which name each machine's gateways. */
@@ -168,9 +185,13 @@ export function MachinesTable({
   /** Upload plus download over the whole window. */
   readonly whole: number;
   readonly search: TrafficWindowSearch;
-  /** The band under the table; a count by default. */
+  /** A preview's own line for the band at the foot of the card, such as "The 10 busiest". */
   readonly footer?: ReactNode;
   readonly empty?: ReactNode;
+  /** The rows per page the toolbar's Limit sets. */
+  readonly pageSize?: number;
+  /** The columns switched off in the toolbar's Columns menu. */
+  readonly hidden?: ReadonlySet<string>;
 }): ReactElement {
   const navigate = useNavigate();
   const widths = useWidths();
@@ -178,14 +199,20 @@ export function MachinesTable({
   const rows: Row[] = nodes.map((node) => ({ ...node, widest, whole }));
   const table = useAppTable({
     data: rows,
-    columns: columns(search, gatewayNames(gateways), widths),
+    columns: columns(search, gatewayNames(gateways), widths).filter(
+      (column) => column.id === undefined || !hidden.has(column.id),
+    ),
     getRowId: (row) => row.nodeId,
-    initialState: { sorting: [{ id: "total", desc: true }] },
+    initialState: {
+      sorting: [{ id: "total", desc: true }],
+      ...(pageSize === undefined ? {} : { pagination: { pageIndex: 0, pageSize } }),
+    },
   });
 
   return (
     <DataTable
       table={table}
+      {...(pageSize === undefined ? {} : { pageSize })}
       empty={
         empty ?? (
           <SectionEmpty
@@ -194,12 +221,7 @@ export function MachinesTable({
           />
         )
       }
-      footer={
-        footer ??
-        (nodes.length === 0 ? undefined : (
-          <TableFooter>{`Showing ${plural(nodes.length, "machine")}`}</TableFooter>
-        ))
-      }
+      footer={footer}
       onRowClick={(nodeId) => {
         void navigate({
           to: "/traffic/machines/$nodeId",

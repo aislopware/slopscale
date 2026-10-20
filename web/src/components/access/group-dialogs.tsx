@@ -1,17 +1,12 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input } from "@cloudflare/kumo/components/input";
-import { Switch } from "@cloudflare/kumo/components/switch";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
+import type { AccessRule, Group } from "~/api/queries.ts";
 import { isSynced, rulesUsingGroup } from "~/components/access/model.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
-import { nodeItems, userItems } from "~/components/access/pickers.ts";
-import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -19,165 +14,26 @@ import {
   DialogFooter,
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
-import { MultiPicker } from "~/components/ui/multi-picker.tsx";
-import { toast } from "~/components/ui/toast.ts";
 
-export interface GroupDialogProps {
-  /** The group to edit; absent when creating one. */
-  readonly group?: Group | undefined;
-  readonly nodes: readonly Node[];
-  readonly users: readonly User[];
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly mutations: AccessMutations;
-}
-
-const nameHint = "Letters, digits, spaces, dots, dashes and underscores, and unique.";
-
-/** Creates a group or edits one; the form mounts with the dialog so it starts from the record. */
-export function GroupDialog(props: GroupDialogProps): ReactElement {
-  const editing = props.group !== undefined;
-
-  return (
-    <DialogRoot open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent
-        size="lg"
-        title={editing ? "Edit group" : "New group"}
-        description="A group is a set of machines. Add machines directly, or add users to include every machine they own."
-      >
-        <GroupForm {...props} />
-      </DialogContent>
-    </DialogRoot>
-  );
-}
-
-function GroupForm({
-  group,
-  nodes,
-  users,
-  onOpenChange,
-  mutations,
-}: Omit<GroupDialogProps, "open">): ReactElement {
-  const [name, setName] = useState(group?.name ?? "");
-  const [description, setDescription] = useState(group?.description ?? "");
-  const [nodeIds, setNodeIds] = useState<string[]>(group?.nodeIds ?? []);
-  const [userIds, setUserIds] = useState<string[]>(group?.userIds ?? []);
-  const synced = group !== undefined && isSynced(group);
-  const [requestable, setRequestable] = useState(group?.requestable ?? false);
-  const mutation = group === undefined ? mutations.createGroup : mutations.updateGroup;
-  // A synced group's users follow the identity provider, so the request leaves them out rather
-  // than resubmitting a list a sign-in may have changed since the dialog opened.
-  const body = {
-    name: name.trim(),
-    description: description.trim(),
-    nodeIds,
-    ...(synced ? {} : { userIds }),
-    requestable,
-  };
-
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-
-    const done = {
-      onSuccess: (): void => {
-        toast.success(group === undefined ? "Group created" : "Group updated");
-        onOpenChange(false);
-      },
-    };
-
-    if (group === undefined) {
-      mutations.createGroup.mutate({ body }, done);
-    } else {
-      mutations.updateGroup.mutate({ params: { path: { id: group.id } }, body }, done);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <Input
-        label="Name"
-        description={
-          synced ? "The name comes from the identity provider's groups claim." : nameHint
-        }
-        value={name}
-        readOnly={synced}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder="Engineering"
-        onChange={(event) => {
-          setName(event.target.value);
-        }}
-      />
-      <Input
-        label="Description"
-        required={false}
-        value={description}
-        placeholder="Laptops of the engineering team"
-        onChange={(event) => {
-          setDescription(event.target.value);
-        }}
-      />
-      <MultiPicker
-        label="Users"
-        description={
-          synced
-            ? "Users follow the identity provider's groups claim at each sign-in."
-            : "Every machine these users own is a member, including ones they register later."
-        }
-        placeholder={synced ? "Managed by the identity provider" : "Add users…"}
-        items={userItems(users)}
-        value={userIds}
-        onValueChange={setUserIds}
-        disabled={synced}
-        empty="No user matches."
-      />
-      <MultiPicker
-        label="Machines"
-        description="Machines added on their own, such as tagged servers."
-        placeholder="Add machines…"
-        items={nodeItems(nodes)}
-        value={nodeIds}
-        onValueChange={setNodeIds}
-        empty="No machine matches."
-      />
-      <Switch.Group>
-        <Switch.Legend>Requests</Switch.Legend>
-        <Switch
-          checked={requestable}
-          onCheckedChange={setRequestable}
-          label={
-            <span className="flex flex-col gap-0.5">
-              <span className="font-medium text-kumo-default">Users may request access</span>
-              <span className="text-xs text-kumo-subtle">
-                A signed-in user can ask to join this group for a while. An approver decides under
-                Requests.
-              </span>
-            </span>
-          }
-        />
-      </Switch.Group>
-      <DialogError message={mutation.isError ? errorMessage(mutation.error) : undefined} />
-      <FormFooter
-        label={group === undefined ? "Create group" : "Save"}
-        pending={mutation.isPending}
-        disabled={name.trim() === ""}
-      />
-    </form>
-  );
-}
-
+/**
+ * Deletes a group: says which rules still name it (the server refuses those), warns that a synced
+ * group comes back at the next sign-in, and otherwise asks for the name.
+ */
 export function DeleteGroupDialog({
   group,
   rules,
   open,
   onOpenChange,
   mutations,
+  onDeleted,
 }: {
   readonly group: Group;
   readonly rules: readonly AccessRule[];
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly mutations: AccessMutations;
+  /** Runs once the group is gone, such as leaving the group's own page. */
+  readonly onDeleted?: () => void;
 }): ReactElement {
   const { deleteGroup } = mutations;
   const using = rulesUsingGroup(rules, group);
@@ -196,8 +52,8 @@ export function DeleteGroupDialog({
             {using.map((rule) => (
               <li key={rule.id} className="truncate">
                 <Link
-                  to="/policy/rules"
-                  search={{ q: rule.name }}
+                  to="/policy/rules/$ruleId"
+                  params={{ ruleId: rule.id }}
                   className="hover:text-kumo-link"
                   onClick={() => {
                     onOpenChange(false);
@@ -217,14 +73,18 @@ export function DeleteGroupDialog({
   }
 
   const remove = (): void => {
-    deleteGroup.mutate(
-      { params: { path: { id: group.id } } },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-        },
-      },
-    );
+    // Awaited rather than passed to mutate: the refetch after a delete drops the record, and
+    // the page that showed it may unmount before mutate's own callbacks would run.
+    void (async (): Promise<void> => {
+      try {
+        await deleteGroup.mutateAsync({ params: { path: { id: group.id } } });
+      } catch {
+        // The dialog shows the refusal from the mutation's own state.
+        return;
+      }
+      onOpenChange(false);
+      onDeleted?.();
+    })();
   };
 
   // A synced group comes back at the next sign-in that carries its claim, as a new group without
@@ -241,10 +101,10 @@ export function DeleteGroupDialog({
             message={deleteGroup.isError ? errorMessage(deleteGroup.error) : undefined}
           />
           <DialogFooter>
-            <DialogClose render={<Button variant="secondary">Cancel</Button>} />
             <Button variant="destructive" loading={deleteGroup.isPending} onClick={remove}>
               Delete group
             </Button>
+            <DialogClose render={<Button variant="secondary">Cancel</Button>} />
           </DialogFooter>
         </DialogContent>
       </DialogRoot>
@@ -252,7 +112,7 @@ export function DeleteGroupDialog({
   }
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="group"

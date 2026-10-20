@@ -97,11 +97,13 @@ function issueOf(node: SyntaxNode, text: string): SyntaxIssue {
   }
 
   const skipped = text.slice(node.from, Math.min(node.to, node.from + errorPreview));
+  const preview = `${skipped}${node.to - node.from > errorPreview ? "…" : ""}`;
 
   return {
     from: node.from,
     to: node.to,
-    message: `Unexpected "${skipped}${node.to - node.from > errorPreview ? "…" : ""}"`,
+    // A stray string brings its own quotes; quoting it again read as `Unexpected ""nope""`.
+    message: skipped.startsWith('"') ? `Unexpected ${preview}` : `Unexpected "${preview}"`,
   };
 }
 

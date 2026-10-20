@@ -27,9 +27,10 @@ import { DialogClose, DialogContent, DialogFooter, DialogRoot } from "~/componen
 import { MachineName } from "~/components/ui/machine-name.tsx";
 
 /**
- * What the table's header row says while machines are ticked: how many, and the things worth doing
- * to a group of them. Deleting asks first, because it cannot be undone; updating the clients
- * reaches only the ticked machines that are connected and behind, since the rest would refuse.
+ * The band over the table's header row while machines are ticked: how many, and the things worth
+ * doing to a group of them. The column headings stay under it. Deleting asks first, because it
+ * cannot be undone; updating the clients reaches only the ticked machines that are connected and
+ * behind, since the rest would refuse.
  */
 export function MachineBulkBar({
   selection,
@@ -69,51 +70,17 @@ export function MachineBulkBar({
     <>
       {ids.length === 0 ? null : (
         <>
-          {/* pl-3 starts the count where the machine names start in the column below. */}
+          {/* The dashboard's DNS bulk bar: "1 of 169 selected", Clear selection beside it, then the
+              actions, the destructive one last and red with its count. */}
           <div
             role="toolbar"
             aria-label="Actions for the selected machines"
-            className="flex items-center gap-2 pl-3 font-normal text-kumo-default"
+            className="flex w-full items-center gap-2 font-normal text-kumo-default"
           >
-            <span className="mr-1 font-medium">
+            <span className="text-base tabular-nums">
               <span className="@3xl:hidden">{`${ids.length} selected`}</span>
-              <span className="hidden @3xl:inline">{`${plural(ids.length, "machine")} selected`}</span>
+              <span className="hidden @3xl:inline">{`${ids.length} of ${nodes.length} selected`}</span>
             </span>
-            <BulkButton
-              icon={CheckIcon}
-              label="Approve"
-              disabled={busy}
-              loading={bulk.running === "approve"}
-              onClick={() => {
-                void run("approve");
-              }}
-            />
-            <BulkButton
-              icon={ArrowsClockwiseIcon}
-              label="Update clients…"
-              disabled={busy || plan.eligible.length === 0}
-              loading={updates.running}
-              onClick={() => {
-                setUpdating(true);
-              }}
-            />
-            <BulkButton
-              icon={SignOutIcon}
-              label="Expire"
-              disabled={busy}
-              loading={bulk.running === "expire"}
-              onClick={() => {
-                void run("expire");
-              }}
-            />
-            <BulkButton
-              icon={TrashIcon}
-              label="Remove…"
-              disabled={busy}
-              onClick={() => {
-                setConfirming(true);
-              }}
-            />
             <BulkButton
               variant="ghost"
               icon={XIcon}
@@ -123,6 +90,44 @@ export function MachineBulkBar({
                 selection.clear();
               }}
             />
+            <span className="ms-auto flex items-center gap-2">
+              <BulkButton
+                icon={CheckIcon}
+                label="Approve"
+                disabled={busy}
+                loading={bulk.running === "approve"}
+                onClick={() => {
+                  void run("approve");
+                }}
+              />
+              <BulkButton
+                icon={ArrowsClockwiseIcon}
+                label="Update clients…"
+                disabled={busy || plan.eligible.length === 0}
+                loading={updates.running}
+                onClick={() => {
+                  setUpdating(true);
+                }}
+              />
+              <BulkButton
+                icon={SignOutIcon}
+                label="Expire"
+                disabled={busy}
+                loading={bulk.running === "expire"}
+                onClick={() => {
+                  void run("expire");
+                }}
+              />
+              <BulkButton
+                variant="destructive"
+                icon={TrashIcon}
+                label={`Remove ${ids.length} selected`}
+                disabled={busy}
+                onClick={() => {
+                  setConfirming(true);
+                }}
+              />
+            </span>
           </div>
           <ConfirmDialog
             open={confirming}
@@ -152,7 +157,7 @@ export function MachineBulkBar({
 }
 
 /**
- * One action on the header row, which must stay one line or the rows under it would move: labelled
+ * One action on the bulk band, which stays one line so the rows under it do not move: labelled
  * where the frame has room, the icon alone with its label as a tooltip where it does not.
  */
 function BulkButton({
@@ -165,7 +170,7 @@ function BulkButton({
 }: {
   readonly icon: Icon;
   readonly label: string;
-  readonly variant?: "secondary" | "ghost";
+  readonly variant?: "secondary" | "ghost" | "destructive";
   readonly disabled: boolean;
   readonly loading?: boolean;
   readonly onClick: () => void;

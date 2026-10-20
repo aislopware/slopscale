@@ -131,7 +131,8 @@ function SSHPage(): ReactElement {
 
   const title = resolvePageTitle(node, session);
   const owner = resolveOwner(node, session);
-  useBreadcrumb(`SSH · ${machineLabel(title, owner)}`);
+  // The trail names the machine alone; whose it is reads in the header under it.
+  useBreadcrumb(`SSH · ${title}`);
 
   const waiting = waitingMessage(state.status);
   const note = sessionDetail(state);

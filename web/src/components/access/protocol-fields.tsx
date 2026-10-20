@@ -10,6 +10,7 @@ import {
   toProtocol,
 } from "~/components/access/model.ts";
 import type { Protocol } from "~/components/access/model.ts";
+import { fieldError } from "~/components/ui/field-error.ts";
 
 export interface ProtocolDraft {
   readonly protocol: Protocol;
@@ -53,7 +54,7 @@ export function ProtocolFields({
         autoComplete="off"
         placeholder={withPorts ? "22, 443, 8000-8100" : "Every port"}
         description={withPorts ? "Empty means every port." : "Ports apply to TCP and UDP."}
-        {...(issue === null ? {} : { error: issue })}
+        {...fieldError(issue ?? undefined)}
         onChange={(event) => {
           onChange({ ports: event.target.value });
         }}

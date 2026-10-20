@@ -151,9 +151,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-cross-linux-amd64-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+          key: go-cross-linux-amd64-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-${{ hashFiles('go.sum') }}
           restore-keys: |
-            go-cross-linux-amd64-
+            go-cross-linux-amd64-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-
       - name: Go cache from the cross build (arm64)
         if: steps.setup.outputs.go-cache-hit != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -161,9 +161,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-cross-linux-arm64-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+          key: go-cross-linux-arm64-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-${{ hashFiles('go.sum') }}
           restore-keys: |
-            go-cross-linux-arm64-
+            go-cross-linux-arm64-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-
       - name: Go cache from the cross build (armv7)
         if: steps.setup.outputs.go-cache-hit != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -171,9 +171,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-cross-linux-arm7-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+          key: go-cross-linux-arm7-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-${{ hashFiles('go.sum') }}
           restore-keys: |
-            go-cross-linux-arm7-
+            go-cross-linux-arm7-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-
 
       # release.mode is replace: the body release-please wrote comes back in
       # through the notes file with goreleaser's upgrade footer under it.

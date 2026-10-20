@@ -11,8 +11,8 @@ import (
 	"golang.org/x/mod/semver"
 )
 
-// Modules whose versions are not independent. tailscale.com follows its main
-// branch, and the modules it pins by pseudo-version or for platform code this
+// Modules whose versions are not independent. tailscale.com follows the commit
+// of Tailscale's newest unstable release, and the modules it pins by pseudo-version or for platform code this
 // repository never compiles move with it or not at all.
 const (
 	modTailscale        = "tailscale.com"
@@ -52,8 +52,13 @@ func moduleVersion(ctx context.Context, r *repo, path string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
-// tailscaleAtom moves tailscale.com to the tip of main and drags gvisor to
-// whatever that exact commit requires.
+// tailscaleAtom moves tailscale.com to the commit of Tailscale's newest
+// unstable release and drags gvisor to whatever that exact commit requires.
+//
+// An unstable release is main that Tailscale built, shipped and runs on its
+// own unstable track, so the server stays a cycle ahead of the stable clients
+// without standing on a commit that may be reverted the next day. A pin
+// already past that commit is left alone until the next release overtakes it.
 //
 // `go get -u tailscale.com` is wrong here: the pin is a pseudo-version that
 // sorts above the newest release tag, so -u either no-ops or downgrades.
@@ -63,9 +68,16 @@ func tailscaleAtom(ctx context.Context, r *repo) (string, error) {
 		return "", err
 	}
 
-	_, err = r.nixRun(ctx, "go", "get", modTailscale+"@main")
+	want, release, err := unstablePin(ctx)
 	if err != nil {
 		return "", err
+	}
+
+	if semver.Compare(want, before) > 0 {
+		_, err = r.nixRun(ctx, "go", "get", modTailscale+"@"+want)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	after, err := moduleVersion(ctx, r, modTailscale)
@@ -93,11 +105,13 @@ func tailscaleAtom(ctx context.Context, r *repo) (string, error) {
 		return "", nil
 	}
 
-	return fmt.Sprintf("tailscale.com %s -> %s (gvisor %s)", before, after, gvisor), nil
+	return fmt.Sprintf("tailscale.com %s -> %s (unstable %s, gvisor %s)", before, after, release, gvisor), nil
 }
 
 // directRequirements is every direct requirement not already owned by the
-// tailscale atom.
+// tailscale atom, plus the modules behind go.mod's tool lines. Those are
+// marked indirect when nothing imports them, yet go generate runs them, and
+// a stale golang.org/x/tools cannot read the export data a newer Go writes.
 func directRequirements(r *repo) ([]string, error) {
 	f, err := parseGoMod(r)
 	if err != nil {
@@ -111,10 +125,15 @@ func directRequirements(r *repo) ([]string, error) {
 		modWireguardWindows: true,
 	}
 
+	tools := map[string]bool{}
+	for _, t := range f.Tool {
+		tools[toolModule(f, t.Path)] = true
+	}
+
 	var paths []string
 
 	for _, req := range f.Require {
-		if req.Indirect || owned[req.Mod.Path] {
+		if owned[req.Mod.Path] || (req.Indirect && !tools[req.Mod.Path]) {
 			continue
 		}
 
@@ -122,6 +141,21 @@ func directRequirements(r *repo) ([]string, error) {
 	}
 
 	return paths, nil
+}
+
+// toolModule finds the required module providing pkg. The longest match wins,
+// since a nested module shadows its parent's tree.
+func toolModule(f *modfile.File, pkg string) string {
+	var best string
+
+	for _, req := range f.Require {
+		p := req.Mod.Path
+		if (pkg == p || strings.HasPrefix(pkg, p+"/")) && len(p) > len(best) {
+			best = p
+		}
+	}
+
+	return best
 }
 
 // moduleAtom upgrades one direct requirement. One atom per module costs nothing

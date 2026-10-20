@@ -5,10 +5,10 @@ import type { ReactElement } from "react";
 import { displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { SettingsRow } from "~/components/ui/settings-card.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { RoleBadge } from "~/components/users/role-badge.tsx";
 
@@ -53,7 +53,7 @@ export function SessionSection({ me }: { readonly me: Me }): ReactElement {
       bodyClassName="p-0"
     >
       <DefinitionList items={consoleItems(me)} />
-      <SettingRow
+      <SettingsRow
         title="Sign out"
         description="Ends this browser session. Machines and keys are unaffected."
         control={

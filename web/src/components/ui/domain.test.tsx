@@ -14,25 +14,24 @@ describe(Domain, () => {
 
     expect(token).not.toBeNull();
     expect(token?.textContent).toBe("*.example.com");
-    expect(token?.querySelector(".opacity-60")?.textContent).toBe("*.");
-    expect(token?.querySelector(".rounded-full")).toBeNull();
+    expect(token?.querySelector(".text-kumo-subtle")?.textContent).toBe("*.");
+    expect(tint(token)).toBe("rgba(0, 0, 0, 0)");
   });
 
-  it("tints the token by the registered site, so hosts under one site match", async () => {
+  // Plain text, as the dashboard's DNS records are: the host in the default colour, the site
+  // stepped back, so a list of hosts under one site reads by what differs between them.
+  it("steps the registered site back behind the host", async () => {
     const view = await render(
       <>
         <Domain domain="a.example.com" />
-        <Domain domain="b.example.com" />
-        <Domain domain="c.example.net" />
+        <Domain domain="example.net" />
       </>,
     );
-    const shades = ["a.example.com", "b.example.com", "c.example.net"].map((domain) =>
-      tint(view.container.querySelector(`[title="${domain}"]`)),
-    );
+    const colour = (text: string): string => getComputedStyle(view.getByText(text).element()).color;
 
-    expect(shades[0]).not.toBe("rgba(0, 0, 0, 0)");
-    expect(shades[0]).toBe(shades[1]);
-    expect(shades[0]).not.toBe(shades[2]);
+    expect(colour("a.")).not.toBe(colour("example.com"));
+    // A bare site is the whole name, so it keeps the default colour.
+    expect(colour("example.net")).toBe(colour("a."));
   });
 });
 

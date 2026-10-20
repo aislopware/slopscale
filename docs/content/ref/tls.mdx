@@ -1,60 +1,102 @@
 ---
 title: "Running the service via TLS (optional)"
-description: "Serve slopscale over TLS with your own certificate or one from Let's Encrypt, pick the HTTP-01 or TLS-ALPN-01 challenge, and check that renewal works."
+description: "Serve slopscale over TLS with your own certificate or one from Let's Encrypt, pick the HTTP-01, TLS-ALPN-01 or DNS-01 challenge, and check that renewal works."
 sidebar:
   label: "TLS"
 ---
 
 ## Bring your own certificate
 
-Slopscale can be configured to expose its web service via TLS. To configure the certificate and key file manually, set the `tls_cert_path` and `tls_key_path` configuration parameters. If the path is relative, it will be interpreted as relative to the directory the configuration file was read from.
+Slopscale can be configured to expose its web service via TLS. To configure the certificate and key file manually, set the `tls.cert_path` and `tls.key_path` configuration parameters. If the path is relative, it will be interpreted as relative to the directory the configuration file was read from.
 
 ```yaml title="config.yaml"
-tls_cert_path: ""
-tls_key_path: ""
+tls:
+  cert_path: ""
+  key_path: ""
 ```
 
 The certificate should contain the full chain, else some clients, like the Tailscale Android client, will reject it.
 
 ## Let's Encrypt / ACME
 
-To get a certificate automatically via [Let's Encrypt](https://letsencrypt.org/), set `tls_letsencrypt_hostname` to the desired certificate hostname. This name must resolve to the IP address(es) slopscale is reachable on (i.e., it must correspond to the `server_url` configuration parameter). The certificate and Let's Encrypt account credentials will be stored in the directory configured in `tls_letsencrypt_cache_dir`. If the path is relative, it will be interpreted as relative to the directory the configuration file was read from.
+To get a certificate automatically via [Let's Encrypt](https://letsencrypt.org/), set `tls.acme.hostname` to the desired certificate hostname. This name must resolve to the IP address(es) slopscale is reachable on (i.e., it must correspond to the `server_url` configuration parameter). The certificate and Let's Encrypt account credentials will be stored in the directory configured in `tls.acme.cache_dir`. If the path is relative, it will be interpreted as relative to the directory the configuration file was read from.
 
 ```yaml title="config.yaml"
-tls_letsencrypt_hostname: ""
-tls_letsencrypt_listen: ":http"
-tls_letsencrypt_cache_dir: ".cache"
-tls_letsencrypt_challenge_type: HTTP-01
+tls:
+  acme:
+    hostname: ""
+    http_listen: ":http"
+    cache_dir: /var/lib/slopscale/cache
+    challenge_type: HTTP-01
+    # url: https://acme-v02.api.letsencrypt.org/directory
+    # email: ""
 ```
+
+The certificate is ordered when slopscale starts, not on the first connection, and kept renewed.
+
+### Older keys
+
+Earlier releases read flat keys. They still work, and a `tls` key wins over its flat key; slopscale logs a warning naming the new key for each flat key it reads.
+
+| Flat key                         | `tls` key                 |
+| -------------------------------- | ------------------------- |
+| `tls_cert_path`                  | `tls.cert_path`           |
+| `tls_key_path`                   | `tls.key_path`            |
+| `tls_letsencrypt_hostname`       | `tls.acme.hostname`       |
+| `tls_letsencrypt_challenge_type` | `tls.acme.challenge_type` |
+| `tls_letsencrypt_listen`         | `tls.acme.http_listen`    |
+| `tls_letsencrypt_cache_dir`      | `tls.acme.cache_dir`      |
+| `acme_url`                       | `tls.acme.url`            |
+| `acme_email`                     | `tls.acme.email`          |
+
+The environment follows the new keys: `SLOPSCALE_TLS_ACME_HOSTNAME` sets `tls.acme.hostname`.
+
+A server upgraded from a release that used autocert keeps its certificate: on the first start slopscale copies the certificate autocert left in `tls.acme.cache_dir` into its own storage in the same directory, as long as it is still valid for `tls.acme.hostname`, and renews it when it is due.
 
 ### Challenge types
 
-Slopscale only supports two values for `tls_letsencrypt_challenge_type`: `HTTP-01` (default) and `TLS-ALPN-01`.
+Slopscale supports three values for `tls.acme.challenge_type`: `HTTP-01` (default), `TLS-ALPN-01` and `DNS-01`.
 
 #### HTTP-01
 
-For `HTTP-01`, slopscale must be reachable on port 80 for the Let's Encrypt automated validation, in addition to whatever port is configured in `listen_addr`. By default, slopscale listens on port 80 on all local IPs for Let's Encrypt automated validation.
+For `HTTP-01`, slopscale must be reachable on port 80 for the Let's Encrypt automated validation, in addition to whatever port is configured in `listen_addr`. By default, slopscale listens on port 80 on all local IPs for Let's Encrypt automated validation. TLS-ALPN-01 on `listen_addr` stays available as well, so a server only reachable on port 443 still validates.
 
 :::warning[The main listener cannot also use port 80]
 
-`listen_addr` and `tls_letsencrypt_listen` must not bind the same TCP socket. A common mistake is `listen_addr: 0.0.0.0:80` together with `tls_letsencrypt_hostname`: both listeners claim port 80. Slopscale refuses to start with `Fatal config error: listen_addr and tls_letsencrypt_listen would bind the same tcp socket`. Use `listen_addr: 0.0.0.0:443` (or any port other than 80) when HTTP-01 is in use. `metrics_listen_addr` and, while the Funnel ingress is on, `funnel.listen_addrs` are checked the same way.
+`listen_addr` and `tls.acme.http_listen` must not bind the same TCP socket. A common mistake is `listen_addr: 0.0.0.0:80` together with `tls.acme.hostname`: both listeners claim port 80. Slopscale refuses to start with `Fatal config error: listen_addr and tls.acme.http_listen would bind the same tcp socket`. Use `listen_addr: 0.0.0.0:443` (or any port other than 80) when HTTP-01 is in use. `metrics_listen_addr` and, while the Funnel ingress is on, `funnel.listen_addrs` are checked the same way.
 
 :::
 
-If you need to change the ip and/or port used by slopscale for the Let's Encrypt validation process, set `tls_letsencrypt_listen` to the appropriate value. This can be handy if you are running slopscale as a non-root user (or can't run `setcap`). Keep in mind, however, that Let's Encrypt will _only_ connect to port 80 for the validation callback, so if you change `tls_letsencrypt_listen` you will also need to configure something else (e.g. a firewall rule) to forward the traffic from port 80 to the ip:port combination specified in `tls_letsencrypt_listen`.
+If you need to change the ip and/or port used by slopscale for the Let's Encrypt validation process, set `tls.acme.http_listen` to the appropriate value. This can be handy if you are running slopscale as a non-root user (or can't run `setcap`). Keep in mind, however, that Let's Encrypt will _only_ connect to port 80 for the validation callback, so if you change `tls.acme.http_listen` you will also need to configure something else (e.g. a firewall rule) to forward the traffic from port 80 to the ip:port combination specified in `tls.acme.http_listen`.
 
 #### TLS-ALPN-01
 
 For `TLS-ALPN-01`, slopscale listens on the ip:port combination defined in `listen_addr`. Let's Encrypt will _only_ connect to port 443 for the validation callback, so if `listen_addr` is not set to port 443, something else (e.g. a firewall rule) will be required to forward the traffic from port 443 to the ip:port combination specified in `listen_addr`.
 
+#### DNS-01
+
+For `DNS-01`, slopscale publishes the challenge as a TXT record through the DNS provider configured under `https_certificates` (see [HTTPS certificates](/ref/https-certificates/)), waits until every authoritative nameserver of the zone serves it, and removes it afterwards. The server needs no inbound port for validation, which suits a server behind a firewall. The provider is used even when `https_certificates.enabled` is off:
+
+```yaml title="config.yaml"
+tls:
+  acme:
+    hostname: slopscale.example.com
+    challenge_type: DNS-01
+https_certificates:
+  provider: cloudflare
+  cloudflare:
+    api_token_path: /run/credentials/slopscale.service/cloudflare-token
+```
+
 ### Technical description
 
-Slopscale uses [autocert](https://pkg.go.dev/golang.org/x/crypto/acme/autocert), a Golang library providing [ACME protocol](https://en.wikipedia.org/wiki/Automatic_Certificate_Management_Environment) verification, to facilitate certificate renewals via [Let's Encrypt](https://letsencrypt.org/about/). Certificates will be renewed automatically, and the following can be expected:
+Slopscale uses [CertMagic](https://github.com/caddyserver/certmagic), a Golang library providing [ACME protocol](https://en.wikipedia.org/wiki/Automatic_Certificate_Management_Environment) verification, to facilitate certificate renewals via [Let's Encrypt](https://letsencrypt.org/about/). Certificates will be renewed automatically, and the following can be expected:
 
 - Certificates provided from Let's Encrypt have a validity of 3 months from date issued.
-- Renewals are only attempted by slopscale when 30 days or less remains until certificate expiry.
-- Renewal attempts by autocert are triggered at a random interval of 30-60 minutes.
-- No log output is generated when renewals are skipped, or successful.
+- Renewals start when a third of the validity remains, or earlier when the CA asks for it through ACME renewal information.
+- Renewal checks run every 10 minutes.
+- When `tls.acme.url` is Let's Encrypt's production directory or empty, a failed order is retried against Let's Encrypt's staging CA first, to spare the production rate limits.
+- Log lines from the library carry `logger=acme`.
 
 #### Checking certificate expiry
 
@@ -69,21 +111,3 @@ $ openssl s_client -servername [hostname] -connect [hostname]:443 | openssl x509
 notBefore=Feb  8 09:48:26 2024 GMT
 notAfter=May  8 09:48:25 2024 GMT
 ```
-
-#### Log output from the autocert library
-
-As these log lines are from the autocert library, they are not strictly generated by slopscale itself.
-
-```plaintext
-acme/autocert: missing server name
-```
-
-Likely caused by an incoming connection that does not specify a hostname, for example a `curl` request directly against the IP of the server, or an unexpected hostname.
-
-```plaintext
-acme/autocert: host "[foo]" not configured in HostWhitelist
-```
-
-Similarly to the above, this likely indicates an invalid incoming request for an incorrect hostname, commonly just the IP itself.
-
-The source code for autocert can be found [here](https://cs.opensource.google/go/x/crypto/+/refs/tags/v0.19.0:acme/autocert/autocert.go)

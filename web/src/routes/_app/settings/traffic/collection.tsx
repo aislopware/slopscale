@@ -27,6 +27,7 @@ function TrafficSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Collection"
+        docs="ref/traffic"
         description="What the gateways collect and how long the server keeps it."
       />
       <ResolverNotices reporters={reporters} />

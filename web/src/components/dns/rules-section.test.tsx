@@ -49,6 +49,17 @@ function Harness({
   return <DnsRulesSection rules={rules} groups={groups} canEdit={canEdit} mutations={mutations} />;
 }
 
+/** The table cell a control sits in. */
+function cellOf(element: Element): Element {
+  const cell = element.closest("td");
+
+  if (cell === null) {
+    throw new Error("not in a cell");
+  }
+
+  return cell;
+}
+
 function renderSection(rules: readonly DnsRule[], canEdit: boolean): ReturnType<typeof render> {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -78,6 +89,21 @@ describe(DnsRulesSection, () => {
     await screen.getByRole("menuitem", { name: "Edit…" }).click();
     await expect.element(screen.getByRole("dialog", { name: "Edit DNS rule" })).toBeVisible();
     await expect.element(screen.getByLabelText("Name")).toHaveValue("Corp DNS");
+  });
+
+  // Design spec §4.A: the ⋯ column is pinned like every other table's, and the nameservers wrap
+  // between addresses, never inside one.
+  it("pins the menu to the right edge and keeps each nameserver whole", async () => {
+    const screen = await renderSection(
+      [{ ...rule, nameservers: ["2001:4860:4860::8888", "149.112.112.112"] }],
+      true,
+    );
+    const menu = screen.getByRole("button", { name: "Actions for DNS rule Corp DNS" }).element();
+    const cell = cellOf(menu);
+    const address = screen.getByText("2001:4860:4860::8888", { exact: false }).element();
+
+    expect(getComputedStyle(cell).position).toBe("sticky");
+    expect(getComputedStyle(address).whiteSpace).toBe("nowrap");
   });
 
   it("refuses to create a rule until it has a name, domains, nameservers and a group", async () => {

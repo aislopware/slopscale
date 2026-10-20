@@ -1,6 +1,6 @@
 ---
 title: "HTTPS certificates"
-description: "Let machines get Let's Encrypt certificates for their MagicDNS names, with slopscale publishing DNS-01 challenges via Cloudflare, RFC 2136 or a command."
+description: "Let machines get Let's Encrypt certificates for their MagicDNS names, with slopscale publishing DNS-01 challenges through Cloudflare, RFC 2136, Hetzner, PowerDNS, acme-dns or a command."
 ---
 
 A machine can get a TLS certificate for its MagicDNS name with
@@ -24,7 +24,7 @@ https_certificates:
   enabled: true
   provider: cloudflare
   cloudflare:
-    api_token: ${CLOUDFLARE_API_TOKEN}
+    api_token_path: /run/credentials/slopscale.service/cloudflare-token
 ```
 
 With `enabled`, every machine's map response lists its MagicDNS name,
@@ -32,43 +32,120 @@ such as `laptop.ts.example.com`, as a cert domain, and the client picks
 DNS-01 when it needs a certificate. The names only need to exist in
 public DNS for the challenge record; they do not need to resolve to
 anything, and the machines stay reachable over the tailnet alone, unless
-[Funnel](./funnel) opens one of them to the internet.
+[Funnel](./funnel) opens one of them to the internet. The base domain
+must be written in lowercase, because clients match certificate names
+exactly.
 
-Three providers publish the record:
+The same provider publishes the server's own certificate when
+`tls.acme.challenge_type` is `DNS-01` (see [TLS](/ref/tls/)), with or
+without `enabled`.
+
+## Providers
+
+Each provider's settings sit under a key named after it. Any of them can
+be read from a file instead, for secrets kept out of the configuration:
+add `_path` to the key, as in `api_token_path`. The environment works key
+by key too: `SLOPSCALE_HTTPS_CERTIFICATES_CLOUDFLARE_API_TOKEN` sets
+`https_certificates.cloudflare.api_token`.
 
 - `cloudflare` uses the Cloudflare API with `api_token`, a token holding
   _Zone: Read_ and _DNS: Edit_ on the zone. The zone is found from the
-  record's name, or pinned with `zone_id`.
-- `rfc2136` sends a dynamic DNS update to `server` (host and port) for
-  `zone`, which defaults to the base domain, signed with `tsig_key_name`,
-  `tsig_secret` and `tsig_algorithm` (`hmac-sha256` by default) when a key
-  is set. BIND, Knot and PowerDNS take these.
-- `command` runs the program at `path` with the record name and value
-  as its two arguments, for any other zone. A non-zero exit fails the
-  challenge with the program's output.
+  record's name, or pinned with `zone_id`, which needs only _DNS: Edit_.
+- `rfc2136` sends a dynamic DNS update to `server` (host and port),
+  signed with `tsig_key_name`, `tsig_secret` and `tsig_algorithm`
+  (`hmac-sha256` by default) when a key is set, and checks the signature
+  of the reply. BIND, Knot and PowerDNS take these.
+- `hetzner` uses the Hetzner Cloud DNS API with `api_token`.
+- `powerdns` uses the PowerDNS API at `server_url` with `api_token`, on
+  `server_id` (`localhost` by default).
+- `acmedns` writes to an [acme-dns](https://github.com/joohoi/acme-dns)
+  server. See [below](#acme-dns).
+- `command` runs the program at `path` with the record name and value as
+  its two arguments, for any other zone, and the program at
+  `delete_path` the same way to remove a record. Without `delete_path`
+  records are left in place. A non-zero exit fails the call with the
+  program's output.
 
-`ttl` is the records' time to live, a minute by default.
+`zone` is the zone records are written to. It defaults to the
+`rfc2136.zone` setting, then to the base domain, which must lie inside
+it. `ttl` is the records' time to live, a minute by default.
+
+## Propagation
 
 The machine accepts the challenge the moment Slopscale answers, and
-Let's Encrypt looks the record up right away, but a provider's API
-takes a record some seconds before its nameservers serve it. So
-Slopscale answers only once every authoritative nameserver of the zone
-serves the record, giving up after `propagation_timeout`, a minute by
-default; `0` answers as soon as the provider took the record.
+Let's Encrypt looks the record up right away, but a provider's API takes
+a record some seconds before its nameservers serve it. So Slopscale
+finds the zone's authoritative nameservers through `resolvers` (1.1.1.1
+and 8.8.8.8 by default; a bare IP means port 53), following a CNAME that
+delegates the challenge elsewhere, and answers only once every one of
+them serves the value. It gives up after `propagation_timeout`, a minute
+by default; `0` answers as soon as the provider took the record.
+
+When a name already had another value, such as the first half of a
+wildcard order, Slopscale also waits out that value's TTL, so a resolver
+that cached the record set before sees the new value.
 
 ## What a machine may publish
 
-A machine may publish only the challenge record of its own MagicDNS name,
-`_acme-challenge.<its name>.<base domain>`, and only a TXT record, over
-its own Noise session. Anything else is refused. Every record published
-lands in the [audit log](/ref/audit) as `node.cert_challenge` on the
-machine.
+A machine may publish only a TXT record holding an ACME DNS-01 value at
+the challenge name of one of its own cert domains,
+`_acme-challenge.<name>`, matched exactly, over its own Noise session,
+and only while its key has not expired. Anything else is refused before
+it reaches the provider. Every record published lands in the
+[audit log](/ref/audit) as `node.cert_challenge` on the machine.
 
-Slopscale does not delete challenge records afterwards; they are
-harmless, and Let's Encrypt asks for a fresh value each time. The
-`cloudflare` provider skips a record whose value is already there, and
-each provider keeps the other values at the name, because a certificate
-for a name and its wildcard needs two challenges at once.
+A name is left out of a machine's cert domains, so it gets no
+certificate, when another party could hold it too:
+
+- a machine name with capitals, kept from before names were lowercased,
+  which could differ from another machine's name by case only; rename
+  the machine to fix it;
+- a name the operator gave an extra DNS record at or below, since a
+  machine picks its own name through its hostname;
+- a name longer than DNS allows once `_acme-challenge.` is added;
+- with `acmedns`, a name without its own registration.
+
+A machine holds at most four pending values at once; a fifth request is
+answered `429` until one expires. Other answers tell the client whether
+to retry: `502` when the provider refused the record, `504` when the
+nameservers did not serve it in time, `503` while the server shuts down.
+
+## Removal
+
+Clients never ask for a record to be removed, so Slopscale removes each
+value ten minutes, plus the propagation timeout, after it was last
+published, and every value it still holds when it shuts down. Other
+values at the same name are left alone. Nothing is kept across a
+restart: a crash, or a failed removal, leaves a few random TXT values
+behind, which are harmless.
+
+## acme-dns
+
+acme-dns answers each registration's challenge from one record, so a
+registration shared between names would let one machine answer another's
+challenge. Machines therefore need a registration per certificate name
+under `config`, keyed by the name, and each `_acme-challenge.<name>`
+CNAMEd to its registration's `fulldomain`. `config_path` reads the JSON
+file `acme-dns-client` writes. A machine without a registration gets no
+certificate. A registration holds two values; more are refused until one
+expires.
+
+```yaml
+https_certificates:
+  enabled: true
+  provider: acmedns
+  acmedns:
+    config:
+      laptop.ts.example.com:
+        username: <username from /register>
+        password: <password from /register>
+        subdomain: <subdomain from /register>
+        server_url: https://auth.acme-dns.io
+```
+
+One account given as `username`, `password`, `subdomain` and
+`server_url` directly, instead of `config`, serves only the server's own
+certificate.
 
 ## Without a public zone
 

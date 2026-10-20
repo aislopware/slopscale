@@ -132,10 +132,10 @@ function EditProfileForm({
       />
       <DialogError message={update.isError ? errorMessage(update.error) : undefined} />
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" loading={update.isPending} disabled={unchanged}>
           Save
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

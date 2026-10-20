@@ -5,29 +5,57 @@ import type { ReactElement } from "react";
 import type { Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { TabBar } from "~/components/layout/tab-bar.tsx";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
-import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { PageHeader } from "~/components/ui/page-header.tsx";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { TagList } from "~/components/ui/tag.tsx";
-import { isTagged, nodeName, nodeStatus, ownerLabel } from "~/lib/node.ts";
 
-/** The machine page's title row: what it is, who owns it, how it joined and how it is doing. */
-export function MachineHeader({
+/** The machine page's tabs, each an address of its own under the machine's. */
+export const machineTabs = ["overview", "routes", "diagnostics", "settings"] as const;
+export type MachineTab = (typeof machineTabs)[number];
+
+const tabLabels: Record<MachineTab, string> = {
+  overview: "Overview",
+  routes: "Routes",
+  diagnostics: "Diagnostics",
+  settings: "Settings",
+};
+
+/** The tab an address under a machine is, from its last segment: Overview for the machine's own. */
+export function machineTabOf(pathname: string): MachineTab {
+  const last = pathname.split("/").findLast((segment) => segment !== "");
+
+  return machineTabs.find((tab) => tab !== "overview" && tab === last) ?? "overview";
+}
+
+function tabHref(nodeId: string, tab: MachineTab): string {
+  return tab === "overview" ? `/machines/${nodeId}` : `/machines/${nodeId}/${tab}`;
+}
+
+/**
+ * The machine page's bar under the top bar, as a Zero Trust detail page draws it: the `TabBar` with
+ * one tab per address under the machine, and what can be done to the machine on the right.
+ */
+export function MachineTabBar({
   node,
   me,
   users,
+  tab,
 }: {
   readonly node: Node;
   readonly me: Me;
   readonly users: readonly User[];
+  readonly tab: MachineTab;
 }): ReactElement {
   return (
-    <PageHeader
-      title={nodeName(node)}
-      meta={<MachineFacts node={node} />}
+    <TabBar
+      label="Machine"
+      value={tab}
+      tabs={machineTabs.map((value) => ({
+        value,
+        label: tabLabels[value],
+        href: tabHref(node.id, value),
+      }))}
       actions={
         <>
           <SSHButton node={node} me={me} />
@@ -76,38 +104,6 @@ function SSHButton({ node, me }: { readonly node: Node; readonly me: Me }): Reac
     <LinkButton href={`/machines/${node.id}/ssh`} variant="secondary" icon={TerminalWindowIcon}>
       SSH
     </LinkButton>
-  );
-}
-
-/**
- * The line under the name: the state first, since it is the fact the operator came for, then who
- * owns it (its tags, for a tagged machine) and when it was last seen. What the Overview panel two
- * inches below states in full -- the client and its platform, how the machine registered -- is left
- * to it, so no fact on this page is written twice and in two wordings.
- */
-function MachineFacts({ node }: { readonly node: Node }): ReactElement {
-  return (
-    <>
-      <StatusBadge status={nodeStatus(node)} />
-      <span aria-hidden>·</span>
-      {isTagged(node) ? <TagList tags={node.tags} size="sm" /> : <span>{ownerLabel(node)}</span>}
-      {node.ephemeral ? (
-        <>
-          <span aria-hidden>·</span>
-          <span>ephemeral, deleted when it logs out or goes offline</span>
-        </>
-      ) : null}
-      {/* The badge above already says a connected machine is connected. */}
-      {node.online ? null : (
-        <>
-          <span aria-hidden>·</span>
-          <span>
-            {"last seen "}
-            <RelativeTime value={node.lastSeen} />
-          </span>
-        </>
-      )}
-    </>
   );
 }
 

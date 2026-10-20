@@ -37,6 +37,7 @@ import type {
   User,
 } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
+import type { HideBelow } from "~/components/table/styles.ts";
 
 /**
  * Every list in the console sorts and filters client-side: the API returns whole collections and a
@@ -157,5 +158,10 @@ declare module "@tanstack/react-table" {
      * on a phone.
      */
     sticky?: "left" | "right";
+    /**
+     * Hides the column below this breakpoint, for a column a phone can do without; put what matters
+     * in it on a second line under the row's name, shown only there (`narrowOnlyClass`).
+     */
+    hideBelow?: HideBelow;
   }
 }

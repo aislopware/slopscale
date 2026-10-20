@@ -30,11 +30,14 @@ func init() {
 		"Default SSH session recorders, tags or addresses, for rules that name none; an empty string clears them")
 	setSettingsCmd.Flags().Bool("ssh-recording-enforce", false,
 		"Reject SSH sessions that cannot reach a default recorder")
+	setSettingsCmd.Flags().String("route-selection", "",
+		"How machines choose among routers serving the same prefix: active-passive-failover, "+
+			"regional-routing, regional-routing-failover or magicroute")
 }
 
 var errNoSettingGiven = errors.New(
 	"give at least one of --devices-approval, --users-approval, --posture-identity, --device-attributes, " +
-		"--key-expiry-days, --ssh-recorders or --ssh-recording-enforce",
+		"--key-expiry-days, --ssh-recorders, --ssh-recording-enforce or --route-selection",
 )
 
 var settingsCmd = &cobra.Command{
@@ -107,9 +110,14 @@ users approval off approves every node or user that was waiting.`,
 				body.SshRecordingEnforce = &on
 			}
 
+			if cmd.Flags().Changed("route-selection") {
+				selection, _ := cmd.Flags().GetString("route-selection")
+				body.RouteSelection = new(clientv1.UpdateSettingsRequestBodyRouteSelection(selection))
+			}
+
 			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil && body.KeyExpiryDays == nil &&
 				body.PostureIdentityOn == nil && body.DeviceAttributesOn == nil && body.SshRecorders == nil &&
-				body.SshRecordingEnforce == nil {
+				body.SshRecordingEnforce == nil && body.RouteSelection == nil {
 				return errNoSettingGiven
 			}
 
@@ -139,6 +147,7 @@ func printSettings(cmd *cobra.Command, settings *clientv1.Settings) error {
 				{"Key expiry", keyExpiryLabel(settings)},
 				{"SSH recorders", sshRecordersLabel(settings)},
 				{"SSH recording enforced", onOff(settings.SshRecordingEnforce)},
+				{"Route selection", string(settings.RouteSelection)},
 			},
 		)
 	})

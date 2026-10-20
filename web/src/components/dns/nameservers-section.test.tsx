@@ -63,11 +63,50 @@ describe(NameserversSection, () => {
       .toBeDisabled();
   });
 
-  it("opens the add nameserver dialog", async () => {
+  it("stages nameservers in a panel and saves them as one change", async () => {
     const screen = await renderSection(base);
 
     await screen.getByRole("button", { name: "Add nameserver" }).click();
+    await expect.element(screen.getByRole("button", { name: "Add nameserver" })).toBeDisabled();
+    await expect.element(screen.getByRole("button", { name: "Save 0 entries" })).toBeDisabled();
 
-    await expect.element(screen.getByRole("heading", { name: "Add nameserver" })).toBeVisible();
+    await screen.getByLabelText("Nameserver").fill("9.9.9.9");
+    await screen.getByRole("button", { name: "Add to list" }).click();
+    await screen.getByLabelText("Nameserver").fill("8.8.8.8");
+    await screen.getByRole("button", { name: "Add to list" }).click();
+
+    await expect.element(screen.getByText("Unsaved changes")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Save 2 entries" })).toBeEnabled();
+
+    await screen.getByRole("button", { name: "Remove 9.9.9.9 from the list" }).click();
+    await expect.element(screen.getByRole("button", { name: "Save 1 entry" })).toBeEnabled();
+  });
+
+  it("refuses a nameserver that is malformed or already listed, inline", async () => {
+    const screen = await renderSection(base);
+
+    await screen.getByRole("button", { name: "Add nameserver" }).click();
+    await screen.getByLabelText("Nameserver").fill("1.1.1.1");
+    await screen.getByRole("button", { name: "Add to list" }).click();
+
+    await expect.element(screen.getByText("That one is already on the list.")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Save 0 entries" })).toBeDisabled();
+
+    await screen.getByLabelText("Nameserver").fill("not a resolver");
+    await screen.getByRole("button", { name: "Add to list" }).click();
+
+    await expect.element(screen.getByText("Unsaved changes")).not.toBeInTheDocument();
+  });
+
+  it("closes the panel on cancel and gives the add button back", async () => {
+    const screen = await renderSection(base);
+
+    await screen.getByRole("button", { name: "Add nameserver" }).click();
+    await screen.getByRole("button", { name: "Cancel" }).click();
+
+    await expect
+      .element(screen.getByRole("heading", { name: "Add nameservers" }))
+      .not.toBeInTheDocument();
+    await expect.element(screen.getByRole("button", { name: "Add nameserver" })).toBeEnabled();
   });
 });

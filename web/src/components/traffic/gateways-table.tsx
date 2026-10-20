@@ -2,10 +2,8 @@ import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { TrafficReporter } from "~/api/traffic.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
 import { GatewayMenu } from "~/components/traffic/gateway-menu.tsx";
 import { trafficNodeLabel, trafficNodeName } from "~/components/traffic/machines-table.tsx";
@@ -317,11 +315,6 @@ export function GatewaysTable({
           title="No gateway reports yet"
           description="A gateway shows up here with its first report, a minute after the agent starts."
         />
-      }
-      footer={
-        reporters.length === 0 ? undefined : (
-          <TableFooter>{`Showing ${plural(reporters.length, "gateway")}`}</TableFooter>
-        )
       }
     />
   );

@@ -177,7 +177,7 @@ func serverInfoFrom(cfg *types.Config, derp state.DERPStatus, ingressNodes int, 
 
 func tlsMode(cfg *types.Config) string {
 	switch {
-	case cfg.TLS.LetsEncrypt.Hostname != "":
+	case cfg.TLS.ACME.Hostname != "":
 		return "letsencrypt"
 	case cfg.TLS.CertPath != "":
 		return "files"

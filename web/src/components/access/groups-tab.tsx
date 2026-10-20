@@ -1,23 +1,18 @@
-import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { groupColumns, toGroupRows } from "~/components/access/group-columns.tsx";
-import { GroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isBuiltin } from "~/components/access/model.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 
 export interface GroupsTabProps {
   readonly me: Me;
@@ -40,10 +35,7 @@ export function GroupsTab({
   search,
   onSearchChange,
 }: GroupsTabProps): ReactElement {
-  const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
   const rows = useMemo(() => toGroupRows(groups, nodes), [groups, nodes]);
 
   const table = useAppTable({
@@ -61,37 +53,21 @@ export function GroupsTab({
   });
 
   const own = groups.filter((group) => !isBuiltin(group)).length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
-      <TableToolbar
-        actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New group
-          </Button>
-        }
-      >
+      <TableToolbar>
         <SearchInput
           value={search}
           placeholder="Search by name or description"
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
+            <SectionEmpty
               title="No groups match"
               contents={
                 <Button
@@ -105,22 +81,28 @@ export function GroupsTab({
               }
             />
           }
-          footer={
-            <TableFooter>
-              {own === 0
-                ? "Only the built-in groups."
-                : `Showing ${shown} of ${plural(groups.length, "group")}`}
-            </TableFooter>
-          }
+          // With no groups of the tailnet's own the list is the built-in ones alone, which the band
+          // says instead of a range.
+          footer={own === 0 ? <TableFooter>Only the built-in groups.</TableFooter> : undefined}
         />
-      </Frame>
-      <GroupDialog
-        nodes={nodes ?? []}
-        users={users ?? []}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
+      </TableGroup>
     </>
+  );
+}
+
+/**
+ * The groups page's create action, in its page header beside the title as the dashboard's "Add a
+ * policy" is. It opens the group editor page.
+ */
+export function NewGroupButton({ me }: { readonly me: Me }): ReactElement {
+  return (
+    <LinkButton
+      href="/policy/groups/new"
+      variant="primary"
+      icon={PlusIcon}
+      disabled={!can(me, "policy_file")}
+    >
+      New group
+    </LinkButton>
   );
 }

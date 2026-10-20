@@ -60,17 +60,16 @@ func TestPickVersion(t *testing.T) {
 		want string
 	}{
 		{
-			name: "newest old enough release",
+			name: "newest release",
 			doc:  doc("2.1.0", map[string]time.Time{"1.0.0": old, "2.0.0": old, "2.1.0": old}),
 			have: "1.0.0",
 			want: "2.1.0",
 		},
 		{
-			// A release that could still be pulled for being hijacked waits.
-			name: "a fresh release waits out the cooldown",
+			name: "a release published an hour ago is taken",
 			doc:  doc("2.1.0", map[string]time.Time{"1.0.0": old, "2.0.0": old, "2.1.0": fresh}),
 			have: "1.0.0",
-			want: "2.0.0",
+			want: "2.1.0",
 		},
 		{
 			name: "prereleases and versions above the latest tag are ignored",
@@ -98,7 +97,7 @@ func TestPickVersion(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := pickVersion(test.doc, test.have, test.held, now)
+			got, err := pickVersion(test.doc, test.have, test.held)
 			if err != nil {
 				t.Fatalf("pickVersion: %v", err)
 			}
@@ -109,7 +108,7 @@ func TestPickVersion(t *testing.T) {
 		})
 	}
 
-	_, err := pickVersion(packument{DistTags: map[string]string{}}, "1.0.0", false, now)
+	_, err := pickVersion(packument{DistTags: map[string]string{}}, "1.0.0", false)
 	if !errors.Is(err, errNoCandidate) {
 		t.Errorf("pickVersion without a latest tag: error = %v, want %v", err, errNoCandidate)
 	}

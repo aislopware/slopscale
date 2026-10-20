@@ -3,8 +3,18 @@ import type { ReactElement } from "react";
 
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 
-/** Asks before a navigation would drop unsaved edits, and warns on reload too. */
-export function LeaveGuard({ dirty }: { readonly dirty: boolean }): ReactElement {
+/**
+ * Asks before a navigation would drop unsaved edits, and warns on reload too, the way the
+ * dashboard's editors ask "Leave without saving?". A navigation that is the save itself passes
+ * `ignoreBlocker`.
+ */
+export function LeaveGuard({
+  dirty,
+  description = "You will lose any changes made to this form.",
+}: {
+  readonly dirty: boolean;
+  readonly description?: string;
+}): ReactElement {
   const blocker = useBlocker({
     shouldBlockFn: () => dirty,
     enableBeforeUnload: dirty,
@@ -20,8 +30,8 @@ export function LeaveGuard({ dirty }: { readonly dirty: boolean }): ReactElement
         }
       }}
       title="Leave without saving?"
-      description="The policy has unsaved changes. They are lost if you leave this page."
-      confirmLabel="Leave"
+      description={description}
+      confirmLabel="Confirm and exit"
       onConfirm={() => {
         blocker.proceed?.();
       }}

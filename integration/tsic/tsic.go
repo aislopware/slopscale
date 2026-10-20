@@ -991,29 +991,6 @@ func (t *TailscaleInContainer) Netmap() (*netmap.NetworkMap, error) {
 	return nm, nil
 }
 
-// Netmap returns the current Netmap ([netmap.NetworkMap]) of the Tailscale instance.
-// This implementation is based on getting the netmap from `tailscale debug watch-ipn`
-// as there seem to be some weirdness omitting endpoint and DERP info if we use
-// Patch updates.
-// This implementation works on all supported versions.
-// func (t *TailscaleInContainer) Netmap() (*netmap.NetworkMap, error) {
-// 	// watch-ipn will only give an update if something is happening,
-// 	// since we send keep alives, the worst case for this should be
-// 	// 1 minute, but set a slightly more conservative time.
-// 	ctx, _ := context.WithTimeout(context.Background(), 3*time.Minute)
-
-// 	notify, err := t.watchIPN(ctx)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if notify.NetMap == nil {
-// 		return nil, fmt.Errorf("no netmap present in ipn.Notify")
-// 	}
-
-// 	return notify.NetMap, nil
-// }
-
 func (t *TailscaleInContainer) DebugDERPRegion(region string) (*ipnstate.DebugDERPRegionReport, error) {
 	if !util.TailscaleVersionNewerOrEqual("1.34", t.version) {
 		panic("tsic.DebugDERPRegion() called with unsupported version: " + t.version)

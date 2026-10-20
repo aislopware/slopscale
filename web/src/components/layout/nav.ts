@@ -107,6 +107,11 @@ export interface NavItem {
    * a page: its own path sends the browser to the first child the caller may see.
    */
   readonly children?: readonly NavChild[];
+  /**
+   * The documentation page for a branch as a whole, under `docs/content`: the "<Branch>
+   * documentation" button at the end of its sub-navigation bar.
+   */
+  readonly docs?: string;
 }
 
 export interface NavGroup {
@@ -147,6 +152,7 @@ export const navGroups: readonly NavGroup[] = [
         label: "Access controls",
         icon: ShieldCheckIcon,
         scope: "policy_file:read",
+        docs: "ref/access-control",
         children: [
           { to: "/policy/rules", label: "Rules" },
           { to: "/policy/graph", label: "Graph" },
@@ -160,6 +166,7 @@ export const navGroups: readonly NavGroup[] = [
         to: "/keys",
         label: "Keys",
         icon: KeyIcon,
+        docs: "ref/registration",
         children: [
           { to: "/keys/pre-auth", label: "Pre-auth keys", scope: "auth_keys:read" },
           { to: "/keys/api", label: "API keys" },
@@ -188,6 +195,7 @@ export const navGroups: readonly NavGroup[] = [
         label: "DNS",
         icon: GlobeIcon,
         scope: "dns:read",
+        docs: "ref/dns",
         children: [
           { to: "/dns/nameservers", label: "Nameservers" },
           { to: "/dns/split", label: "Split DNS" },
@@ -199,6 +207,7 @@ export const navGroups: readonly NavGroup[] = [
         label: "Relays",
         icon: BroadcastIcon,
         scope: "feature_settings:read",
+        docs: "ref/derp",
         children: [
           { to: "/relays/map", label: "Map" },
           { to: "/relays/latency", label: "Latency" },
@@ -229,6 +238,7 @@ export const navGroups: readonly NavGroup[] = [
         label: "Traffic",
         icon: ArrowsDownUpIcon,
         scope: "logs:network:read",
+        docs: "ref/traffic",
         children: [
           { to: "/traffic/overview", label: "Overview" },
           { to: "/traffic/machines", label: "Machines" },
@@ -258,6 +268,7 @@ export const navGroups: readonly NavGroup[] = [
         label: "Traffic monitor",
         icon: GaugeIcon,
         scope: "logs:network:read",
+        docs: "ref/traffic",
         children: [
           { to: "/settings/traffic/gateways", label: "Gateways" },
           { to: "/settings/traffic/collection", label: "Collection" },
@@ -267,6 +278,7 @@ export const navGroups: readonly NavGroup[] = [
         to: "/integrations",
         label: "Integrations",
         icon: WebhooksLogoIcon,
+        docs: "ref/webhooks",
         children: [
           { to: "/integrations/webhooks", label: "Webhooks", scope: "webhooks:read" },
           {

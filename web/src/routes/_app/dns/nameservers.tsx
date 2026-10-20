@@ -9,7 +9,7 @@ import { editableSettings } from "~/components/dns/model.ts";
 import { useDnsMutations } from "~/components/dns/mutations.ts";
 import { NameserversSection } from "~/components/dns/nameservers-section.tsx";
 import { SearchDomainsSection } from "~/components/dns/search-section.tsx";
-import { SourceBanner } from "~/components/dns/source.tsx";
+import { DnsSourceActions } from "~/components/dns/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/dns/nameservers")({
@@ -29,18 +29,17 @@ function NameserversPage(): ReactElement {
     <>
       <PageHeader
         title="Nameservers"
+        docs="ref/dns"
         description="The resolvers every machine uses, MagicDNS, and the search domains that complete short names."
+        actions={<DnsSourceActions dns={dns.data} canEdit={canEdit} mutations={mutations} />}
       />
-      <div className="flex flex-col gap-6">
-        <SourceBanner dns={dns.data} canEdit={canEdit} mutations={mutations} />
-        <MagicDnsSection dns={dns.data} />
-        <NameserversSection
-          settings={editableSettings(dns.data)}
-          canEdit={canEdit}
-          mutations={mutations}
-        />
-        <SearchDomainsSection dns={dns.data} canEdit={canEdit} mutations={mutations} />
-      </div>
+      <MagicDnsSection dns={dns.data} />
+      <NameserversSection
+        settings={editableSettings(dns.data)}
+        canEdit={canEdit}
+        mutations={mutations}
+      />
+      <SearchDomainsSection dns={dns.data} canEdit={canEdit} mutations={mutations} />
     </>
   );
 }

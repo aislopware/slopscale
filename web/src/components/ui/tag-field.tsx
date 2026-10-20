@@ -1,8 +1,10 @@
 import { Combobox } from "@cloudflare/kumo/components/combobox";
+import { cn } from "@cloudflare/kumo/utils";
 import { useMemo, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
-import { Tag, TagText, tagColours } from "~/components/ui/tag.tsx";
+import { fieldError } from "~/components/ui/field-error.ts";
+import { Tag, TagText, tagChipClass } from "~/components/ui/tag.tsx";
 import { normalizeTag, parseTagList, splitTag, tagError } from "~/lib/tag.ts";
 
 /** A row of the list: a tag the tailnet knows, or the one the operator is typing. */
@@ -113,7 +115,7 @@ export function TagField({
       required={required}
       label={label}
       {...(description === undefined ? {} : { description })}
-      {...(issue === null ? {} : { error: issue })}
+      {...fieldError(issue ?? undefined)}
       // The rows are ranked here, so the list is not filtered again by the text.
       filter={null}
       autoHighlight
@@ -146,8 +148,8 @@ export function TagField({
           <Combobox.Chip
             key={item.value}
             removeLabel={`Remove ${item.value}`}
-            // Kumo's chip is a 2px corner; the tag chip elsewhere is the controls' radius.
-            style={{ ...tagColours(item.value), borderRadius: "var(--radius-md)" }}
+            // The same pill a tag is everywhere else, as the dashboard's tag input draws its chips.
+            className={cn("h-5 pl-2 text-sm ring-0", tagChipClass)}
           >
             <TagText tag={item.value} />
           </Combobox.Chip>

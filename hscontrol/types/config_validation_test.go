@@ -57,22 +57,22 @@ func TestValidateListenerCollisions(t *testing.T) {
 		{
 			name:    "acme-collision-numeric",
 			extra:   acme + "listen_addr: \":80\"\ntls_letsencrypt_listen: \":80\"\n",
-			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+			wantErr: "listen_addr and tls.acme.http_listen would bind the same tcp socket",
 		},
 		{
 			name:    "acme-collision-named-vs-numeric",
 			extra:   acme + "listen_addr: 0.0.0.0:80\ntls_letsencrypt_listen: \":http\"\n",
-			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+			wantErr: "listen_addr and tls.acme.http_listen would bind the same tcp socket",
 		},
 		{
 			name:    "acme-collision-unset-listen-is-port-80",
 			extra:   acme + "listen_addr: 0.0.0.0:80\n",
-			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+			wantErr: "listen_addr and tls.acme.http_listen would bind the same tcp socket",
 		},
 		{
 			name:    "acme-collision-https-named",
 			extra:   acme + "listen_addr: \":443\"\ntls_letsencrypt_listen: \":https\"\n",
-			wantErr: "listen_addr and tls_letsencrypt_listen would bind the same tcp socket",
+			wantErr: "listen_addr and tls.acme.http_listen would bind the same tcp socket",
 		},
 		{
 			name:  "acme-canonical",

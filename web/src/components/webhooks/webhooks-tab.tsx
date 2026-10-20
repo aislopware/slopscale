@@ -11,8 +11,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { useWebhookMutations } from "~/components/webhooks/mutations.ts";
 import { webhookColumns } from "~/components/webhooks/webhook-columns.tsx";
 import { WebhookDialog } from "~/components/webhooks/webhook-dialogs.tsx";
@@ -45,7 +44,6 @@ export function WebhooksTab({
   });
 
   const total = webhooks.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -69,7 +67,7 @@ export function WebhooksTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -79,6 +77,19 @@ export function WebhooksTab({
                 size="sm"
                 title="No webhooks yet"
                 description="Post events to your own endpoint, a chat channel, Telegram, ntfy or email."
+                contents={
+                  canEdit ? (
+                    <Button
+                      variant="secondary"
+                      icon={PlusIcon}
+                      onClick={() => {
+                        setCreating(true);
+                      }}
+                    >
+                      Add your first webhook
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : (
               <Empty
@@ -98,13 +109,8 @@ export function WebhooksTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countWebhooks(total)}`}</TableFooter>
-            )
-          }
         />
-      </Frame>
+      </TableGroup>
       <WebhookDialog
         eventTypes={eventTypes}
         open={creating}

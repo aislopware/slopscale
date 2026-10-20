@@ -13,7 +13,6 @@ import {
   trafficSettingsQuery,
 } from "~/api/traffic.ts";
 import type { DestinationGrouping, TrafficNode, TrafficScope } from "~/api/traffic.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { VolumeCell } from "~/components/traffic/cells.tsx";
 import { DestinationsSection, whereGrouping } from "~/components/traffic/destinations-section.tsx";
@@ -28,12 +27,13 @@ import {
   noDestinationFilters,
   pickDestination,
 } from "~/components/traffic/search.ts";
-import { TrafficSummaryPanel, emptySummary } from "~/components/traffic/summary.tsx";
+import { TrafficAnalytics, emptySummary } from "~/components/traffic/summary.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { PageSection } from "~/components/ui/settings-layout.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
 /** How many destinations and names the machine's page lists; the pages it links to list the rest. */
@@ -128,7 +128,7 @@ function MachineTrafficPage(): ReactElement {
       />
       {isRefusedWindow(error) ? null : (
         <>
-          <TrafficSummaryPanel
+          <TrafficAnalytics
             summary={data ?? emptySummary}
             loading={data === undefined && error === null}
             onZoom={(from, to) => {
@@ -169,21 +169,13 @@ function MachineDestinationsSection({
       groupBy={groupBy}
       whole={whole}
       oneMachine
-      footer={
-        rows.length === 0 ? undefined : (
-          <TableFooter
-            actions={
-              <TextLink
-                to="/traffic/destinations"
-                search={{ ...windowOf(search), ...noDestinationFilters, by: groupBy, node: nodeId }}
-              >
-                Open in destinations
-              </TextLink>
-            }
-          >
-            {`Showing ${plural(rows.length, "row")}`}
-          </TableFooter>
-        )
+      actions={
+        <TextLink
+          to="/traffic/destinations"
+          search={{ ...windowOf(search), ...noDestinationFilters, by: groupBy, node: nodeId }}
+        >
+          Open in destinations
+        </TextLink>
       }
       onGroupChange={(by) => {
         void navigate({ search: (previous) => ({ ...previous, by }), replace: true });
@@ -248,10 +240,17 @@ function MachineNamesSection({
   const rows = names.data?.names ?? [];
 
   return (
-    <Section
+    <PageSection
       title="DNS lookups"
       description="The names this machine looked up through the gateways' resolvers, most asked first."
-      panel={false}
+      actions={
+        <TextLink
+          to="/traffic/dns"
+          search={{ ...windowOf(search), by: "name", q: "", name: "", node: nodeId }}
+        >
+          All lookups
+        </TextLink>
+      }
     >
       <NamesTable
         rows={rows}
@@ -259,21 +258,8 @@ function MachineNamesSection({
         oneMachine
         empty={settings.data?.dnsLogging === false ? <DnsLoggingOff /> : undefined}
         footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter
-              actions={
-                <TextLink
-                  to="/traffic/dns"
-                  search={{ ...windowOf(search), by: "name", q: "", name: "", node: nodeId }}
-                >
-                  All lookups
-                </TextLink>
-              }
-            >
-              {rows.length >= nameRows
-                ? `The ${nameRows} most asked`
-                : `Showing ${plural(rows.length, "name")}`}
-            </TableFooter>
+          rows.length < nameRows ? undefined : (
+            <TableFooter>{`The ${nameRows} most asked`}</TableFooter>
           )
         }
         onPick={(row) => {
@@ -283,6 +269,6 @@ function MachineNamesSection({
           });
         }}
       />
-    </Section>
+    </PageSection>
   );
 }

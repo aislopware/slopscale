@@ -41,6 +41,10 @@ const (
 	rebuildPeerMaps = 4
 	setName         = 5
 	updateMulti     = 6
+	// rebuildRoutes reruns the route election with new inputs and keeps
+	// the peer relationship; applyBatch has nothing to apply for it, the
+	// snapshot it builds reads the inputs.
+	rebuildRoutes = 7
 )
 
 const prometheusNamespace = "slopscale"
@@ -118,6 +122,11 @@ type NodeStore struct {
 
 	batchSize    int
 	batchTimeout time.Duration
+
+	// inputs is what the route election reads besides the nodes; nil
+	// is the zero [routeInputs]. inputsMu serialises its writers.
+	inputs   atomic.Pointer[routeInputs]
+	inputsMu sync.Mutex
 }
 
 // NewNodeStore builds a store whose peers come from a [PeersFunc] keyed by
@@ -141,7 +150,7 @@ func NewNodeStorePositional(
 		nodes[n.ID] = *n
 	}
 
-	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{}, nil)
+	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{})
 
 	store := &NodeStore{
 		peersFunc:    peersFunc,
@@ -262,6 +271,9 @@ type Snapshot struct {
 	// steeredExits are the global exit nodes with a priority, in ID
 	// order, whose priority steering lifts per viewer.
 	steeredExits []exitSite
+
+	// services is the choice of host per service; see service_hosts.go.
+	services serviceElection
 }
 
 // machineKeyNode is one node of the machine key index together with the
@@ -307,6 +319,12 @@ type PrimaryRouteLedger struct {
 	// moving region steers viewers elsewhere without moving a primary.
 	contested map[netip.Prefix][]site
 	exits     []exitSite
+
+	// The service hosts, tailnet-wide and per region, and steering's
+	// input for them.
+	serviceHosts     map[tailcfg.ServiceName]types.NodeID
+	serviceRegional  map[tailcfg.DERPRegionID]map[tailcfg.ServiceName]types.NodeID
+	serviceContested map[tailcfg.ServiceName][]site
 }
 
 // Equal reports whether both ledgers assign every prefix, tailnet-wide and
@@ -315,7 +333,10 @@ func (l PrimaryRouteLedger) Equal(o PrimaryRouteLedger) bool {
 	return maps.Equal(l.Global, o.Global) &&
 		maps.EqualFunc(l.Regional, o.Regional, maps.Equal) &&
 		maps.EqualFunc(l.contested, o.contested, slices.Equal) &&
-		slices.Equal(l.exits, o.exits)
+		slices.Equal(l.exits, o.exits) &&
+		maps.Equal(l.serviceHosts, o.serviceHosts) &&
+		maps.EqualFunc(l.serviceRegional, o.serviceRegional, maps.Equal) &&
+		maps.EqualFunc(l.serviceContested, o.serviceContested, slices.Equal)
 }
 
 // PeersFunc is a function that takes a list of nodes and returns a map
@@ -590,13 +611,16 @@ func (s *NodeStore) Stop() {
 // givenNames counts how many nodes hold each given name.
 // [NodeStore.applyBatch] builds it once per batch and keeps it in step
 // with the names the batch writes, so resolving a name costs a lookup per
-// candidate instead of a scan over every node per operation.
+// candidate instead of a scan over every node per operation. Names are
+// counted case-insensitively, as DNS compares them: a "Laptop" from
+// before renames were lowercased already holds "laptop", and one
+// certificate would be valid for both.
 type givenNames map[string]int
 
 func newGivenNames(nodes map[types.NodeID]types.Node) givenNames {
 	names := make(givenNames, len(nodes))
 	for _, n := range nodes {
-		names[n.GivenName]++
+		names[strings.ToLower(n.GivenName)]++
 	}
 
 	return names
@@ -605,8 +629,8 @@ func newGivenNames(nodes map[types.NodeID]types.Node) givenNames {
 // free reports whether candidate is available to the node currently named
 // selfName: nobody holds it, or only that node does.
 func (g givenNames) free(candidate, selfName string) bool {
-	held := g[candidate]
-	if candidate == selfName {
+	held := g[strings.ToLower(candidate)]
+	if strings.EqualFold(candidate, selfName) {
 		held--
 	}
 
@@ -615,11 +639,12 @@ func (g givenNames) free(candidate, selfName string) bool {
 
 // hold records one more node holding name.
 func (g givenNames) hold(name string) {
-	g[name]++
+	g[strings.ToLower(name)]++
 }
 
 // release records one fewer node holding name.
 func (g givenNames) release(name string) {
+	name = strings.ToLower(name)
 	if g[name] <= 1 {
 		delete(g, name)
 		return
@@ -656,16 +681,29 @@ func resolveGivenName(taken givenNames, selfName, base string) string {
 // snapshotFromNodes builds the index maps and primary-route table for
 // a new [Snapshot]. prevRoutes carries forward the previous primary
 // assignment so a still-valid choice survives unrelated batches.
+func snapshotFromNodes(
+	nodes map[types.NodeID]types.Node,
+	peersFunc PeerPositionsFunc,
+	prev PrimaryRouteLedger,
+) Snapshot {
+	return buildSnapshot(nodes, peersFunc, prev, nil, routeInputs{})
+}
+
+// buildSnapshot is [snapshotFromNodes] with the route election's other
+// inputs. The route selection decides which per-viewer structures are
+// built at all: active-passive failover needs neither the regional
+// primaries nor the steering sets, and regional failover no steering.
 //
 // keepPeers, when not nil, is the previous snapshot's peer relationship
 // over the same node set; the caller vouches that the batch changed no
 // input of it (see peerInputsChanged), so the policy scan is skipped and
 // the views are re-pointed at the new copies.
-func snapshotFromNodes(
+func buildSnapshot(
 	nodes map[types.NodeID]types.Node,
 	peersFunc PeerPositionsFunc,
 	prev PrimaryRouteLedger,
 	keepPeers [][]int32,
+	in routeInputs,
 ) Snapshot {
 	defer observeSince(nodeStoreSnapshotBuildDuration, time.Now())
 
@@ -688,8 +726,20 @@ func snapshotFromNodes(
 
 	advertisers := onlineAdvertisers(nodes)
 	routes, isPrimaryRoute := electPrimaryRoutes(nodes, advertisers, prev.Global)
-	regionalRoutes := electRegionalRoutes(nodes, advertisers, prev.Regional)
-	contested := contestedRoutes(nodes, advertisers)
+
+	var (
+		regionalRoutes map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+		contested      map[netip.Prefix][]site
+	)
+
+	if in.selection.Regional() {
+		regionalRoutes = electRegionalRoutes(nodes, advertisers, prev.Regional)
+	}
+
+	steerExits := in.selection.Nearest()
+	if steerExits {
+		contested = contestedRoutes(nodes, advertisers)
+	}
 
 	// The peer relationship is the expensive part: every pair of nodes
 	// through the policy. It is only recomputed when a batch changed an
@@ -716,7 +766,8 @@ func snapshotFromNodes(
 		isPrimaryRoute: isPrimaryRoute,
 		regionalRoutes: regionalRoutes,
 		contested:      contested,
-		steerable:      steerableNodes(contested),
+		steerable:      steerableNodes(routes, contested, regionalRoutes),
+		services:       electServices(nodes, in, prev),
 	}
 
 	// Build nodesByUser, nodesByNodeKey, and nodesByMachineKey maps
@@ -735,7 +786,7 @@ func snapshotFromNodes(
 		// Build machine key index
 		newSnap.nodesByMachineKey[n.MachineKey] = newSnap.nodesByMachineKey[n.MachineKey].add(userID, nodeView)
 
-		if n.GlobalExitNode && n.ExitNodePriority > 0 {
+		if steerExits && n.GlobalExitNode && n.ExitNodePriority > 0 {
 			newSnap.steeredExits = append(newSnap.steeredExits, exitSite{
 				id: n.ID, region: n.DERPRegion(),
 				priority: n.ExitNodePriority,
@@ -818,12 +869,12 @@ func electPrimaryRoutes(
 
 // electPrefixes runs the primary election of [electPrimaryRoutes] over
 // the given advertisers, carrying prev forward where it still holds.
-func electPrefixes(
+func electPrefixes[K comparable](
 	nodes map[types.NodeID]types.Node,
-	advertisers map[netip.Prefix][]types.NodeID,
-	prev map[netip.Prefix]types.NodeID,
-) map[netip.Prefix]types.NodeID {
-	routes := make(map[netip.Prefix]types.NodeID, len(advertisers))
+	advertisers map[K][]types.NodeID,
+	prev map[K]types.NodeID,
+) map[K]types.NodeID {
+	routes := make(map[K]types.NodeID, len(advertisers))
 	for prefix, candidates := range advertisers {
 		if cur, ok := prev[prefix]; ok &&
 			slices.Contains(candidates, cur) &&
@@ -874,16 +925,16 @@ func electPrefixes(
 // advertiser in one region the tailnet-wide election already answers.
 // Regions are read from each node's preferred DERP; nodes without one
 // belong to no region.
-func electRegionalRoutes(
+func electRegionalRoutes[K comparable](
 	nodes map[types.NodeID]types.Node,
-	advertisers map[netip.Prefix][]types.NodeID,
-	prev map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID,
-) map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID {
+	advertisers map[K][]types.NodeID,
+	prev map[tailcfg.DERPRegionID]map[K]types.NodeID,
+) map[tailcfg.DERPRegionID]map[K]types.NodeID {
 	if len(advertisers) == 0 {
 		return nil
 	}
 
-	byRegion := make(map[tailcfg.DERPRegionID]map[netip.Prefix][]types.NodeID)
+	byRegion := make(map[tailcfg.DERPRegionID]map[K][]types.NodeID)
 
 	for prefix, candidates := range advertisers {
 		regions := make(map[tailcfg.DERPRegionID][]types.NodeID)
@@ -908,7 +959,7 @@ func electRegionalRoutes(
 
 		for region, ids := range regions {
 			if byRegion[region] == nil {
-				byRegion[region] = make(map[netip.Prefix][]types.NodeID)
+				byRegion[region] = make(map[K][]types.NodeID)
 			}
 
 			byRegion[region][prefix] = ids
@@ -919,7 +970,7 @@ func electRegionalRoutes(
 		return nil
 	}
 
-	regional := make(map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID, len(byRegion))
+	regional := make(map[tailcfg.DERPRegionID]map[K]types.NodeID, len(byRegion))
 	for region, regionAdvertisers := range byRegion {
 		regional[region] = electPrefixes(nodes, regionAdvertisers, prev[region])
 	}
@@ -931,12 +982,12 @@ func electRegionalRoutes(
 // advertise to those nodes and their DERP regions, in ID order. Prefixes
 // with the same advertisers in the same regions share one slice, so a
 // viewer's steering is worked out once per set rather than per prefix.
-func contestedRoutes(
+func contestedRoutes[K comparable](
 	nodes map[types.NodeID]types.Node,
-	advertisers map[netip.Prefix][]types.NodeID,
-) map[netip.Prefix][]site {
+	advertisers map[K][]types.NodeID,
+) map[K][]site {
 	var (
-		out    map[netip.Prefix][]site
+		out    map[K][]site
 		shared map[string][]site
 		setKey []byte
 	)
@@ -985,7 +1036,7 @@ func contestedRoutes(
 		}
 
 		if out == nil {
-			out = make(map[netip.Prefix][]site)
+			out = make(map[K][]site)
 		}
 
 		out[prefix] = sites
@@ -994,17 +1045,40 @@ func contestedRoutes(
 	return out
 }
 
-// steerableNodes returns the nodes contested lists.
-func steerableNodes(contested map[netip.Prefix][]site) map[types.NodeID]bool {
-	if len(contested) == 0 {
+// steerableNodes returns the nodes whose share of the keys depends on
+// the viewer: those contested lists, the regional primaries, and the
+// tailnet-wide primary of every key that has either, since a viewer
+// steered away no longer reaches the key through it. With steering on,
+// every regional primary is also contested; under regional failover the
+// tailnet-wide primary of a key need not be any region's primary.
+func steerableNodes[K comparable](
+	global map[K]types.NodeID,
+	contested map[K][]site,
+	regional map[tailcfg.DERPRegionID]map[K]types.NodeID,
+) map[types.NodeID]bool {
+	if len(contested) == 0 && len(regional) == 0 {
 		return nil
 	}
 
 	out := make(map[types.NodeID]bool)
 
-	for _, sites := range contested {
+	for key, sites := range contested {
 		for _, s := range sites {
 			out[s.id] = true
+		}
+
+		if id, ok := global[key]; ok {
+			out[id] = true
+		}
+	}
+
+	for _, primaries := range regional {
+		for key, id := range primaries {
+			out[id] = true
+
+			if g, ok := global[key]; ok {
+				out[g] = true
+			}
 		}
 	}
 
@@ -1262,7 +1336,8 @@ func (s *NodeStore) PrimaryRoutesForNode(id types.NodeID) []netip.Prefix {
 }
 
 // HANodes returns the prefixes with two or more online advertisers, the
-// candidate set the HA prober needs to monitor.
+// candidate set the HA prober needs to monitor. A service with two or
+// more online hosts is listed under each of its addresses.
 func (s *NodeStore) HANodes() map[netip.Prefix][]types.NodeID {
 	snap := s.data.Load()
 
@@ -1276,6 +1351,17 @@ func (s *NodeStore) HANodes() map[netip.Prefix][]types.NodeID {
 		}
 
 		out[p] = ids
+	}
+
+	_, hosts := serviceCandidates(snap.nodesByID, snap.services.prefixes)
+	for name, ids := range hosts {
+		if len(ids) < 2 {
+			continue
+		}
+
+		for _, p := range snap.services.prefixes[name] {
+			out[p] = ids
+		}
 	}
 
 	return out
@@ -1329,23 +1415,7 @@ func (snap *Snapshot) primaryFrom(
 	viewer viewerSite,
 	near map[*site][]site,
 ) types.NodeID {
-	primary := global
-	if local, ok := snap.regionalRoutes[viewer.region()][prefix]; ok {
-		primary = local
-	}
-
-	sites := snap.contested[prefix]
-	if len(sites) == 0 {
-		return primary
-	}
-
-	nearSites, ok := near[&sites[0]]
-	if !ok {
-		nearSites = nearest(sites, viewer)
-		near[&sites[0]] = nearSites
-	}
-
-	return steer(prefix, sites, nearSites, viewer, primary)
+	return pickFor(prefix, global, snap.regionalRoutes, snap.contested, viewer, near, isPublicAddr(prefix.Addr()))
 }
 
 // SteeringDiffers reports whether a viewer whose home region or round
@@ -1356,6 +1426,10 @@ func (s *NodeStore) SteeringDiffers(before, after viewerSite) bool {
 	snap := s.data.Load()
 
 	if !maps.Equal(exitPriorities(snap.steeredExits, before), exitPriorities(snap.steeredExits, after)) {
+		return true
+	}
+
+	if snap.services.steeringDiffers(before, after) {
 		return true
 	}
 
@@ -1383,10 +1457,13 @@ func (s *NodeStore) ExitNodePrioritiesFor(viewer viewerSite) map[types.NodeID]in
 // ledger returns the snapshot's primary assignment.
 func (snap *Snapshot) ledger() PrimaryRouteLedger {
 	return PrimaryRouteLedger{
-		Global:    snap.routes,
-		Regional:  snap.regionalRoutes,
-		contested: snap.contested,
-		exits:     snap.steeredExits,
+		Global:           snap.routes,
+		Regional:         snap.regionalRoutes,
+		contested:        snap.contested,
+		exits:            snap.steeredExits,
+		serviceHosts:     snap.services.hosts,
+		serviceRegional:  snap.services.regional,
+		serviceContested: snap.services.contested,
 	}
 }
 
@@ -1659,7 +1736,7 @@ func (s *NodeStore) nextSnapshot(prev *Snapshot, nodes map[types.NodeID]types.No
 		keepPeers = prev.peerPositions
 	}
 
-	return snapshotFromNodes(nodes, s.peersFunc, prev.ledger(), keepPeers)
+	return buildSnapshot(nodes, s.peersFunc, prev.ledger(), keepPeers, s.routeInputs())
 }
 
 // deliverBatchResults unblocks every writer waiting on the batch, after

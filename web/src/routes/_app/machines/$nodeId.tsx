@@ -1,31 +1,17 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { cn } from "@cloudflare/kumo/utils";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { api } from "~/api/client.ts";
 import { appsQuery, groupsQuery, servicesQuery, usersQuery } from "~/api/queries.ts";
-import type { User } from "~/api/queries.ts";
 import { can, canListUsers } from "~/auth/me.ts";
-import { AppConnectorSection } from "~/components/apps/app-connector-section.tsx";
-import { ClientHealthSection } from "~/components/machines/client-health.tsx";
-import { ConnectivitySection } from "~/components/machines/connectivity.tsx";
-import { DangerZone } from "~/components/machines/danger-zone.tsx";
-import { GroupsSection } from "~/components/machines/groups.tsx";
-import { MachineHeader } from "~/components/machines/header.tsx";
-import { AddressesSection, OverviewSection } from "~/components/machines/overview.tsx";
-import { mayManageNode } from "~/components/machines/owner.ts";
-import { machinePolling } from "~/components/machines/polling.ts";
-import { PostureSection } from "~/components/machines/posture.tsx";
-import { PreferencesSection } from "~/components/machines/preferences.tsx";
-import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.tsx";
-import { ServicesSection } from "~/components/machines/services.tsx";
-import { SharingSection } from "~/components/machines/sharing.tsx";
+import { MachineDetails } from "~/components/machines/details-rail.tsx";
+import { MachineTabBar, machineTabOf } from "~/components/machines/header.tsx";
+import { useMachinePage } from "~/components/machines/machine-page.ts";
+import { MachineSummary } from "~/components/machines/summary-strip.tsx";
 import { ClientWarnings } from "~/components/machines/warnings.tsx";
-import { MachineTrafficSection } from "~/components/traffic/machine-section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
-import { nodeLabel } from "~/lib/node.ts";
-
-const emptyUsers: readonly User[] = [];
+import { nodeName } from "~/lib/node.ts";
 
 export const Route = createFileRoute("/_app/machines/$nodeId")({
   loader: async ({ context, params }) => {
@@ -50,57 +36,42 @@ export const Route = createFileRoute("/_app/machines/$nodeId")({
   component: MachinePage,
 });
 
+/**
+ * One machine, as Cloudflare's Mesh draws a node: a bar of tabs (Overview, Routes, Diagnostics,
+ * Settings), each its own address, with the machine's actions at its end; the summary strip; then
+ * the tab's cards in three columns' room and the details in a sticky rail in the fourth. The strip
+ * and the rail stay on every tab. On a phone the rail comes first on Overview, since the name, the
+ * ID and the addresses are what an operator opens a machine for; on the other tabs it follows the
+ * tab's cards, which are what the reader picked the tab for.
+ */
 function MachinePage(): ReactElement {
   const { me } = Route.useRouteContext();
   const { nodeId } = Route.useParams();
-  const detail = useSuspenseQuery({
-    ...api.queryOptions("get", "/api/v1/node/{nodeId}", { params: { path: { nodeId } } }),
-    ...machinePolling,
-  });
-  const users = useQuery({ ...usersQuery, enabled: canListUsers(me) });
-  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
-  const apps = useQuery({ ...appsQuery, enabled: can(me, "policy_file:read") });
-  const services = useQuery({ ...servicesQuery, enabled: can(me, "services:read") });
-  const { node } = detail.data;
-  const userList = users.data?.users ?? emptyUsers;
-  const routes = can(me, "devices:routes");
+  const { node, users } = useMachinePage(nodeId, me);
+  const tab = machineTabOf(useRouterState({ select: (state) => state.location.pathname }));
 
-  useBreadcrumb(nodeLabel(node));
+  // The trail names the machine alone; its tags and owner are on the summary strip.
+  useBreadcrumb(nodeName(node));
 
   return (
     <>
-      <MachineHeader node={node} me={me} users={userList} />
+      <MachineTabBar node={node} me={me} users={users} tab={tab} />
       <ClientWarnings node={node} />
-      <div className="grid grid-cols-1 items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
-        <div className="flex flex-col gap-6">
-          <OverviewSection node={node} />
-          <RoutesSection node={node} canEdit={routes} />
-          {node.appConnector && apps.data !== undefined ? (
-            <AppConnectorSection node={node} apps={apps.data.apps} />
-          ) : null}
-          {services.data === undefined ? null : (
-            <ServicesSection
-              node={node}
-              services={services.data.services}
-              canEdit={can(me, "services")}
-            />
-          )}
-          <PreferencesSection node={node} me={me} />
-          <PostureSection node={node} me={me} />
-          {groups.data === undefined ? null : (
-            <GroupsSection node={node} groups={groups.data.groups} users={userList} me={me} />
-          )}
-          <SharingSection node={node} users={userList} me={me} />
-        </div>
-        <div className="flex flex-col gap-6">
-          <AddressesSection node={node} />
-          <ConnectivitySection node={node} />
-          {can(me, "logs:network:read") ? <MachineTrafficSection nodeId={node.id} /> : null}
-          <ClientHealthSection node={node} me={me} />
-          <GlobalExitSection node={node} canEdit={routes} />
-          {mayManageNode(me, node) ? (
-            <DangerZone node={node} canSuspend={can(me, "devices:core")} />
-          ) : null}
+      <div className="flex flex-col gap-4">
+        <MachineSummary node={node} />
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-4">
+          <div className="min-w-0 lg:col-span-3">
+            <Outlet />
+          </div>
+          <aside
+            aria-label="Machine details"
+            className={cn(
+              "flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--app-header-height,0px)+1rem)]",
+              tab === "overview" && "max-lg:order-first",
+            )}
+          >
+            <MachineDetails node={node} me={me} />
+          </aside>
         </div>
       </div>
     </>

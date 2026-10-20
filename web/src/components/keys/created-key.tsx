@@ -46,6 +46,30 @@ export function CreatedKey({
 }): ReactElement {
   return (
     <div className="flex flex-col gap-4">
+      <RevealedSecret value={value} note={note} />
+      {join ? <JoinCommand authKey={value} /> : null}
+      <DialogFooter>
+        <Button variant="primary" onClick={onDone}>
+          Done
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+/**
+ * The secret itself with the warning that it will not be shown again, for a dialog or a create page
+ * to put its own actions under.
+ */
+export function RevealedSecret({
+  value,
+  note,
+}: {
+  readonly value: string;
+  readonly note: ReactNode;
+}): ReactElement {
+  return (
+    <>
       <Banner
         icon={<CheckCircleIcon weight="fill" />}
         title="Copy the key now"
@@ -61,12 +85,6 @@ export function CreatedKey({
           className="w-full items-start justify-between gap-2 text-left"
         />
       </div>
-      {join ? <JoinCommand authKey={value} /> : null}
-      <DialogFooter>
-        <Button variant="primary" onClick={onDone}>
-          Done
-        </Button>
-      </DialogFooter>
-    </div>
+    </>
   );
 }

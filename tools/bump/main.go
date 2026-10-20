@@ -7,8 +7,11 @@
 // update moves the compiler and every devShell tool at once, bun included, and
 // the lockfiles must still install with that bun. Two Dockerfiles compile a tailscale tree cloned from an unpinned
 // branch, so their builder image has to keep up with upstream's go directive.
-// go.mod follows tailscale.com's main branch and must hold gvisor and
-// wireguard-windows where that commit pins them. flakehashes.json has to follow
+// go.mod follows the commit of Tailscale's newest unstable release and must hold gvisor and
+// wireguard-windows where that commit pins them. The libdns providers and
+// certmagic share one DNS provider instance, so they stay on one libdns major:
+// a provider that moves to the next waits for certmagic, which the compiler
+// enforces and this tool does not. flakehashes.json has to follow
 // go.sum. The capability-version table is scraped from tailscale's published
 // tags, so it goes stale without anyone touching the repository.
 //

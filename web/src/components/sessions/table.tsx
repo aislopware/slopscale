@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
@@ -23,14 +22,22 @@ import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import {
+  actionsColumnClass,
+  hideBelowClasses,
+  narrowOnlyClass,
+  pinnedEdgeClass,
+  tableClass,
+  tableRowClass,
+} from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
+import { Timestamp } from "~/components/ui/timestamp.tsx";
 import { machineLabel } from "~/lib/node.ts";
 
 const stateTones: Record<RecordingState, { tone: Tone; label: string }> = {
@@ -59,9 +66,15 @@ function RecordingRow({
   const remove = useDeleteRecording();
 
   return (
-    <Table.Row className={cn("align-top", frameTableRowClass)}>
-      <Table.Cell className="whitespace-nowrap text-kumo-subtle">
-        <RelativeTime value={recording.startedAt} />
+    <Table.Row className={cn("align-top", tableRowClass)}>
+      <Table.Cell className="whitespace-nowrap">
+        <div className="flex flex-col gap-0.5">
+          <Timestamp value={recording.startedAt} />
+          {/* A phone hides the Status column, so the state takes a line of its own. */}
+          <span className={cn("pt-0.5", narrowOnlyClass)}>
+            <StateBadge recording={recording} />
+          </span>
+        </div>
       </Table.Cell>
       <Table.Cell>
         {/* A user-owned source already reads "alice on laptop"; a tagged one needs its tags. */}
@@ -80,13 +93,13 @@ function RecordingRow({
       <Table.Cell className="max-w-64 truncate font-mono text-sm text-kumo-subtle">
         {recording.command === "" ? "shell" : recording.command}
       </Table.Cell>
-      <Table.Cell className="whitespace-nowrap text-kumo-subtle">
+      <Table.Cell className="text-right whitespace-nowrap text-kumo-subtle tabular-nums">
         {formatBytes(recording.size)}
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell className={hideBelowClasses.sm}>
         <StateBadge recording={recording} />
       </Table.Cell>
-      <Table.Cell sticky="right" className={cn("w-12 text-right", overflowing && pinnedEdgeClass)}>
+      <Table.Cell sticky="right" className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}>
         <RowMenu
           label={`Actions for the recording of ${machineLabel(sessionTarget(recording), recording.dstOwner)}`}
         >
@@ -115,7 +128,7 @@ function RecordingRow({
             </DropdownMenu.Item>
           </DisabledReason>
         </RowMenu>
-        <DeleteResource
+        <DeleteDialog
           open={deleting}
           onOpenChange={setDeleting}
           resourceType="recording"
@@ -155,43 +168,42 @@ export function SessionsTable({
   paging,
 }: SessionsTableProps): ReactElement {
   return (
-    <>
-      <TableScroll
-        pinnedRight
-        below={
-          recordings.length === 0 ? <EmptySessions embeddedRecorder={embeddedRecorder} /> : null
-        }
-      >
-        {(overflowing) => (
-          <Table className={frameTableClass}>
-            <Table.Header variant="compact">
-              <Table.Row>
-                <Table.Head>Started</Table.Head>
-                <Table.Head>From</Table.Head>
-                <Table.Head>To</Table.Head>
-                <Table.Head>Command</Table.Head>
-                <Table.Head>Size</Table.Head>
-                <Table.Head>Status</Table.Head>
-                <Table.Head sticky="right" className={cn("w-12", overflowing && pinnedEdgeClass)}>
-                  <span className="sr-only">Actions</span>
-                </Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {recordings.map((recording) => (
-                <RecordingRow
-                  key={recording.id}
-                  recording={recording}
-                  writable={writable}
-                  overflowing={overflowing}
-                />
-              ))}
-            </Table.Body>
-          </Table>
-        )}
-      </TableScroll>
-      <CursorBand paging={paging} noun="recording" />
-    </>
+    <TableScroll
+      pinnedRight
+      below={recordings.length === 0 ? <EmptySessions embeddedRecorder={embeddedRecorder} /> : null}
+      footer={paging.loaded === 0 ? null : <CursorBand paging={paging} />}
+    >
+      {(overflowing) => (
+        <Table className={tableClass}>
+          <Table.Header>
+            <Table.Row>
+              <Table.Head>Started</Table.Head>
+              <Table.Head>From</Table.Head>
+              <Table.Head>To</Table.Head>
+              <Table.Head>Command</Table.Head>
+              <Table.Head className="text-right">Size</Table.Head>
+              <Table.Head className={hideBelowClasses.sm}>Status</Table.Head>
+              <Table.Head
+                sticky="right"
+                className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
+              >
+                <span className="sr-only">Actions</span>
+              </Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {recordings.map((recording) => (
+              <RecordingRow
+                key={recording.id}
+                recording={recording}
+                writable={writable}
+                overflowing={overflowing}
+              />
+            ))}
+          </Table.Body>
+        </Table>
+      )}
+    </TableScroll>
   );
 }
 

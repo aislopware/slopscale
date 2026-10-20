@@ -257,34 +257,38 @@ database:
 ### TLS configuration
 # See: https://aislopware.github.io/slopscale/ref/tls/
 
-## Let's Encrypt / ACME
-# Slopscale supports automatically requesting and setting up
-# TLS for a domain with Let's Encrypt.
+# The flat keys these replace (tls_cert_path, tls_key_path,
+# tls_letsencrypt_*, acme_url, acme_email) still work; a tls key wins.
+tls:
+  ## Use already defined certificates:
+  cert_path: ""
+  key_path: ""
 
-# URL to ACME directory
-acme_url: https://acme-v02.api.letsencrypt.org/directory
+  ## Let's Encrypt / ACME
+  # Slopscale supports automatically requesting and setting up
+  # TLS for a domain with Let's Encrypt, and keeps it renewed.
+  acme:
+    # Domain name to request a TLS certificate for:
+    hostname: ""
 
-# Email to register with ACME provider
-acme_email: ""
+    # Type of ACME challenge to use, currently supported types:
+    # HTTP-01, TLS-ALPN-01 or DNS-01 (publishes through the
+    # https_certificates provider)
+    challenge_type: HTTP-01
 
-# Domain name to request a TLS certificate for:
-tls_letsencrypt_hostname: ""
+    # When HTTP-01 challenge is chosen, letsencrypt must set up a
+    # verification endpoint, and it will be listening on:
+    # :http = port 80
+    http_listen: ":http"
 
-# Path to store certificates and metadata needed by letsencrypt
-tls_letsencrypt_cache_dir: /var/lib/slopscale/cache
+    # URL to ACME directory
+    url: https://acme-v02.api.letsencrypt.org/directory
 
-# Type of ACME challenge to use, currently supported types:
-# HTTP-01 or TLS-ALPN-01
-tls_letsencrypt_challenge_type: HTTP-01
+    # Email to register with ACME provider
+    email: ""
 
-# When HTTP-01 challenge is chosen, letsencrypt must set up a
-# verification endpoint, and it will be listening on:
-# :http = port 80
-tls_letsencrypt_listen: ":http"
-
-## Use already defined certificates:
-tls_cert_path: ""
-tls_key_path: ""
+    # Path to store certificates and metadata needed by letsencrypt
+    cache_dir: /var/lib/slopscale/cache
 
 log:
   # Valid log levels: panic, fatal, error, warn, info, debug, trace
@@ -358,17 +362,30 @@ policy:
 # with `tailscale cert`. The base domain must be a real zone the server
 # can publish TXT records in; see
 # https://aislopware.github.io/slopscale/ref/https-certificates/.
+#
+# The provider also publishes the server's own certificate when
+# tls.acme.challenge_type is DNS-01, with or without enabled.
+# Records are removed once the CA no longer needs them. Any provider
+# setting can be read from a file instead: add _path to its key.
 # https_certificates:
 #   enabled: false
-#   # cloudflare, rfc2136 or command.
+#   # acmedns, cloudflare, command, hetzner, powerdns or rfc2136.
 #   provider: cloudflare
+#   # The zone records are written to; empty uses rfc2136.zone, then
+#   # dns.base_domain.
+#   zone: ""
 #   ttl: 1m
-#   # How long to wait for the zone's nameservers to serve a record
-#   # before telling the machine to go ahead; 0 does not wait.
+#   # How long to wait for every authoritative nameserver of the zone to
+#   # serve a record before telling the machine to go ahead; 0 does not
+#   # wait.
 #   propagation_timeout: 1m
+#   # Resolvers that find the zone's nameservers; defaults to 1.1.1.1
+#   # and 8.8.8.8.
+#   resolvers: []
 #   cloudflare:
 #     # Needs Zone:Read and DNS:Edit on the zone.
 #     api_token: ""
+#     # api_token_path: /run/credentials/slopscale.service/cloudflare-token
 #     # Empty finds the zone from the record's name.
 #     zone_id: ""
 #   rfc2136:
@@ -381,6 +398,28 @@ policy:
 #   command:
 #     # Run with the record name and value as its two arguments.
 #     path: /usr/local/bin/publish-txt
+#     # Run the same way to remove a record; empty leaves records in place.
+#     delete_path: /usr/local/bin/remove-txt
+#   hetzner:
+#     api_token: ""
+#   powerdns:
+#     server_url: https://pdns.example.com
+#     server_id: localhost
+#     api_token: ""
+#   # acmedns needs a registration per certificate name under config, and
+#   # each _acme-challenge name CNAMEd to its registration's fulldomain. A
+#   # machine without one gets no certificate. A registration holds two
+#   # pending challenges; more are refused until one expires. One account
+#   # (username, password, subdomain and server_url instead of config)
+#   # serves the server's own certificate only. config_path reads the
+#   # JSON file acme-dns-client writes.
+#   acmedns:
+#     config:
+#       laptop.example.com:
+#         username: <username from /register>
+#         password: <password from /register>
+#         subdomain: <subdomain from /register>
+#         server_url: https://auth.acme-dns.io
 
 ## SSH session recording
 #

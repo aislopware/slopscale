@@ -1,21 +1,18 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 
 import type { AccessRule, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureColumns } from "~/components/access/posture-columns.tsx";
-import { PostureDialog } from "~/components/access/posture-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export interface PosturesTabProps {
   readonly me: Me;
@@ -37,8 +34,6 @@ export function PosturesTab({
 }: PosturesTabProps): ReactElement {
   const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAccessMutations();
 
   const table = useAppTable({
     data: postures,
@@ -49,23 +44,20 @@ export function PosturesTab({
     meta: { me, rules, geoIpAvailable },
   });
 
-  const shown = table.getRowModel().rows.length;
   const total = postures.length;
 
   return (
     <>
       <TableToolbar
         actions={
-          <Button
+          <LinkButton
+            href="/policy/postures/new"
             variant="primary"
             icon={PlusIcon}
             disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
           >
             New posture
-          </Button>
+          </LinkButton>
         }
       >
         <SearchInput
@@ -74,7 +66,7 @@ export function PosturesTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -103,19 +95,8 @@ export function PosturesTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${total === 1 ? "1 posture" : `${total} postures`}`}</TableFooter>
-            )
-          }
         />
-      </Frame>
-      <PostureDialog
-        geoIpAvailable={geoIpAvailable}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
+      </TableGroup>
     </>
   );
 }

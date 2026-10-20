@@ -157,7 +157,7 @@ func TestSnapshotFromNodes(t *testing.T) {
 			t.Parallel()
 
 			nodes, peersFunc := tt.setupFunc()
-			snapshot := snapshotFromNodes(nodes, peerPositionsOf(peersFunc), PrimaryRouteLedger{}, nil)
+			snapshot := snapshotFromNodes(nodes, peerPositionsOf(peersFunc), PrimaryRouteLedger{})
 			tt.validate(t, nodes, snapshot)
 		})
 	}

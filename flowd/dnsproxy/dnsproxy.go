@@ -47,8 +47,8 @@ const (
 	maxLabelsPerName = 128
 	minUDPSize       = 512
 	bindAttempts     = 10
-	acceptBackoffMin = 5 * time.Millisecond
-	acceptBackoffMax = time.Second
+	minAcceptBackoff = 5 * time.Millisecond
+	maxAcceptBackoff = time.Second
 )
 
 var (
@@ -384,7 +384,7 @@ func retryable(err error) bool {
 }
 
 func (s *Server) backoff(d time.Duration) time.Duration {
-	d = min(max(2*d, acceptBackoffMin), acceptBackoffMax)
+	d = min(max(2*d, minAcceptBackoff), maxAcceptBackoff)
 
 	timer := time.NewTimer(d)
 	defer timer.Stop()

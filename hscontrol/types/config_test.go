@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/conf"
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -403,7 +404,7 @@ func TestTLSConfigValidation(t *testing.T) {
 
 	configYaml := []byte(`---
 tls_letsencrypt_hostname: example.com
-tls_letsencrypt_challenge_type: ""
+tls_letsencrypt_challenge_type: dns-01
 tls_cert_path: abc.pem
 noise:
   private_key_path: noise_private.key`)
@@ -425,12 +426,12 @@ noise:
 	assert.Contains(
 		t,
 		err.Error(),
-		"Fatal config error: tls_letsencrypt_hostname and tls_cert_path/tls_key_path are mutually exclusive",
+		"Fatal config error: tls.acme.hostname and tls.cert_path/tls.key_path are mutually exclusive",
 	)
 	assert.Contains(
 		t,
 		err.Error(),
-		"Fatal config error: tls_letsencrypt_challenge_type has an unsupported value",
+		"Fatal config error: tls.acme.challenge_type has an unsupported value",
 	)
 	assert.Contains(
 		t,
@@ -454,6 +455,222 @@ tls_letsencrypt_challenge_type: TLS-ALPN-01
 
 	err = LoadConfig(tmpDir, false)
 	require.NoError(t, err)
+}
+
+// TestTLSConfigKeys pins how the tls block reads: its own keys first,
+// then the flat keys it replaced, then the defaults, so a config written
+// for an older release keeps its certificate.
+func TestTLSConfigKeys(t *testing.T) {
+	load := func(t *testing.T, yaml string) TLSConfig {
+		t.Helper()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(yaml), 0o600))
+		require.NoError(t, LoadConfig(dir, false))
+
+		return tlsConfig()
+	}
+
+	t.Run("flat keys", func(t *testing.T) {
+		got := load(t, `---
+acme_url: https://acme.example.com/directory
+acme_email: ops@example.com
+tls_letsencrypt_hostname: hs.example.com
+tls_letsencrypt_challenge_type: TLS-ALPN-01
+tls_letsencrypt_listen: ":8081"
+tls_letsencrypt_cache_dir: /var/lib/slopscale/cache
+`)
+		assert.Equal(t, ACMEConfig{
+			Hostname:      "hs.example.com",
+			ChallengeType: TLSALPN01ChallengeType,
+			HTTPListen:    ":8081",
+			URL:           "https://acme.example.com/directory",
+			Email:         "ops@example.com",
+			CacheDir:      "/var/lib/slopscale/cache",
+		}, got.ACME)
+	})
+
+	t.Run("tls block wins over flat keys", func(t *testing.T) {
+		got := load(t, `---
+tls_letsencrypt_hostname: old.example.com
+tls:
+  acme:
+    hostname: hs.example.com
+    challenge_type: DNS-01
+`)
+		assert.Equal(t, "hs.example.com", got.ACME.Hostname)
+		assert.Equal(t, DNS01ChallengeType, got.ACME.ChallengeType)
+		assert.Equal(t, DefaultACMEListenAddr, got.ACME.HTTPListen)
+		assert.Equal(t, "/var/www/.cache", got.ACME.CacheDir)
+	})
+
+	t.Run("nulls fall back to flat keys", func(t *testing.T) {
+		// The NixOS module writes its unset tls options as null.
+		got := load(t, `---
+tls_letsencrypt_hostname: hs.example.com
+tls_letsencrypt_challenge_type: TLS-ALPN-01
+tls_cert_path: ""
+tls:
+  cert_path: null
+  key_path: null
+  acme:
+    hostname: ""
+    challenge_type: null
+    http_listen: null
+    cache_dir: /var/lib/slopscale/.cache
+`)
+		assert.Equal(t, "hs.example.com", got.ACME.Hostname)
+		assert.Equal(t, TLSALPN01ChallengeType, got.ACME.ChallengeType)
+		assert.Equal(t, DefaultACMEListenAddr, got.ACME.HTTPListen)
+		assert.Equal(t, "/var/lib/slopscale/.cache", got.ACME.CacheDir)
+		assert.Empty(t, got.CertPath)
+	})
+
+	t.Run("static key pair", func(t *testing.T) {
+		got := load(t, `---
+tls:
+  cert_path: /etc/ssl/hs.crt
+  key_path: /etc/ssl/hs.key
+`)
+		assert.Equal(t, "/etc/ssl/hs.crt", got.CertPath)
+		assert.Equal(t, "/etc/ssl/hs.key", got.KeyPath)
+		assert.Empty(t, got.ACME.Hostname)
+	})
+
+	t.Run("environment", func(t *testing.T) {
+		t.Setenv("SLOPSCALE_TLS_ACME_HOSTNAME", "env.example.com")
+
+		got := load(t, "---\ntls_letsencrypt_hostname: old.example.com\n")
+		assert.Equal(t, "env.example.com", got.ACME.Hostname)
+	})
+}
+
+// TestHTTPSCertsConfig covers the provider settings: the existing keys
+// keep working, a provider is needed by DNS-01 for the server's own
+// certificate even without machine certificates, and the zone must hold
+// the base domain.
+func TestHTTPSCertsConfig(t *testing.T) {
+	load := func(t *testing.T, yaml string) (HTTPSCertsConfig, error) {
+		t.Helper()
+
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(yaml), 0o600))
+		require.NoError(t, LoadConfig(dir, false))
+
+		return httpsCertsConfig()
+	}
+
+	t.Run("off needs nothing", func(t *testing.T) {
+		got, err := load(t, "---\nhttps_certificates:\n  provider: cloudflare\n")
+		require.NoError(t, err)
+		assert.Nil(t, got.Provider)
+	})
+
+	t.Run("rfc2136 with its zone", func(t *testing.T) {
+		got, err := load(t, `---
+dns:
+  base_domain: ts.example.com
+https_certificates:
+  enabled: true
+  provider: rfc2136
+  rfc2136:
+    server: 127.0.0.1:53
+    zone: example.com
+    tsig_key_name: slopscale
+    tsig_secret: c2VjcmV0
+`)
+		require.NoError(t, err)
+		require.IsType(t, &dnsprovider.RFC2136{}, got.Provider)
+		assert.Equal(t, "example.com", got.Zone)
+		assert.Equal(t, []string{"1.1.1.1:53", "8.8.8.8:53"}, got.Resolvers)
+	})
+
+	t.Run("zone defaults to the base domain", func(t *testing.T) {
+		t.Setenv("SLOPSCALE_HTTPS_CERTIFICATES_CLOUDFLARE_API_TOKEN", "from-env")
+
+		got, err := load(t, `---
+dns:
+  base_domain: ts.example.com
+https_certificates:
+  enabled: true
+  provider: cloudflare
+  resolvers: [9.9.9.9, "[2620:fe::fe]:53"]
+`)
+		require.NoError(t, err)
+		assert.Equal(t, &dnsprovider.Cloudflare{APIToken: "from-env"}, got.Provider)
+		assert.Equal(t, "ts.example.com", got.Zone)
+		assert.Equal(t, []string{"9.9.9.9:53", "[2620:fe::fe]:53"}, got.Resolvers)
+	})
+
+	t.Run("base domain outside the zone", func(t *testing.T) {
+		_, err := load(t, `---
+dns:
+  base_domain: ts.example.com
+https_certificates:
+  enabled: true
+  zone: example.net
+  provider: command
+  command:
+    path: /bin/true
+`)
+		require.ErrorIs(t, err, errHTTPSCertsZone)
+	})
+
+	t.Run("uppercase base domain", func(t *testing.T) {
+		_, err := load(t, `---
+dns:
+  base_domain: TS.example.com
+https_certificates:
+  enabled: true
+  provider: command
+  command:
+    path: /bin/true
+`)
+		require.ErrorIs(t, err, errHTTPSCertsBaseDomainName)
+	})
+
+	t.Run("server DNS-01 needs a provider", func(t *testing.T) {
+		_, err := load(t, `---
+tls:
+  acme:
+    hostname: hs.example.com
+    challenge_type: DNS-01
+`)
+		require.ErrorIs(t, err, errHTTPSCertsProvider)
+	})
+
+	t.Run("server DNS-01 without machine certificates", func(t *testing.T) {
+		got, err := load(t, `---
+tls:
+  acme:
+    hostname: hs.example.com
+    challenge_type: DNS-01
+https_certificates:
+  provider: command
+  command:
+    path: /bin/true
+`)
+		require.NoError(t, err)
+		assert.Equal(t, &dnsprovider.Command{Path: "/bin/true"}, got.Provider)
+		assert.Empty(t, got.Zone)
+	})
+
+	t.Run("acme-dns needs a registration per name for machines", func(t *testing.T) {
+		_, err := load(t, `---
+dns:
+  base_domain: ts.example.com
+https_certificates:
+  enabled: true
+  provider: acmedns
+  acmedns:
+    username: u
+    password: p
+    subdomain: reg
+    server_url: https://auth.acme-dns.io
+`)
+		require.ErrorIs(t, err, dnsprovider.ErrProviderConfig)
+		require.ErrorContains(t, err, "registration per name")
+	})
 }
 
 func TestPKCEMethodValidation(t *testing.T) {

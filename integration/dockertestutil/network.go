@@ -483,7 +483,13 @@ func execInContainer(
 		}
 	case <-ctx.Done():
 		attached.Close()
-		<-copied
+
+		// Closing the connection is what ends the copy, so a read on
+		// the closed connection says nothing the context does not.
+		copyErr := <-copied
+		if copyErr != nil && !errors.Is(copyErr, net.ErrClosed) {
+			return 0, errors.Join(ctx.Err(), copyErr)
+		}
 
 		return 0, ctx.Err()
 	}

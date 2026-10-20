@@ -42,7 +42,7 @@ func TestClassifyServeError(t *testing.T) {
 		},
 		{
 			name:     "eaddrinuse-named-port",
-			err:      bindError("ACME HTTP-01 challenge", "tls_letsencrypt_listen", "tcp", ":http", syscall.EADDRINUSE),
+			err:      bindError("ACME HTTP-01 challenge", "tls.acme.http_listen", "tcp", ":http", syscall.EADDRINUSE),
 			wantHint: []string{"sudo ss -tlnp 'sport = :80'"},
 		},
 		{

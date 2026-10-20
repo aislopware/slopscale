@@ -7,16 +7,15 @@ import type { ReactElement } from "react";
 import type { PostureIntegration, PostureProvider } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { countIntegrations } from "~/components/posture-integrations/model.ts";
 import { usePostureIntegrationMutations } from "~/components/posture-integrations/mutations.ts";
 import { postureIntegrationColumns } from "~/components/posture-integrations/posture-integration-columns.tsx";
 import { PostureIntegrationDialog } from "~/components/posture-integrations/posture-integration-dialogs.tsx";
+import { ProviderPicker } from "~/components/posture-integrations/provider-picker.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export function PostureIntegrationsTab({
   me,
@@ -34,6 +33,8 @@ export function PostureIntegrationsTab({
   const query = useDeferredValue(search);
   const canEdit = can(me, "devices:posture_attributes");
   const [creating, setCreating] = useState(false);
+  // The provider picked from the tiles, which the form starts with; empty when the button opened it.
+  const [picked, setPicked] = useState("");
   const mutations = usePostureIntegrationMutations();
 
   const table = useAppTable({
@@ -46,7 +47,6 @@ export function PostureIntegrationsTab({
   });
 
   const total = integrations.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -57,6 +57,7 @@ export function PostureIntegrationsTab({
             icon={PlusIcon}
             disabled={!canEdit}
             onClick={() => {
+              setPicked("");
               setCreating(true);
             }}
           >
@@ -64,24 +65,29 @@ export function PostureIntegrationsTab({
           </Button>
         }
       >
-        <SearchInput
-          value={search}
-          placeholder="Search by name, provider or prefix"
-          onValueChange={onSearchChange}
-        />
+        {/* Nothing to search until something is connected; the tiles below are the list. */}
+        {total === 0 ? null : (
+          <SearchInput
+            value={search}
+            placeholder="Search by name, provider or prefix"
+            onValueChange={onSearchChange}
+          />
+        )}
       </TableToolbar>
-      <Frame>
-        <DataTable
-          table={table}
-          empty={
-            total === 0 ? (
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
-                title="No posture integrations yet"
-                description="Connect endpoint security or device management services to check machine attributes in postures."
-              />
-            ) : (
+      {total === 0 ? (
+        <ProviderPicker
+          providers={providers}
+          disabled={!canEdit}
+          onPick={(provider) => {
+            setPicked(provider);
+            setCreating(true);
+          }}
+        />
+      ) : (
+        <TableGroup>
+          <DataTable
+            table={table}
+            empty={
               <Empty
                 className={tableEmptyClass}
                 size="sm"
@@ -97,17 +103,13 @@ export function PostureIntegrationsTab({
                   </Button>
                 }
               />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countIntegrations(total)}`}</TableFooter>
-            )
-          }
-        />
-      </Frame>
+            }
+          />
+        </TableGroup>
+      )}
       <PostureIntegrationDialog
         providers={providers}
+        provider={picked}
         open={creating}
         onOpenChange={setCreating}
         mutations={mutations}

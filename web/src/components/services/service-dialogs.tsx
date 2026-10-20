@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Input, Textarea } from "@cloudflare/kumo/components/input";
 import { InputGroup } from "@cloudflare/kumo/components/input-group";
 import { useState } from "react";
@@ -16,6 +15,7 @@ import {
 } from "~/components/services/model.ts";
 import type { ServiceMutations } from "~/components/services/mutations.ts";
 import { Code } from "~/components/ui/code.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -247,7 +247,7 @@ export function DeleteServiceDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="service"

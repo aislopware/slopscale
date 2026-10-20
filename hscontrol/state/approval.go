@@ -90,6 +90,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetDERP", ErrUnknownSetting, key)
 	case types.SettingKeyExpiry:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetKeyExpiry", ErrUnknownSetting, key)
+	case types.SettingRouteSelection:
+		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetRouteSelection", ErrUnknownSetting, key)
 	case types.SettingSSHRecorders, types.SettingSSHRecordingEnforce:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetSSHRecording", ErrUnknownSetting, key)
 	case types.SettingTraffic, types.SettingTrafficFold:
@@ -117,7 +119,7 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 	case types.SettingDNS, types.SettingDERP, types.SettingKeyExpiry, types.SettingPostureIdentityOn,
 		types.SettingSSHRecorders, types.SettingSSHRecordingEnforce, types.SettingDeviceAttributesOn,
 		types.SettingIDTokenKey, types.SettingTailnetLock, types.SettingTraffic, types.SettingTrafficFold,
-		types.SettingTailnetID:
+		types.SettingTailnetID, types.SettingRouteSelection:
 		return change.Change{}, nil
 	default:
 		return change.Change{}, nil

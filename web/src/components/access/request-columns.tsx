@@ -1,10 +1,12 @@
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import { RequestMenu } from "~/components/access/request-menu.tsx";
 import { phaseLabels } from "~/components/access/request-model.ts";
 import type { RequestPhase, RequestRow } from "~/components/access/request-model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
@@ -30,6 +32,10 @@ export const requestColumns = helper.columns([
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-kumo-default">{row.original.userName}</span>
         <span className="truncate text-xs text-kumo-subtle">{row.original.nodeLabel}</span>
+        {/* A phone hides the Status column, so the state takes a line of its own. */}
+        <span className={cn("pt-0.5", narrowOnlyClass)}>
+          <StatusCell request={row.original} />
+        </span>
       </div>
     ),
     meta: { className: "w-[22%] min-w-40" },
@@ -78,7 +84,7 @@ export const requestColumns = helper.columns([
     header: "Status",
     enableSorting: true,
     cell: ({ row }) => <StatusCell request={row.original} />,
-    meta: { className: "min-w-32" },
+    meta: { className: "min-w-32", hideBelow: "sm" },
   }),
   helper.accessor((request) => request.createdAt, {
     id: "created",

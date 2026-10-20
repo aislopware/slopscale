@@ -13,7 +13,9 @@ import (
 	"sync"
 )
 
-const githubAPI = "https://api.github.com"
+// githubAPI is the REST endpoint. It is a var only so the tests can point it at
+// a fake server.
+var githubAPI = "https://api.github.com"
 
 var errNoRelease = errors.New("no published release")
 

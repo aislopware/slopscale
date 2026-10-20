@@ -121,7 +121,10 @@ func TestACMEListenAddr(t *testing.T) {
 	assert.Equal(t, DefaultACMEListenAddr, ACMEListenAddr(), "empty answers where net/http would")
 
 	conf.Set("tls_letsencrypt_listen", "127.0.0.1:8080")
-	assert.Equal(t, "127.0.0.1:8080", ACMEListenAddr())
+	assert.Equal(t, "127.0.0.1:8080", ACMEListenAddr(), "the flat key still counts")
+
+	conf.Set("tls.acme.http_listen", "127.0.0.1:8081")
+	assert.Equal(t, "127.0.0.1:8081", ACMEListenAddr(), "the tls key wins")
 }
 
 func TestListenerBindError_IsEADDRINUSE(t *testing.T) {
@@ -146,13 +149,13 @@ func TestListenerBindError_IsEADDRINUSE(t *testing.T) {
 func TestListenerBindError_Render(t *testing.T) {
 	bindErr := &ListenerBindError{
 		Listener:  "ACME HTTP-01 challenge",
-		ConfigKey: "tls_letsencrypt_listen",
+		ConfigKey: "tls.acme.http_listen",
 		Network:   "tcp",
 		Addr:      ":http",
 		Err:       errTestBindFailure,
 	}
 	assert.Equal(t,
-		`binding ACME HTTP-01 challenge listener (tls_letsencrypt_listen=":http"): `+
+		`binding ACME HTTP-01 challenge listener (tls.acme.http_listen=":http"): `+
 			`listen tcp :80: bind: address already in use`,
 		bindErr.Error(),
 	)

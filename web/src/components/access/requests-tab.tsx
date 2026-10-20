@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -11,11 +10,10 @@ import { requestNames, toRequestRows } from "~/components/access/request-model.t
 import type { RequestRow } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 import { useNow } from "~/lib/use-now.ts";
 
 const filters = ["pending", "active", "all"] as const;
@@ -103,7 +101,6 @@ export function RequestsTab({
     meta: { me, canDecide },
   });
 
-  const shown = table.getRowModel().rows.length;
   const pending = rows.filter((row) => row.phase === "pending").length;
   const active = rows.filter((row) => row.phase === "active").length;
   const counts: Record<Filter, number> = { pending, active, all: rows.length };
@@ -125,13 +122,11 @@ export function RequestsTab({
           }}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
+            <SectionEmpty
               title={emptyFor(filter, search !== "").title}
               description={emptyFor(filter, search !== "").description}
               contents={
@@ -148,15 +143,8 @@ export function RequestsTab({
               }
             />
           }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>
-                {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`}`}
-              </TableFooter>
-            )
-          }
         />
-      </Frame>
+      </TableGroup>
     </>
   );
 }

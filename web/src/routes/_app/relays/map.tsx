@@ -6,7 +6,11 @@ import { derpQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { MapSection } from "~/components/derp/map-section.tsx";
 import { useDerpMutations } from "~/components/derp/mutations.ts";
-import { FetchErrorBanner, SourceBanner, StaleSettingsBanner } from "~/components/derp/source.tsx";
+import {
+  DerpSourceActions,
+  FetchErrorBanner,
+  StaleSettingsBanner,
+} from "~/components/derp/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/relays/map")({
@@ -26,14 +30,13 @@ function MapPage(): ReactElement {
     <>
       <PageHeader
         title="Map"
+        docs="ref/derp"
         description="The regions and relays that carry traffic between machines that cannot connect directly."
+        actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}
       />
-      <div className="flex flex-col gap-6">
-        <StaleSettingsBanner mutations={mutations} />
-        <SourceBanner derp={derp} canEdit={canEdit} mutations={mutations} />
-        <FetchErrorBanner derp={derp} />
-        <MapSection derp={derp} />
-      </div>
+      <StaleSettingsBanner mutations={mutations} />
+      <FetchErrorBanner derp={derp} />
+      <MapSection derp={derp} />
     </>
   );
 }

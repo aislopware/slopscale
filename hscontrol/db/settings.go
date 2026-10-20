@@ -72,6 +72,12 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			settings.KeyExpiry = d
 
 			continue
+		case types.SettingRouteSelection:
+			// Kept as stored: a value a newer server wrote steers as the
+			// default does rather than refusing to start.
+			settings.RouteSelection = types.RouteSelection(r.Setting.Value)
+
+			continue
 		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey, types.SettingTailnetLock,
 			types.SettingTraffic, types.SettingTrafficFold, types.SettingTailnetID:
 			// Hold JSON, key material or an ID and are read by
@@ -330,6 +336,14 @@ func (hsdb *HSDatabase) SaveSSHRecording(recorders []string, enforce bool) error
 func (hsdb *HSDatabase) SaveKeyExpiry(d time.Duration) error {
 	return hsdb.Write(func(tx *Tx) error {
 		return saveSettingValue(tx, types.SettingKeyExpiry, d.String())
+	})
+}
+
+// SaveRouteSelection writes the route selection, inserting its row on
+// first use.
+func (hsdb *HSDatabase) SaveRouteSelection(r types.RouteSelection) error {
+	return hsdb.Write(func(tx *Tx) error {
+		return saveSettingValue(tx, types.SettingRouteSelection, string(r))
 	})
 }
 

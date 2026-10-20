@@ -1,17 +1,69 @@
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
-import { tableEmptyClass } from "~/components/table/empty.ts";
-import { Frame, FrameBand, FramePanel } from "~/components/ui/frame.tsx";
+import { cardClass } from "~/components/ui/card.tsx";
 
 /**
- * A page section: a Frame whose band carries the 14px semibold title (with optional description and
- * actions) and whose panel holds the content. Panels never nest, so a page reads as a list of named
- * regions rather than a stack of identical boxes.
+ * The grey band of Kumo's layered card (the "white card resting on a grey tray"): rounded 8px, the
+ * elevated fill, a hairline ring. It holds `TrayBand` rows and one or more `TrayPanel`s; `Section`
+ * is the titled composition most places want.
+ */
+export function Tray({
+  children,
+  className,
+}: {
+  readonly children: ReactNode;
+  readonly className?: string | undefined;
+}): ReactElement {
+  return (
+    <div
+      className={cn(
+        "flex min-w-0 flex-col rounded-lg bg-kumo-elevated ring ring-kumo-hairline",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A row of text or small controls on a Tray's band, 16px in, 8px above and below. */
+export function TrayBand({
+  children,
+  className,
+}: {
+  readonly children: ReactNode;
+  readonly className?: string | undefined;
+}): ReactElement {
+  return (
+    <div className={cn("flex min-h-10 items-center gap-2 px-4 py-2", className)}>{children}</div>
+  );
+}
+
+/**
+ * The white panel resting in a Tray, flush with its sides at the same radius. It clips with
+ * overflow-clip, so the corners stay round without the panel becoming a scroll container.
+ */
+export function TrayPanel({
+  children,
+  className,
+}: {
+  readonly children: ReactNode;
+  readonly className?: string | undefined;
+}): ReactElement {
+  return <div className={cn("min-w-0 overflow-clip", cardClass, className)}>{children}</div>;
+}
+
+/**
+ * Kumo's layered card as the Cloudflare dashboard uses it for grouped content (Security rules,
+ * Connected Workers, the API card): a grey elevated band, ringed by a hairline, carrying the title
+ * (13px semibold), its meta (12px subtle, "4/20 rules") and small actions; a white panel resting in
+ * it with the content; and an optional footer band under the panel for a link out. The panel runs
+ * flush to the band's sides at the same 8px radius, so the two rings meet at the corners.
  */
 export function Section({
   title,
+  meta,
   description,
   actions,
   children,
@@ -21,42 +73,62 @@ export function Section({
   panel = true,
 }: {
   readonly title: ReactNode;
+  /** Small facts beside the title: a count, a limit, a state. */
+  readonly meta?: ReactNode;
+  /** A sentence under the title, on the band. */
   readonly description?: ReactNode;
+  /** Small (`size="sm"`) secondary buttons on the band's right. */
   readonly actions?: ReactNode;
   readonly children: ReactNode;
-  /** A line on the band under the panel, such as a readout of what is under the pointer. */
+  /** A line on the band under the panel, such as a "Go to …" link button. */
   readonly footer?: ReactNode;
   readonly className?: string;
   /** Classes for the panel; pass `p-0` for lists that draw their own edges. */
   readonly bodyClassName?: string;
   /**
-   * Whether the children go in a panel. A `frameTableClass` table draws the panel on its own body,
-   * so it goes straight on the band, with its header as the band's last line.
+   * Whether the children go in the white panel, or straight on the band (a table with its own
+   * frame).
    */
   readonly panel?: boolean;
 }): ReactElement {
   return (
-    <Frame className={className}>
-      {/* px-5 puts the title where the text of the rows inside the panel starts. */}
-      <FrameBand className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-5 pt-1.5 pb-2">
+    <section
+      className={cn(
+        "flex min-w-0 flex-col rounded-lg bg-kumo-elevated ring ring-kumo-hairline",
+        className,
+      )}
+    >
+      <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2">
         <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
-          <h2 className="font-semibold text-kumo-strong">{title}</h2>
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+            <h2 className="text-sm font-semibold text-kumo-default">{title}</h2>
+            {meta === undefined ? null : <span className="text-xs text-kumo-subtle">{meta}</span>}
+          </div>
           {description === undefined ? null : (
-            <p className="max-w-prose text-kumo-subtle">{description}</p>
+            <p className="max-w-[750px] text-sm text-pretty text-kumo-subtle">{description}</p>
           )}
         </div>
         {actions === undefined ? null : (
-          // min-h-lh keeps the actions on the title's first line, not centred on a long description.
-          <div className="flex min-h-lh shrink-0 items-center gap-2">{actions}</div>
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
         )}
-      </FrameBand>
-      {panel ? <FramePanel className={bodyClassName}>{children}</FramePanel> : children}
-      {footer === undefined ? null : <FrameBand className="px-5 pt-2 pb-1.5">{footer}</FrameBand>}
-    </Frame>
+      </div>
+      {panel ? (
+        <TrayPanel className={bodyClassName}>{children}</TrayPanel>
+      ) : (
+        // A table that draws its own card sits flush on the band; the count under that card
+        // takes the band's 16px inset, so it lines up with the title instead of the tray's edge.
+        <div className="flex min-w-0 flex-col [&_[data-slot=table-footer]]:px-4 [&_[data-slot=table-footer]]:pb-2">
+          {children}
+        </div>
+      )}
+      {footer === undefined ? null : (
+        <div className="flex items-center justify-end gap-2 px-4 py-2">{footer}</div>
+      )}
+    </section>
   );
 }
 
-/** A row inside a Section panel with the console's padding; hairlines between siblings. */
+/** A row inside a Section panel, divided from the one above by a line. */
 export function SectionRow({
   className,
   children,
@@ -65,7 +137,7 @@ export function SectionRow({
   readonly children: ReactNode;
 }): ReactElement {
   return (
-    <div className={cn("px-5 py-4 not-first:border-t not-first:border-kumo-hairline", className)}>
+    <div className={cn("px-4 py-3 not-first:border-t not-first:border-kumo-line", className)}>
       {children}
     </div>
   );
@@ -79,17 +151,18 @@ export interface SectionEmptyProps {
 }
 
 /**
- * The empty state of a Section panel. It is Kumo's Empty at the size a card uses, so a sub-panel
- * with nothing in it reads like the rows it stands in for rather than as a stray sentence.
+ * The empty state inside a panel, as the dashboard writes it: a centred line of subtle text with
+ * 48px above and below ("No queues matched your search. Try searching for a different name."), and
+ * the way out under it.
  */
 export function SectionEmpty({ title, description, contents }: SectionEmptyProps): ReactElement {
   return (
-    <Empty
-      className={tableEmptyClass}
-      size="sm"
-      title={title}
-      {...(description === undefined ? {} : { description })}
-      {...(contents === undefined ? {} : { contents })}
-    />
+    <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
+      <div className="flex max-w-[60ch] flex-col text-pretty text-kumo-subtle">
+        <h3 className="font-normal text-kumo-default">{title}</h3>
+        {description === undefined ? null : <p>{description}</p>}
+      </div>
+      {contents === undefined ? null : <div className="flex items-center gap-2">{contents}</div>}
+    </div>
   );
 }

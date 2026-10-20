@@ -1,14 +1,12 @@
 package hscontrol
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -48,16 +46,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/acme"
-	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/sync/errgroup"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
-)
-
-var errUnsupportedLetsEncryptChallengeType = errors.New(
-	"unknown value for Lets Encrypt challenge type",
 )
 
 const (
@@ -94,9 +86,10 @@ type Slopscale struct {
 	// recorder node feeds it when cfg.SSHRecording.Enabled.
 	recorder *recorder.Recorder
 
-	// dnsProvider publishes ACME challenge records for machines' HTTPS
-	// certificates; nil when cfg.HTTPSCerts is off.
-	dnsProvider dnsprovider.Provider
+	// challenges publishes ACME challenge records for machines' HTTPS
+	// certificates and removes them after use; nil when cfg.HTTPSCerts
+	// is off.
+	challenges *dnsprovider.Challenges
 
 	// funnelAddrs is where the embedded Funnel ingress listens while it
 	// runs; see [Slopscale.FunnelIngressAddrs].
@@ -161,9 +154,14 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 
 	app.recorder = newRecorder(cfg, s, s.NodeByIP)
 
-	app.dnsProvider, err = newDNSProvider(cfg)
-	if err != nil {
-		return nil, err
+	if cfg.HTTPSCerts.Enabled {
+		app.challenges = dnsprovider.NewChallenges(
+			cfg.HTTPSCerts.Provider,
+			cfg.HTTPSCerts.Zone,
+			cfg.HTTPSCerts.Resolvers,
+			cfg.HTTPSCerts.PropagationTimeout,
+			cfg.HTTPSCerts.TTL,
+		)
 	}
 
 	if len(cfg.TrustedProxies) > 0 {
@@ -528,6 +526,13 @@ func (h *Slopscale) Serve() error {
 	log.Info().
 		Msgf("listening and serving HTTP on: %s", h.cfg.Addr)
 
+	if tlsSettings.manage != nil {
+		err = tlsSettings.manage(ctx)
+		if err != nil {
+			return fmt.Errorf("managing TLS certificate: %w", err)
+		}
+	}
+
 	// Only start debug/metrics server if address is configured
 	var debugHTTPServer *http.Server
 
@@ -657,6 +662,11 @@ func (h *Slopscale) Serve() error {
 				}
 
 				tlsSettings.shutdownACME(shutdownCtx)
+
+				if h.challenges != nil {
+					info("removing ACME challenge records")
+					h.challenges.Close() //nolint:contextcheck // each delete has its own bounded context
+				}
 
 				info("closing batcher")
 				h.mapBatcher.Close()
@@ -1472,165 +1482,6 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r.Head("/", web.RootHandler)
 
 	return r
-}
-
-// tlsBundle is the TLS configuration of the main listener, nil without
-// TLS, and with the HTTP-01 challenge the server that answers it on a
-// listener already bound, so a bind failure stops the start like any
-// other listener's.
-type tlsBundle struct {
-	config       *tls.Config
-	acmeServer   *http.Server
-	acmeListener net.Listener
-}
-
-// serveACME answers the HTTP-01 challenge until [tlsBundle.shutdownACME];
-// without the challenge it returns at once.
-func (s *tlsBundle) serveACME() error {
-	if s.acmeServer == nil {
-		return nil
-	}
-
-	log.Info().Msgf("listening and serving ACME HTTP-01 challenge on: %s", s.acmeListener.Addr())
-
-	err := s.acmeServer.Serve(s.acmeListener)
-	if err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("serving ACME HTTP-01 challenge: %w", err)
-	}
-
-	return nil
-}
-
-func (s *tlsBundle) shutdownACME(ctx context.Context) {
-	if s.acmeServer == nil {
-		return
-	}
-
-	log.Info().Msg("shutting down ACME HTTP-01 challenge server")
-
-	err := s.acmeServer.Shutdown(ctx)
-	if err != nil {
-		log.Error().Err(err).Msg("failed to shutdown ACME HTTP-01 challenge server")
-	}
-}
-
-func (h *Slopscale) getTLSSettings(ctx context.Context) (*tlsBundle, error) {
-	tlsEnabled := h.cfg.TLS.LetsEncrypt.Hostname != "" || h.cfg.TLS.CertPath != ""
-	if tlsEnabled && !strings.HasPrefix(h.cfg.ServerURL, "https://") {
-		log.Warn().Msg("listening with TLS but ServerURL does not start with https://")
-	} else if !tlsEnabled && !strings.HasPrefix(h.cfg.ServerURL, "http://") {
-		log.Warn().Msg("listening without TLS but ServerURL does not start with http://")
-	}
-
-	if h.cfg.TLS.LetsEncrypt.Hostname != "" {
-		certManager := autocert.Manager{
-			Prompt:     autocert.AcceptTOS,
-			HostPolicy: autocert.HostWhitelist(h.cfg.TLS.LetsEncrypt.Hostname),
-			Cache:      autocert.DirCache(h.cfg.TLS.LetsEncrypt.CacheDir),
-			Client: &acme.Client{
-				DirectoryURL: h.cfg.ACMEURL,
-				HTTPClient: &http.Client{
-					Transport: &acmeLogger{
-						rt: http.DefaultTransport,
-					},
-				},
-			},
-			Email: h.cfg.ACMEEmail,
-		}
-
-		switch h.cfg.TLS.LetsEncrypt.ChallengeType {
-		case types.TLSALPN01ChallengeType:
-			// Configuration via autocert with TLS-ALPN-01 (https://tools.ietf.org/html/rfc8737)
-			// The RFC requires that the validation is done on port 443; in other words, slopscale
-			// must be reachable on port 443.
-			return &tlsBundle{config: certManager.TLSConfig()}, nil
-
-		case types.HTTP01ChallengeType:
-			// Configuration via autocert with HTTP-01. This requires listening on
-			// port 80 for the certificate validation in addition to the slopscale
-			// service, which can be configured to run on any other port.
-			server := &http.Server{
-				Addr:        h.cfg.TLS.LetsEncrypt.Listen,
-				Handler:     certManager.HTTPHandler(http.HandlerFunc(h.redirect)),
-				ReadTimeout: types.HTTPTimeout,
-			}
-
-			listener, err := new(net.ListenConfig).Listen(ctx, "tcp", server.Addr)
-			if err != nil {
-				return nil, &types.ListenerBindError{
-					Listener:  "ACME HTTP-01 challenge",
-					ConfigKey: "tls_letsencrypt_listen",
-					Network:   "tcp",
-					Addr:      server.Addr,
-					Err:       err,
-				}
-			}
-
-			return &tlsBundle{
-				config:       certManager.TLSConfig(),
-				acmeServer:   server,
-				acmeListener: listener,
-			}, nil
-
-		default:
-			return nil, errUnsupportedLetsEncryptChallengeType
-		}
-	}
-
-	if h.cfg.TLS.CertPath == "" {
-		return &tlsBundle{}, nil
-	}
-
-	cert, err := tls.LoadX509KeyPair(h.cfg.TLS.CertPath, h.cfg.TLS.KeyPath)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"loading TLS key pair (tls_cert_path=%q, tls_key_path=%q): %w",
-			h.cfg.TLS.CertPath,
-			h.cfg.TLS.KeyPath,
-			err,
-		)
-	}
-
-	return &tlsBundle{
-		config: &tls.Config{
-			NextProtos:   []string{"http/1.1"},
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		},
-	}, nil
-}
-
-// Provide some middleware that can inspect the ACME/autocert https calls
-// and log when things are failing.
-type acmeLogger struct {
-	rt http.RoundTripper
-}
-
-// RoundTrip will log when ACME/autocert failures happen either when err != nil OR
-// when http status codes indicate a failure has occurred.
-func (l *acmeLogger) RoundTrip(req *http.Request) (*http.Response, error) {
-	resp, err := l.rt.RoundTrip(req)
-	if err != nil {
-		log.Error().Err(err).Str("url", req.URL.String()).Msg("acme request failed")
-		return nil, fmt.Errorf("performing ACME HTTP request: %w", err)
-	}
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		log.Error().
-			Int("status_code", resp.StatusCode).
-			Str("url", req.URL.String()).
-			Bytes("body", body).
-			Msg("acme request returned error")
-
-		// The ACME client parses this body to classify errors such as badNonce,
-		// so give it back a readable copy.
-		resp.Body = io.NopCloser(bytes.NewReader(body))
-	}
-
-	return resp, nil
 }
 
 // [zerologRequestLogger] implements chi's [middleware.LogFormatter]

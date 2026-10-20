@@ -4,6 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { DestinationGrouping, TrafficDestination } from "~/api/traffic.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import type { ColumnChoice } from "~/components/table/log-view.tsx";
 import { BytesCell, VolumeCell } from "~/components/traffic/cells.tsx";
 import {
   countryName,
@@ -353,6 +354,37 @@ function columnsFor(
 }
 
 /**
+ * The columns a grouping can show that a reader may switch off, for the toolbar's Columns menu, in
+ * the table's order. The key and the total, which the rows are sorted by, always show.
+ */
+export function destinationColumnChoices(
+  groupBy: DestinationGrouping,
+  oneMachine: boolean,
+): ColumnChoice[] {
+  const directions = [
+    { id: "upload", label: "Upload" },
+    { id: "download", label: "Download" },
+  ];
+  const conns = { id: "conns", label: "Connections" };
+
+  if (groupBy === "destination") {
+    return [
+      { id: "network", label: "Network" },
+      { id: "country", label: "Country" },
+      { id: "port", label: "Port" },
+      ...directions,
+      conns,
+    ];
+  }
+
+  const many = !oneMachine && groupBy !== "node" && groupBy !== "reporter";
+
+  return [...(many ? [{ id: "machines", label: "Machines" }] : []), ...directions, conns];
+}
+
+const noneHidden: ReadonlySet<string> = new Set();
+
+/**
  * Where the traffic went, grouped the way the page asks: by host name, by address, by network, by
  * country, by port, or by the machines and gateways that carried it. A row click narrows the page
  * to that row, which is how an operator gets from "who uses YouTube" to "which machines".
@@ -366,6 +398,8 @@ export function DestinationsTable({
   empty,
   oneMachine = false,
   onPick,
+  pageSize,
+  hidden = noneHidden,
 }: {
   readonly rows: readonly TrafficDestination[];
   readonly groupBy: DestinationGrouping;
@@ -379,6 +413,10 @@ export function DestinationsTable({
   readonly empty?: ReactNode;
   /** Called with the clicked row; a folded remainder row is not clickable. */
   readonly onPick?: (row: TrafficDestination) => void;
+  /** The rows per page the toolbar's Limit sets. */
+  readonly pageSize?: number;
+  /** The columns switched off in the toolbar's Columns menu. */
+  readonly hidden?: ReadonlySet<string>;
 }): ReactElement {
   const widths = useWidths();
   const widest = Math.max(0, ...rows.map((row) => total(row)));
@@ -391,14 +429,20 @@ export function DestinationsTable({
   };
   const table = useAppTable({
     data,
-    columns: columnsFor(groupBy, oneMachine, widths),
+    columns: columnsFor(groupBy, oneMachine, widths).filter(
+      (column) => column.id === undefined || !hidden.has(column.id),
+    ),
     getRowId: (row) => destinationKey(row, groupBy),
-    initialState: { sorting: [{ id: "total", desc: true }] },
+    initialState: {
+      sorting: [{ id: "total", desc: true }],
+      ...(pageSize === undefined ? {} : { pagination: { pageIndex: 0, pageSize } }),
+    },
   });
 
   return (
     <DataTable
       table={table}
+      {...(pageSize === undefined ? {} : { pageSize })}
       empty={
         empty ?? (
           <SectionEmpty

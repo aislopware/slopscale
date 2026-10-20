@@ -1,4 +1,4 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { GlobeIcon, PathIcon } from "@phosphor-icons/react";
@@ -15,9 +15,34 @@ import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { advertisesExit, exitRoutes, isExitNode, isExitRoute } from "~/lib/node.ts";
+import { advertisesExit, exitRoutes, isExitNode, isExitRoute, nodeName } from "~/lib/node.ts";
 
 const routeIconSize = 14;
+
+/**
+ * Every route the machine advertises or was approved for, the exit node first as one entry for its
+ * two default routes, then the subnets in order.
+ */
+export function machineRoutes(node: Node): string[] {
+  const rawRoutes = new Set([...node.availableRoutes, ...node.approvedRoutes]);
+  const hasExit = exitRoutes.some((route) => rawRoutes.has(route));
+  const subnets = [...rawRoutes].filter((route) => !isExitRoute(route)).toSorted();
+
+  return hasExit ? [exitRoutes[0] ?? "", ...subnets] : subnets;
+}
+
+/** Whether a route from `machineRoutes` is approved, and whether the machine still advertises it. */
+export function routeState(
+  node: Node,
+  route: string,
+): { readonly approved: boolean; readonly available: boolean } {
+  const exit = isExitRoute(route);
+
+  return {
+    approved: exit ? isExitNode(node) : node.approvedRoutes.includes(route),
+    available: exit ? advertisesExit(node) : node.availableRoutes.includes(route),
+  };
+}
 
 /** Every route the machine advertises, approved one at a time. */
 export function RoutesSection({
@@ -28,10 +53,7 @@ export function RoutesSection({
   readonly canEdit: boolean;
 }): ReactElement {
   const { setRoutes } = useNodeMutations();
-  const rawRoutes = new Set([...node.availableRoutes, ...node.approvedRoutes]);
-  const hasExit = exitRoutes.some((route) => rawRoutes.has(route));
-  const subnets = [...rawRoutes].filter((route) => !isExitRoute(route)).toSorted();
-  const routes = hasExit ? [exitRoutes[0] ?? "", ...subnets] : subnets;
+  const routes = machineRoutes(node);
 
   function set(route: string, approved: boolean): void {
     const next = withRouteApproved(node, route, approved);
@@ -46,7 +68,22 @@ export function RoutesSection({
   }
 
   return (
-    <Section title="Routes" description="Only approved routes reach the rest of the tailnet.">
+    <Section
+      title="Routes"
+      meta={routes.length === 0 ? undefined : String(routes.length)}
+      description="Only approved routes reach the rest of the tailnet."
+      actions={
+        routes.length === 0 ? undefined : (
+          <LinkButton
+            href={`/routes?q=${encodeURIComponent(nodeName(node))}`}
+            variant="ghost"
+            size="sm"
+          >
+            View in Routes
+          </LinkButton>
+        )
+      }
+    >
       {routes.length === 0 ? (
         <SectionRow className="text-kumo-subtle">
           Nothing advertised. Run <Code>tailscale set --advertise-routes</Code> or{" "}
@@ -79,8 +116,7 @@ function RouteRow({
   readonly onSet: (route: string, approved: boolean) => void;
 }): ReactElement {
   const exit = isExitRoute(route);
-  const approved = exit ? isExitNode(node) : node.approvedRoutes.includes(route);
-  const available = exit ? advertisesExit(node) : node.availableRoutes.includes(route);
+  const { approved, available } = routeState(node, route);
 
   return (
     <SectionRow className="flex flex-wrap items-center justify-between gap-3 py-2.5">
@@ -238,7 +274,7 @@ function PriorityRow({
 }
 
 /** The route by name; one the machine stopped advertising is flagged, with the reason a hover away. */
-function RouteName({
+export function RouteName({
   route,
   exit,
   available,

@@ -36,10 +36,17 @@ service's addresses so it binds them, adds them to the machine's
 `AllowedIPs` on every peer, publishes `web.<base domain>` in MagicDNS and
 hands every client the service's name, display name and ports so the
 Tailscale apps can list it. When several machines host the same service,
-every peer is routed to one of them, an online one first and the oldest
-among those, and to the next when it goes away. A service's addresses
-never appear as a subnet route: the machine's `PrimaryRoutes` stay what
-they were.
+each peer is routed to one of them the way [route selection](/ref/route-selection)
+picks a subnet router: the tailnet-wide host is the first online one, the
+oldest, and keeps the service while it stays online and healthy, so a host
+that comes back does not take the traffic back. Under regional routing each
+peer is sent to the host nearest it instead, spread over the hosts it is
+equally near; under active-passive failover every peer uses the
+tailnet-wide host. With two or more hosts online, the
+[high availability](/ref/routes#high-availability) prober pings them and a
+host that stops answering is passed over while another is healthy. A
+service's addresses never appear as a subnet route: the machine's
+`PrimaryRoutes` stay what they were.
 
 The ports clients are told about are what the hosts serve, unless the
 service sets its own. A host's certificate names include the service's

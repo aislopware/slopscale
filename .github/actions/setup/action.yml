@@ -40,6 +40,12 @@ runs:
     # Saved once per go.sum and toolchain (flake.lock), so the cache does not
     # grow by one entry per push; hestia shares the same 10 GB budget. Later
     # pushes restore the last one and recompile only the packages that changed.
+    #
+    # A fallback never crosses a flake.lock change. The build cache holds the
+    # executables `go tool` and `go run` link, and a cgo link names the nixpkgs
+    # glibc's loader by store path; Go's cache key does not include that path,
+    # so after a nixpkgs bump it reuses a binary whose loader this runner never
+    # fetched, and exec fails with "no such file or directory".
     - name: Go build and module cache
       id: go
       if: inputs.go-key != ''
@@ -48,9 +54,9 @@ runs:
         path: |
           ~/.cache/go-build
           ~/go/pkg/mod
-        key: go-${{ inputs.go-key }}-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+        key: go-${{ inputs.go-key }}-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-${{ hashFiles('go.sum') }}
         restore-keys: |
-          go-${{ inputs.go-key }}-
+          go-${{ inputs.go-key }}-${{ hashFiles('flake.lock', 'sqlite.cflags') }}-
 
     - name: golangci-lint cache
       if: inputs.golangci-lint == 'true'

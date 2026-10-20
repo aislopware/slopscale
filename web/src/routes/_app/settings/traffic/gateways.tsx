@@ -6,11 +6,11 @@ import { trafficReportersQuery } from "~/api/traffic.ts";
 import type { TrafficReporter } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
 import { plural } from "~/components/overview/plural.ts";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { GatewaysTable, gatewayState } from "~/components/traffic/gateways-table.tsx";
 import type { GatewayState } from "~/components/traffic/gateways-table.tsx";
 import { InstallSection } from "~/components/traffic/install-section.tsx";
 import { ResolverNotices } from "~/components/traffic/resolver-notices.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/settings/traffic/gateways")({
@@ -62,17 +62,18 @@ function GatewaysPage(): ReactElement {
     <>
       <PageHeader
         title="Gateways"
+        docs="ref/traffic"
         description="The tagged exit nodes, subnet routers and app connectors that report what passes through them."
         {...(data.reporters.length === 0 ? {} : { meta: <Tally reporters={data.reporters} /> })}
       />
       <ResolverNotices reporters={data} />
-      <Frame>
+      <TableGroup>
         <GatewaysTable
           reporters={data.reporters}
           writable={writable}
           canApprove={writable && can(me, "dns")}
         />
-      </Frame>
+      </TableGroup>
       <InstallSection />
     </>
   );

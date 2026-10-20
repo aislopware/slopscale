@@ -15,9 +15,9 @@ import type { Me } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
 import { describeUserAgent } from "~/components/settings/user-agent.ts";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
@@ -89,8 +89,8 @@ export function SessionsBody({
   return (
     <TableScroll pinnedRight>
       {(overflowing) => (
-        <Table className={frameTableClass}>
-          <Table.Header variant="compact">
+        <Table className={tableClass}>
+          <Table.Header>
             <Table.Row>
               <Table.Head>User</Table.Head>
               <Table.Head>Opened</Table.Head>
@@ -143,7 +143,7 @@ function SessionRow({
   });
 
   return (
-    <Table.Row className={frameTableRowClass}>
+    <Table.Row className={tableRowClass}>
       <Table.Cell className="text-kumo-default">{userLabel(session.user)}</Table.Cell>
       <Table.Cell className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={session.createdAt} />

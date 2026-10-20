@@ -7,24 +7,29 @@ function tint(chip: Element | null | undefined): string {
   return chip instanceof Element ? getComputedStyle(chip).backgroundColor : "";
 }
 
+function styleOf(element: Element | null | undefined): CSSStyleDeclaration | undefined {
+  return element instanceof Element ? getComputedStyle(element) : undefined;
+}
+
 function radiusOf(chip: Element | null): string {
   return chip instanceof Element ? getComputedStyle(chip).borderRadius : "";
 }
 
 describe(Tag, () => {
-  it("reads as the whole tag, with the prefix stepped back from the name", async () => {
+  // Design spec §7.1: the dashboard's chip draws its text in one colour, so the prefix is not faded.
+  it("reads as the whole tag in one colour", async () => {
     const view = await render(<Tag tag="tag:server" />);
     const chip = view.container.querySelector('[title="tag:server"]');
 
     expect(chip).not.toBeNull();
     expect(chip?.textContent).toBe("tag:server");
-    expect(chip?.querySelector(".opacity-60")?.textContent).toBe("tag:");
-    expect(radiusOf(chip)).not.toBe("9999px");
+    expect(chip?.querySelectorAll("*")).toHaveLength(1);
+    expect(styleOf(chip?.firstElementChild)?.opacity).toBe("1");
+    expect(Number(radiusOf(chip).replace("px", ""))).toBeGreaterThanOrEqual(9);
   });
 
-  // The colour is a property of the name, so the same tag is the same colour on every page and two
-  // tags tell apart before they are read.
-  it("tints each tag by its name, the same name the same way", async () => {
+  // The dashboard draws every tag as the same blue pill; the name tells two tags apart, not a hue.
+  it("tints every tag the same info blue", async () => {
     const view = await render(
       <>
         <Tag tag="tag:web" />
@@ -35,8 +40,19 @@ describe(Tag, () => {
     const [web, ci, webAgain] = view.container.querySelectorAll("span[title]");
 
     expect(tint(web)).toBe(tint(webAgain));
-    expect(tint(web)).not.toBe(tint(ci));
+    expect(tint(web)).toBe(tint(ci));
     expect(tint(web)).not.toBe("rgba(0, 0, 0, 0)");
+  });
+});
+
+describe("a tag chip's size", () => {
+  // Design spec §7.1: the chips are 20px with 13px text, a dense table's included.
+  it.each(["sm", "base"] as const)("draws a %s chip 20px tall at 13px", async (size) => {
+    const view = await render(<Tag tag="tag:server" size={size} />);
+    const chip = view.container.querySelector('[title="tag:server"]');
+
+    expect(chip?.getBoundingClientRect().height).toBe(20);
+    expect(styleOf(chip)?.fontSize).toBe("13px");
   });
 });
 

@@ -4,7 +4,7 @@ import { CaretDownIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { PolicyBlocks } from "~/components/policy/blocks.ts";
-import { Frame, FramePanel } from "~/components/ui/frame.tsx";
+import { Tray, TrayPanel } from "~/components/ui/section.tsx";
 import { Tag } from "~/components/ui/tag.tsx";
 
 const caretSize = 14;
@@ -77,10 +77,10 @@ export function BuildingBlocks({
       className="hidden h-fit min-w-0 xl:block"
       render={<section />}
     >
-      <Frame>
+      <Tray>
         <Collapsible.Trigger className="flex w-full items-center justify-between gap-2 rounded-lg px-4 py-2 text-left hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none">
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="font-semibold whitespace-nowrap text-kumo-strong">
+            <span className="text-sm font-semibold whitespace-nowrap text-kumo-default">
               Building blocks
             </span>
             {open ? (
@@ -98,7 +98,7 @@ export function BuildingBlocks({
           />
         </Collapsible.Trigger>
         <Collapsible.Panel>
-          <FramePanel>
+          <TrayPanel>
             <BlockRow label="Groups" names={blocks.groups} empty="None" onSelect={onSelect} />
             <BlockRow label="Tags" names={blocks.tags} empty="None" tags onSelect={onSelect} />
             <BlockRow
@@ -107,9 +107,9 @@ export function BuildingBlocks({
               empty="None"
               onSelect={onSelect}
             />
-          </FramePanel>
+          </TrayPanel>
         </Collapsible.Panel>
-      </Frame>
+      </Tray>
     </Collapsible.Root>
   );
 }

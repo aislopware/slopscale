@@ -20,8 +20,8 @@ import type { ReactElement, ReactNode } from "react";
 
 import { meQuery } from "~/auth/me.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
+import { Card } from "~/components/ui/card.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
-import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 import { describeTrouble, pageNotFound, sentence } from "~/components/ui/trouble.ts";
 import type { Trouble, TroubleKind } from "~/components/ui/trouble.ts";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
@@ -145,9 +145,7 @@ function Stage({
   if (inShell) {
     return (
       <div className="flex flex-1 items-center justify-center py-10">
-        <Frame className="w-full max-w-md">
-          <FramePanel className="px-6 py-6">{children}</FramePanel>
-        </Frame>
+        <Card className="w-full max-w-md rounded-xl p-8">{children}</Card>
       </div>
     );
   }
@@ -159,11 +157,7 @@ function Stage({
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-24">
         <div className="flex w-full max-w-md flex-col gap-4">
-          {/* In dark mode the canvas is nearly black, so the card needs a ring and a shadow of its
-              own to read as a surface. */}
-          <Frame className="shadow-lg ring-kumo-line">
-            <FramePanel className="px-6 py-6">{children}</FramePanel>
-          </Frame>
+          <Card className="rounded-xl p-8">{children}</Card>
           <p className="text-center text-xs text-kumo-subtle">
             <span className="font-mono text-[0.9em]">{globalThis.location.host}</span>
           </p>

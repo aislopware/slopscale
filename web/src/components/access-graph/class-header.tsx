@@ -5,7 +5,7 @@ import type { ReactElement, ReactNode } from "react";
 import { graphNodeOwner } from "~/components/access-graph/model.ts";
 import type { AccessClass } from "~/components/access-graph/model.ts";
 import { MachineName } from "~/components/ui/machine-name.tsx";
-import { TagList, TagText, tagColours } from "~/components/ui/tag.tsx";
+import { TagList, TagText } from "~/components/ui/tag.tsx";
 
 export const openDelay = 150;
 
@@ -128,9 +128,9 @@ export function ColumnLabel({
         delay={openDelay}
         className={cn(
           "mx-auto block max-h-36 rotate-180 cursor-pointer rounded-xs px-0.5 pt-1.5 pb-2 text-xs leading-none text-kumo-subtle [writing-mode:vertical-rl] hover:bg-kumo-tint",
+          tag !== undefined && "text-kumo-info",
           focusClass,
         )}
-        style={tag === undefined ? undefined : { color: tagColours(tag).color }}
       >
         {tag === undefined ? (
           <span className="block truncate">

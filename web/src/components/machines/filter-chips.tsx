@@ -10,7 +10,6 @@ import {
   statusFilterLabels,
 } from "~/components/machines/filters.ts";
 import type { MachineFilterState } from "~/components/machines/filters.ts";
-import { FrameBand } from "~/components/ui/frame.tsx";
 import { userLabel } from "~/lib/node.ts";
 
 const removeIconSize = 12;
@@ -40,8 +39,8 @@ export function FilterChips({
   }
 
   return (
-    // px-5 lines the first chip up with the first column of the table below.
-    <FrameBand className="flex flex-wrap items-center gap-1.5 px-5">
+    // The dashboard's filter bar: the chips in a white ringed strip over the table they narrow.
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg bg-kumo-base p-2 shadow-xs ring ring-kumo-line">
       <span className="mr-0.5 text-xs text-kumo-subtle">Filtered by</span>
       {chips.map((chip) => (
         <Button
@@ -63,7 +62,7 @@ export function FilterChips({
           Clear all
         </Button>
       ) : null}
-    </FrameBand>
+    </div>
   );
 }
 

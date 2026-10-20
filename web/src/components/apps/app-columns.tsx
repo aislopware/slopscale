@@ -1,5 +1,6 @@
 import { Popover } from "@cloudflare/kumo/components/popover";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
@@ -13,7 +14,9 @@ import {
   pendingSearch,
   totalPendingRoutes,
 } from "~/components/apps/model.ts";
+import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { DomainList } from "~/components/ui/domain.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -64,7 +67,7 @@ export const appColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <PendingCell app={row.original} />,
-    meta: { className: "align-top whitespace-nowrap", numeric: true },
+    meta: { className: "align-top whitespace-nowrap", numeric: true, hideBelow: "sm" },
   }),
   helper.display({
     id: "actions",
@@ -89,6 +92,12 @@ function NameCell({ app }: { readonly app: App }): ReactElement {
       <span className="truncate text-xs text-kumo-subtle md:hidden">
         {everyConnector(app.connectors) ? "Every connector" : app.connectors.join(", ")}
       </span>
+      {/* So is the Pending column, so routes waiting for approval take a line of their own. */}
+      {totalPendingRoutes(app.nodes) === 0 ? null : (
+        <span className={cn("pt-0.5", narrowOnlyClass)}>
+          <PendingCell app={app} words />
+        </span>
+      )}
     </div>
   );
 }
@@ -237,7 +246,14 @@ function LearnedRoutes({
  * Routes the connectors advertise that nobody has approved yet. Until they are approved the app's
  * addresses are learned but unreachable, so the count is a link straight to them.
  */
-function PendingCell({ app }: { readonly app: App }): ReactElement {
+function PendingCell({
+  app,
+  words = false,
+}: {
+  readonly app: App;
+  /** Says what the figure counts, where no column heading does. */
+  readonly words?: boolean;
+}): ReactElement {
   const pending = totalPendingRoutes(app.nodes);
 
   if (pending === 0) {
@@ -250,7 +266,7 @@ function PendingCell({ app }: { readonly app: App }): ReactElement {
       search={pendingSearch(app.nodes)}
       className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-kumo-focus"
     >
-      <Status tone="warning">{pending}</Status>
+      <Status tone="warning">{words ? `${plural(pending, "route")} pending` : pending}</Status>
     </Link>
   );
 }

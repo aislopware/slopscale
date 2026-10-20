@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -12,12 +11,11 @@ import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { SectionEmpty } from "~/components/ui/section.tsx";
 import { AddUserButton, FirstUserEmpty } from "~/components/users/add-user.tsx";
 import { columns } from "~/components/users/columns.tsx";
 import { InviteUserButton } from "~/components/users/invite-dialog.tsx";
@@ -108,7 +106,6 @@ function UsersPage(): ReactElement {
   });
 
   const total = users.data.users.length;
-  const shown = table.getRowModel().rows.length;
   const pending = users.data.users.filter((user) => !user.approved).length;
   const handleSearchChange = (value: string): void => {
     void navigate({ search: () => searchFor(value, filter), replace: true });
@@ -122,15 +119,19 @@ function UsersPage(): ReactElement {
 
   return (
     <>
-      <PageHeader title="Users" meta={describe(total, pending)} />
-      <TableToolbar
+      <PageHeader
+        title="Users"
+        docs="ref/roles"
+        description="Everyone who signs in to the tailnet. A user's role bounds what they may change here; the policy decides what their machines reach."
+        meta={describe(total, pending)}
         actions={
           <>
             <InviteUserButton me={me} />
             <AddUserButton me={me} />
           </>
         }
-      >
+      />
+      <TableToolbar>
         <SearchInput
           value={text}
           placeholder="Search by name, email or role"
@@ -146,16 +147,14 @@ function UsersPage(): ReactElement {
           onValueChange={handleFilterChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
             total === 0 ? (
               <FirstUserEmpty />
             ) : (
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
+              <SectionEmpty
                 title="No users match"
                 contents={
                   <Button variant="secondary" onClick={handleClear}>
@@ -165,13 +164,8 @@ function UsersPage(): ReactElement {
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countUsers(total)}`}</TableFooter>
-            )
-          }
         />
-      </Frame>
+      </TableGroup>
       <PendingInvites me={me} />
     </>
   );

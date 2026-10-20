@@ -157,7 +157,7 @@ describe(RoutesTab, () => {
       .element(screen.getByRole("link", { name: "machine-1" }))
       .toHaveAttribute("href", "/machines/1");
     await expect.element(screen.getByRole("link", { name: "machine-2" })).toBeVisible();
-    await expect.element(screen.getByText("Primary")).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "Approved Primary" })).toBeVisible();
     await expect.element(screen.getByText("Disconnected")).toBeVisible();
   });
 
@@ -175,11 +175,11 @@ describe(RoutesTab, () => {
     const nodes = [...pair, node("3", { available: ["10.9.0.0/24"], approved: ["10.9.0.0/24"] })];
     const screen = await render(app(nodes));
 
-    await expect.element(screen.getByText("Showing 2 of 2 routes")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–2 of 2")).toBeVisible();
 
     await screen.getByRole("button", { name: /^Pending/u }).click();
 
-    await expect.element(screen.getByText("Showing 1 of 2 routes")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–1 of 1")).toBeVisible();
     await expect.element(screen.getByText("10.9.0.0/24")).not.toBeInTheDocument();
   });
 
@@ -203,7 +203,7 @@ describe(RoutesTab, () => {
     ];
     const screen = await render(app(nodes));
 
-    await expect.element(screen.getByText("No longer advertised")).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "No longer advertised" })).toBeVisible();
     await expect.element(screen.getByText("1 stale")).not.toBeInTheDocument();
   });
 
@@ -241,5 +241,24 @@ describe(RoutesTab, () => {
 
     await expect.element(screen.getByText("Approve 2 machines?")).toBeVisible();
     await expect.element(screen.getByText(/10\.0\.0\.0\/24 start reaching/u)).toBeVisible();
+  });
+
+  it("presses the every-route chip while nothing narrows, and clears the others with it", async () => {
+    const nodes = [...pair, node("3", { available: ["10.9.0.0/24"], approved: ["10.9.0.0/24"] })];
+    const screen = await render(app(nodes));
+    const every = screen.getByRole("button", { name: "2 routes" });
+    const pending = screen.getByRole("button", { name: /^Pending/u });
+
+    await expect.element(every).toHaveAttribute("aria-pressed", "true");
+
+    await pending.click();
+
+    await expect.element(every).toHaveAttribute("aria-pressed", "false");
+    await expect.element(screen.getByText("Showing 1–1 of 1")).toBeVisible();
+
+    await every.click();
+
+    await expect.element(pending).toHaveAttribute("aria-pressed", "false");
+    await expect.element(screen.getByText("Showing 1–2 of 2")).toBeVisible();
   });
 });

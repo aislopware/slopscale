@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"hash/fnv"
 	"math"
-	"net/netip"
 	"slices"
 	"strconv"
 	"time"
@@ -36,10 +35,10 @@ import (
 // machine does, not with every netcheck.
 
 // nearSlack is how much further than the nearest router another may be and
-// still count as equally near: nearSlackMin, or a nearSlackDivisor-th of
+// still count as equally near: minNearSlack, or a nearSlackDivisor-th of
 // the nearest round trip (10%) when that is more.
 const (
-	nearSlackMin     = 20 * time.Millisecond
+	minNearSlack     = 20 * time.Millisecond
 	nearSlackDivisor = 10
 )
 
@@ -140,7 +139,7 @@ func nearest(sites []site, viewer viewerSite) []site {
 		return nil
 	}
 
-	limit := best + max(nearSlackMin, best/nearSlackDivisor)
+	limit := best + max(minNearSlack, best/nearSlackDivisor)
 
 	var out []site
 
@@ -180,17 +179,53 @@ func rendezvous(sites []site, viewer types.NodeID) types.NodeID {
 	return pick
 }
 
-// steer picks the router a viewer uses for a prefix among the sites that
-// serve it, given the primary it would otherwise use. near is the result
-// of [nearest] for these sites, which the caller computes once per set.
-func steer(prefix netip.Prefix, sites, near []site, viewer viewerSite, fallback types.NodeID) types.NodeID {
+// pickFor is the node the viewer uses for key, a prefix or a service,
+// whose tailnet-wide primary is global: the primary of the viewer's
+// region where regional has one, then steering among contested. spread
+// is whether viewers equally near several nodes are spread over them
+// (see [steer]). near caches [nearest] per shared set of sites.
+func pickFor[K comparable](
+	key K,
+	global types.NodeID,
+	regional map[tailcfg.DERPRegionID]map[K]types.NodeID,
+	contested map[K][]site,
+	viewer viewerSite,
+	near map[*site][]site,
+	spread bool,
+) types.NodeID {
+	primary := global
+	if local, ok := regional[viewer.region()][key]; ok {
+		primary = local
+	}
+
+	sites := contested[key]
+	if len(sites) == 0 {
+		return primary
+	}
+
+	nearSites, ok := near[&sites[0]]
+	if !ok {
+		nearSites = nearest(sites, viewer)
+		near[&sites[0]] = nearSites
+	}
+
+	return steer(spread, sites, nearSites, viewer, primary)
+}
+
+// steer picks the node a viewer uses among the sites that serve one
+// prefix or service, given the primary it would otherwise use. near is
+// the result of [nearest] for these sites, which the caller computes once
+// per set. With spread, viewers equally near several sites are spread
+// over them by rendezvous hash; without, they keep the primary where it
+// is among them.
+func steer(spread bool, sites, near []site, viewer viewerSite, fallback types.NodeID) types.NodeID {
 	// A router viewing its own prefix keeps the primary, so HA
 	// secondaries still learn which peer holds it.
 	if len(near) == 0 || slices.ContainsFunc(sites, func(s site) bool { return s.id == viewer.id }) {
 		return fallback
 	}
 
-	if isPublicAddr(prefix.Addr()) {
+	if spread {
 		return rendezvous(near, viewer.id)
 	}
 

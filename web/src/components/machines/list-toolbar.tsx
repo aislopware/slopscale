@@ -43,7 +43,7 @@ export interface MachinesToolbarProps {
   /** Whether any machine has an attestation record at all. */
   readonly attestable: boolean;
   readonly counts: Record<StatusFilter, number>;
-  /** Opens the page's "Add machine" dialog, which the empty state shares. */
+  /** Opens the Add machine wizard, which the empty state opens too. */
   readonly onAddMachine: () => void;
   readonly onQueryChange: (value: string) => void;
   readonly onStatusChange: (value: StatusFilter) => void;
@@ -131,8 +131,8 @@ export function MachinesToolbar({
 }
 
 /**
- * A machine joins by registering itself, so the console's part is handing out a pre-auth key. The
- * dialog belongs to the page, because the empty state opens the same one.
+ * A machine joins by registering itself, so the console's part is handing out a pre-auth key; the
+ * Add machine wizard does that and hands over the command.
  */
 function AddMachine({
   me,
