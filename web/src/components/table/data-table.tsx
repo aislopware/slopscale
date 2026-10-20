@@ -51,6 +51,11 @@ export interface DataTableProps<TData extends RowData> {
    * does not push the rows down under the pointer.
    */
   readonly headerInfo?: ReactNode;
+  /**
+   * The rows per page a log toolbar's "Limit" sets: the table follows it, and the band leaves its
+   * own "Per page" out so the choice is made in one place.
+   */
+  readonly pageSize?: number;
 }
 
 /**
@@ -70,27 +75,14 @@ export function DataTable<TData extends RowData>({
   headerOverlay,
   overlayShown = false,
   headerInfo,
+  pageSize,
 }: DataTableProps<TData>): ReactElement {
   const { rows } = table.getRowModel();
   const pinnedRight = table
     .getAllColumns()
     .some((column) => column.columnDef.meta?.sticky === "right");
-  // What the rows on the page depend on, by value: a state read hands back a fresh array for a slice
-  // that did not change, and the instance itself is rebuilt on every render, so a reference would
-  // make this look changed every time.
-  const shows = `${table.state.globalFilter ?? ""}|${JSON.stringify(table.state.columnFilters)}|${table.getRowCount()}`;
-  const shown = useRef(shows);
-  const { setPageIndex } = table;
-
-  // Back to the first page whenever the rows change under the table: a search, a filter or a
-  // narrower collection. The row model's own reset cannot do this, because a page rebuilds its
-  // filtered array on every render and a new array is not new data.
-  useEffect(() => {
-    if (shown.current !== shows) {
-      shown.current = shows;
-      setPageIndex(0);
-    }
-  }, [shows, setPageIndex]);
+  useFirstPageOnNewRows(table);
+  useFollowPageSize(table, pageSize);
 
   return (
     // A container while there is a band above the header, so its actions can fold to icons.
@@ -115,7 +107,7 @@ export function DataTable<TData extends RowData>({
           )
         }
         below={rows.length === 0 ? empty : null}
-        footer={pageBand(table, footer)}
+        footer={pageBand(table, footer, pageSize !== undefined)}
       >
         {(overflowing) => (
           <Table className={tableClass}>
@@ -199,6 +191,45 @@ export function DataTable<TData extends RowData>({
   );
 }
 
+/**
+ * Back to the first page whenever the rows change under the table: a search, a filter or a narrower
+ * collection. The row model's own reset cannot do this, because a page rebuilds its filtered array
+ * on every render and a new array is not new data.
+ */
+function useFirstPageOnNewRows<TData extends RowData>(table: AppTableInstance<TData>): void {
+  // What the rows on the page depend on, by value: a state read hands back a fresh array for a slice
+  // that did not change, and the instance itself is rebuilt on every render, so a reference would
+  // make this look changed every time.
+  const shows = `${table.state.globalFilter ?? ""}|${JSON.stringify(table.state.columnFilters)}|${table.getRowCount()}`;
+  const shown = useRef(shows);
+  const { setPageIndex } = table;
+
+  useEffect(() => {
+    if (shown.current !== shows) {
+      shown.current = shows;
+      setPageIndex(0);
+    }
+  }, [shows, setPageIndex]);
+}
+
+/**
+ * The toolbar's Limit lives with the page, the rows per page with the table; this keeps the table
+ * on the toolbar's choice.
+ */
+function useFollowPageSize<TData extends RowData>(
+  table: AppTableInstance<TData>,
+  pageSize: number | undefined,
+): void {
+  const { setPageSize } = table;
+  const current = table.state.pagination.pageSize;
+
+  useEffect(() => {
+    if (pageSize !== undefined && current !== pageSize) {
+      setPageSize(pageSize);
+    }
+  }, [pageSize, current, setPageSize]);
+}
+
 /** The classes a column asks for, in the order that lets `meta.className` override the convention. */
 function cellClass(
   meta:
@@ -229,6 +260,7 @@ function cellClass(
 function pageBand<TData extends RowData>(
   table: AppTableInstance<TData>,
   custom: ReactNode,
+  hidePageSize: boolean,
 ): ReactNode {
   const total = table.getRowCount();
   const { pageIndex, pageSize } = table.state.pagination;
@@ -252,6 +284,7 @@ function pageBand<TData extends RowData>(
       setPageSize={(size) => {
         table.setPageSize(size);
       }}
+      hidePageSize={hidePageSize}
     />
   );
 }

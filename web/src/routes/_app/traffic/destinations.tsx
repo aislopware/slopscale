@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { ReactElement } from "react";
 import { object } from "valibot";
 
@@ -9,9 +9,15 @@ import { trafficDestinationsQuery, trafficReportersQuery } from "~/api/traffic.t
 import type { TrafficDestination, TrafficScope } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
+import { tablePageSize } from "~/components/table/app-table.tsx";
+import { ColumnsMenu, LimitSelect, useHiddenColumns } from "~/components/table/log-view.tsx";
+import type { HiddenColumns } from "~/components/table/log-view.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableGroup } from "~/components/table/toolbar.tsx";
-import { DestinationsTable } from "~/components/traffic/destinations-table.tsx";
+import {
+  DestinationsTable,
+  destinationColumnChoices,
+} from "~/components/traffic/destinations-table.tsx";
 import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import { useSearchDraft } from "~/components/traffic/search-draft.ts";
@@ -87,6 +93,8 @@ function DestinationsPage(): ReactElement {
   };
 
   const chips = destinationChips(search, machineName, setSearch);
+  const [pageSize, setPageSize] = useState(tablePageSize);
+  const columns = useHiddenColumns("slopscale-admin.traffic.destinations.hidden-columns");
 
   return (
     <>
@@ -116,17 +124,24 @@ function DestinationsPage(): ReactElement {
           setSearch({ ...search, ...window, ...noDestinationFilters, q: search.q });
         }}
         actions={
-          <GroupBySelect
-            label="Group destinations by"
-            tabs={destinationTabs}
-            value={search.by}
-            onChange={(value) => {
-              void navigate({
-                search: (previous) => ({ ...previous, by: toDestinationGrouping(value) }),
-                replace: true,
-              });
-            }}
-          />
+          <>
+            <GroupBySelect
+              label="Group destinations by"
+              tabs={destinationTabs}
+              value={search.by}
+              onChange={(value) => {
+                void navigate({
+                  search: (previous) => ({ ...previous, by: toDestinationGrouping(value) }),
+                  replace: true,
+                });
+              }}
+            />
+            <LimitSelect value={pageSize} onChange={setPageSize} />
+            <ColumnsMenu
+              choices={destinationColumnChoices(search.by, search.node !== "")}
+              columns={columns}
+            />
+          </>
         }
       />
       {isRefusedWindow(destinations.error) ? null : (
@@ -135,6 +150,8 @@ function DestinationsPage(): ReactElement {
           rows={destinations.data?.destinations ?? []}
           chips={chips}
           onSearch={setSearch}
+          pageSize={pageSize}
+          columns={columns}
         />
       )}
     </>
@@ -146,11 +163,15 @@ function DestinationsFrame({
   rows,
   chips,
   onSearch,
+  pageSize,
+  columns,
 }: {
   readonly search: DestinationSearch;
   readonly rows: readonly TrafficDestination[];
   readonly chips: FilterChip[];
   readonly onSearch: (next: DestinationSearch) => void;
+  readonly pageSize: number;
+  readonly columns: HiddenColumns;
 }): ReactElement {
   const navigate = useNavigate({ from: Route.fullPath });
   const whole = rows.reduce((sum, row) => sum + row.txBytes + row.rxBytes, 0);
@@ -166,6 +187,8 @@ function DestinationsFrame({
         whole={whole}
         of="the rows shown"
         oneMachine={search.node !== ""}
+        pageSize={pageSize}
+        hidden={columns.hidden}
         empty={
           chips.length === 0 && search.q === "" ? undefined : (
             <NothingMatches

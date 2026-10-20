@@ -33,6 +33,8 @@ export interface PagingBandProps {
   readonly total: number;
   readonly setPage: (page: number) => void;
   readonly setPageSize: (size: number) => void;
+  /** Leaves the band's "Per page" out, for a table whose toolbar sets it (a log's "Limit"). */
+  readonly hidePageSize?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function PagingBand({
   total,
   setPage,
   setPageSize,
+  hidePageSize = false,
 }: PagingBandProps): ReactElement {
   return (
     <Band>
@@ -54,8 +57,16 @@ export function PagingBand({
         <Pagination.Info>
           {() => `Showing ${rangeText(page, pageSize, total)} of ${total}`}
         </Pagination.Info>
-        <Pagination.Separator className="max-sm:hidden" />
-        <Pagination.PageSize className="max-sm:hidden" value={pageSize} onChange={setPageSize} />
+        {hidePageSize ? null : (
+          <>
+            <Pagination.Separator className="max-sm:hidden" />
+            <Pagination.PageSize
+              className="max-sm:hidden"
+              value={pageSize}
+              onChange={setPageSize}
+            />
+          </>
+        )}
         <Pagination.Controls controls="full" pageSelector="input" className="ml-auto grow-0" />
       </Pagination>
     </Band>

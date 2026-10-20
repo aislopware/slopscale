@@ -19,6 +19,7 @@ import { typingSettleMs, useDraft, useTargetFilter } from "~/components/audit/ta
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { LogFilters } from "~/components/table/log-filters.tsx";
 import type { LogFilter } from "~/components/table/log-filters.tsx";
+import { LimitSelect } from "~/components/table/log-view.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
 import { smallestPageSize } from "~/components/table/paging.tsx";
 import { TableGroup } from "~/components/table/toolbar.tsx";
@@ -155,40 +156,6 @@ function RangeSelect({
       {auditRanges.map((range) => (
         <Select.Option key={range} value={range}>
           {rangeLabels[range]}
-        </Select.Option>
-      ))}
-    </Select>
-  );
-}
-
-/** "Limit: 50", the rows one page of the table holds. */
-function LimitSelect({
-  value,
-  onChange,
-}: {
-  readonly value: number;
-  readonly onChange: (size: number) => void;
-}): ReactElement {
-  return (
-    <Select
-      aria-label="Rows per page"
-      className="w-20 sm:w-28"
-      value={value}
-      renderValue={(size) => (
-        <span>
-          <span className="max-sm:hidden">Limit: </span>
-          {String(size)}
-        </span>
-      )}
-      onValueChange={(size) => {
-        if (typeof size === "number") {
-          onChange(size);
-        }
-      }}
-    >
-      {limits.map((size) => (
-        <Select.Option key={size} value={size}>
-          {size}
         </Select.Option>
       ))}
     </Select>
@@ -355,6 +322,7 @@ function AuditPage(): ReactElement {
             }}
           />
           <LimitSelect
+            limits={limits}
             value={window.pageSize}
             onChange={(size) => {
               window.setPageSize(size);

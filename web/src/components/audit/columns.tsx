@@ -1,8 +1,7 @@
-import { Button } from "@cloudflare/kumo/components/button";
-import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { GearSixIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
+
+import { ColumnsMenu as LogColumnsMenu } from "~/components/table/log-view.tsx";
 
 /** Every audit column, in the order the table starts with. */
 export const auditColumns = ["time", "action", "target", "actor", "result", "details"] as const;
@@ -114,41 +113,22 @@ export function useAuditColumns(): AuditColumns {
   };
 }
 
-/**
- * The log toolbar's Columns chooser: one tick per optional column in the table's order, the menu
- * stays open; the last item puts back every column in its first place.
- */
+/** The log toolbar's Columns chooser for the audit log, in the table's current order. */
 export function ColumnsMenu({ columns }: { readonly columns: AuditColumns }): ReactElement {
   return (
-    <DropdownMenu>
-      <DropdownMenu.Trigger
-        render={
-          <Button variant="secondary" icon={GearSixIcon} aria-label="Columns">
-            <span className="max-sm:hidden">Columns</span>
-          </Button>
-        }
-      />
-      <DropdownMenu.Content align="end">
-        {columns.order.filter(isColumn).map((column) => (
-          <DropdownMenu.CheckboxItem
-            key={column}
-            checked={!columns.hidden.has(column)}
-            onCheckedChange={() => {
-              columns.toggle(column);
-            }}
-          >
-            {auditColumnLabels[column]}
-          </DropdownMenu.CheckboxItem>
-        ))}
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item
-          onClick={() => {
-            columns.reset();
-          }}
-        >
-          Reset columns
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu>
+    <LogColumnsMenu
+      choices={columns.order
+        .filter((column) => isColumn(column))
+        .map((column) => ({ id: column, label: auditColumnLabels[column] }))}
+      columns={{
+        hidden: columns.hidden,
+        toggle: (id) => {
+          if (isColumn(id)) {
+            columns.toggle(id);
+          }
+        },
+        reset: columns.reset,
+      }}
+    />
   );
 }

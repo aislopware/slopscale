@@ -1,7 +1,7 @@
 import { Select } from "@cloudflare/kumo/components/select";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { object } from "valibot";
 
@@ -11,11 +11,14 @@ import { trafficNamesQuery, trafficReportersQuery, trafficSettingsQuery } from "
 import type { NameFilters, TrafficName, TrafficScope } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
+import { tablePageSize } from "~/components/table/app-table.tsx";
 import type { LogFilter } from "~/components/table/log-filters.tsx";
+import { ColumnsMenu, LimitSelect, useHiddenColumns } from "~/components/table/log-view.tsx";
+import type { HiddenColumns } from "~/components/table/log-view.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableGroup } from "~/components/table/toolbar.tsx";
 import { DnsLoggingOff, DnsLoggingOffNote } from "~/components/traffic/dns-logging-off.tsx";
-import { NamesTable } from "~/components/traffic/names-table.tsx";
+import { NamesTable, nameColumnChoices } from "~/components/traffic/names-table.tsx";
 import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import { useSearchDraft } from "~/components/traffic/search-draft.ts";
@@ -108,6 +111,8 @@ function DnsPage(): ReactElement {
     nodes.data === undefined ? (id: string): string => `Machine ${id}` : undefined,
     setSearch,
   );
+  const [pageSize, setPageSize] = useState(tablePageSize);
+  const columns = useHiddenColumns("slopscale-admin.traffic.dns.hidden-columns");
 
   return (
     <>
@@ -137,21 +142,34 @@ function DnsPage(): ReactElement {
           setSearch({ ...search, ...window, node: "", name: "" });
         }}
         actions={
-          <GroupBySelect
-            label="Group lookups by"
-            tabs={groupTabs}
-            value={search.by}
-            onChange={(value) => {
-              void navigate({
-                search: (previous) => ({ ...previous, by: toNameGrouping(value) }),
-                replace: true,
-              });
-            }}
-          />
+          <>
+            <GroupBySelect
+              label="Group lookups by"
+              tabs={groupTabs}
+              value={search.by}
+              onChange={(value) => {
+                void navigate({
+                  search: (previous) => ({ ...previous, by: toNameGrouping(value) }),
+                  replace: true,
+                });
+              }}
+            />
+            <LimitSelect value={pageSize} onChange={setPageSize} />
+            <ColumnsMenu
+              choices={nameColumnChoices(search.by, search.node !== "")}
+              columns={columns}
+            />
+          </>
         }
       />
       {isRefusedWindow(names.error) ? null : (
-        <NamesFrame search={search} rows={names.data?.names ?? []} onSearch={setSearch} />
+        <NamesFrame
+          search={search}
+          rows={names.data?.names ?? []}
+          onSearch={setSearch}
+          pageSize={pageSize}
+          columns={columns}
+        />
       )}
     </>
   );
@@ -205,10 +223,14 @@ function NamesFrame({
   search,
   rows,
   onSearch,
+  pageSize,
+  columns,
 }: {
   readonly search: NameSearch;
   readonly rows: readonly TrafficName[];
   readonly onSearch: (next: NameSearch) => void;
+  readonly pageSize: number;
+  readonly columns: HiddenColumns;
 }): ReactElement {
   const settings = useQuery(trafficSettingsQuery);
   const clear = (): void => {
@@ -237,6 +259,8 @@ function NamesFrame({
           groupBy={search.by}
           empty={empty}
           oneMachine={search.node !== ""}
+          pageSize={pageSize}
+          hidden={columns.hidden}
           onPick={(row) => {
             onSearch({ ...search, ...pickName(row, search.by) });
           }}

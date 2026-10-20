@@ -1,14 +1,21 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import type { ReactElement } from "react";
 import { object } from "valibot";
 
 import { trafficReportersQuery, trafficSummaryQuery } from "~/api/traffic.ts";
 import type { TrafficScope } from "~/api/traffic.ts";
 import { plural } from "~/components/overview/plural.ts";
+import { tablePageSize } from "~/components/table/app-table.tsx";
+import { ColumnsMenu, LimitSelect, useHiddenColumns } from "~/components/table/log-view.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableGroup } from "~/components/table/toolbar.tsx";
-import { MachinesTable, trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import {
+  MachinesTable,
+  machineColumnChoices,
+  trafficNodeName,
+} from "~/components/traffic/machines-table.tsx";
 import { optionalText, trafficWindowEntries, windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
@@ -54,6 +61,8 @@ function MachinesPage(): ReactElement {
       ? nodes
       : nodes.filter((node) => trafficNodeName(node).toLowerCase().includes(needle));
   const whole = data === undefined ? 0 : data.total.txBytes + data.total.rxBytes;
+  const [pageSize, setPageSize] = useState(tablePageSize);
+  const columns = useHiddenColumns("slopscale-admin.traffic.machines.hidden-columns");
 
   return (
     <>
@@ -81,6 +90,12 @@ function MachinesPage(): ReactElement {
             }}
           />
         }
+        actions={
+          <>
+            <LimitSelect value={pageSize} onChange={setPageSize} />
+            <ColumnsMenu choices={machineColumnChoices(data?.reporters ?? [])} columns={columns} />
+          </>
+        }
       />
       {isRefusedWindow(error) ? null : (
         <TableGroup>
@@ -89,6 +104,8 @@ function MachinesPage(): ReactElement {
             gateways={data?.reporters ?? []}
             whole={whole}
             search={search}
+            pageSize={pageSize}
+            hidden={columns.hidden}
             empty={
               needle === "" ? undefined : (
                 <SectionEmpty
