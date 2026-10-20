@@ -590,13 +590,16 @@ func (s *NodeStore) Stop() {
 // givenNames counts how many nodes hold each given name.
 // [NodeStore.applyBatch] builds it once per batch and keeps it in step
 // with the names the batch writes, so resolving a name costs a lookup per
-// candidate instead of a scan over every node per operation.
+// candidate instead of a scan over every node per operation. Names are
+// counted case-insensitively, as DNS compares them: a "Laptop" from
+// before renames were lowercased already holds "laptop", and one
+// certificate would be valid for both.
 type givenNames map[string]int
 
 func newGivenNames(nodes map[types.NodeID]types.Node) givenNames {
 	names := make(givenNames, len(nodes))
 	for _, n := range nodes {
-		names[n.GivenName]++
+		names[strings.ToLower(n.GivenName)]++
 	}
 
 	return names
@@ -605,8 +608,8 @@ func newGivenNames(nodes map[types.NodeID]types.Node) givenNames {
 // free reports whether candidate is available to the node currently named
 // selfName: nobody holds it, or only that node does.
 func (g givenNames) free(candidate, selfName string) bool {
-	held := g[candidate]
-	if candidate == selfName {
+	held := g[strings.ToLower(candidate)]
+	if strings.EqualFold(candidate, selfName) {
 		held--
 	}
 
@@ -615,11 +618,12 @@ func (g givenNames) free(candidate, selfName string) bool {
 
 // hold records one more node holding name.
 func (g givenNames) hold(name string) {
-	g[name]++
+	g[strings.ToLower(name)]++
 }
 
 // release records one fewer node holding name.
 func (g givenNames) release(name string) {
+	name = strings.ToLower(name)
 	if g[name] <= 1 {
 		delete(g, name)
 		return

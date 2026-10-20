@@ -59,3 +59,31 @@ func TestRenameNodeInvalidLabelMessage(t *testing.T) {
 		err.Error(),
 	)
 }
+
+// TestRenameNodeLowercasesAndRefreshesSelf covers a rename's effect on the
+// node's own DNS config: the name is stored lowercase, since DNS ignores
+// case and a certificate for "Foo" is one for "foo", and the node is
+// queued for a self refresh so its CertDomains follow the new name.
+func TestRenameNodeLowercasesAndRefreshesSelf(t *testing.T) {
+	t.Parallel()
+
+	s := newRoleTestState(t)
+	user := s.CreateUserForTest("rename-case-user")
+	node := s.CreateRegisteredNodeForTest(user, "rename-case-node")
+	s.PutNodeInStoreForTest(*node)
+	s.DrainSelfRefreshes()
+
+	view, _, err := s.RenameNode(node.ID, "Web-Server")
+	require.NoError(t, err)
+	assert.Equal(t, "web-server", view.GivenName())
+
+	refreshed := false
+
+	for _, c := range s.DrainSelfRefreshes() {
+		if c.TargetNode == node.ID && c.IncludeDNS {
+			refreshed = true
+		}
+	}
+
+	assert.True(t, refreshed, "a rename must resend the node its own DNS config")
+}
