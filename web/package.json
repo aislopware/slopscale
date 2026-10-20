@@ -23,7 +23,7 @@
     "check": "bun run typecheck && bun run lint && bun run fmt:check && bun run test"
   },
   "dependencies": {
-    "@cloudflare/kumo": "^2.14.0",
+    "@cloudflare/kumo": "^2.15.0",
     "@codemirror/autocomplete": "6.20.3",
     "@codemirror/commands": "6.11.1",
     "@codemirror/lang-json": "6.0.2",
