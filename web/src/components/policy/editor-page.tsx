@@ -42,7 +42,7 @@ export function EditorBanner({
   title = "Not saved",
   message,
 }: {
-  readonly title?: string;
+  readonly title?: string | undefined;
   readonly message: string | undefined;
 }): ReactElement | null {
   if (message === undefined || message === "") {
