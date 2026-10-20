@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -56,4 +57,24 @@ func TestDisplayMessages(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLegacyHealth pins the Health list a pre-DisplayMessages client gets:
+// v1.84 shows only the last entry, so suspension sorts after approval, and a
+// node with nothing to show gets an empty list, never nil.
+func TestLegacyHealth(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now()
+
+	pending := types.Node{SuspendedAt: &now}
+	both := legacyHealth(displayMessages(pending.View(), ""))
+	require.Len(t, both, 2)
+	assert.True(t, strings.HasPrefix(both[0], "This device is waiting for approval. "))
+	assert.True(t, strings.HasPrefix(both[1], "This device is suspended. "))
+
+	approved := types.Node{ApprovedAt: &now}
+	none := legacyHealth(displayMessages(approved.View(), ""))
+	assert.NotNil(t, none)
+	assert.Empty(t, none)
 }

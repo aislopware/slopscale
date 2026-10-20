@@ -1349,3 +1349,60 @@ func TestPollNetMapHandler_ForeignMachineKeyStillRejected(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, rec.Code, "body=%q", rec.Body.String())
 }
+
+// TestPollNetMapHandler_HealthForClientsWithoutDisplayMessages pins what a
+// node's user reads about its standing on a client older than
+// capver.DisplayMessagesCapVer (v1.84), which ignores DisplayMessages: the
+// message arrives as Health instead, and an explicit empty Health clears it,
+// because a missing one means "no change" and would leave it on screen.
+func TestPollNetMapHandler_HealthForClientsWithoutDisplayMessages(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	user := app.state.CreateUserForTest("health-user")
+	node := putTestNodeInStore(t, app, user, "health-node")
+	ns := &noiseServer{slopscale: app, machineKey: node.MachineKey}
+
+	poll := func(version tailcfg.CapabilityVersion) (tailcfg.MapResponse, map[string]json.RawMessage) {
+		t.Helper()
+
+		rec := httptest.NewRecorder()
+		ns.PollNetMapHandler(rec, newMapRequest(t, tailcfg.MapRequest{
+			Version: version,
+			NodeKey: node.NodeKey,
+		}))
+		require.Equal(t, http.StatusOK, rec.Code, "body=%q", rec.Body.String())
+
+		resp := decodeMapResponse(t, "", rec.Body.Bytes())
+
+		var fields map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes()[reservedResponseHeaderSize:], &fields))
+
+		return resp, fields
+	}
+
+	oldest := capver.DisplayMessagesCapVer - 1
+
+	_, _, err := app.state.SetNodeSuspension(node.ID, true)
+	require.NoError(t, err)
+
+	resp, fields := poll(oldest)
+	require.Len(t, resp.Health, 1)
+	assert.Contains(t, resp.Health[0], "This device is suspended")
+	assert.NotContains(t, fields, "DisplayMessages", "tailcfg: either Health or DisplayMessages, not both")
+
+	resp, fields = poll(capver.DisplayMessagesCapVer)
+	assert.NotNil(t, resp.DisplayMessages["slopscale-suspended"])
+	assert.NotContains(t, fields, "Health")
+
+	_, _, err = app.state.SetNodeSuspension(node.ID, false)
+	require.NoError(t, err)
+
+	resp, fields = poll(oldest)
+	require.Contains(t, fields, "Health", "only a present empty list clears the message")
+	assert.JSONEq(t, `[]`, string(fields["Health"]))
+	assert.NotContains(t, fields, "MapResponse", "the wrapped response is inlined")
+	require.NotNil(t, resp.Node, "the wrapped response still carries the map")
+	assert.NotNil(t, resp.Health)
+	assert.Empty(t, resp.Health)
+}

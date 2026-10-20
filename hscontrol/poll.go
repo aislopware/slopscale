@@ -504,14 +504,16 @@ func putMapBuffer(buf *bytes.Buffer) {
 func (m *mapSession) encodeMap(out *bytes.Buffer, msg *tailcfg.MapResponse) error {
 	out.Write(mapHeaderPlaceholder[:])
 
+	v := wireMapResponse(msg)
+
 	if m.req.Compress != util.ZstdCompression {
-		return wire.MarshalWrite(out, msg)
+		return wire.MarshalWrite(out, v)
 	}
 
 	raw := getMapBuffer()
 	defer putMapBuffer(raw)
 
-	err := wire.MarshalWrite(raw, msg)
+	err := wire.MarshalWrite(raw, v)
 	if err != nil {
 		return err
 	}
@@ -519,6 +521,26 @@ func (m *mapSession) encodeMap(out *bytes.Buffer, msg *tailcfg.MapResponse) erro
 	out.Write(zstdframe.AppendEncode(out.AvailableBuffer(), raw.Bytes(), zstdframe.FastestCompression))
 
 	return nil
+}
+
+// clearedHealthResponse is a [tailcfg.MapResponse] whose Health is the
+// empty list: tailcfg marks Health omitempty, so on its own the list that
+// clears a pre-117 (capver.DisplayMessagesCapVer) client's health would read as
+// "no change" and leave the old message up.
+type clearedHealthResponse struct {
+	*tailcfg.MapResponse
+
+	Health []string
+}
+
+// wireMapResponse returns what to encode for msg, which is msg itself
+// unless its Health is empty but set.
+func wireMapResponse(msg *tailcfg.MapResponse) any {
+	if msg.Health == nil || len(msg.Health) > 0 {
+		return msg
+	}
+
+	return clearedHealthResponse{MapResponse: msg, Health: msg.Health}
 }
 
 // writeMap writes the map response to the client.
