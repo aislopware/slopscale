@@ -15,6 +15,7 @@ import {
   TargetCell,
   TimeCell,
 } from "~/components/audit/cells.tsx";
+import type { AuditColumn } from "~/components/audit/columns.tsx";
 import { EventSheet } from "~/components/audit/detail-sheet.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
@@ -35,13 +36,17 @@ function onControl(event: MouseEvent<HTMLElement>): boolean {
   );
 }
 
+const noneHidden: ReadonlySet<AuditColumn> = new Set();
+
 function EventRow({
   event,
+  hidden,
   overflowing,
   open,
   onOpen,
 }: {
   readonly event: AuditEvent;
+  readonly hidden: ReadonlySet<AuditColumn>;
   /** Whether the columns run past the panel, so the pinned last column draws its edge. */
   readonly overflowing: boolean;
   /** Whether this event is the one in the sheet. */
@@ -64,18 +69,26 @@ function EventRow({
       <Table.Cell>
         <ActionCell event={event} />
       </Table.Cell>
-      <Table.Cell>
-        <TargetCell event={event} />
-      </Table.Cell>
-      <Table.Cell>
-        <ActorCell event={event} />
-      </Table.Cell>
-      <Table.Cell>
-        <ResultCell event={event} />
-      </Table.Cell>
-      <Table.Cell className="hidden lg:table-cell">
-        <DetailCell event={event} onOpen={onOpen} />
-      </Table.Cell>
+      {hidden.has("target") ? null : (
+        <Table.Cell>
+          <TargetCell event={event} />
+        </Table.Cell>
+      )}
+      {hidden.has("actor") ? null : (
+        <Table.Cell>
+          <ActorCell event={event} />
+        </Table.Cell>
+      )}
+      {hidden.has("result") ? null : (
+        <Table.Cell>
+          <ResultCell event={event} />
+        </Table.Cell>
+      )}
+      {hidden.has("details") ? null : (
+        <Table.Cell className="hidden lg:table-cell">
+          <DetailCell event={event} onOpen={onOpen} />
+        </Table.Cell>
+      )}
       <Table.Cell sticky="right" className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}>
         {/* The row's own control: it says the row opens a sheet, and gives the keyboard the same
             reach as the click on the row. */}
@@ -103,6 +116,8 @@ export interface EventsTableProps {
   /** Puts the page back to the default range with no action and any user. */
   readonly onClearFilters: () => void;
   readonly paging: CursorPaging;
+  /** The columns the reader switched off in the Columns menu. */
+  readonly hidden?: ReadonlySet<AuditColumn>;
 }
 
 /**
@@ -115,6 +130,7 @@ export function EventsTable({
   filtered,
   onClearFilters,
   paging,
+  hidden = noneHidden,
 }: EventsTableProps): ReactElement {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = events.find((event) => event.id === openId) ?? null;
@@ -140,10 +156,12 @@ export function EventsTable({
               <Table.Row>
                 <Table.Head className="w-32">Time</Table.Head>
                 <Table.Head className="w-56">Action</Table.Head>
-                <Table.Head className="w-40">Target</Table.Head>
-                <Table.Head className="w-44">Actor</Table.Head>
-                <Table.Head className="w-24">Result</Table.Head>
-                <Table.Head className="hidden lg:table-cell">Details</Table.Head>
+                {hidden.has("target") ? null : <Table.Head className="w-40">Target</Table.Head>}
+                {hidden.has("actor") ? null : <Table.Head className="w-44">Actor</Table.Head>}
+                {hidden.has("result") ? null : <Table.Head className="w-24">Result</Table.Head>}
+                {hidden.has("details") ? null : (
+                  <Table.Head className="hidden lg:table-cell">Details</Table.Head>
+                )}
                 <Table.Head
                   sticky="right"
                   className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
@@ -157,6 +175,7 @@ export function EventsTable({
                 <EventRow
                   key={event.id}
                   event={event}
+                  hidden={hidden}
                   overflowing={overflowing}
                   open={openId === event.id}
                   onOpen={() => {

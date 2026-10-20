@@ -257,4 +257,14 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("Showing all 1 event")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
   });
+
+  it("leaves out the columns switched off in the Columns menu", async () => {
+    const hidden = new Set(["actor", "result"] as const);
+    const screen = await render(app({ ...base, events: [deletion], hidden }));
+
+    await expect.element(screen.getByText("Target", { exact: true })).toBeVisible();
+    await expect.element(screen.getByText("Actor", { exact: true })).not.toBeInTheDocument();
+    await expect.element(screen.getByText("Success")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("ada")).not.toBeInTheDocument();
+  });
 });

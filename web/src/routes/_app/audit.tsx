@@ -2,7 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Toolbar } from "@cloudflare/kumo/components/toolbar";
 import { cn } from "@cloudflare/kumo/utils";
-import { ArrowClockwiseIcon, CalendarBlankIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, CalendarBlankIcon, XIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -12,6 +12,7 @@ import { fallback, object, optional, picklist, pipe, transform, unknown } from "
 import { auditQuery, auditRanges, usersQuery } from "~/api/queries.ts";
 import type { AuditFilters, AuditRange, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
+import { ColumnsMenu, useHiddenColumns } from "~/components/audit/columns.tsx";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import { ExportMenu } from "~/components/audit/export-menu.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
@@ -19,6 +20,7 @@ import { tablePageSize } from "~/components/table/app-table.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableGroup } from "~/components/table/toolbar.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
@@ -119,20 +121,48 @@ function userOptions(users: readonly User[]): { value: string; label: string }[]
   ];
 }
 
-/** The date-range button with its calendar icon, and the refresh beside it. */
+/** The log toolbar's filter count: how many filters narrow the list, and the × that drops them all. */
+function FilterCount({
+  count,
+  onClear,
+}: {
+  readonly count: number;
+  readonly onClear: () => void;
+}): ReactElement | null {
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-label={`Clear ${String(count)} ${count === 1 ? "filter" : "filters"}`}
+      onClick={onClear}
+    >
+      Filters
+      <Badge tone="neutral">{count}</Badge>
+      <XIcon aria-hidden className="size-3.5 text-kumo-subtle" />
+    </Button>
+  );
+}
+
+/** The date-range button with its calendar icon, the Columns chooser and the refresh. */
 function RangeControls({
   since,
   refreshing,
+  columns,
   onSinceChange,
   onRefresh,
 }: {
   readonly since: AuditRange;
   readonly refreshing: boolean;
+  readonly columns: ReactElement;
   readonly onSinceChange: (since: AuditRange) => void;
   readonly onRefresh: () => void;
 }): ReactElement {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Select
         aria-label="Time range"
         className="w-44"
@@ -153,6 +183,7 @@ function RangeControls({
           </Select.Option>
         ))}
       </Select>
+      {columns}
       <Button
         variant="secondary"
         shape="square"
@@ -198,7 +229,8 @@ function AuditPage(): ReactElement {
     resetKey: JSON.stringify(filters),
   });
 
-  const filtered = search.action !== "" || search.actor !== "";
+  const filterCount = (search.action === "" ? 0 : 1) + (search.actor === "" ? 0 : 1);
+  const [hidden, toggleColumn] = useHiddenColumns();
 
   return (
     <>
@@ -210,9 +242,10 @@ function AuditPage(): ReactElement {
       />
       <TableGroup className="gap-4">
         {/* The dashboard's audit filter row: the filters joined in one ringed group on the left
-            with the way to clear them, the date range and a refresh on the right. */}
+            with their count and the × that clears them; the date range, the Columns chooser and a refresh
+            on the right. The per-page limit sits in the band under the table. */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-1 basis-80 flex-wrap items-center gap-2">
             <Toolbar aria-label="Filters" className="w-full max-w-[560px]">
               <SearchInput
                 joined
@@ -232,21 +265,17 @@ function AuditPage(): ReactElement {
                 />
               )}
             </Toolbar>
-            {filtered ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  void navigate({ search: (previous) => ({ ...previous, action: "", actor: "" }) });
-                }}
-              >
-                Clear filters
-              </Button>
-            ) : null}
+            <FilterCount
+              count={filterCount}
+              onClear={() => {
+                void navigate({ search: (previous) => ({ ...previous, action: "", actor: "" }) });
+              }}
+            />
           </div>
           <RangeControls
             since={search.since}
             refreshing={events.isRefetching && !events.isFetchingNextPage}
+            columns={<ColumnsMenu hidden={hidden} onToggle={toggleColumn} />}
             onSinceChange={(since) => {
               void navigate({ search: (previous) => ({ ...previous, since }) });
             }}
@@ -265,6 +294,7 @@ function AuditPage(): ReactElement {
             void navigate({ search: () => ({ ...clearedSearch }) });
           }}
           paging={window}
+          hidden={hidden}
         />
       </TableGroup>
     </>
