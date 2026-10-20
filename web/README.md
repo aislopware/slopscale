@@ -5,14 +5,15 @@ server at `/console/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ## Stack
 
-- React 19 through `@vitejs/plugin-react`, built by Vite 8, with the React
-  Compiler (`babel-plugin-react-compiler`, pinned exactly, through
-  `@rolldown/plugin-babel`). Keep `@babel/core` on 7: under Babel 8 the
-  compiler 1.0 silently skips every component that destructures a prop with
-  a default. Oxc's native compiler (`react({ compiler: true })`) is still
-  experimental. `DataTable` takes the table as a prop, never through
-  context: the compiler memoizes on identity, and a context provider created
-  once would keep the rows from ever seeing a sort or a new page.
+- React 19 through `@vitejs/plugin-react`, built by Vite 8, with Oxc's
+  port of the React Compiler (`react({ compiler })`, which loads
+  `oxc-transform-react`, pinned exactly). Oxc labels the port experimental,
+  so read its changes before a bump. `panicThreshold: "all_errors"` makes a
+  component the compiler cannot handle fail the build, the dev server and
+  the tests instead of shipping unmemoized. `DataTable` takes the table as
+  a prop, never through context: the compiler memoizes on identity, and a
+  context provider created once would keep the rows from ever seeing a sort
+  or a new page.
 - TanStack Router (file routes under `src/routes`, generated tree in
   `src/routeTree.gen.ts`), TanStack Query, TanStack Table v9 (`useTable` and
   `tableFeatures`; v8 examples do not apply), TanStack Form where a form has

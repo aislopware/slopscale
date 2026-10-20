@@ -1,7 +1,6 @@
-import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // The console is served by slopscale under /console/, so every asset URL is
@@ -14,10 +13,10 @@ export default defineConfig({
   base: "/console/",
   plugins: [
     tanstackRouter({ target: "react", autoCodeSplitting: true }),
-    react(),
-    // A component the compiler cannot handle fails the build instead of
-    // shipping unmemoized; Babel 8 once made it bail on ~40 of them silently.
-    babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
+    // Oxc's React Compiler. A component it cannot handle fails the build
+    // instead of shipping unmemoized; silent bailouts once left ~40 of them
+    // uncompiled.
+    react({ compiler: { panicThreshold: "all_errors" } }),
     tailwindcss(),
   ],
   resolve: { tsconfigPaths: true },
