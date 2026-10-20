@@ -9,6 +9,7 @@ import type { ReactElement, SubmitEvent } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { Dns } from "~/api/queries.ts";
 import type { DnsRecord } from "~/api/schema.gen.ts";
+import { ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import {
   recordError,
   recordTypeLabel,
@@ -19,9 +20,11 @@ import {
 import type { RecordType } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { SearchInput } from "~/components/table/search-input.tsx";
+import { TableToolbar } from "~/components/table/toolbar.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
-import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 interface Editing {
@@ -43,85 +46,79 @@ export function ExtraRecordsSection({
   readonly mutations: DnsMutations;
 }): ReactElement {
   const [dialog, setDialog] = useState<"closed" | "new" | Editing>("closed");
+  const [query, setQuery] = useState("");
   const settings = dns.effective;
   const fromFile = dns.extraRecordsPath !== "";
   const editable = canEdit && !fromFile;
   const pending = mutations.set.isPending;
 
+  const needle = query.trim().toLowerCase();
+  const shown = settings.extraRecords
+    .map((record, index) => ({ record, index }))
+    .filter(
+      ({ record }) =>
+        needle === "" ||
+        record.name.toLowerCase().includes(needle) ||
+        record.value.toLowerCase().includes(needle),
+    );
+  const total = settings.extraRecords.length;
+
   return (
-    <Section
-      title="Extra records"
-      description={
-        fromFile
-          ? `Read from ${dns.extraRecordsPath} on the server, which owns them while that setting is on.`
-          : "Names MagicDNS answers on top of the machines, such as a service behind a reverse proxy."
-      }
-      bodyClassName="p-0"
-      {...(editable
-        ? {
-            actions: (
-              <Button
-                variant="secondary"
-                icon={PlusIcon}
-                onClick={() => {
-                  setDialog("new");
-                }}
-              >
-                Add record
-              </Button>
-            ),
-          }
-        : {})}
-    >
-      {settings.extraRecords.length === 0 ? (
-        <SectionEmpty
-          title="No extra records"
-          description="The control server answers no names of its own."
-        />
-      ) : (
-        settings.extraRecords.map((record, index) => (
-          <SectionRow
-            key={`${record.name}:${record.type}:${record.value}`}
-            className="flex items-center justify-between gap-4 py-2.5"
-          >
-            <div className="grid min-w-0 flex-1 items-center gap-x-4 gap-y-0.5 sm:grid-cols-[minmax(0,1.4fr)_auto_minmax(0,1fr)]">
-              <span className="min-w-0 font-mono text-sm font-medium break-all text-kumo-strong">
-                {record.name}
-              </span>
-              <span>
-                <span className="font-mono text-xs text-kumo-subtle">
-                  {record.type === "" ? "Auto" : record.type}
-                </span>
-              </span>
-              <span className="min-w-0 font-mono text-sm break-all text-kumo-subtle">
-                {record.value}
-              </span>
-            </div>
-            {editable ? (
-              <RowMenu label={`Actions for record ${record.name}`} disabled={pending}>
-                <DropdownMenu.Item
-                  icon={PencilSimpleIcon}
-                  onClick={() => {
-                    setDialog({ index, record });
-                  }}
-                >
-                  Edit…
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator />
-                <DropdownMenu.Item
-                  icon={TrashIcon}
-                  variant="danger"
-                  onClick={() => {
-                    mutations.apply(withoutRecord(settings, index), `Removed ${record.name}`);
-                  }}
-                >
-                  Remove
-                </DropdownMenu.Item>
-              </RowMenu>
-            ) : null}
-          </SectionRow>
-        ))
-      )}
+    <>
+      <TableToolbar
+        actions={
+          editable ? (
+            <Button
+              variant="primary"
+              icon={PlusIcon}
+              onClick={() => {
+                setDialog("new");
+              }}
+            >
+              Add record
+            </Button>
+          ) : undefined
+        }
+      >
+        <SearchInput value={query} placeholder="Search extra records" onValueChange={setQuery} />
+      </TableToolbar>
+      <Section
+        title="Extra records"
+        meta={total === 1 ? "1 record" : `${total} records`}
+        description={
+          fromFile
+            ? `Read from ${dns.extraRecordsPath} on the server, which owns them while that setting is on.`
+            : "Names MagicDNS answers on top of the machines, such as a service behind a reverse proxy."
+        }
+        panel={false}
+      >
+        <ListTable
+          columns={[
+            { key: "type", label: "Type", className: "w-24" },
+            { key: "name", label: "Name", className: "w-[45%]" },
+            { key: "value", label: "Content" },
+          ]}
+          actions={editable}
+          empty={emptyState(total, shown.length, () => {
+            setQuery("");
+          })}
+        >
+          {shown.map(({ record, index }) => (
+            <RecordRow
+              key={`${record.name}:${record.type}:${record.value}`}
+              record={record}
+              editable={editable}
+              pending={pending}
+              onEdit={() => {
+                setDialog({ index, record });
+              }}
+              onRemove={() => {
+                mutations.apply(withoutRecord(settings, index), `Removed ${record.name}`);
+              }}
+            />
+          ))}
+        </ListTable>
+      </Section>
       <DialogRoot
         open={dialog !== "closed"}
         onOpenChange={(open) => {
@@ -145,8 +142,36 @@ export function ExtraRecordsSection({
           />
         </DialogContent>
       </DialogRoot>
-    </Section>
+    </>
   );
+}
+
+/** What the table says with no rows: nothing yet, or nothing that matches the search. */
+function emptyState(total: number, shown: number, onClear: () => void): ReactElement | null {
+  if (total === 0) {
+    return (
+      <SectionEmpty
+        title="No extra records"
+        description="The control server answers no names of its own."
+      />
+    );
+  }
+
+  if (shown === 0) {
+    return (
+      <SectionEmpty
+        title="No record matches"
+        description="Try a different name or address."
+        contents={
+          <Button variant="secondary" onClick={onClear}>
+            Clear search
+          </Button>
+        }
+      />
+    );
+  }
+
+  return null;
 }
 
 function RecordForm({
@@ -248,5 +273,41 @@ function RecordForm({
         disabled={record.name.trim() === "" || record.value.trim() === ""}
       />
     </form>
+  );
+}
+
+/** One extra record: its type, name and value, and its menu while the console owns the records. */
+function RecordRow({
+  record,
+  editable,
+  pending,
+  onEdit,
+  onRemove,
+}: {
+  readonly record: DnsRecord;
+  readonly editable: boolean;
+  readonly pending: boolean;
+  readonly onEdit: () => void;
+  readonly onRemove: () => void;
+}): ReactElement {
+  return (
+    <ListRow>
+      <ListCell className="font-mono text-sm">{record.type === "" ? "Auto" : record.type}</ListCell>
+      <ListCell className="font-mono text-sm font-medium break-all">{record.name}</ListCell>
+      <ListCell className="font-mono text-sm break-all text-kumo-subtle">{record.value}</ListCell>
+      {editable ? (
+        <ListCell actions>
+          <RowMenu label={`Actions for record ${record.name}`} disabled={pending}>
+            <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
+              Edit…
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item icon={TrashIcon} variant="danger" onClick={onRemove}>
+              Remove
+            </DropdownMenu.Item>
+          </RowMenu>
+        </ListCell>
+      ) : null}
+    </ListRow>
   );
 }

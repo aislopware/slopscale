@@ -62,6 +62,7 @@ export function SearchDomainsSection({
             actions: (
               <Button
                 variant="secondary"
+                size="sm"
                 icon={PlusIcon}
                 onClick={() => {
                   mutations.set.reset();
