@@ -27,9 +27,10 @@ import { DialogClose, DialogContent, DialogFooter, DialogRoot } from "~/componen
 import { MachineName } from "~/components/ui/machine-name.tsx";
 
 /**
- * What the table's header row says while machines are ticked: how many, and the things worth doing
- * to a group of them. Deleting asks first, because it cannot be undone; updating the clients
- * reaches only the ticked machines that are connected and behind, since the rest would refuse.
+ * The band over the table's header row while machines are ticked: how many, and the things worth
+ * doing to a group of them. The column headings stay under it. Deleting asks first, because it
+ * cannot be undone; updating the clients reaches only the ticked machines that are connected and
+ * behind, since the rest would refuse.
  */
 export function MachineBulkBar({
   selection,
@@ -69,13 +70,12 @@ export function MachineBulkBar({
     <>
       {ids.length === 0 ? null : (
         <>
-          {/* pl-3 starts the count where the machine names start in the column below. The bar is
-              the dashboard's DNS bulk bar: "1 of 169 selected", Clear selection beside it, then the
+          {/* The dashboard's DNS bulk bar: "1 of 169 selected", Clear selection beside it, then the
               actions, the destructive one last and red with its count. */}
           <div
             role="toolbar"
             aria-label="Actions for the selected machines"
-            className="flex w-full items-center gap-2 pl-3 font-normal text-kumo-default"
+            className="flex w-full items-center gap-2 font-normal text-kumo-default"
           >
             <span className="text-base tabular-nums">
               <span className="@3xl:hidden">{`${ids.length} selected`}</span>
@@ -157,7 +157,7 @@ export function MachineBulkBar({
 }
 
 /**
- * One action on the header row, which must stay one line or the rows under it would move: labelled
+ * One action on the bulk band, which stays one line so the rows under it do not move: labelled
  * where the frame has room, the icon alone with its label as a tooltip where it does not.
  */
 function BulkButton({

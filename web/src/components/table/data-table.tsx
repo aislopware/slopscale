@@ -6,9 +6,15 @@ import { useEffect, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { AppTableInstance } from "~/components/table/app-table.tsx";
-import { PagingBand, smallestPageSize } from "~/components/table/paging.tsx";
+import { PagingBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
+import {
+  hideBelowClasses,
+  pinnedEdgeClass,
+  tableClass,
+  tableRowClass,
+} from "~/components/table/styles.ts";
+import type { HideBelow } from "~/components/table/styles.ts";
 
 export interface DataTableProps<TData extends RowData> {
   /**
@@ -19,14 +25,14 @@ export interface DataTableProps<TData extends RowData> {
   /** Rendered in place of the body when the (filtered) model is empty. */
   readonly empty: ReactNode;
   /**
-   * Rendered under the card: "Showing N of M". A table with enough rows to page shows the range,
-   * the page size and the paging controls there instead.
+   * A line of the table's own for the band at the foot of the card, such as "The 10 busiest" and a
+   * link to the whole list on a preview table. Without it, and on any table with more rows than one
+   * page holds, the band is the dashboard's: "Showing x-y of z", the rows per page and the pager.
    */
   readonly footer?: ReactNode;
   /**
-   * Where the footer and the pager go: under the card (`below`, the account-level DataTable of
-   * §4.A) or in a band inside its frame (`inside`, the Zero Trust list of §13.3, for a list that is
-   * the page's subject, such as Machines).
+   * Ignored: every table puts its band inside the card now (design spec §13.3). The prop goes once
+   * its last caller drops it.
    */
   readonly footerPlacement?: "below" | "inside";
   /** Adds a click handler and pointer cursor to every row. */
@@ -37,33 +43,38 @@ export interface DataTableProps<TData extends RowData> {
    */
   readonly isRowClickable?: ((rowId: string) => boolean) | undefined;
   /**
-   * Drawn on the header row after the first column, such as the actions for the ticked rows next to
-   * the select-all box. It stays mounted, so a dialog inside it outlives the selection it acts on.
+   * A band inside the card above the header row, such as the actions for the ticked rows: the
+   * dashboard's DNS bulk bar, which takes the place of the info band and leaves the column headings
+   * where they are. It stays mounted, so a dialog inside it outlives the selection it acts on.
    */
   readonly headerOverlay?: ReactNode;
-  /**
-   * Whether the overlay stands in for the other headings. They keep their room, invisible, so no
-   * column changes width and no row moves when the overlay comes and goes.
-   */
+  /** Whether the overlay stands in the band; while it does not, it stays mounted, hidden. */
   readonly overlayShown?: boolean;
+  /**
+   * What the band says while no rows are ticked, the dashboard's info band ("You have used 169 of
+   * 3,500 records"). The band is always there on a table with an overlay, so ticking the first row
+   * does not push the rows down under the pointer.
+   */
+  readonly headerInfo?: ReactNode;
 }
 
 /**
  * The Cloudflare dashboard's DataTable: Kumo's table parts styled by `tableClass` in the card
- * `TableScroll` draws, with "Showing x-y of z" (or the pager) under the card. Columns declare
- * `meta.className` for cell widths and alignment, `meta.numeric` for a column of figures,
- * `meta.sticky` to pin a column to an edge (the row's ⋯ menu, 50px) and `enableSorting` for a
- * sortable header; everything else is the column's `cell` renderer.
+ * `TableScroll` draws, with the "Showing x-y of z", rows per page and pager band inside the card's
+ * foot. Columns declare `meta.className` for cell widths and alignment, `meta.numeric` for a column
+ * of figures, `meta.sticky` to pin a column to an edge (the row's ⋯ menu, 50px), `meta.hideBelow`
+ * for a column a phone can do without and `enableSorting` for a sortable header; everything else is
+ * the column's `cell` renderer. A row whose checkbox is ticked takes the tint fill.
  */
 export function DataTable<TData extends RowData>({
   table,
   empty,
   footer,
-  footerPlacement = "below",
   onRowClick,
   isRowClickable,
   headerOverlay,
   overlayShown = false,
+  headerInfo,
 }: DataTableProps<TData>): ReactElement {
   const { rows } = table.getRowModel();
   const pinnedRight = table
@@ -86,23 +97,37 @@ export function DataTable<TData extends RowData>({
     }
   }, [shows, setPageIndex]);
 
-  const band = pageBand(table, footer);
-  const inside = footerPlacement === "inside";
-
   return (
-    // A container while there is a header overlay, so the overlay can reach the card's right edge.
-    <div className={cn("flex min-w-0 flex-col gap-2", headerOverlay !== undefined && "@container")}>
+    // A container while there is a band above the header, so its actions can fold to icons.
+    <div className={cn("flex min-w-0 flex-col", headerOverlay !== undefined && "@container")}>
       <TableScroll
         pinnedRight={pinnedRight}
+        header={
+          headerOverlay === undefined ? null : (
+            <div
+              data-slot="table-header-band"
+              className="flex min-h-12 items-center border-b border-kumo-line bg-kumo-base px-4 py-2"
+            >
+              <div className={cn("w-full min-w-0 items-center", overlayShown ? "flex" : "hidden")}>
+                {headerOverlay}
+              </div>
+              {overlayShown ? null : (
+                <p className="text-kumo-subtle">
+                  {headerInfo ?? "Tick rows to act on several at once."}
+                </p>
+              )}
+            </div>
+          )
+        }
         below={rows.length === 0 ? empty : null}
-        footer={inside ? band : null}
+        footer={pageBand(table, footer)}
       >
         {(overflowing) => (
           <Table className={tableClass}>
             <Table.Header>
               {table.getHeaderGroups().map((group) => (
                 <Table.Row key={group.id}>
-                  {group.headers.map((header, index) => {
+                  {group.headers.map((header) => {
                     const { meta } = header.column.columnDef;
 
                     return (
@@ -111,11 +136,7 @@ export function DataTable<TData extends RowData>({
                         {...(meta?.sticky === undefined ? {} : { sticky: meta.sticky })}
                         // A column whose cells sit at the top still has its heading on the
                         // header row's line, so `align-top` in the meta reaches the cells alone.
-                        className={cn(
-                          cellClass(meta, overflowing),
-                          "align-middle",
-                          overlayShown && index > 0 && "invisible",
-                        )}
+                        className={cn(cellClass(meta, overflowing), "align-middle")}
                       >
                         {header.isPlaceholder ? null : (
                           <HeaderContent
@@ -127,13 +148,6 @@ export function DataTable<TData extends RowData>({
                             <table.FlexRender header={header} />
                           </HeaderContent>
                         )}
-                        {index === 0 && headerOverlay !== undefined ? (
-                          // As wide as the card left of the cell's edge (100cqw is the card, 100% the
-                          // cell), so the overlay can put its actions at the right end of the row.
-                          <div className="absolute inset-y-0 left-full flex w-[calc(100cqw-100%)] items-center pr-4">
-                            {headerOverlay}
-                          </div>
-                        ) : null}
                       </Table.Head>
                     );
                   })}
@@ -186,9 +200,6 @@ export function DataTable<TData extends RowData>({
           </Table>
         )}
       </TableScroll>
-      {inside || band === null || band === undefined ? null : (
-        <div data-slot="table-footer">{band}</div>
-      )}
     </div>
   );
 }
@@ -196,7 +207,12 @@ export function DataTable<TData extends RowData>({
 /** The classes a column asks for, in the order that lets `meta.className` override the convention. */
 function cellClass(
   meta:
-    | { readonly className?: string; readonly numeric?: boolean; readonly sticky?: string }
+    | {
+        readonly className?: string;
+        readonly numeric?: boolean;
+        readonly sticky?: string;
+        readonly hideBelow?: HideBelow;
+      }
     | undefined,
   overflowing: boolean,
 ): string {
@@ -205,25 +221,30 @@ function cellClass(
     // The fade reads as the pinned column's edge, so it is drawn only while something is scrolled
     // behind it; Kumo's own fade is wider than the dashboard's.
     meta?.sticky === "right" && (overflowing ? pinnedEdgeClass : "before:hidden"),
+    meta?.hideBelow === undefined ? undefined : hideBelowClasses[meta.hideBelow],
     meta?.className,
   );
 }
 
 /**
- * The band under the panel: the page's own count while the rows fit the smallest page, and the
- * range with the page size and the paging controls once there are enough rows to page.
+ * The band at the foot of the card: the range, the rows per page and the pager, on every table that
+ * has rows, a short one included (design spec §13.3). A table with a line of its own, a preview of
+ * a longer list, shows that line instead while its rows fit one page.
  */
 function pageBand<TData extends RowData>(
   table: AppTableInstance<TData>,
-  fallback: ReactNode,
+  custom: ReactNode,
 ): ReactNode {
   const total = table.getRowCount();
+  const { pageIndex, pageSize } = table.state.pagination;
 
-  if (total <= smallestPageSize) {
-    return fallback;
+  if (total === 0) {
+    return null;
   }
 
-  const { pageIndex, pageSize } = table.state.pagination;
+  if (custom !== undefined && custom !== null && total <= pageSize) {
+    return custom;
+  }
 
   return (
     <PagingBand

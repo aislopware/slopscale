@@ -1,3 +1,4 @@
+import { Checkbox } from "@cloudflare/kumo/components/checkbox";
 import { useState } from "react";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
@@ -240,5 +241,149 @@ describe("a table's columns", () => {
     expect(getComputedStyle(row).backgroundColor).not.toBe(
       getComputedStyle(elevated).backgroundColor,
     );
+  });
+
+  // A column a phone does without is gone below its breakpoint, so the state that matters moves
+  // under the name instead of sitting as a sliver under the pinned actions.
+  it("hides a column below the breakpoint it names", async () => {
+    const screen = await render(<Hidden />);
+
+    const heading = (text: string): Element => enclosing(screen.getByText(text).element(), "th");
+
+    expect(getComputedStyle(heading("Machine")).display).not.toBe("none");
+    expect(getComputedStyle(heading("Wide")).display).toBe("none");
+  });
+});
+
+const withWide = helper.columns([
+  helper.accessor((machine) => machine.name, { id: "name", header: "Machine" }),
+  helper.accessor((machine) => machine.peers, {
+    id: "wide",
+    header: "Wide",
+    meta: { hideBelow: "2xl" },
+  }),
+]);
+
+/** A column that hides below 2xl, wider than the test viewport. */
+function Hidden(): ReactElement {
+  const table = useAppTable({
+    data: machines.slice(0, 1),
+    columns: withWide,
+    getRowId: (machine) => machine.id,
+  });
+
+  return <DataTable table={table} empty={null} />;
+}
+
+/** A short list with nothing of its own for the band, the way most console lists are. */
+function ShortList({ count }: { readonly count: number }): ReactElement {
+  const table = useAppTable({
+    data: machines.slice(0, count),
+    columns,
+    getRowId: (machine) => machine.id,
+  });
+
+  return <DataTable table={table} empty={<p>No machines</p>} />;
+}
+
+describe("a table's band", () => {
+  // Design spec §13.3: every list ends in the same band inside its card, a short one included.
+  it("puts the range, the page size and the pager inside the card of a short list", async () => {
+    const screen = await render(<ShortList count={5} />);
+    const info = screen.getByText("Showing 1–5 of 5").element();
+    const band = enclosing(info, "[data-slot=table-footer]");
+
+    expect(band.parentElement?.querySelector("table")).not.toBeNull();
+    await expect.element(screen.getByText("Per page:")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
+  });
+
+  it("leaves the band out while there are no rows", async () => {
+    const screen = await render(<ShortList count={0} />);
+
+    await expect.element(screen.getByText("No machines")).toBeVisible();
+    expect(screen.container.querySelector("[data-slot=table-footer]")).toBeNull();
+  });
+});
+
+const selectable = helper.columns([
+  helper.display({
+    id: "select",
+    header: "",
+    cell: ({ row, table }) => (
+      <Checkbox
+        aria-label={`Select ${row.original.name}`}
+        checked={table.options.meta?.eventTypes?.includes(row.id) ?? false}
+      />
+    ),
+  }),
+  helper.accessor((machine) => machine.name, {
+    id: "name",
+    header: "Machine",
+    enableSorting: true,
+  }),
+  helper.accessor((machine) => machine.peers, {
+    id: "peers",
+    header: "Peers",
+    enableSorting: true,
+  }),
+]);
+
+/** Three rows with the first ticked when `ticked`, and the bulk bar over them. */
+function Ticked({ ticked }: { readonly ticked: boolean }): ReactElement {
+  const table = useAppTable({
+    data: machines.slice(0, 3),
+    columns: selectable,
+    getRowId: (machine) => machine.id,
+    meta: { eventTypes: ticked ? ["1"] : [] },
+  });
+
+  return (
+    <DataTable
+      table={table}
+      empty={null}
+      headerOverlay={<span>1 of 3 selected</span>}
+      overlayShown={ticked}
+    />
+  );
+}
+
+describe("a table with a bulk bar", () => {
+  // Design spec §4.B: the bulk bar replaces the info band; the column headings stay.
+  it("keeps the column headings while the bar shows", async () => {
+    const screen = await render(<Ticked ticked />);
+
+    await expect.element(screen.getByText("1 of 3 selected")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: /^Machine/u })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: /^Peers/u })).toBeVisible();
+  });
+
+  it("keeps the band's height whether or not rows are ticked", async () => {
+    const idle = await render(<Ticked ticked={false} />);
+    const idleBand = idle.container.querySelector("[data-slot=table-header-band]");
+    const idleHeight = idleBand?.getBoundingClientRect().height;
+
+    await expect.element(idle.getByText("1 of 3 selected")).not.toBeVisible();
+    await idle.unmount();
+
+    const busy = await render(<Ticked ticked />);
+    const busyBand = busy.container.querySelector("[data-slot=table-header-band]");
+
+    expect(busyBand?.getBoundingClientRect().height).toBe(idleHeight);
+  });
+
+  it("tints a ticked row", async () => {
+    const screen = await render(
+      <>
+        <div data-testid="tint" className="bg-kumo-tint" />
+        <Ticked ticked />
+      </>,
+    );
+    const tint = getComputedStyle(screen.getByTestId("tint").element()).backgroundColor;
+    const ticked = enclosing(screen.getByText("machine-001").element(), "tr");
+    const plain = enclosing(screen.getByText("machine-002").element(), "tr");
+
+    expect(getComputedStyle(ticked).backgroundColor).toBe(tint);
+    expect(getComputedStyle(plain).backgroundColor).not.toBe(tint);
   });
 });
