@@ -1,6 +1,6 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 import { fallback, object, optional, picklist, pipe, transform, unknown } from "valibot";
 
@@ -8,7 +8,6 @@ import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import { can, canListUsers } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { MachineBulkBar } from "~/components/machines/bulk-bar.tsx";
 import { columns, emptyUsers, selectableColumns } from "~/components/machines/columns.tsx";
 import { MachinesEmpty, MachinesFirstRun } from "~/components/machines/empty.tsx";
@@ -100,7 +99,7 @@ function MachinesPage(): ReactElement {
 }
 
 function FirstRunPage({ me }: { readonly me: Me }): ReactElement {
-  const [addingMachine, setAddingMachine] = useState(false);
+  const navigate = useNavigate({ from: Route.fullPath });
 
   return (
     <PageWithRail rail={<UseCases />}>
@@ -109,16 +108,10 @@ function FirstRunPage({ me }: { readonly me: Me }): ReactElement {
         onAddMachine={
           can(me, "auth_keys")
             ? () => {
-                setAddingMachine(true);
+                void navigate({ to: "/machines/add" });
               }
             : undefined
         }
-      />
-      <CreatePreAuthKeyDialog
-        me={me}
-        intent="add-machine"
-        open={addingMachine}
-        onOpenChange={setAddingMachine}
       />
     </PageWithRail>
   );
@@ -129,7 +122,6 @@ function MachinesList(): ReactElement {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const nodes = useSuspenseQuery({ ...nodesQuery, ...machinePolling });
-  const [addingMachine, setAddingMachine] = useState(false);
   // A member gets the directory, names only, so the share dialog and the shared-with marks can
   // name people; the owner filter is for a caller who sees other people's machines at all.
   const users = useQuery({ ...usersQuery, enabled: canListUsers(me) });
@@ -166,8 +158,9 @@ function MachinesList(): ReactElement {
     void navigate({ search: {} });
   }
 
+  // Adding a machine is a page of its own, the Mesh "Add node" wizard, not a dialog.
   function addMachine(): void {
-    setAddingMachine(true);
+    void navigate({ to: "/machines/add" });
   }
 
   return (
@@ -245,12 +238,6 @@ function MachinesList(): ReactElement {
           />
         </SelectionProvider>
       </TableGroup>
-      <CreatePreAuthKeyDialog
-        me={me}
-        intent="add-machine"
-        open={addingMachine}
-        onOpenChange={setAddingMachine}
-      />
     </>
   );
 }

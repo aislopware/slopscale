@@ -35,6 +35,7 @@ import { Route as AppKeysOauthRouteImport } from './routes/_app/keys/oauth'
 import { Route as AppKeysPreAuthRouteImport } from './routes/_app/keys/pre-auth'
 import { Route as AppMachinesIndexRouteImport } from './routes/_app/machines/index'
 import { Route as AppMachinesNodeIdRouteImport } from './routes/_app/machines/$nodeId'
+import { Route as AppMachinesAddRouteImport } from './routes/_app/machines/add'
 import { Route as AppPolicyIndexRouteImport } from './routes/_app/policy/index'
 import { Route as AppPolicyFileRouteImport } from './routes/_app/policy/file'
 import { Route as AppPolicyGraphRouteImport } from './routes/_app/policy/graph'
@@ -192,6 +193,11 @@ const AppMachinesIndexRoute = AppMachinesIndexRouteImport.update({
 const AppMachinesNodeIdRoute = AppMachinesNodeIdRouteImport.update({
   id: '/machines/$nodeId',
   path: '/machines/$nodeId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMachinesAddRoute = AppMachinesAddRouteImport.update({
+  id: '/machines/add',
+  path: '/machines/add',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPolicyIndexRoute = AppPolicyIndexRouteImport.update({
@@ -360,6 +366,7 @@ export interface FileRoutesByFullPath {
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
+  '/machines/add': typeof AppMachinesAddRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
   '/policy/groups': typeof AppPolicyGroupsRoute
@@ -415,6 +422,7 @@ export interface FileRoutesByTo {
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
+  '/machines/add': typeof AppMachinesAddRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
   '/policy/groups': typeof AppPolicyGroupsRoute
@@ -472,6 +480,7 @@ export interface FileRoutesById {
   '/_app/keys/oauth': typeof AppKeysOauthRoute
   '/_app/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/_app/machines/$nodeId': typeof AppMachinesNodeIdRoute
+  '/_app/machines/add': typeof AppMachinesAddRoute
   '/_app/policy/file': typeof AppPolicyFileRoute
   '/_app/policy/graph': typeof AppPolicyGraphRoute
   '/_app/policy/groups': typeof AppPolicyGroupsRoute
@@ -529,6 +538,7 @@ export interface FileRouteTypes {
     | '/keys/oauth'
     | '/keys/pre-auth'
     | '/machines/$nodeId'
+    | '/machines/add'
     | '/policy/file'
     | '/policy/graph'
     | '/policy/groups'
@@ -584,6 +594,7 @@ export interface FileRouteTypes {
     | '/keys/oauth'
     | '/keys/pre-auth'
     | '/machines/$nodeId'
+    | '/machines/add'
     | '/policy/file'
     | '/policy/graph'
     | '/policy/groups'
@@ -640,6 +651,7 @@ export interface FileRouteTypes {
     | '/_app/keys/oauth'
     | '/_app/keys/pre-auth'
     | '/_app/machines/$nodeId'
+    | '/_app/machines/add'
     | '/_app/policy/file'
     | '/_app/policy/graph'
     | '/_app/policy/groups'
@@ -863,6 +875,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMachinesNodeIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/machines/add': {
+      id: '/_app/machines/add'
+      path: '/machines/add'
+      fullPath: '/machines/add'
+      preLoaderRoute: typeof AppMachinesAddRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/policy/': {
       id: '/_app/policy/'
       path: '/policy'
@@ -1083,6 +1102,7 @@ interface AppRouteChildren {
   AppKeysOauthRoute: typeof AppKeysOauthRoute
   AppKeysPreAuthRoute: typeof AppKeysPreAuthRoute
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRoute
+  AppMachinesAddRoute: typeof AppMachinesAddRoute
   AppPolicyFileRoute: typeof AppPolicyFileRoute
   AppPolicyGraphRoute: typeof AppPolicyGraphRoute
   AppPolicyGroupsRoute: typeof AppPolicyGroupsRoute
@@ -1138,6 +1158,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKeysOauthRoute: AppKeysOauthRoute,
   AppKeysPreAuthRoute: AppKeysPreAuthRoute,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRoute,
+  AppMachinesAddRoute: AppMachinesAddRoute,
   AppPolicyFileRoute: AppPolicyFileRoute,
   AppPolicyGraphRoute: AppPolicyGraphRoute,
   AppPolicyGroupsRoute: AppPolicyGroupsRoute,
