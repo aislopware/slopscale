@@ -101,6 +101,66 @@ func TestRouteSelectionModes(t *testing.T) {
 	assert.False(t, store.SetRouteSelection(types.RouteSelectionRegional), "the empty selection is regional routing")
 }
 
+// TestRegionalFailoverOutOfRegionPrimary covers a tailnet-wide primary
+// that is not its own region's primary under regional failover: the
+// office has two routers, 27 holds the prefix tailnet-wide and 30 holds
+// the office region. Every viewer must reach the prefix through exactly
+// one router, and nobody through 27.
+func TestRegionalFailoverOutOfRegionPrimary(t *testing.T) {
+	t.Parallel()
+
+	lan := netip.MustParsePrefix("10.20.0.0/24")
+	online := true
+
+	router := func(id types.NodeID, region tailcfg.DERPRegionID) types.Node {
+		return types.Node{
+			ID: id, IsOnline: &online, ApprovedRoutes: []netip.Prefix{lan},
+			Hostinfo: &tailcfg.Hostinfo{
+				RoutableIPs: []netip.Prefix{lan},
+				NetInfo:     &tailcfg.NetInfo{PreferredDERP: region},
+			},
+		}
+	}
+
+	nodes := map[types.NodeID]types.Node{
+		27: router(27, regionOffice),
+		30: router(30, regionOffice),
+		48: router(48, regionFra),
+	}
+	prev := PrimaryRouteLedger{
+		Global:   map[netip.Prefix]types.NodeID{lan: 27},
+		Regional: map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID{regionOffice: {lan: 30}},
+	}
+
+	snap := buildSnapshot(nodes, peerPositionsOf(noPeersFunc), prev, nil,
+		routeInputs{selection: types.RouteSelectionRegionalFailover})
+	require.Equal(t, types.NodeID(27), snap.routes[lan])
+	require.Equal(t, types.NodeID(30), snap.regionalRoutes[regionOffice][lan])
+
+	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
+	store.data.Store(&snap)
+
+	frankfurt := measured(60, regionFra, map[tailcfg.DERPRegionID]float64{regionFra: 1})
+
+	for name, tc := range map[string]struct {
+		viewer viewerSite
+		via    types.NodeID
+	}{
+		"office":    {hanoi(3), 30},
+		"frankfurt": {frankfurt, 48},
+	} {
+		var holders []types.NodeID
+
+		for _, id := range []types.NodeID{27, 30, 48} {
+			if len(store.PrimaryRoutesForNodeFrom(id, tc.viewer)) > 0 {
+				holders = append(holders, id)
+			}
+		}
+
+		assert.Equal(t, []types.NodeID{tc.via}, holders, name)
+	}
+}
+
 func TestRouteSelectionValues(t *testing.T) {
 	t.Parallel()
 

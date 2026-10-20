@@ -754,7 +754,7 @@ func buildSnapshot(
 		isPrimaryRoute: isPrimaryRoute,
 		regionalRoutes: regionalRoutes,
 		contested:      contested,
-		steerable:      steerableNodes(contested, regionalRoutes),
+		steerable:      steerableNodes(routes, contested, regionalRoutes),
 	}
 
 	// Build nodesByUser, nodesByNodeKey, and nodesByMachineKey maps
@@ -1032,11 +1032,14 @@ func contestedRoutes(
 	return out
 }
 
-// steerableNodes returns the nodes a viewer may be sent to instead of the
-// tailnet-wide primary: those contested lists and the regional primaries.
-// With steering on, every regional primary is also contested; under
-// regional failover only the regional primaries are.
+// steerableNodes returns the nodes whose share of the keys depends on
+// the viewer: those contested lists, the regional primaries, and the
+// tailnet-wide primary of every key that has either, since a viewer
+// steered away no longer reaches the key through it. With steering on,
+// every regional primary is also contested; under regional failover the
+// tailnet-wide primary of a key need not be any region's primary.
 func steerableNodes[K comparable](
+	global map[K]types.NodeID,
 	contested map[K][]site,
 	regional map[tailcfg.DERPRegionID]map[K]types.NodeID,
 ) map[types.NodeID]bool {
@@ -1046,15 +1049,23 @@ func steerableNodes[K comparable](
 
 	out := make(map[types.NodeID]bool)
 
-	for _, sites := range contested {
+	for key, sites := range contested {
 		for _, s := range sites {
 			out[s.id] = true
+		}
+
+		if id, ok := global[key]; ok {
+			out[id] = true
 		}
 	}
 
 	for _, primaries := range regional {
-		for _, id := range primaries {
+		for key, id := range primaries {
 			out[id] = true
+
+			if g, ok := global[key]; ok {
+				out[g] = true
+			}
 		}
 	}
 
