@@ -19,6 +19,31 @@ import { advertisesExit, exitRoutes, isExitNode, isExitRoute, nodeName } from "~
 
 const routeIconSize = 14;
 
+/**
+ * Every route the machine advertises or was approved for, the exit node first as one entry for its
+ * two default routes, then the subnets in order.
+ */
+export function machineRoutes(node: Node): string[] {
+  const rawRoutes = new Set([...node.availableRoutes, ...node.approvedRoutes]);
+  const hasExit = exitRoutes.some((route) => rawRoutes.has(route));
+  const subnets = [...rawRoutes].filter((route) => !isExitRoute(route)).toSorted();
+
+  return hasExit ? [exitRoutes[0] ?? "", ...subnets] : subnets;
+}
+
+/** Whether a route from `machineRoutes` is approved, and whether the machine still advertises it. */
+export function routeState(
+  node: Node,
+  route: string,
+): { readonly approved: boolean; readonly available: boolean } {
+  const exit = isExitRoute(route);
+
+  return {
+    approved: exit ? isExitNode(node) : node.approvedRoutes.includes(route),
+    available: exit ? advertisesExit(node) : node.availableRoutes.includes(route),
+  };
+}
+
 /** Every route the machine advertises, approved one at a time. */
 export function RoutesSection({
   node,
@@ -28,10 +53,7 @@ export function RoutesSection({
   readonly canEdit: boolean;
 }): ReactElement {
   const { setRoutes } = useNodeMutations();
-  const rawRoutes = new Set([...node.availableRoutes, ...node.approvedRoutes]);
-  const hasExit = exitRoutes.some((route) => rawRoutes.has(route));
-  const subnets = [...rawRoutes].filter((route) => !isExitRoute(route)).toSorted();
-  const routes = hasExit ? [exitRoutes[0] ?? "", ...subnets] : subnets;
+  const routes = machineRoutes(node);
 
   function set(route: string, approved: boolean): void {
     const next = withRouteApproved(node, route, approved);
@@ -94,8 +116,7 @@ function RouteRow({
   readonly onSet: (route: string, approved: boolean) => void;
 }): ReactElement {
   const exit = isExitRoute(route);
-  const approved = exit ? isExitNode(node) : node.approvedRoutes.includes(route);
-  const available = exit ? advertisesExit(node) : node.availableRoutes.includes(route);
+  const { approved, available } = routeState(node, route);
 
   return (
     <SectionRow className="flex flex-wrap items-center justify-between gap-3 py-2.5">
@@ -253,7 +274,7 @@ function PriorityRow({
 }
 
 /** The route by name; one the machine stopped advertising is flagged, with the reason a hover away. */
-function RouteName({
+export function RouteName({
   route,
   exit,
   available,

@@ -32,7 +32,7 @@ const caretSize = 14;
  */
 export function OverviewSection({ node }: { readonly node: Node }): ReactElement {
   return (
-    <Section title="Overview" bodyClassName="p-0">
+    <Section title="Properties" bodyClassName="p-0">
       <FactGrid facts={overview(node)} />
       <Keys node={node} />
     </Section>

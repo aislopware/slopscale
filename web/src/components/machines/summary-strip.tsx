@@ -1,4 +1,4 @@
-import { GlobeHemisphereWestIcon } from "@phosphor-icons/react";
+import { DesktopIcon, GlobeHemisphereWestIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
@@ -7,12 +7,14 @@ import { plural } from "~/components/overview/plural.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
+import { DocsBadge } from "~/components/ui/docs-badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 import {
   approvedSubnets,
   isExitNode,
   isTagged,
+  nodeName,
   nodeStatus,
   ownerLabel,
   pendingRouteCount,
@@ -22,9 +24,10 @@ const iconSize = 16;
 
 /**
  * The strip across the top of a Zero Trust detail page ("Profile: Default · Enabled · 0 devices", a
- * Mesh node's "Mesh IP: – · Offline"): the machine's tailnet address, its state, whose it is, when
- * it was last seen and what it does for the tailnet, so the cards under it can each be about one
- * thing.
+ * Mesh node's "Mesh IP: – · Offline"): the machine's name, which is the page's title, its
+ * connection badge, its tailnet address, whose it is, when it was last seen and what it does for
+ * the tailnet, so the cards under it can each be about one thing. The docs pill sits at its far
+ * end.
  */
 export function MachineSummary({ node }: { readonly node: Node }): ReactElement {
   const ipv4 = node.ipAddresses.find((address) => !address.includes(":"));
@@ -33,22 +36,27 @@ export function MachineSummary({ node }: { readonly node: Node }): ReactElement 
 
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-kumo-hairline bg-kumo-base px-4 py-3">
+      <span className="flex min-w-0 items-center gap-2">
+        <DesktopIcon size={iconSize} aria-hidden className="shrink-0 text-kumo-subtle" />
+        <h1 className="truncate text-base font-medium text-kumo-default">{nodeName(node)}</h1>
+      </span>
+      <StatusBadge status={nodeStatus(node)} />
+      <span aria-hidden className="h-4 border-l border-kumo-line max-sm:hidden" />
       <span className="flex items-center gap-2">
         <GlobeHemisphereWestIcon size={iconSize} aria-hidden className="text-kumo-subtle" />
-        <span className="text-base font-medium text-kumo-default">Tailnet IP:</span>
+        <span className="text-kumo-subtle">Tailnet IP</span>
         {ipv4 === undefined ? (
           <span className="text-kumo-subtle">–</span>
         ) : (
-          <CopyText value={ipv4} label="Copy tailnet IP" className="text-base text-kumo-default" />
+          <CopyText value={ipv4} label="Copy tailnet IP" className="text-kumo-default" />
         )}
       </span>
-      <StatusBadge status={nodeStatus(node)} />
       {node.ephemeral ? <Badge tone="neutral">Ephemeral</Badge> : null}
       {node.globalExitNode ? <Badge tone="info">Global exit node</Badge> : null}
       {!node.globalExitNode && isExitNode(node) ? <Badge tone="neutral">Exit node</Badge> : null}
       {subnets === 0 ? null : <Badge tone="neutral">{plural(subnets, "subnet route")}</Badge>}
       {pending === 0 ? null : <Badge tone="warning">{`${plural(pending, "route")} waiting`}</Badge>}
-      <span aria-hidden className="h-4 border-l border-kumo-line" />
+      <span aria-hidden className="h-4 border-l border-kumo-line max-sm:hidden" />
       <Owner node={node} />
       {node.online ? null : (
         <span className="text-sm text-kumo-subtle">
@@ -56,6 +64,9 @@ export function MachineSummary({ node }: { readonly node: Node }): ReactElement 
           <RelativeTime value={node.lastSeen} />
         </span>
       )}
+      <span className="ml-auto">
+        <DocsBadge path="ref/device-management" />
+      </span>
     </div>
   );
 }

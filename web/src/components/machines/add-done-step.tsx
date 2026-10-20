@@ -50,7 +50,11 @@ export function DoneStep({
       }
       footer={
         <>
-          <LinkButton href="/machines" variant={joined === undefined ? "primary" : "ghost"}>
+          <LinkButton
+            href="/machines"
+            variant={joined === undefined ? "primary" : "ghost"}
+            {...(joined === undefined ? {} : { className: "mr-auto" })}
+          >
             Back to machines
           </LinkButton>
           {joined === undefined ? null : (
