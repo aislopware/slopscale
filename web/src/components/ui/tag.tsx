@@ -2,8 +2,6 @@ import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
-import { splitTag } from "~/lib/tag.ts";
-
 /**
  * One chip size everywhere, the tag input's (design spec §7.1): 20px tall, 13px text. A dense table
  * once drew 18px chips at 12px, smaller than the tags the operator typed in; `sm` stays as a name
@@ -23,23 +21,11 @@ export type TagSize = keyof typeof sizes;
 export const tagChipClass = "rounded-full bg-kumo-info-tint text-kumo-info";
 
 /**
- * The words of a tag with the `tag:` prefix a little stepped back, so a row of tags reads by its
- * names and the prefix still says what kind of thing it is, at a contrast that stays readable. Used
- * inside `Tag` and inside a picker's chips.
+ * The words of a tag in one colour, prefix and name alike, the way the dashboard's tag input draws
+ * its chips; the name already tells two tags apart. Used inside `Tag` and inside a picker's chips.
  */
 export function TagText({ tag }: { readonly tag: string }): ReactElement {
-  const { prefix, name } = splitTag(tag);
-
-  return (
-    <span className="truncate">
-      {prefix === "" ? null : (
-        <span data-tag-prefix className="opacity-80">
-          {prefix}
-        </span>
-      )}
-      {name}
-    </span>
-  );
+  return <span className="truncate">{tag}</span>;
 }
 
 /**

@@ -16,13 +16,15 @@ function radiusOf(chip: Element | null): string {
 }
 
 describe(Tag, () => {
-  it("reads as the whole tag, with the prefix stepped back from the name", async () => {
+  // Design spec §7.1: the dashboard's chip draws its text in one colour, so the prefix is not faded.
+  it("reads as the whole tag in one colour", async () => {
     const view = await render(<Tag tag="tag:server" />);
     const chip = view.container.querySelector('[title="tag:server"]');
 
     expect(chip).not.toBeNull();
     expect(chip?.textContent).toBe("tag:server");
-    expect(chip?.querySelector("[data-tag-prefix]")?.textContent).toBe("tag:");
+    expect(chip?.querySelectorAll("*")).toHaveLength(1);
+    expect(styleOf(chip?.firstElementChild)?.opacity).toBe("1");
     expect(Number(radiusOf(chip).replace("px", ""))).toBeGreaterThanOrEqual(9);
   });
 
@@ -44,16 +46,13 @@ describe(Tag, () => {
 });
 
 describe("a tag chip's size", () => {
-  // Design spec §7.1: the chips are 20px with 13px text, a dense table's included, and the prefix
-  // is stepped back only a little.
+  // Design spec §7.1: the chips are 20px with 13px text, a dense table's included.
   it.each(["sm", "base"] as const)("draws a %s chip 20px tall at 13px", async (size) => {
     const view = await render(<Tag tag="tag:server" size={size} />);
     const chip = view.container.querySelector('[title="tag:server"]');
-    const prefix = chip?.querySelector("[data-tag-prefix]");
 
     expect(chip?.getBoundingClientRect().height).toBe(20);
     expect(styleOf(chip)?.fontSize).toBe("13px");
-    expect(Number(styleOf(prefix)?.opacity)).toBeGreaterThanOrEqual(0.8);
   });
 });
 
