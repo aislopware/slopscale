@@ -12,7 +12,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import { useNow } from "~/lib/use-now.ts";
 
@@ -101,7 +101,6 @@ export function RequestsTab({
     meta: { me, canDecide },
   });
 
-  const shown = table.getRowModel().rows.length;
   const pending = rows.filter((row) => row.phase === "pending").length;
   const active = rows.filter((row) => row.phase === "active").length;
   const counts: Record<Filter, number> = { pending, active, all: rows.length };
@@ -143,13 +142,6 @@ export function RequestsTab({
                 )
               }
             />
-          }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>
-                {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`}`}
-              </TableFooter>
-            )
           }
         />
       </TableGroup>

@@ -21,7 +21,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 
 export interface RoutesTabProps {
@@ -68,7 +68,6 @@ export function RoutesTab({
     meta: { me, networks },
   });
 
-  const shown = table.getRowModel().rows.filter((row) => row.depth === 0).length;
   const narrowed = search !== "" || routeFilterCount(filters) > 0;
   // The map draws what the table lists, the search included, one entry per prefix.
   const mapped = table
@@ -140,19 +139,10 @@ export function RoutesTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countRoutes(total)}`}</TableFooter>
-            )
-          }
         />
       </TableGroup>
     </>
   );
-}
-
-function countRoutes(total: number): string {
-  return total === 1 ? "1 route" : `${total} routes`;
 }
 
 function routeFilterCount(filters: RouteFilterState): number {

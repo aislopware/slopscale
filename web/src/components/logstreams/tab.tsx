@@ -14,7 +14,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export function LogStreamsTab({
   me,
@@ -42,7 +42,6 @@ export function LogStreamsTab({
   });
 
   const total = streams.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -106,11 +105,6 @@ export function LogStreamsTab({
                   </Button>
                 }
               />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countStreams(total)}`}</TableFooter>
             )
           }
         />

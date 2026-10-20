@@ -13,7 +13,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import { AddUserButton, FirstUserEmpty } from "~/components/users/add-user.tsx";
@@ -106,7 +106,6 @@ function UsersPage(): ReactElement {
   });
 
   const total = users.data.users.length;
-  const shown = table.getRowModel().rows.length;
   const pending = users.data.users.filter((user) => !user.approved).length;
   const handleSearchChange = (value: string): void => {
     void navigate({ search: () => searchFor(value, filter), replace: true });
@@ -163,11 +162,6 @@ function UsersPage(): ReactElement {
                   </Button>
                 }
               />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countUsers(total)}`}</TableFooter>
             )
           }
         />
