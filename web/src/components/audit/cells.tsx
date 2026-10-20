@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { cn } from "@cloudflare/kumo/utils";
 import type { Icon } from "@phosphor-icons/react";
 import {
   DesktopIcon,
@@ -15,10 +14,9 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import type { MachineOwner } from "~/api/schema.gen.ts";
+import { Timestamp } from "~/components/audit/timestamp.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
-import { DefinitionList } from "~/components/ui/definition-list.tsx";
-import type { Definition } from "~/components/ui/definition-list.tsx";
 import { MachineOwnerLine } from "~/components/ui/machine-name.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
@@ -113,7 +111,7 @@ export function actorName(event: AuditEvent): string {
 }
 
 /** The kind, as a second line; null when it would only repeat the name. */
-function actorKindLine(event: AuditEvent): string | null {
+export function actorKindLabel(event: AuditEvent): string | null {
   const label = actorKinds[event.actorKind] ?? event.actorKind;
 
   return label === "" || label === actorName(event) ? null : label;
@@ -121,7 +119,7 @@ function actorKindLine(event: AuditEvent): string | null {
 
 export function ActorCell({ event }: { readonly event: AuditEvent }): ReactElement {
   const name = actorName(event);
-  const kind = actorKindLine(event);
+  const kind = actorKindLabel(event);
   const icon = event.actorUserId === "" ? (actorIcons[event.actorKind] ?? UserIcon) : undefined;
 
   return (
@@ -140,6 +138,11 @@ export function ActorCell({ event }: { readonly event: AuditEvent }): ReactEleme
       </div>
     </div>
   );
+}
+
+/** When the event was recorded, as the dashboard's audit log writes it. */
+export function TimeCell({ event }: { readonly event: AuditEvent }): ReactElement {
+  return <Timestamp value={event.createdAt} />;
 }
 
 /**
@@ -241,7 +244,7 @@ export function ResultCell({ event }: { readonly event: AuditEvent }): ReactElem
  * A detail field in the operator's words: timestamps as local dates, booleans as yes/no, lists
  * joined, and anything else as JSON. The raw value stays available for copying.
  */
-function detailText(value: unknown): string {
+export function detailText(value: unknown): string {
   if (typeof value === "string") {
     const date = timestamp(value);
 
@@ -287,13 +290,13 @@ function timestamp(value: string): Date | null {
 }
 
 /** The value as the server sent it, for the copy button. */
-function rawText(value: unknown): string {
+export function rawText(value: unknown): string {
   return typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));
 }
 
 /**
  * The first couple of detail fields as key=value lines. The rest are counted in a "+N" button that
- * names them on hover; the row itself opens on click, so every field stays one click away and the
+ * names them on hover and opens the event's sheet, so every field stays one click away and the
  * column keeps its width.
  */
 export function DetailCell({
@@ -301,7 +304,7 @@ export function DetailCell({
   onOpen,
 }: {
   readonly event: AuditEvent;
-  /** Opens the row: the "+N" button is its own, so the row's click does not reach it. */
+  /** Opens the event's sheet: the "+N" button is its own, so the row's click does not reach it. */
   readonly onOpen: () => void;
 }): ReactNode {
   const fields = Object.entries(event.detail);
@@ -326,41 +329,6 @@ export function DetailCell({
           }
         />
       )}
-    </div>
-  );
-}
-
-function detailItems(event: AuditEvent): readonly Definition[] {
-  const fields: Definition[] = Object.entries(event.detail).map(([key, value]) => ({
-    key,
-    label: key,
-    value: detailText(value),
-    copy: rawText(value),
-  }));
-
-  fields.push({ key: "outcome", label: "HTTP status", value: String(event.outcome) });
-
-  if (event.remoteAddr !== "") {
-    fields.push({
-      key: "remoteAddr",
-      label: "Remote address",
-      value: event.remoteAddr,
-      copy: event.remoteAddr,
-    });
-  }
-
-  return fields;
-}
-
-/** The expanded row: every detail field the server recorded, plus where the call came from. */
-export function EventDetail({ event }: { readonly event: AuditEvent }): ReactElement {
-  const items = detailItems(event);
-  // Narrow columns keep each label beside its value instead of across the whole table.
-  const wide = items.length > 2;
-
-  return (
-    <div className={cn("py-1", wide ? "max-w-3xl" : "max-w-sm")}>
-      <DefinitionList items={items} columns={wide ? 2 : 1} wrap />
     </div>
   );
 }

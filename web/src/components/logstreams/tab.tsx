@@ -76,6 +76,19 @@ export function LogStreamsTab({
                 size="sm"
                 title="No log streams yet"
                 description="Ship the audit log to Splunk, Elasticsearch, Datadog, Axiom, Loki or any HTTP collector."
+                contents={
+                  canEdit ? (
+                    <Button
+                      variant="secondary"
+                      icon={PlusIcon}
+                      onClick={() => {
+                        setCreating(true);
+                      }}
+                    >
+                      Add your first log stream
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : (
               <Empty

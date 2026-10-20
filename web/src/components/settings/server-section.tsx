@@ -5,11 +5,12 @@ import type { ReactElement, ReactNode } from "react";
 
 import { api } from "~/api/client.ts";
 import type { ServerInfo } from "~/api/queries.ts";
+import { SettingsGroup } from "~/components/settings/settings-page.tsx";
+import { Card } from "~/components/ui/card.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Section } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 
@@ -198,37 +199,93 @@ function LatestClient({ info }: { readonly info: ServerInfo }): ReactElement {
   return <span>{info.latestClientVersion}</span>;
 }
 
-/** The build, addresses and config file values of the running server. */
+/** The parts of the server page, in the order `ServerSection` renders them. */
+export const serverParts = [
+  { id: "build", label: "Build" },
+  { id: "network", label: "Network" },
+  { id: "policy", label: "Policy and clients" },
+  { id: "relays", label: "Relays" },
+] as const;
+
+/** A part of the server page: its facts as the dashboard's account details rows on a card. */
+function FactsGroup({
+  id,
+  title,
+  description,
+  docs,
+  items,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string;
+  readonly docs?: string;
+  readonly items: readonly Definition[];
+}): ReactElement {
+  return (
+    <SettingsGroup
+      id={id}
+      title={title}
+      {...(description === undefined ? {} : { description })}
+      {...(docs === undefined ? {} : { docs })}
+    >
+      <Card>
+        <DefinitionList items={items} />
+      </Card>
+    </SettingsGroup>
+  );
+}
+
+/**
+ * The build, addresses and config file values of the running server, one part each. Values from the
+ * config file change only with a restart; the rest is read live.
+ */
 export function ServerSection({ info }: { readonly info: ServerInfo }): ReactElement {
   const health = api.useQuery("get", "/api/v1/health");
   const reachable = health.data?.databaseConnectivity === true;
-  const items: readonly Definition[] = [
-    ...buildItems(info, reachable),
-    ...networkItems(info),
-    ...policyItems(info),
-    {
-      label: "DERP relays",
-      wrap: true,
-      value: (
-        <Stacked note={info.derpServer ? "Embedded relay running" : "Embedded relay off"}>
-          <Link to="/relays/map" className={cn(inlineLinkClass, "flex items-center gap-1")}>
-            {info.derpRegions === 0
-              ? "No regions"
-              : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
-            <ArrowRightIcon size={linkIconSize} aria-hidden />
-          </Link>
-        </Stacked>
-      ),
-    },
-  ];
 
   return (
-    <Section
-      title="Server"
-      description="Values from the config file change only with a restart; the rest is read live."
-      bodyClassName="p-0"
-    >
-      <DefinitionList items={items} />
-    </Section>
+    <>
+      <FactsGroup
+        id="build"
+        title="Build"
+        description="What is running and since when. Values from the config file change only with a restart; the rest is read live."
+        items={buildItems(info, reachable)}
+      />
+      <FactsGroup
+        id="network"
+        title="Network"
+        docs="ref/configuration"
+        description="Where clients reach the server and the addresses it hands out."
+        items={networkItems(info)}
+      />
+      <FactsGroup
+        id="policy"
+        title="Policy and clients"
+        docs="ref/policy"
+        description="Where the policy lives and how the server treats clients."
+        items={policyItems(info)}
+      />
+      <FactsGroup
+        id="relays"
+        title="Relays"
+        docs="ref/derp"
+        items={[
+          {
+            label: "DERP relays",
+            wrap: true,
+            value: (
+              <Stacked note={info.derpServer ? "Embedded relay running" : "Embedded relay off"}>
+                <Link to="/relays/map" className={cn(inlineLinkClass, "flex items-center gap-1")}>
+                  {info.derpRegions === 0
+                    ? "No regions"
+                    : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
+                  <ArrowRightIcon size={linkIconSize} aria-hidden />
+                </Link>
+              </Stacked>
+            ),
+          },
+        ]}
+      />
+    </>
   );
 }

@@ -142,7 +142,7 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("200")).not.toBeInTheDocument();
   });
 
-  it("counts the detail fields past the first two and opens the row to show them", async () => {
+  it("counts the detail fields past the first two and opens the sheet to show them", async () => {
     const screen = await render(app({ ...base, events: [manyFields] }));
 
     await expect.element(screen.getByText("reusable=yes")).toBeVisible();
@@ -150,11 +150,13 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText(/^expiration=/u)).not.toBeInTheDocument();
     await screen.getByRole("button", { name: "+1" }).click();
 
-    await expect.element(screen.getByText("expiration")).toBeVisible();
-    await expect.element(screen.getByText("2026-09-30T00:00:00Z")).not.toBeInTheDocument();
+    const sheet = screen.getByRole("dialog");
+
+    await expect.element(sheet.getByText("expiration")).toBeVisible();
+    await expect.element(sheet.getByText("2026-09-30T00:00:00Z")).not.toBeInTheDocument();
     const expiration = formatAbsolute(new Date("2026-09-30T00:00:00Z"));
 
-    await expect.element(screen.getByText(expiration)).toBeVisible();
+    await expect.element(sheet.getByText(expiration)).toBeVisible();
   });
 
   it("names the local socket after the tool that used it", async () => {
@@ -192,16 +194,28 @@ describe(EventsTable, () => {
       .toHaveAttribute("href", "/users?q=bob");
   });
 
-  it("opens a row to show every recorded field, the status and the remote address", async () => {
+  it("opens a sheet with every recorded field, the status and the remote address", async () => {
     const screen = await render(app({ ...base, events: [deletion] }));
 
     await expect.element(screen.getByText("Remote address")).not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "Expand row" }).click();
+    await screen.getByRole("button", { name: "Show details" }).click();
 
-    await expect.element(screen.getByText("Remote address")).toBeVisible();
-    await expect.element(screen.getByText("10.0.0.1")).toBeVisible();
-    await expect.element(screen.getByText("HTTP status")).toBeVisible();
-    await expect.element(screen.getByText("200")).toBeVisible();
+    const sheet = screen.getByRole("dialog");
+
+    await expect.element(sheet.getByText("Event details")).toBeVisible();
+    await expect.element(sheet.getByText("Remote address")).toBeVisible();
+    await expect.element(sheet.getByText("10.0.0.1")).toBeVisible();
+    await expect.element(sheet.getByText("HTTP status 200")).toBeVisible();
+    await expect.element(sheet.getByText("retired")).toBeVisible();
+  });
+
+  it("opens the sheet from a click anywhere on the row and closes it again", async () => {
+    const screen = await render(app({ ...base, events: [deletion] }));
+
+    await screen.getByText("Console session").click();
+    await expect.element(screen.getByRole("dialog")).toBeVisible();
+    await screen.getByRole("button", { name: "Close" }).click();
+    await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("shows the empty state and no paging without events", async () => {
@@ -242,5 +256,15 @@ describe(EventsTable, () => {
 
     await expect.element(screen.getByText("Showing all 1 event")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
+  });
+
+  it("leaves out the columns switched off in the Columns menu", async () => {
+    const hidden = new Set(["actor", "result"] as const);
+    const screen = await render(app({ ...base, events: [deletion], hidden }));
+
+    await expect.element(screen.getByText("Target", { exact: true })).toBeVisible();
+    await expect.element(screen.getByText("Actor", { exact: true })).not.toBeInTheDocument();
+    await expect.element(screen.getByText("Success")).not.toBeInTheDocument();
+    await expect.element(screen.getByText("ada")).not.toBeInTheDocument();
   });
 });

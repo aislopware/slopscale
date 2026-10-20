@@ -78,6 +78,19 @@ export function WebhooksTab({
                 size="sm"
                 title="No webhooks yet"
                 description="Post events to your own endpoint, a chat channel, Telegram, ntfy or email."
+                contents={
+                  canEdit ? (
+                    <Button
+                      variant="secondary"
+                      icon={PlusIcon}
+                      onClick={() => {
+                        setCreating(true);
+                      }}
+                    >
+                      Add your first webhook
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : (
               <Empty

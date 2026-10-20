@@ -4,7 +4,8 @@ import type { ReactElement } from "react";
 import type { Settings } from "~/api/queries.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { SettingsGroup } from "~/components/settings/settings-page.tsx";
+import { SettingsCard } from "~/components/ui/settings-card.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 const week = 7;
@@ -50,43 +51,50 @@ export function KeyExpirySection({
       : "Off. A login lasts as long as the client asks for, 180 days by default.";
 
   return (
-    <Section title="Key expiry" description="How long a login stays valid." bodyClassName="p-0">
-      <SettingRow
-        title="Maximum"
-        description={
-          current > 0
-            ? `A login lasts at most ${optionLabel(current)}, shortened if the client asks for longer. Applies from each machine's next login, never to tagged machines.`
-            : fallback
-        }
-        control={
-          <Select
-            aria-label="Key expiry"
-            value={String(current)}
-            disabled={!canEdit || update.isPending}
-            renderValue={(value) => optionLabel(Number(value))}
-            onValueChange={(value) => {
-              const days = Number(value ?? 0);
+    <SettingsGroup
+      id="key-expiry"
+      title="Key expiry"
+      docs="ref/console"
+      description="How long a login stays valid."
+    >
+      <SettingsCard>
+        <SettingRow
+          title="Maximum"
+          description={
+            current > 0
+              ? `A login lasts at most ${optionLabel(current)}, shortened if the client asks for longer. Applies from each machine's next login, never to tagged machines.`
+              : fallback
+          }
+          control={
+            <Select
+              aria-label="Key expiry"
+              value={String(current)}
+              disabled={!canEdit || update.isPending}
+              renderValue={(value) => optionLabel(Number(value))}
+              onValueChange={(value) => {
+                const days = Number(value ?? 0);
 
-              update.mutate(
-                { body: { keyExpiryDays: days } },
-                {
-                  onSuccess: () => {
-                    toast.success(
-                      days === 0 ? "Key expiry off" : `Key expiry set to ${optionLabel(days)}`,
-                    );
+                update.mutate(
+                  { body: { keyExpiryDays: days } },
+                  {
+                    onSuccess: () => {
+                      toast.success(
+                        days === 0 ? "Key expiry off" : `Key expiry set to ${optionLabel(days)}`,
+                      );
+                    },
                   },
-                },
-              );
-            }}
-          >
-            {options.map((days) => (
-              <Select.Option key={days} value={String(days)}>
-                {optionLabel(days)}
-              </Select.Option>
-            ))}
-          </Select>
-        }
-      />
-    </Section>
+                );
+              }}
+            >
+              {options.map((days) => (
+                <Select.Option key={days} value={String(days)}>
+                  {optionLabel(days)}
+                </Select.Option>
+              ))}
+            </Select>
+          }
+        />
+      </SettingsCard>
+    </SettingsGroup>
   );
 }

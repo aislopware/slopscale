@@ -1,6 +1,8 @@
+import { Button } from "@cloudflare/kumo/components/button";
 import { Select } from "@cloudflare/kumo/components/select";
-import { Tabs } from "@cloudflare/kumo/components/tabs";
-import type { TabsItem } from "@cloudflare/kumo/components/tabs";
+import { Toolbar } from "@cloudflare/kumo/components/toolbar";
+import { cn } from "@cloudflare/kumo/utils";
+import { ArrowClockwiseIcon, CalendarBlankIcon, XIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -10,13 +12,15 @@ import { fallback, object, optional, picklist, pipe, transform, unknown } from "
 import { auditQuery, auditRanges, usersQuery } from "~/api/queries.ts";
 import type { AuditFilters, AuditRange, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
+import { ColumnsMenu, useHiddenColumns } from "~/components/audit/columns.tsx";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import { ExportMenu } from "~/components/audit/export-menu.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
@@ -67,13 +71,20 @@ export const Route = createFileRoute("/_app/audit")({
   component: AuditPage,
 });
 
-const rangeTabs: TabsItem[] = [
-  { value: "1h", label: "1h" },
-  { value: "24h", label: "24h" },
-  { value: "7d", label: "7d" },
-  { value: "30d", label: "30d" },
-  { value: "all", label: "All" },
-];
+/** The date-range button's choices, as the dashboard's audit log words them. */
+const rangeLabels: Record<AuditRange, string> = {
+  "1h": "Last hour",
+  "24h": "Last 24 hours",
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+  all: "All time",
+};
+
+/**
+ * A Kumo Select as a segment of a Toolbar group: the group draws the ring and the dividers, so the
+ * select drops its own.
+ */
+const joinedSelectClass = "rounded-none bg-transparent shadow-none ring-0";
 
 function isRange(value: string): value is AuditRange {
   return (auditRanges as readonly string[]).includes(value);
@@ -110,6 +121,81 @@ function userOptions(users: readonly User[]): { value: string; label: string }[]
   ];
 }
 
+/** The log toolbar's filter count: how many filters narrow the list, and the × that drops them all. */
+function FilterCount({
+  count,
+  onClear,
+}: {
+  readonly count: number;
+  readonly onClear: () => void;
+}): ReactElement | null {
+  if (count === 0) {
+    return null;
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      aria-label={`Clear ${String(count)} ${count === 1 ? "filter" : "filters"}`}
+      onClick={onClear}
+    >
+      Filters
+      <Badge tone="neutral">{count}</Badge>
+      <XIcon aria-hidden className="size-3.5 text-kumo-subtle" />
+    </Button>
+  );
+}
+
+/** The date-range button with its calendar icon, the Columns chooser and the refresh. */
+function RangeControls({
+  since,
+  refreshing,
+  columns,
+  onSinceChange,
+  onRefresh,
+}: {
+  readonly since: AuditRange;
+  readonly refreshing: boolean;
+  readonly columns: ReactElement;
+  readonly onSinceChange: (since: AuditRange) => void;
+  readonly onRefresh: () => void;
+}): ReactElement {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select
+        aria-label="Time range"
+        className="w-44"
+        value={since}
+        renderValue={(value) => (
+          <span className="flex items-center gap-2">
+            <CalendarBlankIcon aria-hidden className="size-4 text-kumo-subtle" />
+            {isRange(value) ? rangeLabels[value] : rangeLabels[defaultRange]}
+          </span>
+        )}
+        onValueChange={(value) => {
+          onSinceChange(typeof value === "string" && isRange(value) ? value : defaultRange);
+        }}
+      >
+        {auditRanges.map((range) => (
+          <Select.Option key={range} value={range}>
+            {rangeLabels[range]}
+          </Select.Option>
+        ))}
+      </Select>
+      {columns}
+      <Button
+        variant="secondary"
+        shape="square"
+        icon={ArrowClockwiseIcon}
+        aria-label="Refresh"
+        loading={refreshing}
+        onClick={onRefresh}
+      />
+    </div>
+  );
+}
+
 function AuditPage(): ReactElement {
   const { me } = Route.useRouteContext();
   const search = Route.useSearch();
@@ -143,46 +229,63 @@ function AuditPage(): ReactElement {
     resetKey: JSON.stringify(filters),
   });
 
+  const filterCount = (search.action === "" ? 0 : 1) + (search.actor === "" ? 0 : 1);
+  const [hidden, toggleColumn] = useHiddenColumns();
+
   return (
     <>
       <PageHeader
         title="Audit log"
         docs="ref/audit"
         description="Who changed what through the API and the console."
+        actions={<ExportMenu filters={filtersOf(search)} />}
       />
-      <AuditStats events={rows} />
-      <TableToolbar actions={<ExportMenu filters={filtersOf(search)} />}>
-        <SearchInput
-          value={actionDraft}
-          placeholder="Filter by action prefix"
-          onValueChange={setActionDraft}
-        />
-        <Tabs
-          variant="segmented"
-          aria-label="Time range"
-          tabs={rangeTabs}
-          value={search.since}
-          onValueChange={(value) => {
-            void navigate({
-              search: (previous) => ({
-                ...previous,
-                since: isRange(value) ? value : defaultRange,
-              }),
-            });
-          }}
-        />
-        {users.data === undefined ? null : (
-          <Select
-            aria-label="Filter by user"
-            className="w-44"
-            value={search.actor}
-            items={userOptions(users.data.users)}
-            onValueChange={(value) => {
-              void navigate({ search: (previous) => ({ ...previous, actor: value ?? "" }) });
+      <TableGroup className="gap-4">
+        {/* The dashboard's audit filter row: the filters joined in one ringed group on the left
+            with their count and the × that clears them; the date range, the Columns chooser and a refresh
+            on the right. The per-page limit sits in the band under the table. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 basis-80 flex-wrap items-center gap-2">
+            <Toolbar aria-label="Filters" className="w-full max-w-[560px]">
+              <SearchInput
+                joined
+                value={actionDraft}
+                placeholder="Filter by action prefix"
+                onValueChange={setActionDraft}
+              />
+              {users.data === undefined ? null : (
+                <Select
+                  aria-label="Filter by user"
+                  className={cn(joinedSelectClass, "w-44")}
+                  value={search.actor}
+                  items={userOptions(users.data.users)}
+                  onValueChange={(value) => {
+                    void navigate({ search: (previous) => ({ ...previous, actor: value ?? "" }) });
+                  }}
+                />
+              )}
+            </Toolbar>
+            <FilterCount
+              count={filterCount}
+              onClear={() => {
+                void navigate({ search: (previous) => ({ ...previous, action: "", actor: "" }) });
+              }}
+            />
+          </div>
+          <RangeControls
+            since={search.since}
+            refreshing={events.isRefetching && !events.isFetchingNextPage}
+            columns={<ColumnsMenu hidden={hidden} onToggle={toggleColumn} />}
+            onSinceChange={(since) => {
+              void navigate({ search: (previous) => ({ ...previous, since }) });
+            }}
+            onRefresh={() => {
+              void events.refetch();
             }}
           />
-        )}
-      </TableToolbar>
+        </div>
+        <AuditStats events={rows} />
+      </TableGroup>
       <TableGroup>
         <EventsTable
           events={window.rows}
@@ -191,6 +294,7 @@ function AuditPage(): ReactElement {
             void navigate({ search: () => ({ ...clearedSearch }) });
           }}
           paging={window}
+          hidden={hidden}
         />
       </TableGroup>
     </>

@@ -1,5 +1,5 @@
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { PlusIcon, ShieldCheckIcon, UserPlusIcon } from "@phosphor-icons/react";
+import { Button } from "@cloudflare/kumo/components/button";
+import { PlusIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -14,10 +14,10 @@ export interface QuickActionsProps {
 }
 
 /**
- * The three things an operator comes here to do: Access controls, Add user, and Add machine. Adding
- * a machine is the one the page is for, so it is the only filled button, rightmost in the group;
- * the rest are secondary. Each one is hidden rather than disabled when the caller has no scope for
- * it, so the row never offers a dead end.
+ * The two things an operator comes here to add: a user and a machine. Adding a machine is the one
+ * the page is for, so it is the only filled button, rightmost in the group; the other is secondary,
+ * as the dashboard pairs its header actions. Each one is hidden rather than disabled when the
+ * caller has no scope for it, so the row never offers a dead end.
  */
 export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElement {
   const [userOpen, setUserOpen] = useState(false);
@@ -25,11 +25,6 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
 
   return (
     <>
-      {can(me, "policy_file") ? (
-        <LinkButton href="/policy/rules" variant="secondary" icon={ShieldCheckIcon}>
-          Access controls
-        </LinkButton>
-      ) : null}
       {can(me, "users") ? (
         <>
           <Button
