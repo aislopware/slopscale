@@ -4,7 +4,7 @@ import type { User } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { Avatar } from "~/components/ui/avatar.tsx";
+import { cellSecondaryClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
@@ -65,6 +65,7 @@ export const columns = helper.columns([
         <GroupNames
           ids={groupsOfUser(groups, row.original).map((group) => group.id)}
           groups={groups}
+          emptyLabel="—"
           max={2}
         />
       );
@@ -100,7 +101,8 @@ export const columns = helper.columns([
  * The name, and under it the username and email on one line: the username is what the policy refers
  * to, the email is how the operator knows who that is. Each shows once, so a provider that uses the
  * address as the username does not print it twice. A separate Email column pushed the role and
- * status off the right edge at 1280px.
+ * status off the right edge at 1280px. There is no avatar: the dashboard's members list names each
+ * member in text alone, and a column of coloured initials only repeated the name beside it.
  */
 function NameCell({ user }: { readonly user: User }): ReactElement {
   const label = userLabel(user);
@@ -109,14 +111,9 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
   const title = [label, ...parts, provider ?? ""].filter((part) => part !== "").join(", ");
 
   return (
-    <div className="flex max-w-80 items-center gap-2.5" title={title}>
-      <Avatar name={label} id={user.id} src={user.profilePicUrl} size="xl" />
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate font-medium text-kumo-default">{label}</span>
-        {parts.length === 0 ? null : (
-          <span className="truncate text-xs text-kumo-subtle">{parts.join(" · ")}</span>
-        )}
-      </div>
+    <div className="flex max-w-80 min-w-0 flex-col gap-0.5" title={title}>
+      <span className="truncate font-medium text-kumo-default">{label}</span>
+      {parts.length === 0 ? null : <span className={cellSecondaryClass}>{parts.join(" · ")}</span>}
     </div>
   );
 }

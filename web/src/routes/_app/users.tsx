@@ -121,15 +121,19 @@ function UsersPage(): ReactElement {
 
   return (
     <>
-      <PageHeader title="Users" docs="ref/roles" meta={describe(total, pending)} />
-      <TableToolbar
+      <PageHeader
+        title="Users"
+        docs="ref/roles"
+        description="Everyone who signs in to the tailnet. A user's role bounds what they may change here; the policy decides what their machines reach."
+        meta={describe(total, pending)}
         actions={
           <>
             <InviteUserButton me={me} />
             <AddUserButton me={me} />
           </>
         }
-      >
+      />
+      <TableToolbar>
         <SearchInput
           value={text}
           placeholder="Search by name, email or role"

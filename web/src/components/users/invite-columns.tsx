@@ -47,7 +47,7 @@ export const inviteColumns = helper.columns([
     cell: ({ row }) => (
       <span className="font-medium wrap-anywhere text-kumo-default">{row.original.email}</span>
     ),
-    meta: { className: "w-[28%] min-w-52 align-top" },
+    meta: { className: "w-[28%] min-w-52" },
   }),
   helper.accessor((invite) => invite.role, {
     id: "role",
@@ -63,7 +63,7 @@ export const inviteColumns = helper.columns([
       const groups = table.options.meta?.groups;
 
       return groups === undefined ? null : (
-        <GroupNames ids={row.original.groupIds} groups={groups} max={2} />
+        <GroupNames ids={row.original.groupIds} groups={groups} emptyLabel="—" max={2} />
       );
     },
     meta: { className: "hidden lg:table-cell" },
