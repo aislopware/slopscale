@@ -1,6 +1,7 @@
 import { Switch } from "@cloudflare/kumo/components/switch";
+import { cn } from "@cloudflare/kumo/utils";
 import { GlobeIcon, PathIcon } from "@phosphor-icons/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Group, Network } from "~/api/queries.ts";
@@ -14,6 +15,7 @@ import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { narrowOnlyClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
@@ -45,7 +47,16 @@ export const networkColumns = helper.columns([
     id: "name",
     header: "Network",
     enableSorting: true,
-    cell: ({ row }) => <NameCell network={row.original} />,
+    cell: ({ row, table }) => {
+      const { me } = table.options.meta ?? {};
+
+      return (
+        <NameCell
+          network={row.original}
+          state={me === undefined ? null : <EnabledCell network={row.original} me={me} labelled />}
+        />
+      );
+    },
     meta: { className: "w-[24%] min-w-44" },
   }),
   helper.accessor((network) => network.prefixes.join(" "), {
@@ -86,7 +97,7 @@ export const networkColumns = helper.columns([
 
       return me === undefined ? null : <EnabledCell network={row.original} me={me} />;
     },
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.display({
     id: "actions",
@@ -108,7 +119,14 @@ export const networkColumns = helper.columns([
   }),
 ]);
 
-function NameCell({ network }: { readonly network: NetworkRow }): ReactElement {
+/** The network's name and who gets it; on a phone, which hides the Enabled column, its switch too. */
+function NameCell({
+  network,
+  state,
+}: {
+  readonly network: NetworkRow;
+  readonly state: ReactNode;
+}): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex items-center gap-1.5">
@@ -125,6 +143,7 @@ function NameCell({ network }: { readonly network: NetworkRow }): ReactElement {
       <span className="truncate text-xs text-kumo-subtle md:hidden">
         {network.groupNames === "" ? "No groups" : network.groupNames}
       </span>
+      {state === null ? null : <span className={cn("pt-0.5", narrowOnlyClass)}>{state}</span>}
     </div>
   );
 }
@@ -229,13 +248,15 @@ function RouterName({ router }: { readonly router: Network["routers"][number] })
 function EnabledCell({
   network,
   me,
+  labelled = false,
 }: {
   readonly network: Network;
   readonly me: Me;
+  /** Says "Enabled" or "Disabled" beside the switch, where no column heading names it. */
+  readonly labelled?: boolean;
 }): ReactElement {
   const { setEnabled } = useNetworkMutations();
-
-  return (
+  const toggle = (
     <Switch
       size="sm"
       aria-label={`${network.name} enabled`}
@@ -256,5 +277,14 @@ function EnabledCell({
         );
       }}
     />
+  );
+
+  return labelled ? (
+    <span className="flex items-center gap-2">
+      {toggle}
+      <span className="text-sm text-kumo-subtle">{network.enabled ? "Enabled" : "Disabled"}</span>
+    </span>
+  ) : (
+    toggle
   );
 }

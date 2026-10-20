@@ -3,7 +3,7 @@ import { cn } from "@cloudflare/kumo/utils";
 import { ArrowRightIcon, ArrowsLeftRightIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Group, Posture } from "~/api/queries.ts";
@@ -15,7 +15,7 @@ import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureName } from "~/components/access/posture-model.ts";
 import { RuleMenu } from "~/components/access/rule-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { rowLinkClass } from "~/components/table/styles.ts";
+import { narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -55,7 +55,26 @@ export const ruleColumns = helper.columns([
     id: "name",
     header: "Rule",
     enableSorting: true,
-    cell: ({ row }) => <NameCell rule={row.original} />,
+    cell: ({ row, table }) => {
+      const { me } = table.options.meta ?? {};
+
+      return (
+        <NameCell
+          rule={row.original}
+          state={
+            me === undefined ? null : (
+              <EnabledCell
+                rule={row.original}
+                me={me}
+                rules={table.options.meta?.rules ?? []}
+                policyFileEnforces={table.options.meta?.policyFileEnforces === true}
+                labelled
+              />
+            )
+          }
+        />
+      );
+    },
     meta: { className: "w-[26%] min-w-44 align-top" },
   }),
   helper.accessor((rule) => `${rule.sourceNames} ${rule.postureNames}`, {
@@ -114,7 +133,7 @@ export const ruleColumns = helper.columns([
         />
       );
     },
-    meta: { className: "whitespace-nowrap align-top" },
+    meta: { className: "whitespace-nowrap align-top", hideBelow: "sm" },
   }),
   helper.accessor((rule) => rule.updatedAt, {
     id: "updated",
@@ -151,7 +170,14 @@ export const ruleColumns = helper.columns([
   }),
 ]);
 
-function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
+/** The rule's name and description; on a phone, which hides the Status column, its switch too. */
+function NameCell({
+  rule,
+  state,
+}: {
+  readonly rule: AccessRule;
+  readonly state: ReactNode;
+}): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
@@ -180,6 +206,7 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
         {protocolSummary(rule)}
       </span>
       <ExpiryLine rule={rule} />
+      {state === null ? null : <span className={cn("pt-0.5", narrowOnlyClass)}>{state}</span>}
     </div>
   );
 }
@@ -255,11 +282,14 @@ function EnabledCell({
   me,
   rules,
   policyFileEnforces,
+  labelled = false,
 }: {
   readonly rule: AccessRule;
   readonly me: Me;
   readonly rules: readonly AccessRule[];
   readonly policyFileEnforces: boolean;
+  /** Says "Enabled" or "Disabled" beside the switch, where no column heading names it. */
+  readonly labelled?: boolean;
 }): ReactElement {
   const { setRuleEnabled } = useAccessMutations();
   const [confirming, setConfirming] = useState(false);
@@ -283,7 +313,7 @@ function EnabledCell({
 
   return (
     <>
-      <span className="flex h-lh items-center">
+      <span className="flex h-lh items-center gap-2">
         <Switch
           size="sm"
           aria-label={`${rule.name} enabled`}
@@ -298,6 +328,9 @@ function EnabledCell({
             }
           }}
         />
+        {labelled ? (
+          <span className="text-sm text-kumo-subtle">{rule.enabled ? "Enabled" : "Disabled"}</span>
+        ) : null}
       </span>
       <ConfirmDialog
         open={confirming}

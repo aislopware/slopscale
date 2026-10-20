@@ -157,7 +157,7 @@ describe(RoutesTab, () => {
       .element(screen.getByRole("link", { name: "machine-1" }))
       .toHaveAttribute("href", "/machines/1");
     await expect.element(screen.getByRole("link", { name: "machine-2" })).toBeVisible();
-    await expect.element(screen.getByText("Primary")).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "Approved Primary" })).toBeVisible();
     await expect.element(screen.getByText("Disconnected")).toBeVisible();
   });
 
@@ -203,7 +203,7 @@ describe(RoutesTab, () => {
     ];
     const screen = await render(app(nodes));
 
-    await expect.element(screen.getByText("No longer advertised")).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "No longer advertised" })).toBeVisible();
     await expect.element(screen.getByText("1 stale")).not.toBeInTheDocument();
   });
 

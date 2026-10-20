@@ -133,8 +133,8 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("Console session")).toBeVisible();
     await expect.element(screen.getByText("node.delete")).toBeVisible();
     await expect.element(screen.getByText("reason=retired")).toBeVisible();
-    await expect.element(screen.getByText("Success")).toBeVisible();
-    await expect.element(screen.getByText("Failed")).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "Success" })).toBeVisible();
+    await expect.element(screen.getByRole("cell", { name: "Failed" })).toBeVisible();
   });
 
   it("reads the target kind as a label and keeps the status out of the cell", async () => {

@@ -22,7 +22,12 @@ import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { tableClass, tableRowClass } from "~/components/table/styles.ts";
+import {
+  hideBelowClasses,
+  narrowOnlyClass,
+  tableClass,
+  tableRowClass,
+} from "~/components/table/styles.ts";
 
 /** A click on a control inside the row belongs to the control, not to the row. */
 function onControl(event: MouseEvent<HTMLElement>): boolean {
@@ -43,7 +48,7 @@ const columnClass: Record<AuditColumnId, string> = {
   action: "w-52",
   target: "w-40",
   actor: "w-44",
-  result: "w-24",
+  result: cn("w-24", hideBelowClasses.sm),
   details: "hidden lg:table-cell",
 };
 
@@ -81,9 +86,20 @@ function EventRow({
         }
       }}
     >
-      {columns.map((column) => (
+      {columns.map((column, at) => (
         <Table.Cell key={column} className={columnClass[column]}>
-          {cells[column](event, onOpen)}
+          {at === 0 && column !== "result" && columns.includes("result") ? (
+            // A phone hides the Result column, so the first cell carries the result on a line of
+            // its own.
+            <div className="flex min-w-0 flex-col gap-0.5">
+              {cells[column](event, onOpen)}
+              <span className={cn("pt-0.5", narrowOnlyClass)}>
+                <ResultCell event={event} />
+              </span>
+            </div>
+          ) : (
+            cells[column](event, onOpen)
+          )}
         </Table.Cell>
       ))}
     </Table.Row>

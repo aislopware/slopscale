@@ -1,10 +1,11 @@
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { cellSecondaryClass } from "~/components/table/styles.ts";
+import { cellSecondaryClass, narrowOnlyClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
@@ -48,12 +49,8 @@ export const columns = helper.columns([
     header: "Status",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ row }) => (
-      <Badge tone={row.original.approved ? "success" : "warning"}>
-        {row.original.approved ? "Approved" : "Needs approval"}
-      </Badge>
-    ),
-    meta: { className: "whitespace-nowrap" },
+    cell: ({ row }) => <UserStatus user={row.original} />,
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.display({
     id: "groups",
@@ -114,6 +111,18 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
     <div className="flex max-w-80 min-w-0 flex-col gap-0.5" title={title}>
       <span className="truncate font-medium text-kumo-default">{label}</span>
       {parts.length === 0 ? null : <span className={cellSecondaryClass}>{parts.join(" · ")}</span>}
+      {/* A phone hides the Status column, so the state takes a line of its own. */}
+      <span className={cn("pt-0.5", narrowOnlyClass)}>
+        <UserStatus user={user} />
+      </span>
     </div>
+  );
+}
+
+function UserStatus({ user }: { readonly user: User }): ReactElement {
+  return (
+    <Badge tone={user.approved ? "success" : "warning"}>
+      {user.approved ? "Approved" : "Needs approval"}
+    </Badge>
   );
 }

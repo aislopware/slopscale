@@ -21,7 +21,7 @@ import { SelectAllCheckbox, SelectRowCheckbox } from "~/components/machines/sele
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { hostedServices } from "~/components/services/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { cellSecondaryClass, rowLinkClass } from "~/components/table/styles.ts";
+import { cellSecondaryClass, narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
@@ -91,6 +91,7 @@ export const columns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <StatusCell node={row.original} />,
+    meta: { hideBelow: "sm" },
   }),
   helper.accessor((node) => parseTime(node.lastSeen)?.getTime() ?? 0, {
     id: "lastSeen",
@@ -143,6 +144,10 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
       {node.name === name ? null : (
         <span className={cn(cellSecondaryClass, "font-mono")}>{node.name}</span>
       )}
+      {/* A phone hides the Status column, so the state takes a line of its own. */}
+      <span className={cn("pt-0.5", narrowOnlyClass)}>
+        <StatusCell node={node} />
+      </span>
     </div>
   );
 }

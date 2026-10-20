@@ -24,6 +24,8 @@ import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import {
   actionsColumnClass,
+  hideBelowClasses,
+  narrowOnlyClass,
   pinnedEdgeClass,
   tableClass,
   tableRowClass,
@@ -66,7 +68,13 @@ function RecordingRow({
   return (
     <Table.Row className={cn("align-top", tableRowClass)}>
       <Table.Cell className="whitespace-nowrap">
-        <Timestamp value={recording.startedAt} />
+        <div className="flex flex-col gap-0.5">
+          <Timestamp value={recording.startedAt} />
+          {/* A phone hides the Status column, so the state takes a line of its own. */}
+          <span className={cn("pt-0.5", narrowOnlyClass)}>
+            <StateBadge recording={recording} />
+          </span>
+        </div>
       </Table.Cell>
       <Table.Cell>
         {/* A user-owned source already reads "alice on laptop"; a tagged one needs its tags. */}
@@ -88,7 +96,7 @@ function RecordingRow({
       <Table.Cell className="text-right whitespace-nowrap text-kumo-subtle tabular-nums">
         {formatBytes(recording.size)}
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell className={hideBelowClasses.sm}>
         <StateBadge recording={recording} />
       </Table.Cell>
       <Table.Cell sticky="right" className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}>
@@ -174,7 +182,7 @@ export function SessionsTable({
               <Table.Head>To</Table.Head>
               <Table.Head>Command</Table.Head>
               <Table.Head className="text-right">Size</Table.Head>
-              <Table.Head>Status</Table.Head>
+              <Table.Head className={hideBelowClasses.sm}>Status</Table.Head>
               <Table.Head
                 sticky="right"
                 className={cn(actionsColumnClass, overflowing && pinnedEdgeClass)}
