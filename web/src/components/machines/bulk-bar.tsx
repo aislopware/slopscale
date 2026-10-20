@@ -69,16 +69,28 @@ export function MachineBulkBar({
     <>
       {ids.length === 0 ? null : (
         <>
-          {/* pl-3 starts the count where the machine names start in the column below. */}
+          {/* pl-3 starts the count where the machine names start in the column below. The bar is
+              the dashboard's DNS bulk bar: "1 of 169 selected", Clear selection beside it, then the
+              actions, the destructive one last and red with its count. */}
           <div
             role="toolbar"
             aria-label="Actions for the selected machines"
             className="flex items-center gap-2 pl-3 font-normal text-kumo-default"
           >
-            <span className="mr-1 font-medium">
+            <span className="text-base tabular-nums">
               <span className="@3xl:hidden">{`${ids.length} selected`}</span>
-              <span className="hidden @3xl:inline">{`${plural(ids.length, "machine")} selected`}</span>
+              <span className="hidden @3xl:inline">{`${ids.length} of ${nodes.length} selected`}</span>
             </span>
+            <BulkButton
+              variant="ghost"
+              icon={XIcon}
+              label="Clear selection"
+              disabled={busy}
+              onClick={() => {
+                selection.clear();
+              }}
+            />
+            <span aria-hidden className="h-5 border-l border-kumo-line" />
             <BulkButton
               icon={CheckIcon}
               label="Approve"
@@ -107,20 +119,12 @@ export function MachineBulkBar({
               }}
             />
             <BulkButton
+              variant="destructive"
               icon={TrashIcon}
-              label="Remove…"
+              label={`Remove ${ids.length} selected`}
               disabled={busy}
               onClick={() => {
                 setConfirming(true);
-              }}
-            />
-            <BulkButton
-              variant="ghost"
-              icon={XIcon}
-              label="Clear selection"
-              disabled={busy}
-              onClick={() => {
-                selection.clear();
               }}
             />
           </div>
@@ -165,7 +169,7 @@ function BulkButton({
 }: {
   readonly icon: Icon;
   readonly label: string;
-  readonly variant?: "secondary" | "ghost";
+  readonly variant?: "secondary" | "ghost" | "destructive";
   readonly disabled: boolean;
   readonly loading?: boolean;
   readonly onClick: () => void;

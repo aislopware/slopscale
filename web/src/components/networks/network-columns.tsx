@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Group, Network } from "~/api/queries.ts";
+import type { MachineOwner } from "~/api/schema.gen.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
@@ -13,12 +14,13 @@ import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
-import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Status } from "~/components/ui/status.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { machineLabel } from "~/lib/node.ts";
+import { machineLabel, machineOwnerLabel } from "~/lib/node.ts";
 
 /** A network with its group names spelled out, so the global filter can match them. */
 export interface NetworkRow extends Network {
@@ -162,13 +164,33 @@ function RoutersCell({ network }: { readonly network: Network }): ReactElement {
   return (
     <div className="flex flex-col items-start gap-1.5">
       {network.routers.map((router) => (
-        <MachineName
-          key={router.nodeId}
-          name={<RouterName router={router} />}
-          owner={router.owner}
-        />
+        // One line per router, the owner beside the name rather than under it, so a network
+        // with one router keeps the 44px row.
+        <span key={router.nodeId} className="flex max-w-full min-w-0 items-center gap-2">
+          <RouterName router={router} />
+          <RouterOwner owner={router.owner} />
+        </span>
       ))}
     </div>
+  );
+}
+
+/** Whose the router is, compact: its first tag, or the person's avatar with the name on hover. */
+function RouterOwner({ owner }: { readonly owner: MachineOwner | undefined }): ReactElement | null {
+  if (owner === undefined) {
+    return null;
+  }
+
+  if (owner.tags.length > 0) {
+    return <TagList tags={owner.tags} size="sm" max={1} className="shrink-0 flex-nowrap" />;
+  }
+
+  const label = machineOwnerLabel(owner);
+
+  return label === "" ? null : (
+    <span title={label} className="flex shrink-0">
+      <Avatar name={label} id={owner.userId} src={owner.profilePicUrl} size="sm" />
+    </span>
   );
 }
 

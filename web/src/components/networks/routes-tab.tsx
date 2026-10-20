@@ -8,6 +8,7 @@ import type { Network, Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { routeColumns } from "~/components/networks/route-columns.tsx";
 import { RouteFilterChips } from "~/components/networks/route-filters.tsx";
+import { RouteMap } from "~/components/networks/route-map.tsx";
 import {
   filterGroups,
   groupRoutes,
@@ -52,6 +53,7 @@ export function RoutesTab({
   const counts = useMemo(() => routeFilterCounts(groups), [groups]);
   const rows: RoutesRow[] = useMemo(() => filterGroups(groups, filters), [groups, filters]);
   const [expanded, setExpanded] = useState<ExpandedState>({});
+  const total = groups.length;
 
   const table = useAppTable({
     data: rows,
@@ -66,27 +68,41 @@ export function RoutesTab({
     meta: { me, networks },
   });
 
-  const total = groups.length;
   const shown = table.getRowModel().rows.filter((row) => row.depth === 0).length;
   const narrowed = search !== "" || routeFilterCount(filters) > 0;
+  // The map draws what the table lists, the search included, one entry per prefix.
+  const mapped = table
+    .getRowModel()
+    .rows.filter((row) => row.depth === 0)
+    .map((row) => row.original)
+    .filter((row) => isRouteGroup(row));
 
   return (
     <>
-      <TableToolbar>
-        <SearchInput
-          value={search}
-          placeholder="Search by route, machine or network"
-          onValueChange={onSearchChange}
-        />
+      {/* The dashboard's Routes page: the facet chips, the search under them, the map of what the
+          filters leave, then the table. */}
+      <TableGroup>
         <RouteFilterChips
           state={filters}
           counts={counts}
+          total={total}
           onToggle={(filter) => {
             onFiltersChange({ ...filters, [filter]: !filters[filter] });
           }}
+          onClear={() => {
+            onFiltersChange(noRouteFilters);
+          }}
         />
-      </TableToolbar>
+        <TableToolbar>
+          <SearchInput
+            value={search}
+            placeholder="Search by route, machine or network"
+            onValueChange={onSearchChange}
+          />
+        </TableToolbar>
+      </TableGroup>
       <TableGroup>
+        <RouteMap groups={mapped} />
         <DataTable
           table={table}
           empty={

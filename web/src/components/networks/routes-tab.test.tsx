@@ -242,4 +242,23 @@ describe(RoutesTab, () => {
     await expect.element(screen.getByText("Approve 2 machines?")).toBeVisible();
     await expect.element(screen.getByText(/10\.0\.0\.0\/24 start reaching/u)).toBeVisible();
   });
+
+  it("presses the every-route chip while nothing narrows, and clears the others with it", async () => {
+    const nodes = [...pair, node("3", { available: ["10.9.0.0/24"], approved: ["10.9.0.0/24"] })];
+    const screen = await render(app(nodes));
+    const every = screen.getByRole("button", { name: "2 routes" });
+    const pending = screen.getByRole("button", { name: /^Pending/u });
+
+    await expect.element(every).toHaveAttribute("aria-pressed", "true");
+
+    await pending.click();
+
+    await expect.element(every).toHaveAttribute("aria-pressed", "false");
+    await expect.element(screen.getByText("Showing 1 of 2 routes")).toBeVisible();
+
+    await every.click();
+
+    await expect.element(pending).toHaveAttribute("aria-pressed", "false");
+    await expect.element(screen.getByText("Showing 2 of 2 routes")).toBeVisible();
+  });
 });

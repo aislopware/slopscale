@@ -8,10 +8,7 @@ import type { Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import type { useNodeMutations } from "~/components/machines/mutations.ts";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import {
-  ConfirmDialog,
-  DeleteDialog as DeleteResourceDialog,
-} from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -22,7 +19,7 @@ import {
 import { TagField } from "~/components/ui/tag-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { dnsLabelIssue } from "~/lib/dns-label.ts";
-import { nodeLabel, nodeName } from "~/lib/node.ts";
+import { nodeLabel, nodeName, ownerLabel } from "~/lib/node.ts";
 
 type Mutations = ReturnType<typeof useNodeMutations>;
 
@@ -360,7 +357,9 @@ export function BulkClientUpdateDialog({
 
 /**
  * Removing a machine is not undoable and the tailnet keeps working without it, so it asks for the
- * name to be typed rather than for one more click.
+ * name to be typed rather than for one more click. The dialog repeats the machine in an inset
+ * summary card, as the dashboard's Networking deletes do (a route's CIDR, a tunnel's name and ID),
+ * so the operator sees which of several similar names they are about to remove.
  */
 export function DeleteDialog({
   node,
@@ -369,19 +368,44 @@ export function DeleteDialog({
   mutations,
 }: NodeDialogProps): ReactElement {
   const { remove } = mutations;
+  const name = nodeName(node);
 
   return (
-    <DeleteResourceDialog
+    <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      resourceType="machine"
-      resourceName={nodeName(node)}
-      deleteButtonText="Remove machine"
-      isDeleting={remove.isPending}
-      {...(remove.isError ? { errorMessage: errorMessage(remove.error) } : {})}
-      onDelete={() => {
+      title={`Remove ${name}?`}
+      description={
+        <>
+          <span className="block">
+            The machine leaves the tailnet with its routes and shares. It can register again with a
+            new key.
+          </span>
+          <MachineSummaryCard node={node} />
+        </>
+      }
+      confirmLabel="Remove machine"
+      loading={remove.isPending}
+      error={remove.isError ? errorMessage(remove.error) : undefined}
+      confirmName={name}
+      onConfirm={() => {
         remove.mutate({ params: { path: { nodeId: node.id } } });
       }}
     />
+  );
+}
+
+/**
+ * The machine as the delete dialog's inset card shows it: the name over its addresses in mono and
+ * whose it is. Spans laid out as blocks, since the card sits in the dialog's description
+ * paragraph.
+ */
+function MachineSummaryCard({ node }: { readonly node: Node }): ReactElement {
+  return (
+    <span className="mt-4 flex flex-col gap-1 rounded-lg bg-kumo-elevated px-4 py-3 text-sm ring ring-kumo-hairline">
+      <span className="font-medium text-kumo-default">{nodeName(node)}</span>
+      <span className="font-mono text-xs text-kumo-subtle">{node.ipAddresses.join(" · ")}</span>
+      <span className="text-kumo-subtle">{ownerLabel(node)}</span>
+    </span>
   );
 }
