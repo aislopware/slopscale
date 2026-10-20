@@ -72,7 +72,7 @@ require (
 	golang.org/x/term v0.47.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
-	tailscale.com v1.105.0-pre.0.20261019223425-db03d4e19da5
+	tailscale.com v1.105.0-pre.0.20261013235713-a6a4c25c26e9
 	tailscale.com/client/tailscale/v2 v2.12.0
 )
 
