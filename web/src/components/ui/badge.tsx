@@ -4,12 +4,20 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { Tone } from "~/components/ui/status.tsx";
 
-const variants: Record<Tone, BadgeVariant> = {
+/**
+ * A badge's tone: a `Status` tone, or the solid inverted pill (Kumo's `primary`, black in light
+ * mode and white in dark) for a state as prominent as success without being one, such as a
+ * disconnected machine.
+ */
+export type BadgeTone = Tone | "inverted";
+
+const variants: Record<BadgeTone, BadgeVariant> = {
   success: "success",
   warning: "warning",
   danger: "error",
   info: "info",
   neutral: "secondary",
+  inverted: "primary",
 };
 
 /**
@@ -24,7 +32,7 @@ export function Badge({
   children,
   className,
 }: {
-  readonly tone: Tone;
+  readonly tone: BadgeTone;
   readonly children: ReactNode;
   readonly className?: string;
 }): ReactElement {
