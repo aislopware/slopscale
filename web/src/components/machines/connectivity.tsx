@@ -16,15 +16,20 @@ import {
   portMapLabel,
   yesNo,
 } from "~/components/derp/latency-model.ts";
+import { signInCommand } from "~/components/machines/connect.ts";
+import { CommandBox } from "~/components/ui/command-text.tsx";
 import { FactGrid } from "~/components/ui/fact-grid.tsx";
 import type { Fact } from "~/components/ui/fact-grid.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
+import { nodeName, nodeStatus } from "~/lib/node.ts";
 
 /**
  * How the machine reaches the rest of the tailnet, the Mesh node page's connection card: the relay
  * region it homes on, and what its own network report says about the path out. The client sends the
- * report, so it is what the machine believes rather than something the server measured.
+ * report, so it is what the machine believes rather than something the server measured. A machine
+ * that is not connected gets the next step first, the way the Mesh node page puts its connect
+ * commands in this card while a node is offline, and its last report under that on Diagnostics.
  */
 export function ConnectivitySection({
   node,
@@ -76,17 +81,126 @@ export function ConnectivitySection({
           }
         : {})}
     >
-      {netInfo === undefined ? (
-        <SectionEmpty
-          title="No network report yet"
-          description="The client sends one when it connects: its home relay, the link it is on and how it gets through NAT."
-        />
-      ) : (
-        <FactGrid facts={[...facts(netInfo), ...tls]} />
-      )}
+      {node.online ? null : <NextStep node={node} />}
+      <Report node={node} preview={preview} tls={tls} />
       {netInfo === undefined && tls.length > 0 ? <FactGrid facts={tls} /> : null}
       {preview || others.length === 0 ? null : <OtherRegions regions={others} />}
     </Section>
+  );
+}
+
+/**
+ * The client's network report: what a connected machine says now, or, on Diagnostics, the last
+ * thing a disconnected one said, under its next step. A connected machine that has not sent one yet
+ * says so; a disconnected one leaves the card to its next step.
+ */
+function Report({
+  node,
+  preview,
+  tls,
+}: {
+  readonly node: Node;
+  readonly preview: boolean;
+  readonly tls: readonly Fact[];
+}): ReactElement | null {
+  const { netInfo } = node;
+
+  if (netInfo === undefined) {
+    return node.online ? (
+      <SectionEmpty
+        title="No network report yet"
+        description="The client sends one when it connects: its home relay, the link it is on and how it gets through NAT."
+      />
+    ) : null;
+  }
+
+  if (node.online) {
+    return <FactGrid facts={[...facts(netInfo), ...tls]} />;
+  }
+
+  return preview ? null : (
+    <>
+      <p className="border-t border-kumo-line px-4 pt-3 text-xs text-kumo-subtle">Last report</p>
+      <FactGrid facts={facts(netInfo)} />
+    </>
+  );
+}
+
+/**
+ * What brings a machine that is not connected back, by why it is not: a stopped or signed-out
+ * client rejoins with the join command's sign-in half (the same flags, so `tailscale up` does not
+ * refuse over one left out), an expired key signs in again, and a suspended or unapproved machine
+ * waits on an administrator, which no command on the machine changes.
+ */
+function NextStep({ node }: { readonly node: Node }): ReactElement {
+  const name = nodeName(node);
+  const status = nodeStatus(node);
+
+  if (status === "suspended") {
+    return (
+      <Guide
+        title={`${name} is suspended`}
+        description="It stays off the tailnet until an administrator resumes it from the danger zone in its settings."
+        action={
+          <LinkButton href={`/machines/${node.id}/settings`} variant="secondary" size="sm">
+            Open settings
+          </LinkButton>
+        }
+      />
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <Guide
+        title={`${name} is waiting for approval`}
+        description="It joins the tailnet as soon as an administrator approves it."
+      />
+    );
+  }
+
+  if (status === "expired") {
+    return (
+      <Guide
+        title={`Sign ${name} in again`}
+        description="Its key has expired. Run this on the machine to sign in again; a tagged machine signs in with a new pre-auth key, given as --authkey, instead."
+        command={`${signInCommand()} --force-reauth`}
+      />
+    );
+  }
+
+  return (
+    <Guide
+      title={`Reconnect ${name}`}
+      description="If Tailscale is stopped or signed out on the machine, run this there, with sudo on Linux and macOS. It rejoins as the same machine."
+      command={signInCommand()}
+    />
+  );
+}
+
+/** The next step as the Mesh node page states it: a centred title and sentence, then the command. */
+function Guide({
+  title,
+  description,
+  command,
+  action,
+}: {
+  readonly title: string;
+  readonly description: string;
+  readonly command?: string;
+  readonly action?: ReactElement;
+}): ReactElement {
+  return (
+    <div className="flex flex-col items-center gap-4 px-4 py-8 text-center">
+      <div className="flex max-w-[60ch] flex-col gap-1 text-pretty">
+        <h3 className="text-lg font-semibold text-kumo-default">{title}</h3>
+        <p className="text-kumo-subtle">{description}</p>
+      </div>
+      {command === undefined ? null : (
+        <CommandBox command={command} wrap className="w-full max-w-2xl text-left" />
+      )}
+      {action}
+    </div>
   );
 }
 
