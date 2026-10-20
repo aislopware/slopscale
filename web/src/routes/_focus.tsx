@@ -1,9 +1,6 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-import { ApiError } from "~/api/error.ts";
-import type { Me } from "~/auth/me.ts";
-import { meQuery } from "~/auth/me.ts";
-import { redirectFor } from "~/components/layout/nav.ts";
+import { requireSignIn } from "~/auth/guard.ts";
 
 /**
  * Pages that take the whole screen, without the sidebar and the top bar: the Mesh "Add node"
@@ -12,26 +9,6 @@ import { redirectFor } from "~/components/layout/nav.ts";
  * the page it was opened from; each page draws its own focused chrome.
  */
 export const Route = createFileRoute("/_focus")({
-  beforeLoad: async ({ context, location }): Promise<{ me: Me }> => {
-    let me: Me;
-
-    try {
-      me = await context.queryClient.query({ ...meQuery, staleTime: "static" });
-    } catch (error) {
-      if (error instanceof ApiError && error.unauthorized) {
-        throw redirect({ to: "/login", search: { redirect: location.href } });
-      }
-
-      throw error;
-    }
-
-    const elsewhere = redirectFor(me, location.pathname);
-
-    if (elsewhere !== null) {
-      throw redirect({ to: elsewhere, replace: true });
-    }
-
-    return { me };
-  },
+  beforeLoad: requireSignIn,
   component: Outlet,
 });

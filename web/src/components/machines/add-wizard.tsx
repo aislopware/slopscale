@@ -8,10 +8,10 @@ import type { ReactElement } from "react";
 import { nodesQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
+import { FocusedFlow } from "~/components/layout/focused-flow.tsx";
 import { DoneStep } from "~/components/machines/add-done-step.tsx";
 import { OwnerStep } from "~/components/machines/add-owner-step.tsx";
 import { Folded, StepCard } from "~/components/machines/add-step-card.tsx";
-import { FocusedFlow } from "~/components/machines/focused-flow.tsx";
 import { JoinCommand } from "~/components/machines/join-command.tsx";
 import { nodeName } from "~/lib/node.ts";
 

@@ -4,8 +4,8 @@ import type { ReactElement } from "react";
 
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import { can, canListUsers } from "~/auth/me.ts";
+import { FocusedFlow } from "~/components/layout/focused-flow.tsx";
 import { AddMachineWizard } from "~/components/machines/add-wizard.tsx";
-import { FocusedFlow } from "~/components/machines/focused-flow.tsx";
 import { cardClass } from "~/components/ui/card.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 

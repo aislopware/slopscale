@@ -66,7 +66,7 @@ function MachinePage(): ReactElement {
           <aside
             aria-label="Machine details"
             className={cn(
-              "flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--app-header-height,0px)+59px+1rem)]",
+              "flex min-w-0 flex-col gap-4 lg:sticky lg:top-[calc(var(--app-header-height,0px)+1rem)]",
               tab === "overview" && "max-lg:order-first",
             )}
           >

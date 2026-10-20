@@ -1,16 +1,14 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { CheckIcon, TerminalWindowIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { TabBar } from "~/components/layout/tab-bar.tsx";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { FullBleed } from "~/components/ui/page.tsx";
-import { AppLink } from "~/lib/link.tsx";
 
 /** The machine page's tabs, each an address of its own under the machine's. */
 export const machineTabs = ["overview", "routes", "diagnostics", "settings"] as const;
@@ -35,10 +33,8 @@ function tabHref(nodeId: string, tab: MachineTab): string {
 }
 
 /**
- * The machine page's bar under the top bar, as a Zero Trust detail page draws it: Kumo's segmented
- * Tabs on the left, one link per tab so each is an address, and what can be done to the machine on
- * the right. It spans the page edge to edge with a rule under it and stays put while the tab
- * scrolls; on a phone the actions wrap under the tabs and the bar scrolls away with the page.
+ * The machine page's bar under the top bar, as a Zero Trust detail page draws it: the `TabBar` with
+ * one tab per address under the machine, and what can be done to the machine on the right.
  */
 export function MachineTabBar({
   node,
@@ -52,28 +48,22 @@ export function MachineTabBar({
   readonly tab: MachineTab;
 }): ReactElement {
   return (
-    <FullBleed className="-mt-8 grid grid-cols-subgrid border-b border-kumo-line bg-kumo-canvas md:sticky md:top-(--app-header-height,0px) md:z-5">
-      <nav
-        aria-label="Machine"
-        className="col-start-2 flex min-h-[58px] min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5"
-      >
-        <Tabs
-          variant="segmented"
-          value={tab}
-          tabs={machineTabs.map((value) => ({
-            value,
-            label: tabLabels[value],
-            nativeButton: false,
-            render: <AppLink href={tabHref(node.id, value)} />,
-          }))}
-        />
-        <div className="flex max-w-full flex-wrap items-center gap-2">
+    <TabBar
+      label="Machine"
+      value={tab}
+      tabs={machineTabs.map((value) => ({
+        value,
+        label: tabLabels[value],
+        href: tabHref(node.id, value),
+      }))}
+      actions={
+        <>
           <SSHButton node={node} me={me} />
           <MachineMenu node={node} me={me} users={users} labelled hideDestructive />
           {!node.approved && can(me, "devices:core") ? <ApproveButton node={node} /> : null}
-        </div>
-      </nav>
-    </FullBleed>
+        </>
+      }
+    />
   );
 }
 

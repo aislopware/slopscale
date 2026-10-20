@@ -1,14 +1,10 @@
-import { LinkButton } from "@cloudflare/kumo/components/button";
-import { Tabs } from "@cloudflare/kumo/components/tabs";
-import { BookOpenTextIcon } from "@phosphor-icons/react";
 import { Outlet, useRouteContext, useRouterState } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Me } from "~/auth/me.ts";
 import type { NavChild, NavItem, NavPath } from "~/components/layout/nav.ts";
 import { visibleGroups } from "~/components/layout/nav.ts";
-import { docsUrl } from "~/lib/docs.ts";
-import { AppLink } from "~/lib/link.tsx";
+import { TabBar } from "~/components/layout/tab-bar.tsx";
 
 /** The branch of the sidebar at `area`, as far as the caller may see it. */
 function branchOf(me: Me, area: NavPath): NavItem | undefined {
@@ -25,15 +21,10 @@ function pageOf(children: readonly NavChild[], pathname: string): NavChild | und
 }
 
 /**
- * The Zero Trust sub-navigation bar (design spec §13.2, §13.15.2): a sticky 53px bar under the top
- * bar with the branch's pages as a 36px segmented Kumo `Tabs` track, each tab a link to its own
- * address, and the branch's documentation on the right. It shows on the branch's own pages only; a
- * detail or form page under one (a rule, a new key) has its breadcrumbs and its own header instead.
- * The sidebar keeps its sub-menus, so the bar is a second way, not the only one.
- *
- * It spans the page edge to edge and lines its tabs up with the page's column. While it is on the
- * page, the page grid raises `--app-header-height` by its height (see `pageGridClass`), so the
- * sticky toolbars, rails and banners inside the page come to rest under it, not behind it.
+ * A sidebar branch's sub-navigation: the `TabBar` with the branch's pages as its tabs and the
+ * branch's documentation on the right. It shows on the branch's own pages only; a detail or form
+ * page under one (a rule, a new key) has its breadcrumbs and its own header instead. The sidebar
+ * keeps its sub-menus, so the bar is a second way, not the only one.
  */
 export function AreaSubNav({
   me,
@@ -52,39 +43,14 @@ export function AreaSubNav({
   }
 
   return (
-    <nav
-      data-full-bleed
-      data-sub-nav
-      aria-label={branch.label}
-      className="sticky top-(--app-bar-height,0px) z-10 -mt-8 border-b border-kumo-line bg-kumo-canvas"
-    >
-      <div className="grid grid-cols-[minmax(var(--page-padding-x),1fr)_minmax(0,var(--page-max-width))_minmax(var(--page-padding-x),1fr)]">
-        <div className="col-start-2 flex h-[52px] min-w-0 items-center justify-between gap-3">
-          <Tabs
-            variant="segmented"
-            className="min-w-0"
-            value={current.to}
-            tabs={children.map((child) => ({
-              value: child.to,
-              label: child.label,
-              render: <AppLink href={child.to} />,
-              nativeButton: false,
-            }))}
-          />
-          {branch.docs === undefined ? null : (
-            <LinkButton
-              variant="secondary"
-              href={docsUrl(branch.docs)}
-              external
-              icon={<BookOpenTextIcon aria-hidden />}
-              className="shrink-0 max-md:hidden"
-            >
-              {`${branch.label} documentation`}
-            </LinkButton>
-          )}
-        </div>
-      </div>
-    </nav>
+    <TabBar
+      label={branch.label}
+      value={current.to}
+      tabs={children.map((child) => ({ value: child.to, label: child.label, href: child.to }))}
+      {...(branch.docs === undefined
+        ? {}
+        : { docs: { path: branch.docs, label: `${branch.label} documentation` } })}
+    />
   );
 }
 
