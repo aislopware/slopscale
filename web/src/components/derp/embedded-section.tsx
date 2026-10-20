@@ -23,7 +23,8 @@ import { Code } from "~/components/ui/code.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Section } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
 import { Note, Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -161,51 +162,54 @@ export function EmbeddedSection({
   }
 
   return (
-    <Section
-      title="Embedded relay"
-      description="The relay this server runs on its own URL, so there is always one next to the control server."
-      bodyClassName="p-0"
-      {...(canEdit && canRun
-        ? {
-            actions: (
-              <Button
-                variant="secondary"
-                icon={PencilSimpleIcon}
-                onClick={() => {
-                  setEditing(true);
-                }}
-              >
-                Edit details
-              </Button>
-            ),
-          }
-        : {})}
-    >
-      <SectionRow className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="font-medium text-kumo-strong">Run the embedded relay</span>
-          <p className="max-w-prose text-kumo-subtle">
-            {canRun ? (
+    <>
+      <SettingsCard>
+        <SettingsRow
+          title="Run the embedded relay"
+          description={
+            canRun ? (
               "Serves DERP on the server URL and STUN on its own UDP port. Turning it off moves the machines using it to the next closest relay."
             ) : (
               <>
                 The server has no relay key. Set <Code>derp.server.private_key_path</Code> in the
                 config file and restart.
               </>
-            )}
-          </p>
-        </div>
-        <span className="flex h-lh shrink-0 items-center">
-          <Switch
-            aria-label="Run the embedded relay"
-            checked={server.enabled}
-            disabled={!canEdit || !canRun || pending}
-            transitioning={pending}
-            onCheckedChange={toggle}
-          />
-        </span>
-      </SectionRow>
-      <DefinitionList items={facts(derp)} />
+            )
+          }
+          control={
+            <Switch
+              aria-label="Run the embedded relay"
+              checked={server.enabled}
+              disabled={!canEdit || !canRun || pending}
+              transitioning={pending}
+              onCheckedChange={toggle}
+            />
+          }
+        />
+      </SettingsCard>
+      <Section
+        title="Details"
+        description="The relay this server runs on its own URL, so there is always one next to the control server."
+        bodyClassName="p-0"
+        {...(canEdit && canRun
+          ? {
+              actions: (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={PencilSimpleIcon}
+                  onClick={() => {
+                    setEditing(true);
+                  }}
+                >
+                  Edit details
+                </Button>
+              ),
+            }
+          : {})}
+      >
+        <DefinitionList items={facts(derp)} />
+      </Section>
       <DialogRoot open={editing} onOpenChange={setEditing}>
         <DialogContent
           size="base"
@@ -221,7 +225,7 @@ export function EmbeddedSection({
           />
         </DialogContent>
       </DialogRoot>
-    </Section>
+    </>
   );
 }
 

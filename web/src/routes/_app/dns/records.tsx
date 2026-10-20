@@ -6,7 +6,7 @@ import { dnsQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { useDnsMutations } from "~/components/dns/mutations.ts";
 import { ExtraRecordsSection } from "~/components/dns/records-section.tsx";
-import { SourceBanner } from "~/components/dns/source.tsx";
+import { DnsSourceActions } from "~/components/dns/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/dns/records")({
@@ -28,11 +28,9 @@ function RecordsPage(): ReactElement {
         title="Extra records"
         docs="ref/dns"
         description="Names the server answers itself, on top of the ones MagicDNS gives every machine."
+        actions={<DnsSourceActions dns={dns.data} canEdit={canEdit} mutations={mutations} />}
       />
-      <div className="flex flex-col gap-6">
-        <SourceBanner dns={dns.data} canEdit={canEdit} mutations={mutations} />
-        <ExtraRecordsSection dns={dns.data} canEdit={canEdit} mutations={mutations} />
-      </div>
+      <ExtraRecordsSection dns={dns.data} canEdit={canEdit} mutations={mutations} />
     </>
   );
 }

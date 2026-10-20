@@ -14,16 +14,16 @@ import {
   urlError,
   withAutoUpdate,
   withFrequency,
-  withUrl,
+  withUrls,
   withoutUrl,
 } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { EntryList } from "~/components/dns/entry-list.tsx";
-import { ValueDialog } from "~/components/dns/value-dialog.tsx";
-import { SettingRow } from "~/components/settings/setting-row.tsx";
+import { StagedAddPanel } from "~/components/dns/staged-add-panel.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 
 /** The maps the server fetches and merges, and how often. */
@@ -41,92 +41,103 @@ export function SourcesSection({
   const pending = mutations.set.isPending;
 
   return (
-    <Section
-      title="Map sources"
-      description="Maps of relays, fetched and merged in order. A later map's region replaces an earlier one with the same id."
-      bodyClassName="p-0"
-      {...(canEdit
-        ? {
-            actions: (
-              <>
-                <Button
-                  variant="ghost"
-                  icon={ArrowsClockwiseIcon}
-                  loading={mutations.refresh.isPending}
-                  onClick={() => {
-                    mutations.refresh.mutate({});
-                  }}
-                >
-                  Refetch now
-                </Button>
-                <Button
-                  variant="secondary"
-                  icon={PlusIcon}
-                  onClick={() => {
-                    setAdding(true);
-                  }}
-                >
-                  Add map URL
-                </Button>
-              </>
-            ),
-          }
-        : {})}
-    >
-      <EntryList
-        canEdit={canEdit}
-        pending={pending}
-        empty={{
-          title: "No map URLs",
-          description: "Only the relays below and the config file's map files are served.",
-        }}
-        entries={settings.urls.map((url) => ({
-          key: url,
-          value: <UrlText url={url} />,
-          aside:
-            url === tailscaleMapUrl ? (
-              <span className="text-xs text-kumo-subtle">Tailscale</span>
-            ) : undefined,
-          menuLabel: `Actions for map URL ${url}`,
-          onRemove: () => {
-            mutations.apply(withoutUrl(settings, url), `Removed ${url}`);
-          },
-        }))}
-      />
-      {derp.paths.length === 0 ? null : (
-        <SectionRow className="flex flex-col gap-1">
-          <span className="font-medium text-kumo-strong">Map files</span>
-          <p className="max-w-prose text-kumo-subtle">
-            Merged after the URLs, from <Code>derp.paths</Code> in the config file.
-          </p>
-          <ul className="flex flex-col gap-0.5 font-mono text-sm">
-            {derp.paths.map((path) => (
-              <li key={path}>{path}</li>
-            ))}
-          </ul>
-        </SectionRow>
-      )}
-      <RefetchRow derp={derp} canEdit={canEdit} mutations={mutations} />
-      <ValueDialog
-        open={adding}
-        onOpenChange={setAdding}
-        title="Add map URL"
-        description="A DERP map in Tailscale's JSON format."
-        label="Map URL"
-        placeholder={tailscaleMapUrl}
-        validate={urlError}
-        successMessage="Map URL added"
-        mutation={mutations.set}
-        onSubmit={(value, done) => {
-          mutations.set.mutate({ body: withUrl(settings, value) }, { onSuccess: done });
-        }}
-      />
-    </Section>
+    <>
+      {adding ? (
+        <StagedAddPanel
+          title="Add map URLs"
+          description="Each a DERP map in Tailscale's JSON format, merged after the ones already listed."
+          label="Map URL"
+          placeholder={tailscaleMapUrl}
+          validate={urlError}
+          existing={settings.urls}
+          successMessage={(count) => (count === 1 ? "Map URL added" : `${count} map URLs added`)}
+          mutation={mutations.set}
+          onClose={() => {
+            setAdding(false);
+          }}
+          onSubmit={(values, done) => {
+            mutations.set.mutate({ body: withUrls(settings, values) }, { onSuccess: done });
+          }}
+        />
+      ) : null}
+      <Section
+        title="Map sources"
+        description="Maps of relays, fetched and merged in order. A later map's region replaces an earlier one with the same id."
+        bodyClassName="p-0"
+        {...(canEdit
+          ? {
+              actions: (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={ArrowsClockwiseIcon}
+                    loading={mutations.refresh.isPending}
+                    onClick={() => {
+                      mutations.refresh.mutate({});
+                    }}
+                  >
+                    Refetch now
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={PlusIcon}
+                    disabled={adding}
+                    onClick={() => {
+                      setAdding(true);
+                    }}
+                  >
+                    Add map URL
+                  </Button>
+                </>
+              ),
+            }
+          : {})}
+      >
+        <EntryList
+          canEdit={canEdit}
+          pending={pending}
+          empty={{
+            title: "No map URLs",
+            description: "Only the relays below and the config file's map files are served.",
+          }}
+          entries={settings.urls.map((url) => ({
+            key: url,
+            value: <UrlText url={url} />,
+            aside:
+              url === tailscaleMapUrl ? (
+                <span className="text-xs text-kumo-subtle">Tailscale</span>
+              ) : undefined,
+            menuLabel: `Actions for map URL ${url}`,
+            onRemove: () => {
+              mutations.apply(withoutUrl(settings, url), `Removed ${url}`);
+            },
+          }))}
+        />
+        {derp.paths.length === 0 ? null : (
+          <SectionRow className="flex flex-col gap-1">
+            <span className="font-medium text-kumo-strong">Map files</span>
+            <p className="max-w-prose text-kumo-subtle">
+              Merged after the URLs, from <Code>derp.paths</Code> in the config file.
+            </p>
+            <ul className="flex flex-col gap-0.5 font-mono text-sm">
+              {derp.paths.map((path) => (
+                <li key={path}>{path}</li>
+              ))}
+            </ul>
+          </SectionRow>
+        )}
+      </Section>
+      <SettingsCard>
+        <RefetchRows derp={derp} canEdit={canEdit} mutations={mutations} />
+      </SettingsCard>
+    </>
   );
 }
 
 /** Whether the map URLs are fetched again on a schedule, and how often. */
-function RefetchRow({
+function RefetchRows({
   derp,
   canEdit,
   mutations,
@@ -144,7 +155,7 @@ function RefetchRow({
 
   return (
     <>
-      <SettingRow
+      <SettingsRow
         title="Refetch on a schedule"
         description={
           <>
@@ -172,7 +183,7 @@ function RefetchRow({
           />
         }
       />
-      <SettingRow
+      <SettingsRow
         title="Refetch interval"
         description="How long between two fetches while the schedule is on."
         control={

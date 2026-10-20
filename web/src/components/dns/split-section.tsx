@@ -7,6 +7,7 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { DnsSettings } from "~/api/schema.gen.ts";
+import { ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import {
   domainError,
   nameserversError,
@@ -24,7 +25,7 @@ import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
-import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 interface Editing {
@@ -43,18 +44,18 @@ export function SplitDnsSection({
 }): ReactElement {
   const [dialog, setDialog] = useState<"closed" | "new" | Editing>("closed");
   const entries = splitEntries(settings);
-  const pending = mutations.set.isPending;
 
   return (
     <Section
       title="Split DNS"
       description="Every machine in the tailnet resolves these domains through the resolvers you name here."
-      bodyClassName="p-0"
+      panel={false}
       {...(canEdit
         ? {
             actions: (
               <Button
                 variant="secondary"
+                size="sm"
                 icon={PlusIcon}
                 onClick={() => {
                   setDialog("new");
@@ -66,62 +67,36 @@ export function SplitDnsSection({
           }
         : {})}
     >
-      {entries.length === 0 ? (
-        <SectionEmpty
-          title="No split DNS domains"
-          description="Every domain is answered by the global nameservers."
-        />
-      ) : (
-        entries.map(([domain, servers]) => (
-          <SectionRow key={domain} className="flex items-center justify-between gap-4 py-2.5">
-            <div className="grid min-w-0 flex-1 gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-              <span className="flex min-w-0">
-                <Domain domain={domain} />
-              </span>
-              <span className="min-w-0 font-mono text-sm break-all text-kumo-subtle">
-                {servers.join(", ")}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <ExitNodeToggle
-                name={domain}
-                checked={splitKeptWithExitNode(settings, domain)}
-                disabled={!canEdit || pending}
-                reason={canEdit ? undefined : "Your credentials cannot change DNS"}
-                pending={pending}
-                onChange={(on) => {
-                  mutations.apply(
-                    withSplitUseWithExitNode(settings, domain, on),
-                    `${domain} ${on ? "will be used" : "will not be used"} with an exit node`,
-                  );
-                }}
-              />
-              {canEdit ? (
-                <RowMenu label={`Actions for split DNS ${domain}`} disabled={pending}>
-                  <DropdownMenu.Item
-                    icon={PencilSimpleIcon}
-                    onClick={() => {
-                      setDialog({ domain, servers });
-                    }}
-                  >
-                    Edit…
-                  </DropdownMenu.Item>
-                  <DropdownMenu.Separator />
-                  <DropdownMenu.Item
-                    icon={TrashIcon}
-                    variant="danger"
-                    onClick={() => {
-                      mutations.apply(withoutSplit(settings, domain), `Removed ${domain}`);
-                    }}
-                  >
-                    Remove
-                  </DropdownMenu.Item>
-                </RowMenu>
-              ) : null}
-            </div>
-          </SectionRow>
-        ))
-      )}
+      <ListTable
+        columns={[
+          { key: "domain", label: "Domain", className: "w-[30%]" },
+          { key: "servers", label: "Nameservers" },
+          { key: "exit", label: "Exit node", className: "w-56" },
+        ]}
+        actions={canEdit}
+        empty={
+          entries.length === 0 ? (
+            <SectionEmpty
+              title="No split DNS domains"
+              description="Every domain is answered by the global nameservers."
+            />
+          ) : null
+        }
+      >
+        {entries.map(([domain, servers]) => (
+          <SplitRow
+            key={domain}
+            domain={domain}
+            servers={servers}
+            settings={settings}
+            canEdit={canEdit}
+            mutations={mutations}
+            onEdit={() => {
+              setDialog({ domain, servers });
+            }}
+          />
+        ))}
+      </ListTable>
       <DialogRoot
         open={dialog !== "closed"}
         onOpenChange={(open) => {
@@ -260,5 +235,71 @@ function SplitForm({
         disabled={cleanDomain === "" || list.length === 0}
       />
     </form>
+  );
+}
+
+/** One split DNS domain: its resolvers, whether an exit node keeps them, and its menu. */
+function SplitRow({
+  domain,
+  servers,
+  settings,
+  canEdit,
+  mutations,
+  onEdit,
+}: {
+  readonly domain: string;
+  readonly servers: readonly string[];
+  readonly settings: DnsSettings;
+  readonly canEdit: boolean;
+  readonly mutations: DnsMutations;
+  readonly onEdit: () => void;
+}): ReactElement {
+  const pending = mutations.set.isPending;
+
+  return (
+    <ListRow>
+      <ListCell>
+        <span className="flex min-w-0">
+          <Domain domain={domain} />
+        </span>
+      </ListCell>
+      <ListCell className="font-mono text-sm break-all text-kumo-subtle">
+        {servers.join(", ")}
+      </ListCell>
+      <ListCell>
+        <ExitNodeToggle
+          name={domain}
+          checked={splitKeptWithExitNode(settings, domain)}
+          disabled={!canEdit || pending}
+          reason={canEdit ? undefined : "Your credentials cannot change DNS"}
+          pending={pending}
+          onChange={(on) => {
+            mutations.apply(
+              withSplitUseWithExitNode(settings, domain, on),
+              `${domain} ${on ? "will be used" : "will not be used"} with an exit node`,
+            );
+          }}
+        />
+      </ListCell>
+      {canEdit ? (
+        <ListCell actions>
+          <RowMenu label={`Actions for split DNS ${domain}`} disabled={pending}>
+            <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
+              Edit…
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item
+              icon={TrashIcon}
+              variant="danger"
+              onClick={() => {
+                mutations.apply(withoutSplit(settings, domain), `Removed ${domain}`);
+              }}
+            >
+              Remove
+            </DropdownMenu.Item>
+          </RowMenu>
+        </ListCell>
+      ) : null}
+    </ListRow>
   );
 }

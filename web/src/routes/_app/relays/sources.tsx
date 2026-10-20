@@ -5,7 +5,11 @@ import type { ReactElement } from "react";
 import { derpQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { useDerpMutations } from "~/components/derp/mutations.ts";
-import { FetchErrorBanner, SourceBanner, StaleSettingsBanner } from "~/components/derp/source.tsx";
+import {
+  DerpSourceActions,
+  FetchErrorBanner,
+  StaleSettingsBanner,
+} from "~/components/derp/source.tsx";
 import { SourcesSection } from "~/components/derp/sources-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -28,13 +32,11 @@ function SourcesPage(): ReactElement {
         title="Sources"
         docs="ref/derp"
         description="The map URLs and files the map is built from, and how often they are fetched again."
+        actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}
       />
-      <div className="flex flex-col gap-6">
-        <StaleSettingsBanner mutations={mutations} />
-        <SourceBanner derp={derp} canEdit={canEdit} mutations={mutations} />
-        <FetchErrorBanner derp={derp} />
-        <SourcesSection derp={derp} canEdit={canEdit} mutations={mutations} />
-      </div>
+      <StaleSettingsBanner mutations={mutations} />
+      <FetchErrorBanner derp={derp} />
+      <SourcesSection derp={derp} canEdit={canEdit} mutations={mutations} />
     </>
   );
 }

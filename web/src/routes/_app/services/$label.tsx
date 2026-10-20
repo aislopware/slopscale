@@ -15,12 +15,11 @@ import {
 } from "~/components/services/model.ts";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
-import { DefinitionList } from "~/components/ui/definition-list.tsx";
-import type { Definition } from "~/components/ui/definition-list.tsx";
+import { KeyValueList } from "~/components/ui/definition-list.tsx";
+import type { KeyValue } from "~/components/ui/definition-list.tsx";
 import { RouteNotFound } from "~/components/ui/error-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Section } from "~/components/ui/section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 import { isIpv4 } from "~/lib/ip.ts";
 
@@ -54,16 +53,19 @@ function ServicePage(): ReactElement {
   return (
     <>
       <ServiceHeader service={service} me={me} />
-      <div className="grid grid-cols-1 items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
+      {/* Zero Trust's detail layout: the cards in the main column, a 260px details rail beside them
+          that stays in view while the hosts scroll. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_260px] xl:gap-6">
         <HostsSection
           service={service}
           services={services}
           nodes={nodes.data?.nodes ?? emptyNodes}
           me={me}
         />
-        <Section title="Details">
-          <DefinitionList items={details(service)} />
-        </Section>
+        <aside className="flex flex-col gap-2 lg:sticky lg:top-[calc(var(--app-header-height,0px)+1rem)]">
+          <h2 className="text-base font-medium text-kumo-default">Details</h2>
+          <KeyValueList items={details(service)} className="border-t border-kumo-line px-0" />
+        </aside>
       </div>
     </>
   );
@@ -82,6 +84,7 @@ function ServiceHeader({
   return (
     <PageHeader
       title={serviceTitle(service)}
+      docs="ref/services"
       meta={
         <>
           <Badge tone={tone}>{label}</Badge>
@@ -109,15 +112,21 @@ function ServiceHeader({
 }
 
 /** The facts about the service: what it is called, where it answers and what it was told to say. */
-function details(service: Service): Definition[] {
-  const items: Definition[] = [
-    { key: "name", label: "Name", value: service.name, copy: service.name },
+function details(service: Service): KeyValue[] {
+  const items: KeyValue[] = [
+    {
+      key: "name",
+      label: "Name",
+      value: <span className="font-mono">{service.name}</span>,
+      copy: service.name,
+      copyLabel: "Copy service name",
+    },
     {
       key: "dnsName",
       label: "DNS name",
       ...(service.dnsName === ""
         ? { value: <span className="text-kumo-subtle">No base domain</span> }
-        : { value: service.dnsName, copy: service.dnsName }),
+        : { value: service.dnsName, copy: service.dnsName, copyLabel: "Copy DNS name" }),
     },
   ];
 
@@ -125,8 +134,9 @@ function details(service: Service): Definition[] {
     items.push({
       key: address,
       label: isIpv4(address) ? "IPv4" : "IPv6",
-      value: address,
+      value: <span className="font-mono">{address}</span>,
       copy: address,
+      copyLabel: `Copy ${address}`,
     });
   }
 
