@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { useState } from "react";
@@ -12,7 +11,7 @@ import type { AccessMutations } from "~/components/access/mutations.ts";
 import { groupItems, postureItems } from "~/components/access/pickers.ts";
 import { ProtocolFields } from "~/components/access/protocol-fields.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DateTimeField } from "~/components/ui/date-time-field.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
@@ -331,7 +330,7 @@ export function DeleteRuleDialog({
   }
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="rule"

@@ -233,7 +233,6 @@ function InviteForm({
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button
           type="submit"
           variant="primary"
@@ -242,6 +241,7 @@ function InviteForm({
         >
           Send invitation
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

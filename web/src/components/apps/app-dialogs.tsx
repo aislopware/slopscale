@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Input } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
@@ -18,6 +17,7 @@ import type { AppMutations } from "~/components/apps/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import { Code } from "~/components/ui/code.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { ListField } from "~/components/ui/list-field.tsx";
 import { TagField } from "~/components/ui/tag-field.tsx";
@@ -202,7 +202,7 @@ export function DeleteAppDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="app"

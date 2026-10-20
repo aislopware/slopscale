@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
@@ -9,6 +8,7 @@ import { errorMessage } from "~/api/error.ts";
 import type { Webhook } from "~/api/queries.ts";
 import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -252,7 +252,6 @@ export function RotateSecretDialog({
           <div className="flex flex-col gap-4">
             <DialogError message={rotate.isError ? errorMessage(rotate.error) : undefined} />
             <DialogFooter>
-              <DialogClose render={<Button variant="secondary">Cancel</Button>} />
               <Button
                 variant="primary"
                 loading={rotate.isPending}
@@ -269,6 +268,7 @@ export function RotateSecretDialog({
               >
                 Rotate secret
               </Button>
+              <DialogClose render={<Button variant="secondary">Cancel</Button>} />
             </DialogFooter>
           </div>
         ) : (
@@ -299,7 +299,7 @@ export function DeleteWebhookDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="webhook"

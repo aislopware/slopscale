@@ -125,10 +125,10 @@ function CreateOAuthClientForm({
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
       <DialogFooter submitDisabled={!canSubmit || create.isPending}>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" disabled={!canSubmit} loading={create.isPending}>
           Create client
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

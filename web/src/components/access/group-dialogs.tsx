@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
@@ -12,6 +11,7 @@ import { isSynced, rulesUsingGroup } from "~/components/access/model.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
 import { nodeItems, userItems } from "~/components/access/pickers.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -241,10 +241,10 @@ export function DeleteGroupDialog({
             message={deleteGroup.isError ? errorMessage(deleteGroup.error) : undefined}
           />
           <DialogFooter>
-            <DialogClose render={<Button variant="secondary">Cancel</Button>} />
             <Button variant="destructive" loading={deleteGroup.isPending} onClick={remove}>
               Delete group
             </Button>
+            <DialogClose render={<Button variant="secondary">Cancel</Button>} />
           </DialogFooter>
         </DialogContent>
       </DialogRoot>
@@ -252,7 +252,7 @@ export function DeleteGroupDialog({
   }
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="group"

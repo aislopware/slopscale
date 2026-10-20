@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
   ArrowsClockwiseIcon,
@@ -10,7 +9,7 @@ import {
 import { useState } from "react";
 import type { ReactElement } from "react";
 
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 
@@ -205,7 +204,7 @@ export function KeyActions({
           }}
         />
       )}
-      <DeleteResource
+      <DeleteDialog
         open={dialog === "delete"}
         onOpenChange={(next) => {
           if (!next) {

@@ -145,10 +145,10 @@ function CreateApiKeyForm({
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" loading={create.isPending}>
           Create API key
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );
@@ -247,10 +247,10 @@ function RotateApiKeyForm({
       />
       <DialogError message={rotate.isError ? errorMessage(rotate.error) : undefined} />
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="destructive" loading={rotate.isPending}>
           Rotate key
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

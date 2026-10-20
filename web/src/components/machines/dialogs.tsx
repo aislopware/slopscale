@@ -1,5 +1,3 @@
-// DeleteResource is exported from the package root only.
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
@@ -10,7 +8,10 @@ import type { Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import type { useNodeMutations } from "~/components/machines/mutations.ts";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import {
+  ConfirmDialog,
+  DeleteDialog as DeleteResourceDialog,
+} from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -46,10 +47,10 @@ export function FormFooter({
     // Enter in a text input presses the hidden submitter, so it holds what the visible button does:
     // a form nobody can submit by button is not one Enter can submit either.
     <DialogFooter submitDisabled={disabled || pending}>
-      <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       <Button type="submit" variant="primary" loading={pending} disabled={disabled}>
         {label}
       </Button>
+      <DialogClose render={<Button variant="secondary">Cancel</Button>} />
     </DialogFooter>
   );
 }
@@ -370,7 +371,7 @@ export function DeleteDialog({
   const { remove } = mutations;
 
   return (
-    <DeleteResource
+    <DeleteResourceDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="machine"

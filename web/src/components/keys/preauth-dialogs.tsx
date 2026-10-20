@@ -167,10 +167,10 @@ function CreatePreAuthKeyForm({
         </p>
       ) : null}
       <DialogFooter>
-        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" loading={create.isPending} disabled={userId === ""}>
           Create key
         </Button>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       </DialogFooter>
     </form>
   );

@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
 import { Input } from "@cloudflare/kumo/components/input";
@@ -24,6 +23,7 @@ import {
 } from "~/components/access/posture-model.ts";
 import type { Weekday } from "~/components/access/posture-model.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -414,7 +414,7 @@ export function DeletePostureDialog({
   }
 
   return (
-    <DeleteResource
+    <DeleteDialog
       open={open}
       onOpenChange={onOpenChange}
       resourceType="posture"
