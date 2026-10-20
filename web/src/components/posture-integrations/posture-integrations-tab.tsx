@@ -7,7 +7,6 @@ import type { ReactElement } from "react";
 import type { PostureIntegration, PostureProvider } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { countIntegrations } from "~/components/posture-integrations/model.ts";
 import { usePostureIntegrationMutations } from "~/components/posture-integrations/mutations.ts";
 import { postureIntegrationColumns } from "~/components/posture-integrations/posture-integration-columns.tsx";
 import { PostureIntegrationDialog } from "~/components/posture-integrations/posture-integration-dialogs.tsx";
@@ -16,7 +15,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export function PostureIntegrationsTab({
   me,
@@ -48,7 +47,6 @@ export function PostureIntegrationsTab({
   });
 
   const total = integrations.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -106,7 +104,6 @@ export function PostureIntegrationsTab({
                 }
               />
             }
-            footer={<TableFooter>{`Showing ${shown} of ${countIntegrations(total)}`}</TableFooter>}
           />
         </TableGroup>
       )}

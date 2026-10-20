@@ -18,10 +18,9 @@ describe(ShellText, () => {
 describe(CommandBox, () => {
   it("shows a wrapped command with the line breaks it was written with", async () => {
     const screen = await render(<CommandBox command={docker} wrap />);
-    const box = screen.getByRole("button", { name: "Copy command" });
+    const code = screen.container.querySelector("code");
 
-    await expect.element(box).toBeVisible();
-    expect(box.element().textContent).toBe(docker);
+    expect(code?.textContent).toBe(docker);
     // A word inherits the code's white space, and the last one may break inside.
     await expect
       .element(screen.getByText("tailscale/tailscale"))
@@ -30,13 +29,29 @@ describe(CommandBox, () => {
 
   it("stays on one line, cut short, when not wrapping", async () => {
     const screen = await render(
-      <div style={{ width: 120 }}>
+      <div style={{ width: 160 }}>
         <CommandBox command="tailscale up --login-server=http://hs.example --authkey=<key>" />
       </div>,
     );
-    const code = screen.getByRole("button", { name: "Copy command" }).element();
+    const code = screen.container.querySelector("code");
 
-    expect(code.getBoundingClientRect().width).toBeLessThanOrEqual(120);
-    expect(code.scrollWidth).toBeLessThanOrEqual(code.clientWidth);
+    expect(code?.getBoundingClientRect().width).toBeLessThanOrEqual(160);
+    expect(code?.getBoundingClientRect().height).toBeLessThan(30);
+  });
+
+  // Design spec §13.14: an install command keeps its copy control in view, not only on hover, so a
+  // touch screen can copy it too.
+  it("shows its copy button without a hover", async () => {
+    const screen = await render(<CommandBox command="tailscale up" />);
+    const button = screen.getByRole("button", { name: "Copy command" });
+
+    await expect.element(button).toBeVisible();
+    expect(getComputedStyle(button.element()).opacity).toBe("1");
+    expect(
+      Array.from(
+        button.element().querySelectorAll("svg"),
+        (icon) => getComputedStyle(icon).opacity,
+      ),
+    ).toStrictEqual(["1"]);
   });
 });

@@ -8,7 +8,6 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { groupColumns, toGroupRows } from "~/components/access/group-columns.tsx";
 import { isBuiltin } from "~/components/access/model.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
@@ -54,7 +53,6 @@ export function GroupsTab({
   });
 
   const own = groups.filter((group) => !isBuiltin(group)).length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -83,13 +81,9 @@ export function GroupsTab({
               }
             />
           }
-          footer={
-            <TableFooter>
-              {own === 0
-                ? "Only the built-in groups."
-                : `Showing ${shown} of ${plural(groups.length, "group")}`}
-            </TableFooter>
-          }
+          // With no groups of the tailnet's own the list is the built-in ones alone, which the band
+          // says instead of a range.
+          footer={own === 0 ? <TableFooter>Only the built-in groups.</TableFooter> : undefined}
         />
       </TableGroup>
     </>

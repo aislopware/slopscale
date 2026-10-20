@@ -12,7 +12,7 @@ import { requestColumns } from "~/components/access/request-columns.tsx";
 import { toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
@@ -107,13 +107,6 @@ function MyAccessPage(): ReactElement {
               title="No requests"
               description={emptyText(me.user !== undefined, options.groups.length > 0)}
             />
-          }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>
-                {rows.length === 1 ? "1 request" : `${rows.length} requests`}
-              </TableFooter>
-            )
           }
         />
       </TableGroup>

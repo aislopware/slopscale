@@ -24,14 +24,39 @@ export const tableClass = cn(
 /**
  * A body row: the base fill, the overlay fill under the pointer and no stripe. Kumo's default row
  * stripes every second row; the `even` modifiers outrank the stripe instead of relying on source
- * order. The row's fill is also handed to a sticky cell through `--kumo-table-row-bg`.
+ * order. The row's fill is also handed to a sticky cell through `--kumo-table-row-bg`. A row whose
+ * checkbox is ticked takes the tint fill, as the dashboard's selected DNS records do, under the
+ * pointer too, so the selection reads while the operator moves down the list.
  */
 export const tableRowClass = cn(
   "bg-kumo-base [--kumo-table-row-bg:var(--color-kumo-base)]",
   "even:bg-kumo-base even:[--kumo-table-row-bg:var(--color-kumo-base)]",
   "hover:bg-kumo-overlay hover:[--kumo-table-row-bg:var(--color-kumo-overlay)]",
   "even:hover:bg-kumo-overlay even:hover:[--kumo-table-row-bg:var(--color-kumo-overlay)]",
+  "has-[[role=checkbox][aria-checked=true]]:bg-kumo-tint! has-[[role=checkbox][aria-checked=true]]:[--kumo-table-row-bg:var(--color-kumo-tint)]!",
 );
+
+/** The breakpoints a column can hide below, `meta.hideBelow`. */
+export type HideBelow = "sm" | "md" | "lg" | "xl" | "2xl";
+
+/**
+ * A column a narrow screen does without, as whole class names so Tailwind finds them. What matters
+ * in it moves to a second line under the row's name (`narrowOnlyClass`), so a state never ends up
+ * as a sliver under the pinned actions column on a phone.
+ */
+export const hideBelowClasses: Readonly<Record<HideBelow, string>> = {
+  sm: "max-sm:hidden",
+  md: "max-md:hidden",
+  lg: "max-lg:hidden",
+  xl: "max-xl:hidden",
+  "2xl": "max-2xl:hidden",
+};
+
+/**
+ * A line under the name that stands in for the columns `hideBelow: "sm"` hides: shown on a phone
+ * only, so the row says its state on one screen width without scrolling.
+ */
+export const narrowOnlyClass = "sm:hidden";
 
 /**
  * A pinned column: Kumo's sticky cell fades its fill over the columns it covers; the dashboard's

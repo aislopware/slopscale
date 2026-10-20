@@ -7,7 +7,7 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { DnsRule, Group } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
-import { ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
+import { AddressList, ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { ConfirmDialog, ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
@@ -65,7 +65,7 @@ export function DnsRulesSection({
           { key: "name", label: "Rule", className: "w-[22%]" },
           { key: "domains", label: "Domains" },
           { key: "servers", label: "Nameservers" },
-          { key: "groups", label: "Groups", className: "w-[18%]" },
+          { key: "groups", label: "Groups", className: "w-[18%] min-w-32" },
         ]}
         actions={canEdit}
         empty={
@@ -161,8 +161,8 @@ function RuleRow({
           ))}
         </span>
       </ListCell>
-      <ListCell className="font-mono text-sm break-all text-kumo-subtle">
-        {rule.nameservers.join(", ")}
+      <ListCell className="font-mono text-sm text-kumo-subtle">
+        <AddressList addresses={rule.nameservers} />
       </ListCell>
       <ListCell>
         <GroupNames ids={rule.groupIds} groups={groups} emptyLabel="No group" />

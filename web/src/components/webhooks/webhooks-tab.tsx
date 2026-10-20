@@ -11,7 +11,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { useWebhookMutations } from "~/components/webhooks/mutations.ts";
 import { webhookColumns } from "~/components/webhooks/webhook-columns.tsx";
 import { WebhookDialog } from "~/components/webhooks/webhook-dialogs.tsx";
@@ -44,7 +44,6 @@ export function WebhooksTab({
   });
 
   const total = webhooks.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -108,11 +107,6 @@ export function WebhooksTab({
                   </Button>
                 }
               />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countWebhooks(total)}`}</TableFooter>
             )
           }
         />

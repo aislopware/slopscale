@@ -12,7 +12,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 
 export interface RulesTabProps {
@@ -51,7 +51,6 @@ export function RulesTab({
   });
 
   const total = rules.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -107,19 +106,10 @@ export function RulesTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countRules(total)}`}</TableFooter>
-            )
-          }
         />
       </TableGroup>
     </>
   );
-}
-
-function countRules(total: number): string {
-  return total === 1 ? "1 rule" : `${total} rules`;
 }
 
 /** What the tailnet does right now, so a disabled last rule is never a surprise. */

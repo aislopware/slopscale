@@ -1,13 +1,21 @@
 /*
  * Kumo owns the design tokens (colours, type scale, radii) and dark mode:
  * every colour is a light-dark() pair switched by `data-mode` on <html>,
- * so nothing here may use Tailwind's `dark:` variant or a raw palette
- * colour. Order matters: Kumo's @theme must be registered before Tailwind.
+ * so console code uses the semantic tokens, never Tailwind's `dark:` variant
+ * or a raw palette colour. Order matters: Kumo's @theme must be registered
+ * before Tailwind.
  */
 @source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
+
+/*
+ * A few Kumo components still colour themselves with `dark:` utilities (the Switch's track and
+ * thumb). Tailwind's own `dark:` follows the operating system's preference, so a console set to
+ * dark on a light system drew light switches; it follows the same `data-mode` the tokens do.
+ */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 /*
  * The type is the Cloudflare dashboard's: Inter with its open 4, flat-top 3 and open 6/9

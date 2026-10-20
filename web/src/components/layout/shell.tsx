@@ -135,7 +135,7 @@ export function Shell({
             <Sidebar.Trigger />
           </Sidebar.Footer>
         </Sidebar>
-        <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas [--app-header-height:58px]">
+        <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas [--app-bar-height:58px] [--app-header-height:58px]">
           {/* 58px like the sidebar's header, so the bottom borders run as one line; sticky toolbars
               and rails come to rest under it through the variable. */}
           <header className="sticky top-0 z-10 flex h-(--app-header-height) shrink-0 items-center justify-between gap-2 border-b border-kumo-line bg-kumo-canvas px-4">

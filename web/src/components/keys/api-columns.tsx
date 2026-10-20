@@ -1,3 +1,4 @@
+import { cn } from "@cloudflare/kumo/utils";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -10,6 +11,7 @@ import { useApiKeyMutations } from "~/components/keys/mutations.ts";
 import { scopeLabel } from "~/components/keys/scopes.ts";
 import { apiKeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { cellSecondaryClass, narrowOnlyClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -27,7 +29,9 @@ export const apiKeyColumns = helper.columns([
     id: "prefix",
     header: "Key",
     enableSorting: true,
-    cell: ({ row }) => <KeyCell apiKey={row.original} />,
+    cell: ({ row, table }) => (
+      <KeyCell apiKey={row.original} users={table.options.meta?.users ?? emptyUsers} />
+    ),
     meta: { className: "min-w-36" },
   }),
   helper.accessor((apiKey) => apiKey.scopes.join(" "), {
@@ -45,7 +49,7 @@ export const apiKeyColumns = helper.columns([
     cell: ({ row, table }) => (
       <UserCell userId={row.original.userId} users={table.options.meta?.users ?? emptyUsers} />
     ),
-    meta: { className: "min-w-40" },
+    meta: { className: "min-w-40", hideBelow: "sm" },
   }),
   helper.accessor((apiKey) => parseTime(apiKey.expiration)?.getTime() ?? 0, {
     id: "expiration",
@@ -53,7 +57,7 @@ export const apiKeyColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <ExpiryCell value={row.original.expiration} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.accessor((apiKey) => parseTime(apiKey.lastSeen)?.getTime() ?? 0, {
     id: "lastSeen",
@@ -89,16 +93,59 @@ export const apiKeyColumns = helper.columns([
   }),
 ]);
 
-/** The masked prefix with the description under it. */
-function KeyCell({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
+/**
+ * The masked prefix with the description under it. On a phone the User and Expires columns are
+ * hidden, so the key says whose it is and when it runs out on a line of its own.
+ */
+function KeyCell({
+  apiKey,
+  users,
+}: {
+  readonly apiKey: ApiKey;
+  readonly users: readonly User[];
+}): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <KeyPrefix text={apiKey.prefix} copy={apiKey.prefix} label="Copy prefix" />
       {apiKey.description === "" ? null : (
-        <span className="truncate text-xs text-kumo-subtle">{apiKey.description}</span>
+        <span className={cellSecondaryClass}>{apiKey.description}</span>
       )}
+      <span className={cn("flex min-w-0 items-center gap-2 pt-0.5 text-sm", narrowOnlyClass)}>
+        <span className="min-w-0 truncate text-kumo-default">
+          {ownerName(apiKey.userId, users) ?? "All access"}
+        </span>
+        <NarrowExpiry apiKey={apiKey} />
+      </span>
     </div>
   );
+}
+
+/** "Expires" before a time still to come; an expired key's badge says it alone. */
+function NarrowExpiry({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
+  if (apiKey.expiration === null) {
+    return <span className="text-kumo-subtle">Never expires</span>;
+  }
+
+  if (apiKeyStatus(apiKey) === "expired") {
+    return <ExpiryCell value={apiKey.expiration} />;
+  }
+
+  return (
+    <span className="flex items-center gap-1 text-kumo-subtle">
+      Expires <ExpiryCell value={apiKey.expiration} />
+    </span>
+  );
+}
+
+/** Whose key it is, by name; null for a key without a user, which acts with all access. */
+function ownerName(userId: string | null, users: readonly User[]): string | null {
+  if (userId === null || userId === "") {
+    return null;
+  }
+
+  const user = users.find((candidate) => candidate.id === userId);
+
+  return user === undefined ? `User ${userId}` : userLabel(user);
 }
 
 /** The scopes by their console names; a key without any acts with its owner's whole role. */
@@ -113,12 +160,11 @@ function UserCell({
   readonly userId: string | null;
   readonly users: readonly User[];
 }): ReactElement {
-  if (userId === null || userId === "") {
+  const name = ownerName(userId, users);
+
+  if (name === null || userId === null) {
     return <span className="text-kumo-subtle">All access</span>;
   }
-
-  const user = users.find((candidate) => candidate.id === userId);
-  const name = user === undefined ? `User ${userId}` : userLabel(user);
 
   return (
     <span className="flex min-w-0 items-center gap-2">

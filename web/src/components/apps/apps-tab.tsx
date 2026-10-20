@@ -11,13 +11,13 @@ import { appColumns } from "~/components/apps/app-columns.tsx";
 import type { AppRow } from "~/components/apps/app-columns.tsx";
 import { AppDialog } from "~/components/apps/app-dialogs.tsx";
 import { useLearnedCounts } from "~/components/apps/learned.ts";
-import { connectorMachineCounts, countApps, totalPendingRoutes } from "~/components/apps/model.ts";
+import { connectorMachineCounts, totalPendingRoutes } from "~/components/apps/model.ts";
 import { useAppMutations } from "~/components/apps/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { FacetChips } from "~/components/ui/facet-chips.tsx";
 import type { Facet } from "~/components/ui/facet-chips.tsx";
@@ -56,7 +56,6 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
   });
 
   const total = apps.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -108,11 +107,6 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
                   </Button>
                 }
               />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countApps(total)}`}</TableFooter>
             )
           }
         />

@@ -16,10 +16,8 @@ import {
   rangeValue,
 } from "~/components/derp/latency-model.ts";
 import type { LatencyMachineRow } from "~/components/derp/latency-model.ts";
-import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
 import { cardClass } from "~/components/ui/card.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
@@ -165,11 +163,6 @@ function RegionsSection({
             description="Machines report their relay latency once they connect."
           />
         }
-        footer={
-          regions.length === 0 ? undefined : (
-            <TableFooter>{`Showing ${plural(regions.length, "region")}`}</TableFooter>
-          )
-        }
       />
     </Section>
   );
@@ -263,11 +256,6 @@ function MachinesSection({ report }: { readonly report: DerpLatencyReport }): Re
             title="No machines reporting"
             description="A machine appears here once its client sends a network report."
           />
-        }
-        footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter>{`Showing ${plural(rows.length, "machine")}`}</TableFooter>
-          )
         }
       />
     </Section>

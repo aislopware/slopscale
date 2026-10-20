@@ -4,8 +4,8 @@ import type { ReactElement, ReactNode } from "react";
 import { plural } from "~/components/overview/plural.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 
-/** The smallest page on offer. A table with fewer rows than this has nothing to page. */
-export const smallestPageSize = 25;
+/** The smallest page on offer: a server-paged list with fewer rows than this has nothing to page. */
+const smallestPageSize = 25;
 
 const enDash = "–";
 
@@ -17,8 +17,8 @@ function rangeText(page: number, pageSize: number, count: number): string {
 }
 
 /**
- * The line under a table that pages, Kumo's Pagination as the dashboard lays it out: "Showing 1-10
- * of 120" in 13px subtle figures, the rows per page, and the joined pager on the right.
+ * The band at a table's foot, Kumo's Pagination as the dashboard lays it out: "Showing 1-10 of 120"
+ * in 13px subtle figures, the rows per page, and the joined pager on the right.
  */
 function Band({ children }: { readonly children: ReactNode }): ReactElement {
   return (
@@ -36,7 +36,12 @@ export interface PagingBandProps {
   readonly setPageSize: (size: number) => void;
 }
 
-/** Paging over rows the browser already holds, so the total is known and every page is reachable. */
+/**
+ * Paging over rows the browser already holds, so the total is known and every page is reachable. It
+ * is the Zero Trust list footer of design spec §13.3: "Showing 1-5 of 5", a divider, "Per page:"
+ * and its select, and the joined pager on the right, the same on a list of five rows as on one of
+ * five hundred, so every list ends the same way. A phone keeps the range and the pager.
+ */
 export function PagingBand({
   page,
   pageSize,
@@ -44,23 +49,15 @@ export function PagingBand({
   setPage,
   setPageSize,
 }: PagingBandProps): ReactElement {
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-
   return (
     <Band>
       <Pagination page={page} perPage={pageSize} totalCount={total} setPage={setPage}>
         <Pagination.Info>
           {() => `Showing ${rangeText(page, pageSize, total)} of ${total}`}
         </Pagination.Info>
-        <Pagination.PageSize
-          className="ml-auto max-sm:hidden"
-          label="Rows per page"
-          value={pageSize}
-          onChange={setPageSize}
-        />
-        {pages > 1 ? (
-          <Pagination.Controls controls="full" pageSelector="input" className="grow-0" />
-        ) : null}
+        <Pagination.Separator className="max-sm:hidden" />
+        <Pagination.PageSize className="max-sm:hidden" value={pageSize} onChange={setPageSize} />
+        <Pagination.Controls controls="full" pageSelector="input" className="ml-auto grow-0" />
       </Pagination>
     </Band>
   );

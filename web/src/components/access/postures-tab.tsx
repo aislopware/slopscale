@@ -12,7 +12,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export interface PosturesTabProps {
   readonly me: Me;
@@ -44,7 +44,6 @@ export function PosturesTab({
     meta: { me, rules, geoIpAvailable },
   });
 
-  const shown = table.getRowModel().rows.length;
   const total = postures.length;
 
   return (
@@ -94,11 +93,6 @@ export function PosturesTab({
                   </Button>
                 }
               />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${total === 1 ? "1 posture" : `${total} postures`}`}</TableFooter>
             )
           }
         />

@@ -1,3 +1,4 @@
+import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -11,6 +12,7 @@ import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
 import { preAuthKeyStatus, statusOrder } from "~/components/keys/status.ts";
 import type { KeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { cellSecondaryClass, narrowOnlyClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
@@ -81,7 +83,7 @@ export const preAuthKeyColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <StatusCell status={preAuthKeyStatus(row.original)} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.accessor((authKey) => parseTime(authKey.expiration)?.getTime() ?? 0, {
     id: "expiration",
@@ -89,7 +91,7 @@ export const preAuthKeyColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <ExpiresCell authKey={row.original} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", hideBelow: "sm" },
   }),
   helper.accessor((authKey) => parseTime(authKey.createdAt)?.getTime() ?? 0, {
     id: "created",
@@ -116,17 +118,30 @@ export const preAuthKeyColumns = helper.columns([
   }),
 ]);
 
-/** On a phone the User and Options columns are hidden, so the key carries their words below it. */
+/**
+ * On a phone the User, Options, Status and Expires columns are hidden, so the key carries their
+ * words below it, and its state and expiry on a line of their own: a state is never left as a
+ * sliver under the pinned actions.
+ */
 function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
   // The tags say "tagged" on their own, so a key without a user adds no owner word here.
   const owner = authKey.user === undefined ? [] : [userLabel(authKey.user)];
   const words = [...owner, ...traits(authKey), ...authKey.aclTags];
+  const status = preAuthKeyStatus(authKey);
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <KeyPrefix text={`${preview(authKey)}…`} copy={authKey.key} label="Copy pre-auth key" />
-      <span className="truncate text-xs text-kumo-subtle sm:hidden" title={words.join(" · ")}>
+      <span className={cn(cellSecondaryClass, narrowOnlyClass)} title={words.join(" · ")}>
         {words.join(" · ")}
+      </span>
+      <span className={cn("flex items-center gap-2 pt-0.5 text-sm", narrowOnlyClass)}>
+        <StatusCell status={status} />
+        {status === "expired" || authKey.expiration === null ? null : (
+          <span className="flex items-center gap-1 text-kumo-subtle">
+            Expires <ExpiryCell value={authKey.expiration} />
+          </span>
+        )}
       </span>
     </div>
   );

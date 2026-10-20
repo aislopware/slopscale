@@ -14,7 +14,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export interface NetworksTabProps {
   readonly me: Me;
@@ -53,7 +53,6 @@ export function NetworksTab({
   });
 
   const total = networks.length;
-  const shown = table.getRowModel().rows.length;
 
   return (
     <>
@@ -106,11 +105,6 @@ export function NetworksTab({
               />
             )
           }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countNetworks(total)}`}</TableFooter>
-            )
-          }
         />
       </TableGroup>
       <NetworkDialog
@@ -123,8 +117,4 @@ export function NetworksTab({
       />
     </>
   );
-}
-
-function countNetworks(total: number): string {
-  return total === 1 ? "1 network" : `${total} networks`;
 }

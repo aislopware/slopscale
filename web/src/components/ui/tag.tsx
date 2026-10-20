@@ -4,12 +4,13 @@ import type { ReactElement } from "react";
 
 import { splitTag } from "~/lib/tag.ts";
 
-const sizes = {
-  /** For the second line of a table cell and a dense list. */
-  sm: "h-4.5 px-1.5 text-xs",
-  /** For a page header, a definition list and a form. */
-  base: "h-5 px-2 text-sm",
-} as const;
+/**
+ * One chip size everywhere, the tag input's (design spec §7.1): 20px tall, 13px text. A dense table
+ * once drew 18px chips at 12px, smaller than the tags the operator typed in; `sm` stays as a name
+ * for the callers that ask for it.
+ */
+const chipSize = "h-5 px-2 text-sm";
+const sizes = { sm: chipSize, base: chipSize } as const;
 
 export type TagSize = keyof typeof sizes;
 
@@ -22,15 +23,20 @@ export type TagSize = keyof typeof sizes;
 export const tagChipClass = "rounded-full bg-kumo-info-tint text-kumo-info";
 
 /**
- * The words of a tag with the `tag:` prefix stepped back, so a row of tags reads by its names and
- * the prefix still says what kind of thing it is. Used inside `Tag` and inside a picker's chips.
+ * The words of a tag with the `tag:` prefix a little stepped back, so a row of tags reads by its
+ * names and the prefix still says what kind of thing it is, at a contrast that stays readable. Used
+ * inside `Tag` and inside a picker's chips.
  */
 export function TagText({ tag }: { readonly tag: string }): ReactElement {
   const { prefix, name } = splitTag(tag);
 
   return (
     <span className="truncate">
-      {prefix === "" ? null : <span className="opacity-60">{prefix}</span>}
+      {prefix === "" ? null : (
+        <span data-tag-prefix className="opacity-80">
+          {prefix}
+        </span>
+      )}
       {name}
     </span>
   );

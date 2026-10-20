@@ -28,7 +28,7 @@ import type { AppTableInstance, RowData } from "~/components/table/app-table.tsx
 import { DataTable } from "~/components/table/data-table.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 
 const preAuthStatusTabs: readonly { value: StatusFilter; label: string }[] = [
@@ -92,8 +92,6 @@ export function PreAuthPanel({
         table={table}
         controls={controls}
         total={keys.data.preAuthKeys.length}
-        shown={table.getRowModel().rows.length}
-        noun="pre-auth key"
         firstEmpty={
           <SectionEmpty
             title="No pre-auth keys"
@@ -141,8 +139,6 @@ export function ApiPanel({
         table={table}
         controls={controls}
         total={keys.data.apiKeys.length}
-        shown={table.getRowModel().rows.length}
-        noun="API key"
         firstEmpty={
           <SectionEmpty
             title="No API keys"
@@ -201,8 +197,6 @@ export function OAuthPanel({
         table={table}
         controls={controls}
         total={clients.data.oauthClients.length}
-        shown={table.getRowModel().rows.length}
-        noun="OAuth client"
         firstEmpty={
           <SectionEmpty
             title="No OAuth clients"
@@ -272,24 +266,15 @@ function KeyPanel({
   );
 }
 
-/** "1 API key" / "3 API keys": the footer counts the rows an operator can see. */
-function count(total: number, noun: string): string {
-  return total === 1 ? `1 ${noun}` : `${total} ${noun}s`;
-}
-
 function PanelTable<TData extends RowData>({
   table,
   controls,
   total,
-  shown,
-  noun,
   firstEmpty,
 }: {
   readonly table: AppTableInstance<TData>;
   readonly controls: PanelControls;
   readonly total: number;
-  readonly shown: number;
-  readonly noun: string;
   readonly firstEmpty: ReactNode;
 }): ReactElement {
   return (
@@ -307,11 +292,6 @@ function PanelTable<TData extends RowData>({
               </Button>
             }
           />
-        )
-      }
-      footer={
-        total === 0 ? undefined : (
-          <TableFooter>{`Showing ${shown} of ${count(total, noun)}`}</TableFooter>
         )
       }
     />

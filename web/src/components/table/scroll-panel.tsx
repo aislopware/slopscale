@@ -11,6 +11,11 @@ export interface TableScrollProps {
    */
   readonly children: (overflowing: boolean) => ReactNode;
   /**
+   * A band above the table inside the card, outside the scroll container: the bulk bar a table
+   * shows while rows are ticked.
+   */
+  readonly header?: ReactNode;
+  /**
    * Rendered under the header, outside the scroll container: the empty state a table with no rows
    * shows where its rows would be.
    */
@@ -33,6 +38,7 @@ export interface TableScrollProps {
  */
 export function TableScroll({
   children,
+  header,
   below,
   pinnedRight = false,
   footer,
@@ -42,25 +48,35 @@ export function TableScroll({
 
   return (
     <div className={cn("relative min-w-0 overflow-clip", cardClass)}>
-      {/* A region that scrolls sideways must be reachable from the keyboard, or the arrow keys
-          never get to move it; it only joins the tab order while there is something to scroll to. */}
-      <div
-        ref={ref}
-        className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:ring-inset"
-        {...(overflowing
-          ? { tabIndex: 0, role: "region", "aria-label": "Table, scrolls sideways" }
-          : {})}
-      >
-        {children(overflowing)}
+      {header}
+      {/* The fades cover the columns alone, not the bands above and below them. */}
+      <div className="relative">
+        {/* A region that scrolls sideways must be reachable from the keyboard, or the arrow keys
+            never get to move it; it only joins the tab order while there is something to scroll
+            to. */}
+        <div
+          ref={ref}
+          className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:ring-inset"
+          {...(overflowing
+            ? { tabIndex: 0, role: "region", "aria-label": "Table, scrolls sideways" }
+            : {})}
+        >
+          {children(overflowing)}
+        </div>
+        {edges.left ? <ScrollFade side="left" /> : null}
+        {edges.right && !pinnedRight ? <ScrollFade side="right" /> : null}
       </div>
       {below === null || below === undefined ? null : (
         <div className="border-t border-kumo-line">{below}</div>
       )}
       {footer === null || footer === undefined ? null : (
-        <div className="border-t border-kumo-line bg-kumo-elevated px-4 py-2">{footer}</div>
+        <div
+          data-slot="table-footer"
+          className="border-t border-kumo-line bg-kumo-elevated px-4 py-2"
+        >
+          {footer}
+        </div>
       )}
-      {edges.left ? <ScrollFade side="left" /> : null}
-      {edges.right && !pinnedRight ? <ScrollFade side="right" /> : null}
     </div>
   );
 }

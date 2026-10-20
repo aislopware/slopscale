@@ -175,11 +175,11 @@ describe(RoutesTab, () => {
     const nodes = [...pair, node("3", { available: ["10.9.0.0/24"], approved: ["10.9.0.0/24"] })];
     const screen = await render(app(nodes));
 
-    await expect.element(screen.getByText("Showing 2 of 2 routes")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–2 of 2")).toBeVisible();
 
     await screen.getByRole("button", { name: /^Pending/u }).click();
 
-    await expect.element(screen.getByText("Showing 1 of 2 routes")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–1 of 1")).toBeVisible();
     await expect.element(screen.getByText("10.9.0.0/24")).not.toBeInTheDocument();
   });
 
@@ -254,11 +254,11 @@ describe(RoutesTab, () => {
     await pending.click();
 
     await expect.element(every).toHaveAttribute("aria-pressed", "false");
-    await expect.element(screen.getByText("Showing 1 of 2 routes")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–1 of 1")).toBeVisible();
 
     await every.click();
 
     await expect.element(pending).toHaveAttribute("aria-pressed", "false");
-    await expect.element(screen.getByText("Showing 2 of 2 routes")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1–2 of 2")).toBeVisible();
   });
 });

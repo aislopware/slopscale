@@ -89,10 +89,9 @@ export function FetchErrorBanner({ derp }: { readonly derp: Derp }): ReactElemen
   }
 
   return (
-    <Banner
-      size="sm"
-      variant="error"
-      icon={<WarningIcon />}
+    <Callout
+      tone="error"
+      icon={WarningIcon}
       title="The last map fetch failed"
       description={`Machines keep the last map fetched. ${derp.fetchError}`}
     />
