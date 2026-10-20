@@ -4,6 +4,9 @@ import type { ReactElement, ReactNode } from "react";
 import { plural } from "~/components/overview/plural.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 
+/** The smallest page on offer: a server-paged list with fewer rows than this has nothing to page. */
+const smallestPageSize = 25;
+
 const enDash = "–";
 
 function rangeText(page: number, pageSize: number, count: number): string {
@@ -87,14 +90,20 @@ export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | nu
     return null;
   }
 
-  const pages = Math.ceil(loaded / pageSize);
-  let info = `Showing ${rangeText(page, pageSize, loaded)} of ${loaded}`;
-
-  if (hasMore) {
-    info = `Showing ${rangeText(page, pageSize, loaded)}${moreText(fetching, failed)}`;
-  } else if (pages === 1) {
-    info = `Showing all ${plural(loaded, noun)}`;
+  if (!hasMore && loaded <= smallestPageSize) {
+    return (
+      <Band>
+        <Pagination page={1} perPage={pageSize} totalCount={loaded} setPage={setPage}>
+          <Pagination.Info>{() => `Showing all ${plural(loaded, noun)}`}</Pagination.Info>
+        </Pagination>
+      </Band>
+    );
   }
+
+  const info = hasMore
+    ? `Showing ${rangeText(page, pageSize, loaded)}${moreText(fetching, failed)}`
+    : `Showing ${rangeText(page, pageSize, loaded)} of ${loaded}`;
+  const pages = Math.ceil(loaded / pageSize);
 
   return (
     <Band>
@@ -105,13 +114,19 @@ export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | nu
         setPage={setPage}
       >
         <Pagination.Info>{() => info}</Pagination.Info>
-        <Pagination.Separator className="max-sm:hidden" />
-        <Pagination.PageSize className="max-sm:hidden" value={pageSize} onChange={setPageSize} />
-        <Pagination.Controls
-          controls={hasMore ? "simple" : "full"}
-          pageSelector="input"
-          className="ml-auto grow-0"
+        <Pagination.PageSize
+          className="ml-auto max-sm:hidden"
+          label="Rows per page"
+          value={pageSize}
+          onChange={setPageSize}
         />
+        {hasMore || pages > 1 ? (
+          <Pagination.Controls
+            controls={hasMore ? "simple" : "full"}
+            pageSelector="input"
+            className="grow-0"
+          />
+        ) : null}
       </Pagination>
     </Band>
   );
