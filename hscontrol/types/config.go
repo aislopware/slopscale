@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/conf"
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
 	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/aislopware/slopscale/hscontrol/traffic/asn"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -149,9 +150,6 @@ type Config struct {
 	DERP DERPConfig
 
 	TLS TLSConfig
-
-	ACMEURL   string
-	ACMEEmail string
 
 	// DNSConfig is the slopscale representation of the DNS configuration.
 	// It is kept in the config update for some settings that are
@@ -295,18 +293,74 @@ type DatabaseConfig struct {
 	Postgres PostgresConfig
 }
 
+// TLSConfig is the server's own TLS: a certificate from files, or one
+// obtained and renewed from an ACME CA.
 type TLSConfig struct {
 	CertPath string
 	KeyPath  string
 
-	LetsEncrypt LetsEncryptConfig
+	ACME ACMEConfig
 }
 
-type LetsEncryptConfig struct {
-	Listen        string
+// ACMEConfig gets the server's own certificate from an ACME CA.
+type ACMEConfig struct {
 	Hostname      string
-	CacheDir      string
 	ChallengeType string
+	// HTTPListen serves HTTP-01 challenges.
+	HTTPListen string
+	URL        string
+	Email      string
+	CacheDir   string
+}
+
+// legacyTLSKeys maps each tls key to the flat key it replaced. The flat
+// keys keep working, so existing configs and NixOS modules still run; an
+// environment variable names both, since SLOPSCALE_TLS_CERT_PATH is
+// tls.cert_path and tls_cert_path alike.
+var legacyTLSKeys = map[string]string{
+	"tls.cert_path":           "tls_cert_path",
+	"tls.key_path":            "tls_key_path",
+	"tls.acme.hostname":       "tls_letsencrypt_hostname",
+	"tls.acme.challenge_type": "tls_letsencrypt_challenge_type",
+	"tls.acme.http_listen":    "tls_letsencrypt_listen",
+	"tls.acme.cache_dir":      "tls_letsencrypt_cache_dir",
+	"tls.acme.url":            "acme_url",
+	"tls.acme.email":          "acme_email",
+}
+
+// tlsDefaults are not conf defaults: those would shadow the flat keys.
+var tlsDefaults = map[string]string{
+	"tls.acme.challenge_type": HTTP01ChallengeType,
+	"tls.acme.http_listen":    DefaultACMEListenAddr,
+	"tls.acme.cache_dir":      "/var/www/.cache",
+}
+
+// tlsKey reads a tls setting, falling back to the flat key it replaced and
+// then to its default.
+func tlsKey(key string) string {
+	for _, k := range []string{key, legacyTLSKeys[key]} {
+		if v := conf.GetString(k); v != "" {
+			return v
+		}
+	}
+
+	return tlsDefaults[key]
+}
+
+// warnLegacyTLSKeys points at the tls keys for flat keys that turn TLS
+// on. The NixOS module wrote the flat keys even with TLS off. An
+// environment variable sets the tls key as well, so it is not warned
+// about.
+func warnLegacyTLSKeys(depr *deprecator) {
+	if conf.GetString("tls_letsencrypt_hostname") == "" && conf.GetString("tls_cert_path") == "" {
+		return
+	}
+
+	for _, key := range slices.Sorted(maps.Keys(legacyTLSKeys)) {
+		if old := legacyTLSKeys[key]; conf.GetString(old) != "" && !conf.IsSet(key) {
+			depr.warnNoAlias(key, old)
+		}
+	}
 }
 
 // OIDCGroupsConfig is oidc.groups: when Sync is on, every group in the
@@ -509,65 +563,129 @@ func smtpConfig() (SMTPConfig, error) {
 var errSMTPFrom = errors.New("notifications.smtp.from is required when notifications.smtp.host is set")
 
 var (
-	errHTTPSCertsProvider = errors.New(
-		"https_certificates.provider must be cloudflare, rfc2136 or command when https_certificates.enabled is set",
+	errHTTPSCertsProvider = errors.New("https_certificates.provider is required: one of " +
+		strings.Join(dnsprovider.ProviderNames(), ", "))
+	errHTTPSCertsBaseDomain     = errors.New("https_certificates.enabled needs dns.base_domain")
+	errHTTPSCertsBaseDomainName = errors.New(
+		"dns.base_domain must be a lowercase DNS name for https_certificates: clients match certificate names exactly",
 	)
-	errHTTPSCertsBaseDomain = errors.New("https_certificates.enabled needs dns.base_domain")
-	errCloudflareToken      = errors.New("https_certificates.cloudflare.api_token is required")
-	errRFC2136Server        = errors.New("https_certificates.rfc2136.server is required")
-	errCommandPath          = errors.New("https_certificates.command.path is required")
+	errHTTPSCertsZone        = errors.New("dns.base_domain is not inside https_certificates.zone")
+	errHTTPSCertsPropagation = errors.New("https_certificates.propagation_timeout must not be negative")
 )
 
-// httpsCertsConfig reads the certificate assistance settings and checks
-// that the chosen provider has what it needs.
+// httpsCertsConfig reads the certificate assistance settings and builds
+// the DNS provider, which machines' certificates and the server's own
+// DNS-01 certificate publish through. Provider settings live under
+// https_certificates.<provider> and are read key by key, because the
+// environment never reaches into a map.
 func httpsCertsConfig() (HTTPSCertsConfig, error) {
 	cfg := HTTPSCertsConfig{
 		Enabled:            conf.GetBool("https_certificates.enabled"),
-		Provider:           DNSProviderKind(conf.GetString("https_certificates.provider")),
+		ProviderName:       strings.ToLower(conf.GetString("https_certificates.provider")),
 		TTL:                conf.GetDuration("https_certificates.ttl"),
 		PropagationTimeout: conf.GetDuration("https_certificates.propagation_timeout"),
-		Cloudflare: CloudflareDNSConfig{
-			APIToken: conf.GetString("https_certificates.cloudflare.api_token"),
-			ZoneID:   conf.GetString("https_certificates.cloudflare.zone_id"),
-		},
-		RFC2136: RFC2136Config{
-			Server:        conf.GetString("https_certificates.rfc2136.server"),
-			Zone:          conf.GetString("https_certificates.rfc2136.zone"),
-			TSIGKeyName:   conf.GetString("https_certificates.rfc2136.tsig_key_name"),
-			TSIGSecret:    conf.GetString("https_certificates.rfc2136.tsig_secret"),
-			TSIGAlgorithm: conf.GetString("https_certificates.rfc2136.tsig_algorithm"),
-		},
-		Command: CommandDNSConfig{
-			Path: conf.GetString("https_certificates.command.path"),
-		},
+		Resolvers:          challengeResolvers(conf.GetStringSlice("https_certificates.resolvers")),
 	}
+
+	ownDNS01 := tlsKey("tls.acme.hostname") != "" && tlsKey("tls.acme.challenge_type") == DNS01ChallengeType
+	if !cfg.Enabled && !ownDNS01 {
+		return cfg, nil
+	}
+
+	if cfg.PropagationTimeout < 0 {
+		return cfg, errHTTPSCertsPropagation
+	}
+
+	if cfg.ProviderName == "" {
+		return cfg, errHTTPSCertsProvider
+	}
+
+	prefix := "https_certificates." + cfg.ProviderName
+	settings, _ := conf.Get(prefix).(map[string]any)
+
+	provider, err := dnsprovider.New(cfg.ProviderName, settings, func(key string) (any, bool) {
+		v := conf.Get(prefix + "." + key)
+
+		return v, v != nil
+	})
+	if err != nil {
+		return cfg, fmt.Errorf("%s: %w", prefix, err)
+	}
+
+	cfg.Provider = provider
 
 	if !cfg.Enabled {
 		return cfg, nil
 	}
 
-	if conf.GetString("dns.base_domain") == "" {
-		return cfg, errHTTPSCertsBaseDomain
+	zone, err := httpsCertsZone(provider)
+	if err != nil {
+		return cfg, err
 	}
 
-	switch cfg.Provider {
-	case DNSProviderCloudflare:
-		if cfg.Cloudflare.APIToken == "" {
-			return cfg, errCloudflareToken
+	cfg.Zone = zone
+
+	// Only machines' certificates let a client pick what is published; a
+	// record shared by the server's own certificate alone is harmless.
+	if iso, ok := provider.(dnsprovider.Isolator); ok {
+		err = iso.CheckIsolation()
+		if err != nil {
+			return cfg, fmt.Errorf("%s: %w: %w", prefix, dnsprovider.ErrProviderConfig, err)
 		}
-	case DNSProviderRFC2136:
-		if cfg.RFC2136.Server == "" {
-			return cfg, errRFC2136Server
-		}
-	case DNSProviderCommand:
-		if cfg.Command.Path == "" {
-			return cfg, errCommandPath
-		}
-	default:
-		return cfg, errHTTPSCertsProvider
 	}
 
 	return cfg, nil
+}
+
+// httpsCertsZone returns the zone machines' records go in:
+// https_certificates.zone, else the zone an RFC 2136 provider names,
+// else the base domain, which must lie inside it.
+func httpsCertsZone(provider dnsprovider.Provider) (string, error) {
+	base := strings.TrimSuffix(conf.GetString("dns.base_domain"), ".")
+	if base == "" {
+		return "", errHTTPSCertsBaseDomain
+	}
+
+	if base != strings.ToLower(base) || dnsname.ValidHostname(base) != nil {
+		return "", fmt.Errorf("%w: %q", errHTTPSCertsBaseDomainName, base)
+	}
+
+	zone := conf.GetString("https_certificates.zone")
+	if rfc, ok := provider.(*dnsprovider.RFC2136); ok && zone == "" {
+		zone = rfc.Zone
+	}
+
+	zone = strings.ToLower(strings.TrimSuffix(zone, "."))
+	if zone == "" {
+		zone = base
+	}
+
+	if base != zone && !strings.HasSuffix(base, "."+zone) {
+		return "", fmt.Errorf("%w: %q is not under %q", errHTTPSCertsZone, base, zone)
+	}
+
+	return zone, nil
+}
+
+// challengeResolvers defaults the resolvers and, as for dns.nameservers,
+// lets each be a bare IP.
+func challengeResolvers(resolvers []string) []string {
+	if len(resolvers) == 0 {
+		return slices.Clone(defaultChallengeResolvers)
+	}
+
+	out := make([]string, 0, len(resolvers))
+
+	for _, r := range resolvers {
+		_, _, err := net.SplitHostPort(r)
+		if err != nil {
+			r = net.JoinHostPort(r, "53")
+		}
+
+		out = append(out, r)
+	}
+
+	return out
 }
 
 func funnelConfig() (FunnelConfig, error) {
@@ -831,9 +949,6 @@ func LoadConfig(path string, isFile bool) error {
 
 	setNodeServiceDefaults()
 
-	conf.SetDefault("tls_letsencrypt_cache_dir", "/var/www/.cache")
-	conf.SetDefault("tls_letsencrypt_challenge_type", HTTP01ChallengeType)
-
 	conf.SetDefault("log.level", "info")
 	conf.SetDefault("log.format", TextLogFormat)
 
@@ -1020,6 +1135,8 @@ func validateDeprecatedKeys(v *configValidator) {
 	// Removed: oidc.expiry -> node.expiry
 	depr.fatalIfSet("oidc.expiry", "node.expiry")
 
+	warnLegacyTLSKeys(&depr)
+
 	depr.apply(v)
 }
 
@@ -1065,36 +1182,36 @@ func validateServerSettings(v *configValidator) {
 // validateTLSSettings checks that one TLS strategy is chosen and that the
 // ACME challenge is one the server can answer.
 func validateTLSSettings(v *configValidator) {
-	hostname := conf.GetString("tls_letsencrypt_hostname")
-	certPath := conf.GetString("tls_cert_path")
-	keyPath := conf.GetString("tls_key_path")
+	hostname := tlsKey("tls.acme.hostname")
+	certPath := tlsKey("tls.cert_path")
+	keyPath := tlsKey("tls.key_path")
 
 	if hostname != "" && (certPath != "" || keyPath != "") {
 		v.Add(&ConfigError{
-			Reason:        "tls_letsencrypt_hostname and tls_cert_path/tls_key_path are mutually exclusive",
-			Current:       []KV{{"tls_letsencrypt_hostname", hostname}},
-			ConflictsWith: []KV{{"tls_cert_path", certPath}, {"tls_key_path", keyPath}},
-			Hint:          "choose one TLS strategy and unset the other (Let's Encrypt or a static key pair)",
+			Reason:        "tls.acme.hostname and tls.cert_path/tls.key_path are mutually exclusive",
+			Current:       []KV{{"tls.acme.hostname", hostname}},
+			ConflictsWith: []KV{{"tls.cert_path", certPath}, {"tls.key_path", keyPath}},
+			Hint:          "choose one TLS strategy and unset the other (ACME or a static key pair)",
 			See:           docsURL + "ref/tls",
 		})
 	}
 
-	challenge := conf.GetString("tls_letsencrypt_challenge_type")
+	challenge := tlsKey("tls.acme.challenge_type")
 
 	if hostname != "" && challenge == TLSALPN01ChallengeType &&
 		!strings.HasSuffix(conf.GetString("listen_addr"), ":443") {
 		// this is only a warning because there could be something sitting in front of
 		// slopscale that redirects the traffic (e.g. an iptables rule)
 		log.Warn().
-			Msg("Warning: when using tls_letsencrypt_hostname with TLS-ALPN-01 as challenge type, " +
+			Msg("Warning: when using tls.acme.hostname with TLS-ALPN-01 as challenge type, " +
 				"slopscale must be reachable on port 443, i.e. listen_addr should probably end in :443")
 	}
 
-	if challenge != HTTP01ChallengeType && challenge != TLSALPN01ChallengeType {
+	if challenge != HTTP01ChallengeType && challenge != TLSALPN01ChallengeType && challenge != DNS01ChallengeType {
 		v.Add(&ConfigError{
-			Reason:  "tls_letsencrypt_challenge_type has an unsupported value",
-			Current: []KV{{"tls_letsencrypt_challenge_type", challenge}},
-			Allowed: []string{HTTP01ChallengeType, TLSALPN01ChallengeType},
+			Reason:  "tls.acme.challenge_type has an unsupported value",
+			Current: []KV{{"tls.acme.challenge_type", challenge}},
+			Allowed: []string{HTTP01ChallengeType, TLSALPN01ChallengeType, DNS01ChallengeType},
 			Hint:    "pick one of the allowed values; HTTP-01 is the default",
 		})
 	}
@@ -1329,20 +1446,16 @@ func validateDatabaseConfig(v *configValidator) {
 
 func tlsConfig() TLSConfig {
 	return TLSConfig{
-		LetsEncrypt: LetsEncryptConfig{
-			Hostname: conf.GetString("tls_letsencrypt_hostname"),
-			Listen:   ACMEListenAddr(),
-			CacheDir: util.AbsolutePathFromConfigPath(
-				conf.GetString("tls_letsencrypt_cache_dir"),
-			),
-			ChallengeType: conf.GetString("tls_letsencrypt_challenge_type"),
+		CertPath: util.AbsolutePathFromConfigPath(tlsKey("tls.cert_path")),
+		KeyPath:  util.AbsolutePathFromConfigPath(tlsKey("tls.key_path")),
+		ACME: ACMEConfig{
+			Hostname:      tlsKey("tls.acme.hostname"),
+			ChallengeType: tlsKey("tls.acme.challenge_type"),
+			HTTPListen:    ACMEListenAddr(),
+			URL:           tlsKey("tls.acme.url"),
+			Email:         tlsKey("tls.acme.email"),
+			CacheDir:      util.AbsolutePathFromConfigPath(tlsKey("tls.acme.cache_dir")),
 		},
-		CertPath: util.AbsolutePathFromConfigPath(
-			conf.GetString("tls_cert_path"),
-		),
-		KeyPath: util.AbsolutePathFromConfigPath(
-			conf.GetString("tls_key_path"),
-		),
 	}
 }
 
@@ -2087,9 +2200,6 @@ func LoadServerConfig() (*Config, error) {
 		DNSConfig:        s.dns,
 		TailcfgDNSConfig: dnsToTailcfgDNS(s.dns),
 
-		ACMEEmail: conf.GetString("acme_email"),
-		ACMEURL:   conf.GetString("acme_url"),
-
 		UnixSocket:           conf.GetString("unix_socket"),
 		UnixSocketPermission: s.socketPerm,
 
@@ -2476,6 +2586,27 @@ func (c *Config) CloneTailcfgDNSConfigFor(id NodeID, exitNode tailcfg.StableNode
 	}
 
 	return cfg.Clone()
+}
+
+// extraRecordAtOrBelow reports whether an extra DNS record the operator
+// set is name or a name under it. Case is ignored, as in TLS name
+// matching; name is lowercase.
+func (c *Config) extraRecordAtOrBelow(name string) bool {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	if c.TailcfgDNSConfig == nil {
+		return false
+	}
+
+	for _, r := range c.TailcfgDNSConfig.ExtraRecords {
+		rn := strings.ToLower(strings.TrimSuffix(r.Name, "."))
+		if rn == name || strings.HasSuffix(rn, "."+name) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *Config) effectiveDNSLocked() DNSConfig {

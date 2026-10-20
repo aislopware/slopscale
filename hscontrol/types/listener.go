@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultACMEListenAddr is where the ACME HTTP-01 challenge is answered
-// when tls_letsencrypt_listen is empty, the address an [net/http.Server]
+// when tls.acme.http_listen is empty, the address an [net/http.Server]
 // with no Addr listens on.
 const DefaultACMEListenAddr = ":http"
 
@@ -97,11 +97,7 @@ type listenerSpec struct {
 
 // ACMEListenAddr is the address the ACME HTTP-01 challenge is answered on.
 func ACMEListenAddr() string {
-	if addr := conf.GetString("tls_letsencrypt_listen"); addr != "" {
-		return addr
-	}
-
-	return DefaultACMEListenAddr
+	return tlsKey("tls.acme.http_listen")
 }
 
 // configuredListeners lists the sockets the configuration makes the server
@@ -118,9 +114,8 @@ func configuredListeners() []listenerSpec {
 		}
 	}
 
-	if conf.GetString("tls_letsencrypt_hostname") != "" &&
-		conf.GetString("tls_letsencrypt_challenge_type") == HTTP01ChallengeType {
-		out = append(out, listenerSpec{key: "tls_letsencrypt_listen", addr: ACMEListenAddr(), network: "tcp"})
+	if tlsKey("tls.acme.hostname") != "" && tlsKey("tls.acme.challenge_type") == HTTP01ChallengeType {
+		out = append(out, listenerSpec{key: "tls.acme.http_listen", addr: ACMEListenAddr(), network: "tcp"})
 	}
 
 	if conf.GetBool("funnel.enabled") {

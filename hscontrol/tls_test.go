@@ -20,9 +20,10 @@ func acmeTestServer(t *testing.T, listen string) *Slopscale {
 
 	return &Slopscale{cfg: &types.Config{
 		ServerURL: "https://slopscale.example.com",
-		TLS: types.TLSConfig{LetsEncrypt: types.LetsEncryptConfig{
+		Addr:      "127.0.0.1:0",
+		TLS: types.TLSConfig{ACME: types.ACMEConfig{
 			Hostname:      "slopscale.example.com",
-			Listen:        listen,
+			HTTPListen:    listen,
 			CacheDir:      t.TempDir(),
 			ChallengeType: types.HTTP01ChallengeType,
 		}},
@@ -45,7 +46,7 @@ func TestACMEChallengeListenerBindFailure(t *testing.T) {
 	bindErr, ok := errors.AsType[*types.ListenerBindError](err)
 	require.True(t, ok, "want a ListenerBindError, got %T", err)
 	assert.Equal(t, "ACME HTTP-01 challenge", bindErr.Listener)
-	assert.Equal(t, "tls_letsencrypt_listen", bindErr.ConfigKey)
+	assert.Equal(t, "tls.acme.http_listen", bindErr.ConfigKey)
 	assert.Equal(t, taken.Addr().String(), bindErr.Addr)
 }
 
@@ -56,6 +57,7 @@ func TestACMEChallengeListenerServesAndShutsDown(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, bundle.config)
 	require.NotNil(t, bundle.acmeListener)
+	require.NotNil(t, bundle.manage)
 
 	served := make(chan error, 1)
 
@@ -67,12 +69,17 @@ func TestACMEChallengeListenerServesAndShutsDown(t *testing.T) {
 
 	req.Host = "slopscale.example.com"
 
-	resp, err := http.DefaultClient.Do(req)
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	resp, err := noRedirect.Do(req)
 	require.NoError(t, err)
 
 	_, _ = io.Copy(io.Discard, resp.Body)
 	require.NoError(t, resp.Body.Close())
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode, "an unknown token is not found")
+	assert.Equal(t, http.StatusFound, resp.StatusCode, "anything but a pending challenge goes to the server URL")
+	assert.Equal(t, "https://slopscale.example.com/.well-known/acme-challenge/unknown", resp.Header.Get("Location"))
 
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()

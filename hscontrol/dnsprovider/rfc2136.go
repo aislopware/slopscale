@@ -11,7 +11,7 @@ import (
 
 	"codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
-	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/libdns/libdns"
 )
 
 const rfc2136Timeout = 30 * time.Second
@@ -29,6 +29,7 @@ var (
 	// server did not sign, or signed with a different key.
 	ErrReplyUnsigned = errors.New("dns update reply not signed with the key")
 	errNoTSIG        = errors.New("no TSIG record")
+	errRFC2136Server = errors.New("server is required")
 )
 
 // tsigAlgorithms maps the config's names to the wire names. hmac-md5 is
@@ -44,57 +45,124 @@ var tsigAlgorithms = map[string]string{
 // RFC2136 publishes with dynamic updates to an authoritative server,
 // signed with TSIG when a key is configured.
 type RFC2136 struct {
-	server    string
-	zone      string
-	ttl       uint32
+	// Server is the authoritative server, host:port.
+	Server string `json:"server"`
+	// Zone is read by the configuration as the default zone the records
+	// go in; https_certificates.zone takes its place.
+	Zone string `json:"zone,omitempty"`
+	// TSIG signs the updates; empty sends them unsigned.
+	TSIGKeyName   string `json:"tsig_key_name,omitempty"`
+	TSIGSecret    string `json:"tsig_secret,omitempty"`
+	TSIGAlgorithm string `json:"tsig_algorithm,omitempty"`
+
 	keyName   string
 	secret    []byte
 	algorithm string
 }
 
-// NewRFC2136 builds the provider; the zone is where the records go.
-func NewRFC2136(cfg types.RFC2136Config, zone string, ttl time.Duration) (*RFC2136, error) {
-	p := &RFC2136{
-		server: cfg.Server,
-		zone:   dnsutil.Fqdn(strings.ToLower(zone)),
-		ttl:    uint32(ttl.Seconds()),
-	}
+// NewRFC2136 builds the provider.
+func NewRFC2136(server, keyName, secret, algorithm string) (*RFC2136, error) {
+	p := &RFC2136{Server: server, TSIGKeyName: keyName, TSIGSecret: secret, TSIGAlgorithm: algorithm}
 
-	if cfg.TSIGKeyName != "" {
-		algorithm, ok := tsigAlgorithms[strings.ToLower(strings.TrimSuffix(cfg.TSIGAlgorithm, "."))]
-		if !ok {
-			return nil, fmt.Errorf("%w: %q", ErrTSIGAlgorithm, cfg.TSIGAlgorithm)
-		}
-
-		secret, err := base64.StdEncoding.DecodeString(cfg.TSIGSecret)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrTSIGSecret, err)
-		}
-
-		p.keyName = dnsutil.Fqdn(cfg.TSIGKeyName)
-		p.secret = secret
-		p.algorithm = algorithm
+	err := p.validate()
+	if err != nil {
+		return nil, err
 	}
 
 	return p, nil
 }
 
-// SetTXT sends one update inserting the record.
-func (p *RFC2136) SetTXT(ctx context.Context, name, value string) error {
-	fqdn := dnsutil.Fqdn(strings.ToLower(name))
-	if !inZone(fqdn, p.zone) {
-		return fmt.Errorf("%w: %s not under %s", ErrNameOutsideZone, name, p.zone)
+// AppendRecords sends one update inserting the records.
+func (p *RFC2136) AppendRecords(ctx context.Context, zone string, recs []libdns.Record) ([]libdns.Record, error) {
+	err := p.update(ctx, zone, recs, dns.ClassINET)
+	if err != nil {
+		return nil, err
+	}
+
+	return recs, nil
+}
+
+// DeleteRecords sends one update deleting exactly these records (RFC 2136
+// section 2.5.4); other values at the names stay.
+func (p *RFC2136) DeleteRecords(ctx context.Context, zone string, recs []libdns.Record) ([]libdns.Record, error) {
+	for _, rec := range recs {
+		// An empty value would be "every record at the name" to some
+		// servers, including ones the operator keeps there.
+		if rec.RR().Data == "" {
+			return nil, fmt.Errorf("%w: refusing to delete a TXT record without a value", ErrProviderConfig)
+		}
+	}
+
+	err := p.update(ctx, zone, recs, dns.ClassNONE)
+	if err != nil {
+		return nil, err
+	}
+
+	return recs, nil
+}
+
+func (p *RFC2136) validate() error {
+	if p.Server == "" {
+		return errRFC2136Server
+	}
+
+	if p.TSIGKeyName == "" {
+		return nil
+	}
+
+	alg := p.TSIGAlgorithm
+	if alg == "" {
+		alg = "hmac-sha256"
+	}
+
+	algorithm, ok := tsigAlgorithms[strings.ToLower(strings.TrimSuffix(alg, "."))]
+	if !ok {
+		return fmt.Errorf("%w: %q", ErrTSIGAlgorithm, p.TSIGAlgorithm)
+	}
+
+	secret, err := base64.StdEncoding.DecodeString(p.TSIGSecret)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrTSIGSecret, err)
+	}
+
+	p.keyName = dnsutil.Fqdn(p.TSIGKeyName)
+	p.secret = secret
+	p.algorithm = algorithm
+
+	return nil
+}
+
+// update sends one UPDATE adding (class IN) or deleting (class NONE) the
+// records.
+func (p *RFC2136) update(ctx context.Context, zone string, recs []libdns.Record, class uint16) error {
+	zone = dnsutil.Fqdn(strings.ToLower(zone))
+
+	txts, err := txtRecords(zone, recs)
+	if err != nil {
+		return err
 	}
 
 	// An UPDATE carries the zone as its question and the records to
-	// insert in the authority section (RFC 2136 section 2).
-	msg := dns.NewMsg(p.zone, dns.TypeSOA)
+	// change in the authority section (RFC 2136 section 2).
+	msg := dns.NewMsg(zone, dns.TypeSOA)
 	msg.Opcode = dns.OpcodeUpdate
 	msg.RecursionDesired = false
-	msg.Ns = []dns.RR{&dns.TXT{
-		Hdr: dns.Header{Name: fqdn, Class: dns.ClassINET, TTL: p.ttl},
-		Txt: []string{value},
-	}}
+
+	for i, txt := range txts {
+		if !inZone(txt[0], zone) {
+			return fmt.Errorf("%w: %s not under %s", ErrNameOutsideZone, txt[0], zone)
+		}
+
+		ttl := uint32(recs[i].RR().TTL.Seconds())
+		if class == dns.ClassNONE {
+			ttl = 0
+		}
+
+		msg.Ns = append(msg.Ns, &dns.TXT{
+			Hdr: dns.Header{Name: dnsutil.Fqdn(txt[0]), Class: class, TTL: ttl},
+			Txt: []string{txt[1]},
+		})
+	}
 
 	var (
 		signer dns.HmacTSIG
@@ -105,7 +173,7 @@ func (p *RFC2136) SetTXT(ctx context.Context, name, value string) error {
 		signer = dns.HmacTSIG{Secret: p.secret}
 		msg.Pseudo = append(msg.Pseudo, dns.NewTSIG(p.keyName, p.algorithm, 0))
 
-		err := dns.TSIGSign(msg, signer, &tsig)
+		err = dns.TSIGSign(msg, signer, &tsig)
 		if err != nil {
 			return fmt.Errorf("signing dns update: %w", err)
 		}
@@ -116,9 +184,9 @@ func (p *RFC2136) SetTXT(ctx context.Context, name, value string) error {
 	client.ReadTimeout = rfc2136Timeout
 	client.WriteTimeout = rfc2136Timeout
 
-	reply, _, err := client.Exchange(ctx, msg, "tcp", p.server)
+	reply, _, err := client.Exchange(ctx, msg, "tcp", p.Server)
 	if err != nil {
-		return fmt.Errorf("dns update to %s: %w", p.server, err)
+		return fmt.Errorf("dns update to %s: %w", p.Server, err)
 	}
 
 	if p.keyName != "" {
@@ -128,12 +196,12 @@ func (p *RFC2136) SetTXT(ctx context.Context, name, value string) error {
 		// treated like a refusal.
 		err = verifyReplyTSIG(reply, p.keyName, signer, &tsig)
 		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrReplyUnsigned, p.server, err)
+			return fmt.Errorf("%w: %s: %w", ErrReplyUnsigned, p.Server, err)
 		}
 	}
 
 	if reply.Rcode != dns.RcodeSuccess {
-		return fmt.Errorf("%w: %s answered %s", ErrUpdateRefused, p.server, dns.RcodeToString[reply.Rcode])
+		return fmt.Errorf("%w: %s answered %s", ErrUpdateRefused, p.Server, dns.RcodeToString[reply.Rcode])
 	}
 
 	return nil

@@ -81,10 +81,11 @@ func tailnetSettings(b Backend) TailnetSettings {
 
 	return TailnetSettings{
 		// File-mode policy is genuinely externally managed (read-only via API).
-		ACLsExternallyManagedOn:                cfg.Policy.Mode == types.PolicyModeFile,
-		DevicesApprovalOn:                      current.DevicesApprovalOn,
-		DevicesKeyDurationDays:                 int(keyDuration / (hoursPerDay * time.Hour)),
-		HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
+		ACLsExternallyManagedOn: cfg.Policy.Mode == types.PolicyModeFile,
+		DevicesApprovalOn:       current.DevicesApprovalOn,
+		DevicesKeyDurationDays:  int(keyDuration / (hoursPerDay * time.Hour)),
+		// Tailscale's toggle for machine certificates, not the server's own TLS.
+		HTTPSEnabled:                           cfg.HTTPSCerts.Enabled,
 		PostureIdentityCollectionOn:            current.PostureIdentityOn,
 		RegionalRoutingOn:                      true,
 		RouteSelection:                         routeSelectionRegional,

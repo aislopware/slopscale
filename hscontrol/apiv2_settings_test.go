@@ -56,16 +56,15 @@ func TestAPIv2SettingsComputedFields(t *testing.T) {
 			cfg:  types.Config{},
 		},
 		{
-			name:      "https via cert path",
-			cfg:       types.Config{TLS: types.TLSConfig{CertPath: "/x/cert.pem"}},
+			name:      "https via machine certificates",
+			cfg:       types.Config{HTTPSCerts: types.HTTPSCertsConfig{Enabled: true}},
 			wantHTTPS: true,
 		},
 		{
-			name: "https via letsencrypt",
-			cfg: types.Config{
-				TLS: types.TLSConfig{LetsEncrypt: types.LetsEncryptConfig{Hostname: "hs.example.com"}},
-			},
-			wantHTTPS: true,
+			// httpsEnabled is the machine certificate toggle; the server's
+			// own TLS does not let machines get certificates.
+			name: "server tls is not https",
+			cfg:  types.Config{TLS: types.TLSConfig{CertPath: "/x/cert.pem"}},
 		},
 		{
 			name:                "key duration 7d",
@@ -113,9 +112,10 @@ func TestAPIv2SettingsConstantOffFields(t *testing.T) {
 	t.Parallel()
 
 	cfg := types.Config{
-		TLS:    types.TLSConfig{CertPath: "/x/cert.pem"},
-		Node:   types.NodeConfig{Expiry: 90 * 24 * time.Hour},
-		Policy: types.PolicyConfig{Mode: types.PolicyModeFile},
+		TLS:        types.TLSConfig{CertPath: "/x/cert.pem"},
+		HTTPSCerts: types.HTTPSCertsConfig{Enabled: true},
+		Node:       types.NodeConfig{Expiry: 90 * 24 * time.Hour},
+		Policy:     types.PolicyConfig{Mode: types.PolicyModeFile},
 	}
 
 	s := getSettings(t, settingsAPIWithConfig(t, &cfg))

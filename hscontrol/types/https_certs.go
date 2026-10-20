@@ -1,70 +1,43 @@
 package types
 
 import (
-	"errors"
 	"time"
+
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
 )
-
-// DNSProviderKind names a way to publish DNS records.
-type DNSProviderKind string
-
-const (
-	DNSProviderCloudflare DNSProviderKind = "cloudflare"
-	DNSProviderRFC2136    DNSProviderKind = "rfc2136"
-	DNSProviderCommand    DNSProviderKind = "command"
-)
-
-// ErrDNSProviderUnknown is returned for a provider the server does not
-// have.
-var ErrDNSProviderUnknown = errors.New("unknown DNS provider")
 
 // ACMEChallengePrefix is the label ACME DNS-01 challenges live under.
 const ACMEChallengePrefix = "_acme-challenge."
 
+// defaultChallengeResolvers find the zone's nameservers when
+// https_certificates.resolvers is empty: public resolvers see the zone
+// as the CA does, which a split-horizon local resolver may not.
+var defaultChallengeResolvers = []string{"1.1.1.1:53", "8.8.8.8:53"}
+
 // HTTPSCertsConfig lets machines get HTTPS certificates for their
 // MagicDNS names: the server publishes the ACME DNS-01 challenge
-// records a client asks for; see docs/ref/https-certificates.md.
+// records a client asks for; see docs/ref/https-certificates.md. The
+// provider also answers the DNS-01 challenge of the server's own
+// certificate (tls.acme.challenge_type DNS-01).
 type HTTPSCertsConfig struct {
 	// Enabled announces every machine's MagicDNS name as a cert domain
 	// and answers /machine/set-dns.
 	Enabled bool
-	// Provider publishes the records.
-	Provider DNSProviderKind
+	// ProviderName is the registry name of the provider, lowercase.
+	ProviderName string
+	// Provider publishes the records; nil when neither machines nor the
+	// server's own certificate need one.
+	Provider dnsprovider.Provider
+	// Zone is the DNS zone machines' records are written to; the base
+	// domain is in it.
+	Zone string
 	// TTL is the records' time to live.
 	TTL time.Duration
-	// PropagationTimeout is how long set-dns waits for the zone's
+	// PropagationTimeout is how long publishing waits for the zone's
 	// authoritative nameservers to serve a record before answering,
-	// because the client accepts the ACME challenge as soon as it gets
-	// the answer. Zero answers as soon as the provider took the record.
+	// because the client asks the CA to validate as soon as it gets the
+	// answer. Zero answers as soon as the provider took the record.
 	PropagationTimeout time.Duration
-
-	Cloudflare CloudflareDNSConfig
-	RFC2136    RFC2136Config
-	Command    CommandDNSConfig
-}
-
-// CloudflareDNSConfig publishes through the Cloudflare API.
-type CloudflareDNSConfig struct {
-	// APIToken needs Zone:Read and DNS:Edit on the zone.
-	APIToken string
-	// ZoneID names the zone; empty finds it from the record's name.
-	ZoneID string
-}
-
-// RFC2136Config publishes with dynamic DNS updates.
-type RFC2136Config struct {
-	// Server is the authoritative server, host:port.
-	Server string
-	// Zone is the zone the records go in; empty derives it from the
-	// base domain.
-	Zone string
-	// TSIG signs the updates; empty sends them unsigned.
-	TSIGKeyName   string
-	TSIGSecret    string
-	TSIGAlgorithm string
-}
-
-// CommandDNSConfig runs a program with the record name and value.
-type CommandDNSConfig struct {
-	Path string
+	// Resolvers find the zone's nameservers, host:port.
+	Resolvers []string
 }

@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider/dnstest"
 	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
@@ -84,8 +85,8 @@ func TestFunnelEndToEnd(t *testing.T) {
 		servertest.WithDNS(types.DNSConfig{MagicDNS: true, BaseDomain: "funnel.test"}),
 		servertest.WithHTTPSCerts(types.HTTPSCertsConfig{
 			Enabled:  true,
-			Provider: types.DNSProviderCommand,
-			Command:  types.CommandDNSConfig{Path: "/usr/bin/true"},
+			Provider: &dnstest.Provider{},
+			Zone:     "funnel.test",
 		}),
 		servertest.WithFunnel(types.FunnelConfig{
 			Enabled:     true,
