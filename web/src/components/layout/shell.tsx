@@ -1,33 +1,40 @@
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
-import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
 import { cn } from "@cloudflare/kumo/utils";
-import { MagnifyingGlassIcon, SignOutIcon } from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
+import { MagnifyingGlassIcon, QuestionIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { accessRequestsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
-import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
-import { signOut } from "~/auth/session.ts";
+import { can, canSeeMachines } from "~/auth/me.ts";
 import { pendingCount } from "~/components/access/request-model.ts";
+import { AccountMenu } from "~/components/layout/account-menu.tsx";
 import { BrandMark, useBrand } from "~/components/layout/brand.tsx";
 import type { NavBadge, NavItem, NavPath, NavPlace } from "~/components/layout/nav.ts";
 import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/nav.ts";
 import { QuickSearch } from "~/components/layout/quick-search.tsx";
-import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
-import { Avatar } from "~/components/ui/avatar.tsx";
-import { RoleBadge } from "~/components/users/role-badge.tsx";
+import { pageGridClass } from "~/components/ui/page.tsx";
 import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
+import { docsBase } from "~/lib/docs.ts";
 import { pendingRouteCount } from "~/lib/node.ts";
 
 /**
- * Every page gets the same content width, so navigating never moves the first column sideways.
- * Cards and tables fill it; the forms inside them keep their own narrower measures.
+ * The sidebar sits on the page's canvas, divided from it by one line, as the Cloudflare dashboard's
+ * does; hover, the current page and an open branch share the recessed fill (the control fill in
+ * dark mode, where recessed is darker than the canvas).
  */
-const contentWidthClass = "max-w-[1400px]";
+const sidebarSurfaceClass =
+  "[--sidebar-bg:var(--color-kumo-canvas)] [--sidebar-active-bg:light-dark(var(--color-kumo-recessed),var(--color-kumo-control))]";
+
+/** A nav icon at half strength, so the 13px labels lead and the icons only mark the rows. */
+function navIcon(NavIcon: Icon): ReactElement {
+  return <NavIcon aria-hidden className="size-4 shrink-0 opacity-50" />;
+}
 
 /**
  * The drawer is reached with a thumb, so its rows meet the 44px touch target. The desktop rail
@@ -64,33 +71,25 @@ export function Shell({
          * pixel short of the viewport always has the slack to stay put; its own panel keeps the
          * full height, so nothing shows through under it.
          */}
-        <Sidebar className="md:sticky md:top-0 md:h-[calc(100svh-1px)] md:[&>div]:h-svh">
-          <Sidebar.Header className="h-12">
+        <Sidebar
+          className={cn(
+            sidebarSurfaceClass,
+            "md:sticky md:top-0 md:h-[calc(100svh-1px)] md:[&>div]:h-svh",
+          )}
+        >
+          <Sidebar.Header>
             <Brand />
             {/* The drawer has no chrome of its own, so it carries the way out. */}
             <Sidebar.Close className="md:hidden" />
           </Sidebar.Header>
           <Sidebar.Content>
-            <Sidebar.Group className="pb-4">
+            <Sidebar.Group className="pb-1">
               <Sidebar.Menu>
-                <Sidebar.MenuButton
-                  icon={MagnifyingGlassIcon}
-                  tooltip="Quick search (⌘K)"
-                  className={cn(
-                    touchRowClass,
-                    "bg-kumo-base font-normal text-kumo-subtle ring ring-kumo-line group-data-[state=collapsed]/sidebar:bg-transparent group-data-[state=collapsed]/sidebar:ring-transparent",
-                  )}
-                  onClick={() => {
+                <QuickSearchButton
+                  onOpen={() => {
                     setSearchOpen(true);
                   }}
-                >
-                  <span className="flex flex-1 items-center justify-between gap-2">
-                    Quick search…
-                    <kbd className="rounded border border-kumo-hairline px-1 font-sans text-[10px] text-kumo-subtle">
-                      ⌘K
-                    </kbd>
-                  </span>
-                </Sidebar.MenuButton>
+                />
               </Sidebar.Menu>
             </Sidebar.Group>
             {groups.map((group, index) => (
@@ -104,7 +103,7 @@ export function Shell({
                       <Sidebar.MenuButton
                         key={item.to}
                         href={item.to}
-                        icon={item.icon}
+                        icon={navIcon(item.icon)}
                         active={isActive(item, pathname)}
                         tooltip={item.label}
                         className={touchRowClass}
@@ -136,25 +135,59 @@ export function Shell({
             <Sidebar.Trigger />
           </Sidebar.Footer>
         </Sidebar>
-        <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
-          <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
+        <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas [--app-header-height:58px]">
+          {/* 58px like the sidebar's header, so the bottom borders run as one line; sticky toolbars
+              and rails come to rest under it through the variable. */}
+          <header className="sticky top-0 z-10 flex h-(--app-header-height) shrink-0 items-center justify-between gap-2 border-b border-kumo-line bg-kumo-canvas px-4">
             <RouteProgress />
             <Trail place={place} pathname={pathname} />
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-1">
+              <LinkButton
+                variant="ghost"
+                href={docsBase}
+                external
+                icon={
+                  <QuestionIcon aria-hidden weight="fill" className="size-4 text-kumo-subtle" />
+                }
+                className="h-8 px-3 font-medium max-sm:hidden"
+              >
+                Docs
+              </LinkButton>
               <AccountMenu me={me} />
             </div>
           </header>
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-            <div className={cn("mx-auto flex w-full flex-col gap-6", contentWidthClass)}>
-              {children}
-            </div>
+          <main className="@container flex-1">
+            <div className={pageGridClass}>{children}</div>
           </main>
         </div>
         <QuickSearch me={me} pages={pages} open={searchOpen} onOpenChange={setSearchOpen} />
         <CurrentPageIntoView key={pathname} />
       </Sidebar.Provider>
     </BreadcrumbProvider>
+  );
+}
+
+/**
+ * The quick search at the top of the sidebar, the dashboard's: a 32px secondary-looking button with
+ * the ⌘K hint at its end. On the icon rail it is the magnifier alone.
+ */
+function QuickSearchButton({ onOpen }: { readonly onOpen: () => void }): ReactElement {
+  return (
+    <Sidebar.MenuButton
+      icon={navIcon(MagnifyingGlassIcon)}
+      tooltip="Quick search (⌘K)"
+      className={cn(
+        touchRowClass,
+        "min-h-8 bg-kumo-base font-normal text-kumo-subtle shadow-xs ring ring-kumo-line hover:bg-kumo-base",
+        "group-data-[state=collapsed]/sidebar:bg-transparent group-data-[state=collapsed]/sidebar:shadow-none group-data-[state=collapsed]/sidebar:ring-transparent",
+      )}
+      onClick={onOpen}
+    >
+      <span className="flex flex-1 items-center justify-between gap-2">
+        Quick search…
+        <kbd className="font-sans text-xs opacity-50">⌘K</kbd>
+      </span>
+    </Sidebar.MenuButton>
   );
 }
 
@@ -218,10 +251,11 @@ function NavBranch({
         <Sidebar.CollapsibleTrigger
           render={
             <Sidebar.MenuButton
-              icon={item.icon}
+              icon={navIcon(item.icon)}
               active={active && !shown}
               tooltip={item.label}
-              className={touchRowClass}
+              // An open branch keeps the active fill, so the branch and its pages read as one block.
+              className={cn(touchRowClass, shown && "bg-(--sidebar-active-bg)")}
             >
               {item.label}
               {shown ? null : <CountBadge count={total} />}
@@ -275,22 +309,38 @@ function PendingBadge({
   return badge === undefined ? null : <CountBadge count={counts[badge]} />;
 }
 
+/**
+ * How many things wait for the reader, as Kumo's count dot: a brand-blue pill with the figure in
+ * 10px, the one coloured mark in the sidebar, so it reads as something to act on.
+ */
 function CountBadge({ count }: { readonly count: number }): ReactElement | null {
   return count === 0 ? null : (
-    <Sidebar.MenuBadge title={`${count} waiting`}>{count}</Sidebar.MenuBadge>
+    <span
+      title={`${count} waiting`}
+      className="inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-kumo-brand px-1 text-[10px] leading-none font-medium text-kumo-inverse tabular-nums group-data-[state=collapsed]/sidebar:hidden"
+    >
+      {count}
+    </span>
   );
 }
 
+/**
+ * The top of the sidebar: the mark and the tailnet's name, in the place and the shape of the
+ * dashboard's account switcher. There is one tailnet, so it is a way home rather than a menu.
+ */
 function Brand(): ReactElement {
   const brand = useBrand();
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
-      <BrandMark markClassName="size-5 shrink-0" logoClassName="size-5 shrink-0" />
-      <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
+    <Link
+      to="/"
+      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-kumo-default no-underline outline-none group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0 hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus"
+    >
+      <BrandMark markClassName="size-6 shrink-0" logoClassName="h-6 max-w-24 shrink-0" />
+      <span className="flex-1 truncate text-sm font-medium group-data-[state=collapsed]/sidebar:hidden">
         {brand.title}
       </span>
-    </div>
+    </Link>
   );
 }
 
@@ -337,80 +387,26 @@ function Trail({
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Sidebar.Trigger className="md:hidden" aria-label="Open navigation" />
-      <Breadcrumbs>
-        {current === undefined || last === null ? (
-          <Breadcrumbs.Current>{current?.label ?? leaf ?? brand.title}</Breadcrumbs.Current>
-        ) : (
-          <>
-            <Breadcrumbs.Link href={current.children?.[0]?.to ?? current.to}>
-              {current.label}
-            </Breadcrumbs.Link>
-            <Breadcrumbs.Separator />
-            {detail === null || page === undefined ? (
-              <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
-            ) : (
-              <>
-                <Breadcrumbs.Link href={page.to}>{page.label}</Breadcrumbs.Link>
-                <Breadcrumbs.Separator />
-                <Breadcrumbs.Current>{detail}</Breadcrumbs.Current>
-              </>
-            )}
-          </>
-        )}
-      </Breadcrumbs>
+      {/* A page with nothing above it has no trail: its title is on the page, and the dashboard
+          leaves the top bar empty there too. */}
+      {current === undefined || last === null ? null : (
+        <Breadcrumbs>
+          <Breadcrumbs.Link href={current.children?.[0]?.to ?? current.to}>
+            {current.label}
+          </Breadcrumbs.Link>
+          <Breadcrumbs.Separator />
+          {detail === null || page === undefined ? (
+            <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
+          ) : (
+            <>
+              <Breadcrumbs.Link href={page.to}>{page.label}</Breadcrumbs.Link>
+              <Breadcrumbs.Separator />
+              <Breadcrumbs.Current>{detail}</Breadcrumbs.Current>
+            </>
+          )}
+        </Breadcrumbs>
+      )}
     </div>
-  );
-}
-
-const kindLabels: Record<string, string> = {
-  local: "Local socket",
-  api_key: "API key",
-  oauth: "OAuth token",
-  session: "Browser session",
-};
-
-function AccountMenu({ me }: { readonly me: Me }): ReactElement {
-  const name = displayName(me);
-  const role = roleLabel(me);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenu.Trigger
-        render={
-          <button
-            type="button"
-            aria-label="Account"
-            title={name}
-            className="flex cursor-pointer items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
-          >
-            <Avatar name={name} id={me.user?.id ?? ""} src={me.user?.profilePicUrl} size="lg" />
-          </button>
-        }
-      />
-      <DropdownMenu.Content align="end" className="min-w-56">
-        <DropdownMenu.Group>
-          <DropdownMenu.Label className="flex items-center gap-2">
-            <Avatar name={name} id={me.user?.id ?? ""} src={me.user?.profilePicUrl} size="lg" />
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate font-medium text-kumo-default">{name}</span>
-              <span className="flex min-w-0 items-center gap-1.5 text-xs text-kumo-subtle">
-                <span className="truncate">{kindLabels[me.kind] ?? me.kind}</span>
-                {role === null ? null : <RoleBadge role={me.role} size="sm" />}
-              </span>
-            </span>
-          </DropdownMenu.Label>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item
-            icon={SignOutIcon}
-            onClick={() => {
-              void signOut();
-            }}
-          >
-            Sign out
-          </DropdownMenu.Item>
-        </DropdownMenu.Group>
-      </DropdownMenu.Content>
-    </DropdownMenu>
   );
 }
 
@@ -431,7 +427,7 @@ function RouteProgress(): ReactElement {
         pending ? "opacity-100 delay-150" : "opacity-0 delay-0",
       )}
     >
-      <div className="h-full w-1/3 animate-route-progress bg-kumo-contrast" />
+      <div className="h-full w-1/3 animate-route-progress bg-kumo-brand" />
     </div>
   );
 }

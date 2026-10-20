@@ -1,43 +1,63 @@
 import type { ReactElement, ReactNode } from "react";
 
+import { DocsBadge } from "~/components/ui/docs-badge.tsx";
+import { FullBleed } from "~/components/ui/page.tsx";
+
 /**
- * Title row of every page: sentence-case h1, an optional one-line description, an optional `meta`
- * line of small facts (counts, who is signed in, the state of the thing) and right-aligned actions.
- * Related text stays close (gap-1); the page content below gets the larger gap. Nothing sits above
- * the title: a state or a label there reads as a kicker, and the title carries its own weight.
+ * The title block of every page, in the Cloudflare dashboard's current style: a 20px semibold title
+ * with a "View docs" pill beside it, an optional 12px kicker above it, a subtle description kept to
+ * 750px, an optional meta line of small facts, and the page's actions on the right (h-9, secondary
+ * before primary). Under it a rule runs the full width of the page, edge to edge. It renders two
+ * blocks of the page grid, the header and the rule, so it goes straight in the route's fragment
+ * rather than inside a wrapper.
  */
 export function PageHeader({
   title,
+  kicker,
+  docs,
   description,
   meta,
   actions,
 }: {
   readonly title: ReactNode;
+  /** A 12px word above the title naming the part of a thing this page is: "Overview". */
+  readonly kicker?: ReactNode;
+  /** The documentation page that explains this one, under `docs/content`: "ref/dns". */
+  readonly docs?: string;
   readonly description?: ReactNode;
-  /** Small muted facts under the title, e.g. "3 machines · 2 connected". */
+  /** Small muted facts under the description, e.g. "3 machines · 2 connected". */
   readonly meta?: ReactNode;
   readonly actions?: ReactNode;
 }): ReactElement {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="truncate text-2xl font-semibold text-kumo-strong">{title}</h1>
-        {description === undefined ? null : (
-          <p className="max-w-prose text-kumo-subtle">{description}</p>
-        )}
-        {meta === undefined ? null : (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-kumo-subtle">
-            {meta}
+    <>
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-1">
+            {kicker === undefined ? null : <p className="text-xs text-kumo-subtle">{kicker}</p>}
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="truncate text-[20px] leading-[25px] font-semibold text-kumo-default">
+                {title}
+              </h1>
+              {docs === undefined ? null : <DocsBadge path={docs} />}
+            </div>
           </div>
-        )}
-      </div>
-      {actions === undefined ? null : (
-        // Wraps rather than shrinks: a row of three controls (a back link, a field and a button)
-        // is wider than a phone, and squeezing them would cut their labels instead of stacking.
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-          {actions}
+          {description === undefined ? null : (
+            <p className="max-w-[750px] text-pretty text-kumo-subtle">{description}</p>
+          )}
+          {meta === undefined ? null : (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-kumo-subtle">
+              {meta}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+        {actions === undefined ? null : (
+          // Wraps rather than shrinks: a row of three controls is wider than a phone, and squeezing
+          // them would cut their labels instead of stacking.
+          <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        )}
+      </header>
+      <FullBleed className="border-b border-kumo-line" />
+    </>
   );
 }
