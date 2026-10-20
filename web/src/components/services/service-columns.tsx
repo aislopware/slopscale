@@ -1,3 +1,4 @@
+import { cn } from "@cloudflare/kumo/utils";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
@@ -5,6 +6,7 @@ import { reachStates } from "~/components/services/model.ts";
 import type { ServiceRow } from "~/components/services/model.ts";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 
@@ -77,7 +79,7 @@ function NameCell({ service }: { readonly service: ServiceRow }): ReactElement {
       <Link
         to="/services/$label"
         params={{ label: service.label }}
-        className="block truncate font-mono text-[0.9em] font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
+        className={cn("block truncate font-mono text-[0.9em] font-medium", rowLinkClass)}
       >
         {service.name}
       </Link>

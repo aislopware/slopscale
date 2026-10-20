@@ -17,9 +17,8 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 
 export interface AppsTabProps {
   readonly me: Me;
@@ -74,7 +73,7 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -104,7 +103,7 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
             )
           }
         />
-      </Frame>
+      </TableGroup>
       <AppDialog me={me} open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );

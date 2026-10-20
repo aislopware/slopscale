@@ -36,6 +36,7 @@ function SplitDnsPage(): ReactElement {
     <>
       <PageHeader
         title="Split DNS"
+        docs="ref/dns"
         description="Domains answered by nameservers of their own, for every machine or only for the groups you pick."
       />
       <div className="flex flex-col gap-6">

@@ -26,6 +26,7 @@ function MapPage(): ReactElement {
     <>
       <PageHeader
         title="Map"
+        docs="ref/derp"
         description="The regions and relays that carry traffic between machines that cannot connect directly."
       />
       <div className="flex flex-col gap-6">

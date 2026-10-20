@@ -15,8 +15,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { AddUserButton, FirstUserEmpty } from "~/components/users/add-user.tsx";
 import { columns } from "~/components/users/columns.tsx";
@@ -122,7 +121,7 @@ function UsersPage(): ReactElement {
 
   return (
     <>
-      <PageHeader title="Users" meta={describe(total, pending)} />
+      <PageHeader title="Users" docs="ref/roles" meta={describe(total, pending)} />
       <TableToolbar
         actions={
           <>
@@ -146,7 +145,7 @@ function UsersPage(): ReactElement {
           onValueChange={handleFilterChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -171,7 +170,7 @@ function UsersPage(): ReactElement {
             )
           }
         />
-      </Frame>
+      </TableGroup>
       <PendingInvites me={me} />
     </>
   );

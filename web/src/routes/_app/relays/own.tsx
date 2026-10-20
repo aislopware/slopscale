@@ -26,6 +26,7 @@ function OwnRelaysPage(): ReactElement {
     <>
       <PageHeader
         title="Your relays"
+        docs="ref/derp"
         description="Regions you add by hand, for relays you run yourself. They are merged into the map on top of the sources."
       />
       <div className="flex flex-col gap-6">

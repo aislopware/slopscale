@@ -1,7 +1,7 @@
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
-import { CopyText } from "~/components/ui/copy-text.tsx";
+import { CopyButton, CopyText } from "~/components/ui/copy-text.tsx";
 
 export interface Definition {
   readonly label: ReactNode;
@@ -16,9 +16,9 @@ export interface Definition {
 }
 
 /**
- * Label/value rows with hairlines between them: the console's way to show facts about a resource.
- * Mono values are a CopyText: click to copy, with the icon always visible so every value ends at
- * the same edge.
+ * Label/value rows divided by lines, the dashboard's account-details rows: a 13px subtle label on
+ * the left, the value right-aligned, 36px a row. Mono values are a CopyText: click to copy, the
+ * icon showing on hover.
  *
  * A value is cut with an ellipsis when the row runs out of room, but the cut is `overflow-clip`
  * with a margin rather than `overflow-hidden`: hidden clips at the box edge, which took the focus
@@ -47,7 +47,7 @@ export function DefinitionList({
             // Centred, not on the baseline: a control in the value (a copy button, a popover
             // trigger) is a box with its own line, and baseline alignment set it a few pixels
             // below the label. A two-line value centres its label on the pair.
-            "flex min-w-0 items-center justify-between gap-4 border-t border-kumo-hairline px-5 py-2.5 first:border-t-0",
+            "flex min-h-9 min-w-0 items-center justify-between gap-4 border-t border-kumo-line px-4 py-2 text-sm first:border-t-0",
             columns === 2 && "xl:nth-[2]:border-t-0",
             columns === 2 && item.wide === true && "xl:col-span-2",
           )}
@@ -75,6 +75,45 @@ export function DefinitionList({
                 copy={item.copy}
                 wrap={item.wrap ?? wrap}
               />
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export interface KeyValue {
+  readonly label: ReactNode;
+  readonly value: ReactNode;
+  /** Puts a copy button beside the value that copies this text. */
+  readonly copy?: string;
+  /** The copy button's accessible name: "Copy tailnet ID". */
+  readonly copyLabel?: string;
+  readonly key?: string;
+}
+
+/**
+ * The dashboard's stacked key-value list (a zone's API card, Zero Trust's details rail): each pair
+ * a 13px subtle label over the 13px value, rows divided by lines, and a 26px ghost copy button at
+ * the end of a copyable value such as an ID.
+ */
+export function KeyValueList({
+  items,
+  className,
+}: {
+  readonly items: readonly KeyValue[];
+  readonly className?: string;
+}): ReactElement {
+  return (
+    <dl className={cn("flex flex-col divide-y divide-kumo-line px-4", className)}>
+      {items.map((item, index) => (
+        <div key={item.key ?? index} className="grid gap-1 py-3">
+          <dt className="truncate text-sm text-kumo-subtle">{item.label}</dt>
+          <dd className="flex min-w-0 items-center justify-between gap-2 text-sm text-kumo-default">
+            <span className="min-w-0 truncate">{item.value}</span>
+            {item.copy === undefined ? null : (
+              <CopyButton value={item.copy} label={item.copyLabel ?? `Copy ${item.copy}`} />
             )}
           </dd>
         </div>

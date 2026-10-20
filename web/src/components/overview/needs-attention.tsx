@@ -12,9 +12,9 @@ import type { Me } from "~/auth/me.ts";
 import { groupName } from "~/components/access/model.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { EmptySlot } from "~/components/ui/settings-card.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { nodeName, ownerLabel, userHint, userLabel } from "~/lib/node.ts";
 import { formatDuration, parseTime } from "~/lib/time.ts";
@@ -251,18 +251,15 @@ function ApprovalSettingsLink({ me }: { readonly me: Me }): ReactElement | null 
 }
 
 /**
- * Nothing is waiting: one quiet row in a frame of its own, no heading. It keeps the shape of the
- * other frames on the page, band and panel, so it reads as a state of the same list rather than a
- * loose line between two cards.
+ * Nothing is waiting: the dashboard's empty slot, a dashed recessed row with the way to the
+ * approval settings at its end, so it reads as the place the list will be rather than a loose
+ * line.
  */
 function AllApproved({ me }: { readonly me: Me }): ReactElement {
   return (
-    <Frame>
-      <FramePanel className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-kumo-subtle">
-        <span>Nothing is waiting for a decision</span>
-        <ApprovalSettingsLink me={me} />
-      </FramePanel>
-    </Frame>
+    <EmptySlot action={<ApprovalSettingsLink me={me} />}>
+      Nothing is waiting for a decision
+    </EmptySlot>
   );
 }
 

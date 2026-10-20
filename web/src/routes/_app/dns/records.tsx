@@ -26,6 +26,7 @@ function RecordsPage(): ReactElement {
     <>
       <PageHeader
         title="Extra records"
+        docs="ref/dns"
         description="Names the server answers itself, on top of the ones MagicDNS gives every machine."
       />
       <div className="flex flex-col gap-6">

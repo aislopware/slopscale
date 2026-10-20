@@ -1,5 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
 import {
   FunnelIcon,
   GlobeIcon,
@@ -19,6 +20,7 @@ import { SelectAllCheckbox, SelectRowCheckbox } from "~/components/machines/sele
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { hostedServices } from "~/components/services/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
@@ -124,7 +126,7 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
         <Link
           to="/machines/$nodeId"
           params={{ nodeId: node.id }}
-          className="block min-w-0 truncate font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
+          className={cn("block min-w-0 truncate font-medium", rowLinkClass)}
         >
           {name}
         </Link>

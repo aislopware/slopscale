@@ -206,11 +206,13 @@ describe("a table's columns", () => {
     expect(getComputedStyle(cell).right).toBe("0px");
   });
 
-  it("steps the outer cells in to where the band's text starts", async () => {
+  // The dashboard's tables: 44px rows, 16px from the card's edge to the text.
+  it("sets each row 44px tall with its text 16px in from the card", async () => {
     const screen = await render(<Machines count={2} />);
     const first = screen.getByRole("cell", { name: "machine-001" }).element();
 
-    expect(getComputedStyle(first).paddingLeft).toBe("20px");
+    expect(getComputedStyle(first).paddingLeft).toBe("16px");
+    expect(first.getBoundingClientRect().height).toBe(44);
   });
 
   it("draws no stripe on the second row", async () => {

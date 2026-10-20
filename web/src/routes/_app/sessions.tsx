@@ -7,8 +7,8 @@ import { can } from "~/auth/me.ts";
 import { SessionsTable } from "~/components/sessions/table.tsx";
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/sessions")({
@@ -41,6 +41,7 @@ function SessionsPage(): ReactElement {
     <>
       <PageHeader
         title="SSH sessions"
+        docs="ref/ssh-recording"
         description={
           <>
             Terminal recordings of SSH sessions, one asciinema file each. Play a download with{" "}
@@ -48,14 +49,14 @@ function SessionsPage(): ReactElement {
           </>
         }
       />
-      <Frame>
+      <TableGroup>
         <SessionsTable
           recordings={window.rows}
           writable={can(me, "logs:configuration")}
           embeddedRecorder={settings.embeddedRecorder}
           paging={window}
         />
-      </Frame>
+      </TableGroup>
     </>
   );
 }

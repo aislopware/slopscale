@@ -29,6 +29,7 @@ function NameserversPage(): ReactElement {
     <>
       <PageHeader
         title="Nameservers"
+        docs="ref/dns"
         description="The resolvers every machine uses, MagicDNS, and the search domains that complete short names."
       />
       <div className="flex flex-col gap-6">

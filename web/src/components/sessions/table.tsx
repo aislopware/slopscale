@@ -1,4 +1,3 @@
-import { DeleteResource } from "@cloudflare/kumo";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
@@ -23,10 +22,11 @@ import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { DeleteDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
@@ -59,7 +59,7 @@ function RecordingRow({
   const remove = useDeleteRecording();
 
   return (
-    <Table.Row className={cn("align-top", frameTableRowClass)}>
+    <Table.Row className={cn("align-top", tableRowClass)}>
       <Table.Cell className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={recording.startedAt} />
       </Table.Cell>
@@ -115,7 +115,7 @@ function RecordingRow({
             </DropdownMenu.Item>
           </DisabledReason>
         </RowMenu>
-        <DeleteResource
+        <DeleteDialog
           open={deleting}
           onOpenChange={setDeleting}
           resourceType="recording"
@@ -163,8 +163,8 @@ export function SessionsTable({
         }
       >
         {(overflowing) => (
-          <Table className={frameTableClass}>
-            <Table.Header variant="compact">
+          <Table className={tableClass}>
+            <Table.Header>
               <Table.Row>
                 <Table.Head>Started</Table.Head>
                 <Table.Head>From</Table.Head>

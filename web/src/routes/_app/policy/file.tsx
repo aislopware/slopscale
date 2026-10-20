@@ -48,6 +48,7 @@ function PolicyFilePage(): ReactElement {
     <>
       <PageHeader
         title="Policy file"
+        docs="ref/policy"
         description="The HuJSON policy for everything the rules do not say."
       />
       <PolicyFileTab

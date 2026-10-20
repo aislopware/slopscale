@@ -3,7 +3,6 @@ import type { ReactElement, ReactNode } from "react";
 
 import { plural } from "~/components/overview/plural.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
-import { FrameBand } from "~/components/ui/frame.tsx";
 
 /** The smallest page on offer. A table with fewer rows than this has nothing to page. */
 export const smallestPageSize = 25;
@@ -18,14 +17,14 @@ function rangeText(page: number, pageSize: number, count: number): string {
 }
 
 /**
- * The band under a table that pages: the range shown, how many rows a page holds and the way to the
- * other pages. The band and the frame's padding put the text where the rows' text starts.
+ * The line under a table that pages, Kumo's Pagination as the dashboard lays it out: "Showing 1-10
+ * of 120" in 13px subtle figures, the rows per page, and the joined pager on the right.
  */
 function Band({ children }: { readonly children: ReactNode }): ReactElement {
   return (
-    <FrameBand className="px-5 [&_[data-slot=pagination-info]]:whitespace-nowrap">
+    <div className="text-sm text-kumo-subtle tabular-nums [&_[data-slot=pagination-info]]:whitespace-nowrap">
       {children}
-    </FrameBand>
+    </div>
   );
 }
 

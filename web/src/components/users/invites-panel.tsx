@@ -10,7 +10,6 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
-import { Frame, FrameBand } from "~/components/ui/frame.tsx";
 import { inviteColumns } from "~/components/users/invite-columns.tsx";
 import { openInvites } from "~/components/users/invites.ts";
 
@@ -43,14 +42,13 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
   }
 
   return (
-    <Frame>
-      {/* px-5 puts the title where the first column's text starts. */}
-      <FrameBand className="px-5 pt-1.5 pb-2">
-        <h2 className="font-semibold text-kumo-strong">Pending invitations</h2>
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-lg font-semibold text-kumo-default">Pending invitations</h2>
         <p className="text-kumo-subtle">
           An invitation becomes a user the first time its link is opened.
         </p>
-      </FrameBand>
+      </div>
       <DataTable
         table={table}
         empty={
@@ -67,6 +65,6 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
           )
         }
       />
-    </Frame>
+    </section>
   );
 }

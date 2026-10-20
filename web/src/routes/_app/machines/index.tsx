@@ -31,8 +31,7 @@ import { SelectionProvider, useMachineSelection } from "~/components/machines/se
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 /**
@@ -75,6 +74,9 @@ export const Route = createFileRoute("/_app/machines/")({
   },
   component: MachinesPage,
 });
+
+/** What a caller who sees only their own machines is looking at. */
+const ownMachinesNote = "Your own machines, and the ones other users share with you.";
 
 function MachinesPage(): ReactElement {
   const { me } = Route.useRouteContext();
@@ -126,11 +128,8 @@ function MachinesPage(): ReactElement {
     <>
       <PageHeader
         title="Machines"
-        description={
-          can(me, "devices:core:read")
-            ? undefined
-            : "Your own machines, and the ones other users share with you."
-        }
+        docs="ref/device-management"
+        description={can(me, "devices:core:read") ? undefined : ownMachinesNote}
         meta={summary(machines)}
       />
       <MachinesToolbar
@@ -161,7 +160,7 @@ function MachinesPage(): ReactElement {
           setFilters({ ...view, attestation: value });
         }}
       />
-      <Frame className="@container">
+      <TableGroup className="@container">
         <FilterChips
           chips={machineChips(view, mayFilterByUser ? users.data?.users : undefined, setFilters)}
           onClearAll={clearFilters}
@@ -199,7 +198,7 @@ function MachinesPage(): ReactElement {
             }
           />
         </SelectionProvider>
-      </Frame>
+      </TableGroup>
       <CreatePreAuthKeyDialog
         me={me}
         intent="add-machine"

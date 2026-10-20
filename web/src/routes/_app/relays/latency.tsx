@@ -20,6 +20,7 @@ function LatencyPage(): ReactElement {
     <>
       <PageHeader
         title="Latency"
+        docs="ref/derp"
         description="What the machines measure to each relay region, and which of them sit farthest from the region they home on."
       />
       <LatencySection report={report} />

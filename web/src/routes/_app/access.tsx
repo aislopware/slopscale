@@ -14,9 +14,8 @@ import { toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
-import { TableFooter } from "~/components/table/toolbar.tsx";
+import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/access")({
@@ -100,7 +99,7 @@ function MyAccessPage(): ReactElement {
           </DisabledReason>
         }
       />
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -119,7 +118,7 @@ function MyAccessPage(): ReactElement {
             )
           }
         />
-      </Frame>
+      </TableGroup>
       <RequestAccessDialog
         options={options}
         open={requesting}

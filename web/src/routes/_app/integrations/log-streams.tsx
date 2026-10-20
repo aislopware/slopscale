@@ -39,6 +39,7 @@ function LogStreamsPage(): ReactElement {
     <>
       <PageHeader
         title="Log streams"
+        docs="ref/log-streaming"
         description="Ships every audit log entry to a SIEM or log store in batches."
         meta={meta}
       />

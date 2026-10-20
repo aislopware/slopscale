@@ -14,8 +14,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export function LogStreamsTab({
   me,
@@ -67,7 +66,7 @@ export function LogStreamsTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -102,7 +101,7 @@ export function LogStreamsTab({
             )
           }
         />
-      </Frame>
+      </TableGroup>
       <LogStreamDialog open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );

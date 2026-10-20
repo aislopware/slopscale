@@ -11,7 +11,7 @@ import type { ReactElement, ReactNode, Ref } from "react";
 
 import { policyLanguage } from "~/components/policy/policy-language.ts";
 import { CodeEditor } from "~/components/ui/code-editor.tsx";
-import { Frame, FrameBand, FramePanel } from "~/components/ui/frame.tsx";
+import { Tray, TrayBand, TrayPanel } from "~/components/ui/section.tsx";
 import type { EditorProblem } from "~/lib/editor/problems.ts";
 
 const iconSize = 14;
@@ -160,8 +160,8 @@ export function PolicyEditor({
   }));
 
   return (
-    <Frame>
-      <FrameBand className="flex items-center justify-between gap-3 px-5 text-sm text-kumo-subtle">
+    <Tray>
+      <TrayBand className="justify-between gap-3 text-sm text-kumo-subtle">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-lh items-center">
             <FileCodeIcon size={iconSize} aria-hidden />
@@ -189,8 +189,8 @@ export function PolicyEditor({
             Discard
           </Button>
         ) : null}
-      </FrameBand>
-      <FramePanel>
+      </TrayBand>
+      <TrayPanel>
         <div ref={host} className={editorHeightClass}>
           <CodeEditor
             value={value}
@@ -202,7 +202,7 @@ export function PolicyEditor({
             aria-label="Tailnet policy"
           />
         </div>
-      </FramePanel>
-    </Frame>
+      </TrayPanel>
+    </Tray>
   );
 }

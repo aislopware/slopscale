@@ -15,7 +15,7 @@ import { FilterChips } from "~/components/machines/filter-chips.tsx";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
 import { plural } from "~/components/overview/plural.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
+import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
 import { DnsLoggingOff, DnsLoggingOffNote } from "~/components/traffic/dns-logging-off.tsx";
 import { NamesTable } from "~/components/traffic/names-table.tsx";
 import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
@@ -32,7 +32,6 @@ import type { NameSearch } from "~/components/traffic/search.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar, windowSearchClass } from "~/components/traffic/window-toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 import { nodeLabel } from "~/lib/node.ts";
 
 /** The server's cap on one read. */
@@ -202,7 +201,7 @@ function NamesFrame({
   return (
     <>
       {loggingOff && rows.length > 0 ? <DnsLoggingOffNote /> : null}
-      <Frame>
+      <TableGroup>
         <FilterChips chips={chips} onClearAll={clear} />
         <NamesTable
           rows={rows}
@@ -222,7 +221,7 @@ function NamesFrame({
             onSearch({ ...search, ...pickName(row, search.by) });
           }}
         />
-      </Frame>
+      </TableGroup>
     </>
   );
 }

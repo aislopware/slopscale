@@ -36,6 +36,7 @@ function PosturesPage(): ReactElement {
     <>
       <PageHeader
         title="Postures"
+        docs="ref/device-trust"
         description="Conditions a machine must meet before a rule applies to it, such as a current client, a known serial number or a weekly window."
         meta={postures.length === 1 ? "1 posture" : `${postures.length} postures`}
       />

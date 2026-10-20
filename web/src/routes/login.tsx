@@ -12,8 +12,8 @@ import { consolePath } from "~/auth/session.ts";
 import { BrandMark } from "~/components/layout/brand.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
+import { Card } from "~/components/ui/card.tsx";
 import { Code } from "~/components/ui/code.tsx";
-import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 
 const searchSchema = object({
   redirect: optional(string()),
@@ -89,62 +89,58 @@ function LoginPage(): ReactElement {
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-24">
         <div className="flex w-full max-w-sm flex-col gap-4">
-          {/* In dark mode the canvas is nearly black, so the card needs a ring and a shadow of its
-              own to read as a surface. */}
-          <Frame className="shadow-lg ring-kumo-line">
-            <FramePanel className="flex flex-col gap-6 px-6 py-6">
-              <div className="flex flex-col gap-3">
-                <BrandMark markClassName="size-8" logoClassName="h-8 max-w-56" />
-                <div className="flex flex-col gap-1">
-                  <h1 className="text-xl font-semibold text-kumo-strong">
-                    Sign in to {branding.title}
-                  </h1>
-                  <p className="text-kumo-subtle">
-                    {oidc === undefined
-                      ? "This server has no identity provider, so the console cannot sign anyone in."
-                      : "Sign in with the account your administrator gave you."}
-                  </p>
-                </div>
+          <Card className="gap-6 rounded-xl p-8">
+            <div className="flex flex-col gap-3">
+              <BrandMark markClassName="size-8" logoClassName="h-8 max-w-56" />
+              <div className="flex flex-col gap-1">
+                <h1 className="text-xl font-semibold text-kumo-strong">
+                  Sign in to {branding.title}
+                </h1>
+                <p className="text-kumo-subtle">
+                  {oidc === undefined
+                    ? "This server has no identity provider, so the console cannot sign anyone in."
+                    : "Sign in with the account your administrator gave you."}
+                </p>
               </div>
-              {problem === undefined ? null : (
-                <Banner variant="error" title="Sign-in failed" description={problem} />
-              )}
-              {invite === undefined || invite === "" ? null : (
-                <Callout title="Sign in to accept your invitation." />
-              )}
-              {oidc === undefined ? (
-                <Banner
-                  variant="alert"
-                  title="No identity provider"
-                  description={
-                    <>
-                      Set the <Code>oidc</Code> section of the config file and restart. The CLI and
-                      the API keep working with API keys.
-                    </>
-                  }
-                />
-              ) : (
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  icon={SignInIcon}
-                  onClick={() => {
-                    // The provider flow is served by slopscale, not routed by
-                    // the console, so this is a full navigation.
-                    globalThis.location.assign(loginUrl(oidc.loginPath, target, invite));
-                  }}
-                >
-                  Continue with {oidc.provider}
-                </Button>
-              )}
-              <p className="text-xs text-kumo-subtle">
-                {oidc === undefined
-                  ? "See the OpenID Connect documentation."
-                  : "A sign-in lasts seven days in this browser."}
-              </p>
-            </FramePanel>
-          </Frame>
+            </div>
+            {problem === undefined ? null : (
+              <Banner variant="error" title="Sign-in failed" description={problem} />
+            )}
+            {invite === undefined || invite === "" ? null : (
+              <Callout title="Sign in to accept your invitation." />
+            )}
+            {oidc === undefined ? (
+              <Banner
+                variant="alert"
+                title="No identity provider"
+                description={
+                  <>
+                    Set the <Code>oidc</Code> section of the config file and restart. The CLI and
+                    the API keep working with API keys.
+                  </>
+                }
+              />
+            ) : (
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                icon={SignInIcon}
+                onClick={() => {
+                  // The provider flow is served by slopscale, not routed by
+                  // the console, so this is a full navigation.
+                  globalThis.location.assign(loginUrl(oidc.loginPath, target, invite));
+                }}
+              >
+                Continue with {oidc.provider}
+              </Button>
+            )}
+            <p className="text-xs text-kumo-subtle">
+              {oidc === undefined
+                ? "See the OpenID Connect documentation."
+                : "A sign-in lasts seven days in this browser."}
+            </p>
+          </Card>
           <p className="text-center text-xs text-kumo-subtle">
             <span className="font-mono text-[0.9em]">{globalThis.location.host}</span>
           </p>

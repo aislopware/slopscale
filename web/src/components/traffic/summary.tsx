@@ -11,7 +11,7 @@ import {
   formatScaled,
   rateScale,
 } from "~/components/traffic/format.ts";
-import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { cardClass } from "~/components/ui/card.tsx";
 import { useMinWidth } from "~/lib/breakpoint.ts";
 import { echarts } from "~/lib/echarts.ts";
 import { useDarkMode } from "~/lib/theme.ts";
@@ -97,10 +97,7 @@ function Stat({
 }): ReactElement {
   return (
     <div
-      className={cn(
-        framePanelClass,
-        "flex min-w-0 flex-col gap-0.5 px-3 py-3 sm:gap-1 sm:px-5 sm:py-4",
-      )}
+      className={cn(cardClass, "flex min-w-0 flex-col gap-0.5 px-3 py-3 sm:gap-1 sm:px-5 sm:py-4")}
     >
       <span className="text-xs text-kumo-subtle sm:text-sm">{label}</span>
       <span className="text-base font-semibold text-kumo-strong tabular-nums sm:text-xl">
@@ -151,15 +148,15 @@ export interface TrafficSummaryProps {
  */
 export function TrafficSummaryPanel(props: TrafficSummaryProps): ReactElement {
   return (
-    <Frame className="grid grid-cols-3 gap-1">
+    <div className="grid grid-cols-3 gap-4">
       <TrafficSummaryPanels {...props} />
-    </Frame>
+    </div>
   );
 }
 
 /**
- * The summary's panels without a Frame of their own, for a Frame that holds more: three stats and
- * the chart under them, laid out by a three-column grid.
+ * The summary's panels without a grid of their own, for a grid that holds more: three stats and the
+ * chart under them, laid out by a three-column grid.
  */
 export function TrafficSummaryPanels({
   summary,
@@ -196,7 +193,7 @@ export function TrafficSummaryPanels({
         value={formatCount(summary.total.conns)}
         hint={`${formatCount(summary.total.txPackets + summary.total.rxPackets)} packets`}
       />
-      <div className={cn(framePanelClass, "col-span-3 flex min-w-0 flex-col gap-3 px-5 py-4")}>
+      <div className={cn(cardClass, "col-span-3 flex min-w-0 flex-col gap-3 px-5 py-4")}>
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <span className="text-sm text-kumo-subtle">
             {`Average rate${bucketLabel(summary.resolution)}`}

@@ -16,8 +16,7 @@ import { AuditStats } from "~/components/audit/stats.tsx";
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
@@ -148,6 +147,7 @@ function AuditPage(): ReactElement {
     <>
       <PageHeader
         title="Audit log"
+        docs="ref/audit"
         description="Who changed what through the API and the console."
       />
       <AuditStats events={rows} />
@@ -183,7 +183,7 @@ function AuditPage(): ReactElement {
           />
         )}
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <EventsTable
           events={window.rows}
           filtered={isFiltered(search)}
@@ -192,7 +192,7 @@ function AuditPage(): ReactElement {
           }}
           paging={window}
         />
-      </Frame>
+      </TableGroup>
     </>
   );
 }

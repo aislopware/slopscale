@@ -19,7 +19,7 @@ import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
+import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 /** Every row spans this many columns when it opens. */
@@ -51,7 +51,7 @@ function EventRows({
     <>
       <Table.Row
         variant={open ? "selected" : "default"}
-        className={cn("cursor-pointer align-top", !open && frameTableRowClass)}
+        className={cn("cursor-pointer align-top", !open && tableRowClass)}
         onClick={(click) => {
           if (!onControl(click)) {
             onToggle();
@@ -141,8 +141,8 @@ export function EventsTable({
           // panel. A fixed column does not grow for its content, so every cell in one either
           // truncates or wraps; a value that does neither runs into the next column. The minimum
           // keeps the columns readable on a phone, where the panel scrolls.
-          <Table className={cn(frameTableClass, "min-w-[800px] table-fixed")}>
-            <Table.Header variant="compact">
+          <Table className={cn(tableClass, "min-w-[800px] table-fixed")}>
+            <Table.Header>
               <Table.Row>
                 <Table.Head className="w-32">Time</Table.Head>
                 <Table.Head className="w-40">Actor</Table.Head>

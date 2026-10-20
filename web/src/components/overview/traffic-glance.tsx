@@ -13,7 +13,7 @@ import { defaultTrafficWindow } from "~/components/traffic/range.ts";
 import { noDestinationFilters, pickDestination } from "~/components/traffic/search.ts";
 import { TrafficSummaryPanels, emptySummary } from "~/components/traffic/summary.tsx";
 import { textLinkClass } from "~/components/traffic/window-header.tsx";
-import { framePanelClass } from "~/components/ui/frame.tsx";
+import { cardClass } from "~/components/ui/card.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 
@@ -57,7 +57,7 @@ function ListPanel({
   }
 
   return (
-    <div className={cn(framePanelClass, "flex min-w-0 flex-col overflow-clip")}>
+    <div className={cn(cardClass, "flex min-w-0 flex-col overflow-clip")}>
       <div className="flex items-center justify-between gap-4 px-5 pt-4 pb-2">
         <span className="text-sm text-kumo-subtle">{label}</span>
         {more}

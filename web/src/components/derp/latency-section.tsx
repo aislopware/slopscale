@@ -20,7 +20,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
-import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { cardClass } from "~/components/ui/card.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -40,7 +40,7 @@ export function LatencySection({ report }: { readonly report: DerpLatencyReport 
 
 function StatStrip({ report }: { readonly report: DerpLatencyReport }): ReactElement {
   return (
-    <Frame className="grid gap-1 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-3">
       <Stat label="Reporting" value={report.reporting} hint="Machines that measured the relays" />
       <Stat label="Silent" value={report.silent} hint="Machines that measured none" />
       <Stat
@@ -49,7 +49,7 @@ function StatStrip({ report }: { readonly report: DerpLatencyReport }): ReactEle
         hint="They relay most of their traffic"
         explain="A hard NAT gives every destination a different port, so two machines behind one cannot guess where to send the first packet and fall back to a relay."
       />
-    </Frame>
+    </div>
   );
 }
 
@@ -66,7 +66,7 @@ function Stat({
   readonly explain?: string;
 }): ReactElement {
   return (
-    <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4")}>
+    <div className={cn(cardClass, "flex flex-col gap-1 px-5 py-4")}>
       <span className="flex items-center gap-1 text-sm text-kumo-subtle">
         {label}
         {explain === undefined ? null : <Explain hint={explain} />}

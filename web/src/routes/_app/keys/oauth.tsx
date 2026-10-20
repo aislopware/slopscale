@@ -27,6 +27,7 @@ function OAuthClientsPage(): ReactElement {
     <>
       <PageHeader
         title="OAuth clients"
+        docs="ref/api"
         description="Client credentials for the v2 API, each limited to its own scopes and tags."
       />
       <OAuthPanel me={me} controls={controls} />

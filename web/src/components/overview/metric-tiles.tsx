@@ -7,7 +7,7 @@ import type { AccessRequest, Node, User } from "~/api/queries.ts";
 import { activeCount, pendingCount } from "~/components/access/request-model.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { cardClass } from "~/components/ui/card.tsx";
 import { isExitNode, nodeLabel } from "~/lib/node.ts";
 
 /** Column count by tile count, so a shorter strip still fills its row. */
@@ -20,9 +20,9 @@ const columnsFor: readonly string[] = [
   "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5",
 ];
 
-/** Each tile is its own inset panel in the strip's Frame. */
+/** Each tile is a card of its own, 16px from the next. */
 const tileClass = cn(
-  framePanelClass,
+  cardClass,
   "flex flex-col gap-1.5 px-5 py-4 text-kumo-default no-underline hover:bg-kumo-tint focus-visible:bg-kumo-tint",
 );
 
@@ -31,9 +31,9 @@ type Tone = "neutral" | "warning";
 const percent = 100;
 
 /**
- * How much of the number the context line speaks for, as a line under it: a recessed track and an
- * ink fill, so "8 connected" of 9 is seen before it is read. Nothing is drawn for a number that is
- * not a share of anything.
+ * How much of the number the context line speaks for, as a line under it: a recessed track and a
+ * brand-blue fill, so "8 connected" of 9 is seen before it is read. Nothing is drawn for a number
+ * that is not a share of anything.
  */
 function Meter({ share, of }: { readonly share: number; readonly of: number }): ReactElement {
   const width = of === 0 ? 0 : Math.round((share / of) * percent);
@@ -43,7 +43,7 @@ function Meter({ share, of }: { readonly share: number; readonly of: number }): 
       aria-hidden
       className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-kumo-recessed"
     >
-      <span className="block h-full rounded-full bg-kumo-contrast" style={{ width: `${width}%` }} />
+      <span className="block h-full rounded-full bg-kumo-brand" style={{ width: `${width}%` }} />
     </span>
   );
 }
@@ -279,5 +279,5 @@ export function MetricTiles({
     return null;
   }
 
-  return <Frame className={cn("grid gap-1", columnsFor[tiles.length])}>{tiles}</Frame>;
+  return <div className={cn("grid gap-4", columnsFor[tiles.length])}>{tiles}</div>;
 }

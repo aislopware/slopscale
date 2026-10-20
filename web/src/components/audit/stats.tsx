@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import { clientError } from "~/components/audit/cells.tsx";
-import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { cardClass } from "~/components/ui/card.tsx";
 import { echarts } from "~/lib/echarts.ts";
 import { useDarkMode } from "~/lib/theme.ts";
 import { daySeconds, formatAbsolute, minuteSeconds, parseTime } from "~/lib/time.ts";
@@ -28,7 +28,7 @@ function Stat({
   readonly alert?: boolean;
 }): ReactElement {
   return (
-    <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4")}>
+    <div className={cn(cardClass, "flex flex-col gap-1 px-5 py-4")}>
       <span className="text-sm text-kumo-subtle">{label}</span>
       <span
         className={cn(
@@ -132,7 +132,7 @@ function Activity({ events }: { readonly events: readonly AuditEvent[] }): React
   ];
 
   return (
-    <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4 sm:col-span-3")}>
+    <div className={cn(cardClass, "flex flex-col gap-1 px-5 py-4 sm:col-span-3")}>
       <span className="text-sm text-kumo-subtle">Activity</span>
       <TimeseriesChart
         echarts={echarts}
@@ -159,11 +159,11 @@ export function AuditStats({ events }: { readonly events: readonly AuditEvent[] 
   const failures = events.filter((event) => event.outcome >= clientError).length;
 
   return (
-    <Frame className="grid gap-1 sm:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-3">
       <Stat label="Events loaded" value={events.length} hint="In the selected range" />
       <Stat label="Distinct actors" value={actors.size} hint="Users, machines, keys and sessions" />
       <Stat label="Failures" value={failures} hint="HTTP status 400 or higher" alert />
       <Activity events={events} />
-    </Frame>
+    </div>
   );
 }

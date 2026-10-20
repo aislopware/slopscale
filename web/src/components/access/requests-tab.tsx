@@ -14,8 +14,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { useNow } from "~/lib/use-now.ts";
 
 const filters = ["pending", "active", "all"] as const;
@@ -125,7 +124,7 @@ export function RequestsTab({
           }}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -156,7 +155,7 @@ export function RequestsTab({
             )
           }
         />
-      </Frame>
+      </TableGroup>
     </>
   );
 }

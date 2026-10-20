@@ -35,8 +35,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 const preAuthStatusTabs: readonly { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -305,7 +304,7 @@ function KeyPanel({
           <Tabs variant="segmented" tabs={[...tabs]} value={currentTab} onValueChange={handleTab} />
         )}
       </TableToolbar>
-      <Frame>{children}</Frame>
+      <TableGroup>{children}</TableGroup>
     </>
   );
 }

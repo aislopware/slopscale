@@ -7,14 +7,13 @@ import { trafficReportersQuery, trafficSummaryQuery } from "~/api/traffic.ts";
 import type { TrafficScope } from "~/api/traffic.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
+import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
 import { MachinesTable, trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { optionalText, trafficWindowEntries, windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 
 /** The server's own cap on how many machines one summary lists. */
@@ -83,7 +82,7 @@ function MachinesPage(): ReactElement {
         />
       </WindowToolbar>
       {isRefusedWindow(error) ? null : (
-        <Frame>
+        <TableGroup>
           <MachinesTable
             nodes={shown}
             gateways={data?.reporters ?? []}
@@ -107,7 +106,7 @@ function MachinesPage(): ReactElement {
               )
             }
           />
-        </Frame>
+        </TableGroup>
       )}
     </>
   );

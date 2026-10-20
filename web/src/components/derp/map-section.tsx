@@ -7,7 +7,7 @@ import type { Derp } from "~/api/queries.ts";
 import { sourceLabels } from "~/components/derp/model.ts";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
+import { tableClass, tableRowClass } from "~/components/table/styles.ts";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 
 type Region = Derp["regions"][number];
@@ -73,8 +73,8 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
       {regions.length === 0 ? null : (
         <TableScroll>
           {() => (
-            <Table className={frameTableClass}>
-              <Table.Header variant="compact">
+            <Table className={tableClass}>
+              <Table.Header>
                 <Table.Row>
                   <Table.Head className="w-16">ID</Table.Head>
                   <Table.Head>Code</Table.Head>
@@ -85,7 +85,7 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
               </Table.Header>
               <Table.Body>
                 {regions.map((region) => (
-                  <Table.Row key={region.id} className={frameTableRowClass}>
+                  <Table.Row key={region.id} className={tableRowClass}>
                     <Table.Cell className="font-mono tabular-nums">{region.id}</Table.Cell>
                     <Table.Cell className="font-mono">{region.code}</Table.Cell>
                     <Table.Cell className="text-kumo-subtle">{region.name}</Table.Cell>

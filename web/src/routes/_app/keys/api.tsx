@@ -27,6 +27,7 @@ function ApiKeysPage(): ReactElement {
     <>
       <PageHeader
         title="API keys"
+        docs="ref/api"
         description="Authenticate this console and automation against the v1 API. Rotating a key gives it a new secret, same id and scopes."
       />
       <ApiPanel me={me} controls={controls} />

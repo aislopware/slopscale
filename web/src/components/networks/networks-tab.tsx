@@ -14,8 +14,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { TableFooter, TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 
 export interface NetworksTabProps {
   readonly me: Me;
@@ -78,7 +77,7 @@ export function NetworksTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <Frame>
+      <TableGroup>
         <DataTable
           table={table}
           empty={
@@ -113,7 +112,7 @@ export function NetworksTab({
             )
           }
         />
-      </Frame>
+      </TableGroup>
       <NetworkDialog
         groups={groups}
         nodes={nodes}

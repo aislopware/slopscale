@@ -1,6 +1,6 @@
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
-import { ArrowDownIcon, ArrowsDownUpIcon, ArrowUpIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CaretUpDownIcon, CaretUpIcon } from "@phosphor-icons/react";
 import type { RowData, SortDirection } from "@tanstack/react-table";
 import { useEffect, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
@@ -8,7 +8,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { AppTableInstance } from "~/components/table/app-table.tsx";
 import { PagingBand, smallestPageSize } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
+import { pinnedEdgeClass, tableClass, tableRowClass } from "~/components/table/styles.ts";
 
 export interface DataTableProps<TData extends RowData> {
   /**
@@ -19,8 +19,8 @@ export interface DataTableProps<TData extends RowData> {
   /** Rendered in place of the body when the (filtered) model is empty. */
   readonly empty: ReactNode;
   /**
-   * Rendered on the band under the panel: "Showing N of M". A table with enough rows to page shows
-   * the range, the page size and the paging controls there instead.
+   * Rendered under the card: "Showing N of M". A table with enough rows to page shows the range,
+   * the page size and the paging controls there instead.
    */
   readonly footer?: ReactNode;
   /** Adds a click handler and pointer cursor to every row. */
@@ -43,9 +43,10 @@ export interface DataTableProps<TData extends RowData> {
 }
 
 /**
- * Renders the table with Kumo's table parts, as the panel of the Frame it sits in, with the footer
- * on the band below. Columns declare `meta.className` for cell widths and alignment, `meta.numeric`
- * for a column of figures, `meta.sticky` to pin a column to an edge and `enableSorting` for a
+ * The Cloudflare dashboard's DataTable: Kumo's table parts styled by `tableClass` in the card
+ * `TableScroll` draws, with "Showing x-y of z" (or the pager) under the card. Columns declare
+ * `meta.className` for cell widths and alignment, `meta.numeric` for a column of figures,
+ * `meta.sticky` to pin a column to an edge (the row's ⋯ menu, 50px) and `enableSorting` for a
  * sortable header; everything else is the column's `cell` renderer.
  */
 export function DataTable<TData extends RowData>({
@@ -79,11 +80,11 @@ export function DataTable<TData extends RowData>({
   }, [shows, setPageIndex]);
 
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-2">
       <TableScroll pinnedRight={pinnedRight} below={rows.length === 0 ? empty : null}>
         {(overflowing) => (
-          <Table className={frameTableClass}>
-            <Table.Header variant="compact">
+          <Table className={tableClass}>
+            <Table.Header>
               {table.getHeaderGroups().map((group) => (
                 <Table.Row key={group.id}>
                   {group.headers.map((header, index) => {
@@ -131,7 +132,7 @@ export function DataTable<TData extends RowData>({
                 return (
                   <Table.Row
                     key={row.id}
-                    className={cn(frameTableRowClass, clickable && "cursor-pointer")}
+                    className={cn(tableRowClass, clickable && "cursor-pointer")}
                     onClick={
                       !clickable || onRowClick === undefined
                         ? undefined
@@ -171,7 +172,7 @@ export function DataTable<TData extends RowData>({
         )}
       </TableScroll>
       <PageBand table={table} fallback={footer} />
-    </>
+    </div>
   );
 }
 
@@ -184,9 +185,9 @@ function cellClass(
 ): string {
   return cn(
     meta?.numeric === true && "text-right tabular-nums",
-    // The hairline reads as the pinned column's edge, so it appears only while there is something
-    // scrolled behind it.
-    meta?.sticky === "right" && overflowing && pinnedEdgeClass,
+    // The fade reads as the pinned column's edge, so it is drawn only while something is scrolled
+    // behind it; Kumo's own fade is wider than the dashboard's.
+    meta?.sticky === "right" && (overflowing ? pinnedEdgeClass : "before:hidden"),
     meta?.className,
   );
 }
@@ -249,9 +250,7 @@ function HeaderContent({
       type="button"
       onClick={onToggle}
       className={cn(
-        "group/sort inline-flex h-6 items-center gap-1 rounded-sm px-1.5 hover:bg-kumo-tint hover:text-kumo-default focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
-        // The padding is pulled back off the cell's inset, so the label starts where a cell's text does.
-        numeric ? "-mr-1.5" : "-ml-1.5",
+        "group/sort inline-flex h-6 items-center gap-1.5 rounded-sm hover:text-kumo-default focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
         sorted !== false && "text-kumo-default",
       )}
     >
@@ -263,24 +262,17 @@ function HeaderContent({
 }
 
 /**
- * The direction the column is sorted in. An unsorted column keeps the icon's room but only shows it
- * under the pointer or the keyboard, so a wide table's headers read as words rather than as
- * arrows.
+ * The sort caret beside a sortable heading: the 12px up-down caret at half strength while the
+ * column is not sorted, a single caret in the heading's own colour once it is.
  */
 function SortIcon({ sorted }: { readonly sorted: false | SortDirection }): ReactElement {
   if (sorted === "asc") {
-    return <ArrowUpIcon size={14} aria-label="Sorted ascending" />;
+    return <CaretUpIcon size={12} weight="bold" aria-label="Sorted ascending" />;
   }
 
   if (sorted === "desc") {
-    return <ArrowDownIcon size={14} aria-label="Sorted descending" />;
+    return <CaretDownIcon size={12} weight="bold" aria-label="Sorted descending" />;
   }
 
-  return (
-    <ArrowsDownUpIcon
-      size={14}
-      aria-hidden
-      className="text-kumo-subtle opacity-0 group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100"
-    />
-  );
+  return <CaretUpDownIcon size={12} aria-hidden className="opacity-50" />;
 }

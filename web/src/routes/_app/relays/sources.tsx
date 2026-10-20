@@ -26,6 +26,7 @@ function SourcesPage(): ReactElement {
     <>
       <PageHeader
         title="Sources"
+        docs="ref/derp"
         description="The map URLs and files the map is built from, and how often they are fetched again."
       />
       <div className="flex flex-col gap-6">
