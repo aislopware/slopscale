@@ -4,20 +4,26 @@ import { forwardRef } from "react";
 import type { ReactElement, Ref } from "react";
 
 /**
- * The router's `to` is a path alone, so a query string in an href would become part of the path. A
- * console address is split into the path and its parameters; anything else goes through as it is.
+ * The router's `to` is a path alone, so a query string or a fragment in an href would become part
+ * of the path. A console address is split into the path, its parameters and its fragment (the
+ * router scrolls to it); anything else goes through as it is.
  */
 function destination(href: string): {
   readonly to: string;
   readonly search?: Record<string, string>;
+  readonly hash?: string;
 } {
-  if (!href.startsWith("/") || !href.includes("?")) {
+  if (!href.startsWith("/") || !(href.includes("?") || href.includes("#"))) {
     return { to: href };
   }
 
   const url = new URL(href, globalThis.location.origin);
 
-  return { to: url.pathname, search: Object.fromEntries(url.searchParams) };
+  return {
+    to: url.pathname,
+    ...(url.search === "" ? {} : { search: Object.fromEntries(url.searchParams) }),
+    ...(url.hash === "" ? {} : { hash: url.hash.slice(1) }),
+  };
 }
 
 function RouterLink(

@@ -2,6 +2,8 @@ import { cn } from "@cloudflare/kumo/utils";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
+import { AppLink } from "~/lib/link.tsx";
+
 /**
  * The Cloudflare dashboard's page grid: a 1200px column centred between two gutters of at least
  * 16px (32px from md), 32px above and below, 28px between blocks. Every child sits in the centre
@@ -98,6 +100,38 @@ export function RailList({ children }: { readonly children: ReactNode }): ReactE
   );
 }
 
+const railLinkClass =
+  "inline-flex w-fit items-center gap-1 text-xs text-kumo-link hover:text-kumo-link/70";
+
+/**
+ * A rail row's link: a console page through the router, which adds the /console/ base path and
+ * navigates without a reload; anything else in a new tab with the external icon.
+ */
+function RailLink({
+  href,
+  label,
+  external = false,
+}: {
+  readonly href: string;
+  readonly label: string;
+  readonly external?: boolean;
+}): ReactElement {
+  if (!external) {
+    return (
+      <AppLink href={href} className={railLinkClass}>
+        {label}
+      </AppLink>
+    );
+  }
+
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className={railLinkClass}>
+      {label}
+      <ArrowSquareOutIcon aria-hidden className="size-3" />
+    </a>
+  );
+}
+
 /**
  * One row of a rail: a 13px medium title, a 12px subtle description, an optional 12px link (with
  * the external icon when it leaves the console) and a control such as a Switch on the right.
@@ -124,16 +158,7 @@ export function RailRow({
         {description === undefined ? null : (
           <span className="text-xs text-kumo-subtle">{description}</span>
         )}
-        {link === undefined ? null : (
-          <a
-            href={link.href}
-            {...(link.external === true ? { target: "_blank", rel: "noreferrer" } : {})}
-            className="inline-flex w-fit items-center gap-1 text-xs text-kumo-link hover:text-kumo-link/70"
-          >
-            {link.label}
-            {link.external === true ? <ArrowSquareOutIcon aria-hidden className="size-3" /> : null}
-          </a>
-        )}
+        {link === undefined ? null : <RailLink {...link} />}
       </div>
       {control === undefined ? null : <div className="flex shrink-0 items-center">{control}</div>}
     </div>

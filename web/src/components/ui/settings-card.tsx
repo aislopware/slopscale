@@ -57,8 +57,10 @@ export function SettingsRow({
         "py-4 pr-6 pl-4 group-data-compact/settings:py-2.5 group-data-compact/settings:pr-2.5 group-data-compact/settings:pl-5",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 flex-col gap-1">
+      {/* The control stays beside the description at every width, as the dashboard's rows keep a
+          Switch on the right of a phone's screen; the text wraps instead. */}
+      <div className="flex items-start justify-between gap-4 sm:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-h-lh flex-wrap items-center gap-2">
             <h3 className="font-medium text-kumo-default">{title}</h3>
             {docs === undefined ? null : <DocsBadge path={docs} />}
@@ -67,9 +69,8 @@ export function SettingsRow({
             <div className="max-w-[750px] text-pretty text-kumo-subtle">{description}</div>
           )}
         </div>
-        {/* ms-auto keeps the control at the right edge on its own line once the row wraps. */}
         {control === undefined ? null : (
-          <div className="ms-auto flex min-h-lh shrink-0 items-center">{control}</div>
+          <div className="flex min-h-lh shrink-0 items-center">{control}</div>
         )}
       </div>
       {children}

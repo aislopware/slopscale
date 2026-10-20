@@ -13,6 +13,7 @@ import type { KeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
+import { ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
@@ -279,6 +280,11 @@ function PreAuthKeyMenu({
       remove={{
         resourceType: "pre-auth key",
         resourceName: shortName(authKey),
+        summary: (
+          <ConfirmSummary name={`${preview(authKey)}…`} mono>
+            <span>{[ownerLabel(authKey), ...traits(authKey), ...authKey.aclTags].join(" · ")}</span>
+          </ConfirmSummary>
+        ),
         pending: remove.isPending,
         error: remove.isError ? errorMessage(remove.error) : undefined,
         run: (done) => {

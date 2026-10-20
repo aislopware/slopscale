@@ -1,6 +1,7 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Input } from "@cloudflare/kumo/components/input";
 import { LayerDialog } from "@cloudflare/kumo/components/layer-dialog";
+import { cn } from "@cloudflare/kumo/utils";
 import { useId, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -12,6 +13,12 @@ export interface ConfirmDialogProps {
   readonly onOpenChange: (open: boolean, eventDetails?: unknown) => void;
   readonly title: string;
   readonly description?: ReactNode;
+  /**
+   * The object the action applies to, repeated in an inset card under the description, as the
+   * dashboard's Networking deletes show a route's CIDR or a tunnel's name and ID. Block content
+   * belongs here: the description is a paragraph. `ConfirmSummary` lays out the usual lines.
+   */
+  readonly summary?: ReactNode;
   readonly confirmLabel?: string;
   readonly destructive?: boolean;
   readonly loading?: boolean;
@@ -67,6 +74,30 @@ function TypedName({
 }
 
 /**
+ * The usual inset summary: the object's name (mono for an address, a key or an ID) over a subtle
+ * line or two of what identifies it.
+ */
+export function ConfirmSummary({
+  name,
+  mono = false,
+  children,
+}: {
+  readonly name: ReactNode;
+  readonly mono?: boolean;
+  /** The subtle lines under the name, each a block of its own. */
+  readonly children?: ReactNode;
+}): ReactElement {
+  return (
+    <>
+      <span className={cn("font-medium text-kumo-default", mono && "font-mono")}>{name}</span>
+      {children === undefined ? null : (
+        <span className="flex flex-col gap-0.5 text-kumo-subtle">{children}</span>
+      )}
+    </>
+  );
+}
+
+/**
  * A modal yes/no question as Kumo's LayerDialog alert, the dashboard's delete confirmation: a white
  * panel inside an elevated frame, 576px wide and 64px from the top, the title, the consequence in
  * subtle text, and on the frame below the panel Cancel on the left and the action on the right.
@@ -78,6 +109,7 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
+  summary,
   confirmLabel = "Confirm",
   destructive = true,
   loading = false,
@@ -107,6 +139,11 @@ export function ConfirmDialog({
           <div className="flex flex-col gap-4">
             {description === undefined ? null : (
               <p className="text-base text-pretty text-kumo-subtle">{description}</p>
+            )}
+            {summary === undefined ? null : (
+              <div className="flex min-w-0 flex-col gap-1 rounded-lg bg-kumo-base px-4 py-3 text-sm [overflow-wrap:anywhere] ring ring-kumo-line">
+                {summary}
+              </div>
             )}
             {failed ? <Banner variant="error" title="Request failed" description={error} /> : null}
             {confirmName === undefined ? null : (
@@ -141,6 +178,8 @@ export interface DeleteDialogProps {
   /** The action's label; "Delete {resourceType}" when not given. */
   readonly deleteButtonText?: string;
   readonly errorMessage?: string;
+  /** The resource in an inset card under the sentence; see `ConfirmDialog`'s `summary`. */
+  readonly summary?: ReactNode;
 }
 
 /**
@@ -158,6 +197,7 @@ export function DeleteDialog({
   isDeleting = false,
   deleteButtonText,
   errorMessage,
+  summary,
 }: DeleteDialogProps): ReactElement {
   return (
     <ConfirmDialog
@@ -175,6 +215,7 @@ export function DeleteDialog({
       loading={isDeleting}
       error={errorMessage}
       confirmName={resourceName}
+      summary={summary}
       onConfirm={onDelete}
     />
   );

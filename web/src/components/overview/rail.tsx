@@ -16,10 +16,6 @@ import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { docsBase, docsUrl } from "~/lib/docs.ts";
 
-/** A rail link in the dashboard's 12px link style; the router's Link, so it keeps the base path. */
-const railLinkClass =
-  "inline-flex w-fit items-center gap-1 text-xs text-kumo-link hover:text-kumo-link/70";
-
 /** A 13px link on its own row of a rail card, as the zone overview's "Get your API token". */
 const cardLinkClass =
   "inline-flex w-fit items-center gap-1 text-sm text-kumo-link hover:text-kumo-link/70";
@@ -65,14 +61,8 @@ function ApprovalRows({
         <RailRow
           key={row.title}
           title={row.title}
-          description={
-            <span className="flex flex-col gap-0.5">
-              <span>{row.description}</span>
-              <Link to="/settings/tailnet" hash="approval" className={railLinkClass}>
-                Approval settings
-              </Link>
-            </span>
-          }
+          description={row.description}
+          link={{ href: "/settings/tailnet#approval", label: "Approval settings" }}
           control={
             <Switch
               aria-label={row.title}

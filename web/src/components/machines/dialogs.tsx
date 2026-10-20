@@ -8,7 +8,7 @@ import type { Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import type { useNodeMutations } from "~/components/machines/mutations.ts";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -375,14 +375,12 @@ export function DeleteDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Remove ${name}?`}
-      description={
-        <>
-          <span className="block">
-            The machine leaves the tailnet with its routes and shares. It can register again with a
-            new key.
-          </span>
-          <MachineSummaryCard node={node} />
-        </>
+      description="The machine leaves the tailnet with its routes and shares. It can register again with a new key."
+      summary={
+        <ConfirmSummary name={name}>
+          <span className="font-mono text-xs">{node.ipAddresses.join(" · ")}</span>
+          <span>{ownerLabel(node)}</span>
+        </ConfirmSummary>
       }
       confirmLabel="Remove machine"
       loading={remove.isPending}
@@ -392,20 +390,5 @@ export function DeleteDialog({
         remove.mutate({ params: { path: { nodeId: node.id } } });
       }}
     />
-  );
-}
-
-/**
- * The machine as the delete dialog's inset card shows it: the name over its addresses in mono and
- * whose it is. Spans laid out as blocks, since the card sits in the dialog's description
- * paragraph.
- */
-function MachineSummaryCard({ node }: { readonly node: Node }): ReactElement {
-  return (
-    <span className="mt-4 flex flex-col gap-1 rounded-lg bg-kumo-elevated px-4 py-3 text-sm ring ring-kumo-hairline">
-      <span className="font-medium text-kumo-default">{nodeName(node)}</span>
-      <span className="font-mono text-xs text-kumo-subtle">{node.ipAddresses.join(" · ")}</span>
-      <span className="text-kumo-subtle">{ownerLabel(node)}</span>
-    </span>
   );
 }

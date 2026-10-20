@@ -11,6 +11,7 @@ import { scopeLabel } from "~/components/keys/scopes.ts";
 import { apiKeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { ValueList } from "~/components/ui/value-list.tsx";
@@ -164,6 +165,11 @@ function ApiKeyMenu({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
         remove={{
           resourceType: "API key",
           resourceName: apiKey.prefix,
+          summary: (
+            <ConfirmSummary name={apiKey.prefix} mono>
+              {apiKey.description === "" ? undefined : <span>{apiKey.description}</span>}
+            </ConfirmSummary>
+          ),
           pending: remove.isPending,
           error: remove.isError ? errorMessage(remove.error) : undefined,
           run: (done) => {

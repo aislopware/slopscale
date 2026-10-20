@@ -10,7 +10,7 @@ import { GroupNames } from "~/components/access/group-names.tsx";
 import { ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { ConfirmDialog, ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
@@ -104,10 +104,13 @@ export function DnsRulesSection({
         open={removing !== undefined}
         onOpenChange={close}
         title="Delete DNS rule?"
-        description={
-          removing === undefined
-            ? ""
-            : `The machines in its groups stop using ${removing.name}'s nameservers for ${removing.domains.join(", ")}.`
+        description="The machines in its groups stop using its nameservers for these domains."
+        summary={
+          removing === undefined ? undefined : (
+            <ConfirmSummary name={removing.name}>
+              <span className="font-mono text-xs">{removing.domains.join(", ")}</span>
+            </ConfirmSummary>
+          )
         }
         confirmLabel="Delete"
         loading={mutations.remove.isPending}
