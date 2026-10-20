@@ -30,11 +30,6 @@ export interface DataTableProps<TData extends RowData> {
    * page holds, the band is the dashboard's: "Showing x-y of z", the rows per page and the pager.
    */
   readonly footer?: ReactNode;
-  /**
-   * Ignored: every table puts its band inside the card now (design spec §13.3). The prop goes once
-   * its last caller drops it.
-   */
-  readonly footerPlacement?: "below" | "inside";
   /** Adds a click handler and pointer cursor to every row. */
   readonly onRowClick?: ((rowId: string) => void) | undefined;
   /**

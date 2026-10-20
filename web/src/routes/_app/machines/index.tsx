@@ -31,7 +31,7 @@ import { SelectionProvider, useMachineSelection } from "~/components/machines/se
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { TableFooter, TableGroup } from "~/components/table/toolbar.tsx";
+import { TableGroup } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { PageWithRail, RailList, RailRow, RailSection } from "~/components/ui/page.tsx";
 import { docsUrl } from "~/lib/docs.ts";
@@ -146,7 +146,10 @@ function MachinesList(): ReactElement {
   // the table's filtered model instead — every matching machine, paging aside.
   const matching = table.getFilteredRowModel().rows;
   const selection = useMachineSelection(matching.map((row) => row.id));
-  const shown = table.getRowModel().rows.length;
+  const counted =
+    matching.length === machines.length
+      ? plural(machines.length, "machine")
+      : `${matching.length} of ${plural(machines.length, "machine")} match`;
 
   // Typing narrows the list as the operator types, so a keystroke replaces the URL rather than
   // filling the back button with every prefix of the search.
@@ -211,7 +214,7 @@ function MachinesList(): ReactElement {
               <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
             }
             overlayShown={selection.selected.size > 0}
-            footerPlacement="inside"
+            headerInfo={mayAct ? `${counted}. Tick rows to act on several at once.` : `${counted}.`}
             onRowClick={(nodeId) => {
               void navigate({ to: "/machines/$nodeId", params: { nodeId } });
             }}
@@ -228,13 +231,6 @@ function MachinesList(): ReactElement {
                 ownOnly={!can(me, "devices:core:read")}
                 onClearFilters={clearFilters}
               />
-            }
-            footer={
-              machines.length === 0 ? undefined : (
-                <TableFooter>
-                  {`Showing ${shown} of ${plural(machines.length, "machine")}`}
-                </TableFooter>
-              )
             }
           />
         </SelectionProvider>
