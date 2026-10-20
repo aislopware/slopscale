@@ -82,7 +82,7 @@ export function OwnerStep({
         description="The machine joins with a single-use key, so it belongs to the user you pick, or to its tags if you give it any."
         footer={
           <>
-            <LinkButton href="/machines" variant="ghost">
+            <LinkButton href="/machines" variant="ghost" className="mr-auto">
               Cancel
             </LinkButton>
             <Button

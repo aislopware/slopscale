@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Loader } from "@cloudflare/kumo/components/loader";
-import { cn } from "@cloudflare/kumo/utils";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -12,6 +11,7 @@ import type { Me } from "~/auth/me.ts";
 import { DoneStep } from "~/components/machines/add-done-step.tsx";
 import { OwnerStep } from "~/components/machines/add-owner-step.tsx";
 import { Folded, StepCard } from "~/components/machines/add-step-card.tsx";
+import { FocusedFlow } from "~/components/machines/focused-flow.tsx";
 import { JoinCommand } from "~/components/machines/join-command.tsx";
 import { nodeName } from "~/lib/node.ts";
 
@@ -54,74 +54,54 @@ export function AddMachineWizard({ me }: { readonly me: Me }): ReactElement {
       : nodes.data?.nodes.find((candidate) => !minted.before.has(candidate.id));
 
   return (
-    <div className="grid justify-center gap-8 lg:grid-cols-[minmax(0,35rem)_12rem]">
-      <ol
-        aria-label="Steps"
-        className="flex gap-4 max-lg:flex-wrap lg:sticky lg:top-[calc(var(--app-header-height,0px)+2rem)] lg:order-last lg:flex-col lg:gap-3 lg:self-start"
-      >
-        {steps.map((item) => (
-          <li
-            key={item.id}
-            aria-current={item.id === step ? "step" : undefined}
-            className={cn(
-              "flex items-center gap-2.5 text-sm",
-              item.id === step ? "font-medium text-kumo-default" : "text-kumo-subtle",
-            )}
-          >
-            <span
-              aria-hidden
-              className={cn(
-                "size-1.5 rounded-full ring ring-current",
-                item.id === step && "bg-current",
-              )}
-            />
-            {item.label}
-          </li>
-        ))}
-      </ol>
-      <div className="flex min-w-0 flex-col gap-4">
-        {step === "owner" ? (
-          <OwnerStep
-            me={me}
-            onMinted={(key, summary) => {
-              setMinted({
-                key,
-                summary,
-                before: new Set(nodes.data?.nodes.map((candidate) => candidate.id)),
-              });
-              setStep("install");
-            }}
+    <FocusedFlow
+      title="Add machine"
+      section="Machines"
+      closeHref="/machines"
+      steps={steps}
+      current={step}
+    >
+      {step === "owner" ? (
+        <OwnerStep
+          me={me}
+          onMinted={(key, summary) => {
+            setMinted({
+              key,
+              summary,
+              before: new Set(nodes.data?.nodes.map((candidate) => candidate.id)),
+            });
+            setStep("install");
+          }}
+        />
+      ) : (
+        <Folded title="Who it belongs to" lines={[minted?.summary ?? ""]} />
+      )}
+      {step === "install" && minted !== null ? (
+        <InstallStep
+          authKey={minted.key}
+          joined={joined}
+          onContinue={() => {
+            setStep("done");
+          }}
+        />
+      ) : null}
+      {step === "done" ? (
+        <>
+          <Folded
+            title="Install and connect"
+            settled={joined !== undefined}
+            lines={[joined === undefined ? "Not connected yet" : `${nodeName(joined)} connected`]}
           />
-        ) : (
-          <Folded title="Who it belongs to" lines={[minted?.summary ?? ""]} />
-        )}
-        {step === "install" && minted !== null ? (
-          <InstallStep
-            authKey={minted.key}
+          <DoneStep
             joined={joined}
-            onContinue={() => {
-              setStep("done");
+            onAnother={() => {
+              setMinted(null);
+              setStep("owner");
             }}
           />
-        ) : null}
-        {step === "done" ? (
-          <>
-            <Folded
-              title="Install and connect"
-              settled={joined !== undefined}
-              lines={[joined === undefined ? "Not connected yet" : `${nodeName(joined)} connected`]}
-            />
-            <DoneStep
-              joined={joined}
-              onAnother={() => {
-                setMinted(null);
-                setStep("owner");
-              }}
-            />
-          </>
-        ) : null}
-      </div>
-    </div>
+        </>
+      ) : null}
+    </FocusedFlow>
   );
 }
 
@@ -145,7 +125,7 @@ function InstallStep({
       description="Run this on the machine. It installs Tailscale where it can, points it at this server and joins with the key. The key is shown only once."
       footer={
         <>
-          <output className="mr-auto flex items-center gap-2 text-sm text-kumo-subtle">
+          <output className="mr-auto flex items-center gap-2 pl-2 text-sm text-kumo-subtle">
             {joined === undefined ? (
               <>
                 <Loader size="sm" />
