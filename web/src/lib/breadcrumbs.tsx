@@ -39,12 +39,14 @@ export function useBreadcrumbLeaf(): BreadcrumbLeaf | null {
  * trail reads "Machines › office-minipc › Preferences" with the record a link back.
  */
 export function useBreadcrumb(leaf: string | null, parent?: Crumb): void {
-  const store = use(BreadcrumbContext);
+  // The setter alone: the store object changes with every leaf, so depending on it would set the
+  // leaf again after each set.
+  const setLeaf = use(BreadcrumbContext)?.setLeaf;
   const parentLabel = parent?.label;
   const parentTo = parent?.to;
 
   useEffect((): (() => void) => {
-    store?.setLeaf(
+    setLeaf?.(
       leaf === null
         ? null
         : {
@@ -57,7 +59,7 @@ export function useBreadcrumb(leaf: string | null, parent?: Crumb): void {
     );
 
     return () => {
-      store?.setLeaf(null);
+      setLeaf?.(null);
     };
-  }, [store, leaf, parentLabel, parentTo]);
+  }, [setLeaf, leaf, parentLabel, parentTo]);
 }
