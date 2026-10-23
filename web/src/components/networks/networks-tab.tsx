@@ -1,15 +1,13 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { Group, Network, Node } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { networkColumns, toNetworkRows } from "~/components/networks/network-columns.tsx";
-import { NetworkDialog } from "~/components/networks/network-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
@@ -39,8 +37,6 @@ export function NetworksTab({
 }: NetworksTabProps): ReactElement {
   const canEdit = can(me, "devices:routes");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useNetworkMutations();
   const rows = useMemo(() => toNetworkRows(networks, groups), [networks, groups]);
 
   const table = useAppTable({
@@ -58,16 +54,15 @@ export function NetworksTab({
     <>
       <TableToolbar
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New network
-          </Button>
+          canEdit ? (
+            <LinkButton href="/networks/new" variant="primary" icon={PlusIcon}>
+              New network
+            </LinkButton>
+          ) : (
+            <Button variant="primary" icon={PlusIcon} disabled>
+              New network
+            </Button>
+          )
         }
       >
         <SearchInput
@@ -107,14 +102,6 @@ export function NetworksTab({
           }
         />
       </TableGroup>
-      <NetworkDialog
-        groups={groups}
-        nodes={nodes}
-        enforcing={enforcing}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
     </>
   );
 }

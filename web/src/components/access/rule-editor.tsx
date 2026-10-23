@@ -19,10 +19,9 @@ import {
   ruleSnippet,
 } from "~/components/access/rule-hujson.ts";
 import { previewColumns } from "~/components/access/rule-preview.tsx";
-import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import { BuilderHeading, RulePreview, SettingToggle } from "~/components/policy/rule-builder.tsx";
 import { fieldError } from "~/components/ui/field-error.ts";
-import { Section } from "~/components/ui/section.tsx";
+import { FieldGrid, FormPage, FormSection, useDraft } from "~/components/ui/form-page.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import type { EditorProblem } from "~/lib/editor/problems.ts";
 
@@ -144,50 +143,52 @@ function ScopeSection({
   readonly onChange: Change;
 }): ReactElement {
   return (
-    <Section title="Scope" bodyClassName="grid lg:grid-cols-2">
-      <div className="flex min-w-0 flex-col gap-6 p-4">
-        <BuilderHeading
-          logic="if"
-          title="Conditions"
-          description={
-            policyFileEnforces
-              ? "Matching connections are allowed on top of what the policy file allows."
-              : "Matching connections are allowed. Once a rule is enabled, whatever no rule allows is blocked."
-          }
-        />
-        <RuleModeSwitch mode={view.mode} onModeChange={view.handleModeChange} />
-        {view.mode === "visual" ? (
-          <RuleConditions
-            draft={draft}
-            groups={groups}
-            postures={postures}
-            errors={errors}
-            onChange={onChange}
+    <FormSection title="Scope" flush>
+      <div className="grid lg:grid-cols-2">
+        <div className="flex min-w-0 flex-col gap-6 p-4">
+          <BuilderHeading
+            logic="if"
+            title="Conditions"
+            description={
+              policyFileEnforces
+                ? "Matching connections are allowed on top of what the policy file allows."
+                : "Matching connections are allowed. Once a rule is enabled, whatever no rule allows is blocked."
+            }
           />
-        ) : (
-          <RuleHujsonEditor
-            value={view.snippet}
-            onChange={view.handleSnippetChange}
-            problems={view.problems}
-            fieldErrors={[errors.sources, errors.destinations, errors.ports].filter(
-              (error) => error !== undefined,
-            )}
-            readOnly={view.readOnly}
-          />
-        )}
-      </div>
-      <div className="min-w-0 border-t border-kumo-line p-4 lg:border-t-0 lg:border-l">
-        <div className="flex flex-col gap-6 lg:sticky lg:top-[calc(var(--app-header-height,0px)+1rem)]">
-          <BuilderHeading logic="then" title="Action and settings" />
-          <RuleSettings
-            draft={draft}
-            toOwnMachines={toOwnMachines}
-            errors={errors}
-            onChange={onChange}
-          />
+          <RuleModeSwitch mode={view.mode} onModeChange={view.handleModeChange} />
+          {view.mode === "visual" ? (
+            <RuleConditions
+              draft={draft}
+              groups={groups}
+              postures={postures}
+              errors={errors}
+              onChange={onChange}
+            />
+          ) : (
+            <RuleHujsonEditor
+              value={view.snippet}
+              onChange={view.handleSnippetChange}
+              problems={view.problems}
+              fieldErrors={[errors.sources, errors.destinations, errors.ports].filter(
+                (error) => error !== undefined,
+              )}
+              readOnly={view.readOnly}
+            />
+          )}
+        </div>
+        <div className="min-w-0 border-t border-kumo-line p-4 lg:border-t-0 lg:border-l">
+          <div className="flex flex-col gap-6 lg:sticky lg:top-[calc(var(--app-header-height,0px)+1rem)]">
+            <BuilderHeading logic="then" title="Action and settings" />
+            <RuleSettings
+              draft={draft}
+              toOwnMachines={toOwnMachines}
+              errors={errors}
+              onChange={onChange}
+            />
+          </div>
         </div>
       </div>
-    </Section>
+    </FormSection>
   );
 }
 
@@ -202,7 +203,7 @@ function DetailsSection({
   readonly onChange: Change;
 }): ReactElement {
   return (
-    <Section title="Details" bodyClassName="flex flex-col gap-6 p-4">
+    <FormSection title="Details">
       <FieldGrid>
         <Input
           label="Rule name"
@@ -233,7 +234,7 @@ function DetailsSection({
           onChange({ enabled });
         }}
       />
-    </Section>
+    </FormSection>
   );
 }
 
@@ -298,7 +299,7 @@ export function RuleEditor({
   }
 
   return (
-    <EditorPage
+    <FormPage
       noun="rule"
       creating={rule === undefined}
       canEdit={canEdit}
@@ -306,9 +307,7 @@ export function RuleEditor({
       pending={mutation.isPending}
       dirty={dirty}
       onSubmit={save}
-      onCancel={() => {
-        void navigate({ to: "/policy/rules" });
-      }}
+      cancelTo="/policy/rules"
       onDelete={() => {
         setDeleting(true);
       }}
@@ -339,14 +338,12 @@ export function RuleEditor({
         view={view}
         onChange={update}
       />
-      <Section
-        title="Preview"
-        description="What the rule does once it is saved."
-        bodyClassName="bg-kumo-elevated"
-      >
-        <RulePreview columns={previewColumns(draft, { groups, postures, toOwnMachines })} />
-      </Section>
+      <FormSection title="Preview" info="What the rule does once it is saved." flush>
+        <div className="bg-kumo-elevated">
+          <RulePreview columns={previewColumns(draft, { groups, postures, toOwnMachines })} />
+        </div>
+      </FormSection>
       <DetailsSection draft={draft} errors={shown} onChange={update} />
-    </EditorPage>
+    </FormPage>
   );
 }

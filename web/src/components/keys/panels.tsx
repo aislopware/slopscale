@@ -1,9 +1,8 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
-import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
@@ -18,7 +17,6 @@ import type { Me } from "~/auth/me.ts";
 import { apiKeyColumns, emptyUsers } from "~/components/keys/api-columns.tsx";
 import { matchesKind } from "~/components/keys/federated.ts";
 import { oauthClientColumns } from "~/components/keys/oauth-columns.tsx";
-import { CreateFederatedIdentityDialog } from "~/components/keys/oauth-dialogs.tsx";
 import { preAuthKeyColumns } from "~/components/keys/preauth-columns.tsx";
 import type { KindFilter } from "~/components/keys/search.ts";
 import { apiKeyStatus, preAuthKeyStatus } from "~/components/keys/status.ts";
@@ -157,8 +155,8 @@ const oauthKindTabs: readonly { value: KindFilter; label: string }[] = [
 ];
 
 /**
- * The OAuth clients and federated identities list. A client is created on a page of its own; a
- * federated identity still in its dialog, opened from the page header's secondary action.
+ * The OAuth clients and federated identities list. Each is created, and edited, on a page of its
+ * own, linked from the page header and from the client id.
  */
 export function OAuthPanel({
   me,
@@ -205,27 +203,6 @@ export function OAuthPanel({
         }
       />
     </KeyPanel>
-  );
-}
-
-/** The OAuth page header's secondary action: the federated identity dialog and its trigger. */
-export function NewFederatedIdentityButton({ me }: { readonly me: Me }): ReactElement {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <Button
-        variant="secondary"
-        icon={PlusIcon}
-        disabled={!can(me, "oauth_keys")}
-        onClick={() => {
-          setOpen(true);
-        }}
-      >
-        New federated identity
-      </Button>
-      <CreateFederatedIdentityDialog me={me} open={open} onOpenChange={setOpen} />
-    </>
   );
 }
 

@@ -14,10 +14,9 @@ import { DeletePostureDialog } from "~/components/access/posture-dialogs.tsx";
 import { ExampleTiles, ScheduleFields } from "~/components/access/posture-fields.tsx";
 import { isClock, isWeekday, parseExpressions } from "~/components/access/posture-model.ts";
 import type { Weekday } from "~/components/access/posture-model.ts";
-import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import { SettingToggle } from "~/components/policy/rule-builder.tsx";
 import { fieldError } from "~/components/ui/field-error.ts";
-import { Section } from "~/components/ui/section.tsx";
+import { FieldGrid, FormPage, FormSection, useDraft } from "~/components/ui/form-page.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
 
@@ -170,10 +169,9 @@ function ConditionsSection({
   );
 
   return (
-    <Section
+    <FormSection
       title="Conditions"
-      description="Every expression must hold for a machine to pass. A rule that requires the posture admits only machines that pass."
-      bodyClassName="flex flex-col gap-5 p-4"
+      info="Every expression must hold for a machine to pass. A rule that requires the posture admits only machines that pass."
     >
       {creating ? tiles : null}
       <ExpressionEditor
@@ -190,7 +188,7 @@ function ConditionsSection({
         <p className="-mt-3 text-sm leading-snug text-kumo-danger">{error}</p>
       )}
       {creating ? null : tiles}
-    </Section>
+    </FormSection>
   );
 }
 
@@ -204,7 +202,7 @@ function BasicSection({
   readonly onChange: Change;
 }): ReactElement {
   return (
-    <Section title="Basic information" bodyClassName="p-4">
+    <FormSection title="Posture details">
       <FieldGrid>
         <Input
           label="Posture name"
@@ -227,7 +225,7 @@ function BasicSection({
           }}
         />
       </FieldGrid>
-    </Section>
+    </FormSection>
   );
 }
 
@@ -293,7 +291,7 @@ export function PostureEditor({
   }
 
   return (
-    <EditorPage
+    <FormPage
       noun="posture"
       creating={posture === undefined}
       canEdit={canEdit}
@@ -301,9 +299,7 @@ export function PostureEditor({
       pending={mutation.isPending}
       dirty={dirty}
       onSubmit={save}
-      onCancel={() => {
-        void navigate({ to: "/policy/postures" });
-      }}
+      cancelTo="/policy/postures"
       onDelete={() => {
         setDeleting(true);
       }}
@@ -329,7 +325,7 @@ export function PostureEditor({
         geoIpAvailable={geoIpAvailable}
         onChange={update}
       />
-      <Section title="Schedule" bodyClassName="p-4">
+      <FormSection title="Schedule">
         <SettingToggle
           title="Only during a weekly window"
           description="Outside the window the posture fails, so rules that require it deny traffic."
@@ -342,7 +338,7 @@ export function PostureEditor({
             <ScheduleFields draft={draft} daysError={shown.days} onChange={update} />
           ) : null}
         </SettingToggle>
-      </Section>
-    </EditorPage>
+      </FormSection>
+    </FormPage>
   );
 }

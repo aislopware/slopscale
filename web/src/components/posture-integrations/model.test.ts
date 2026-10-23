@@ -4,7 +4,7 @@ import type { PostureIntegration, PostureProvider } from "~/api/queries.ts";
 import {
   countIntegrations,
   draftFrom,
-  draftIssue,
+  draftIssues,
   fieldInputType,
   fieldLabel,
   fieldPlaceholder,
@@ -53,6 +53,19 @@ const mockProviders: readonly PostureProvider[] = [
 ];
 
 const [falconProvider] = mockProviders;
+
+function providerOf(key: string): PostureProvider {
+  const found = mockProviders.find((item) => item.provider === key);
+
+  if (found === undefined) {
+    throw new Error(`no mock provider ${key}`);
+  }
+
+  return found;
+}
+
+const falcon = providerOf("falcon");
+const kolide = providerOf("kolide");
 
 describe(integrationStatus, () => {
   it("is off when disabled regardless of sync state or errors", () => {
@@ -265,76 +278,49 @@ describe("fields logic", () => {
     expect(fieldInputType("baseUrl")).toBe("url");
     expect(fieldInputType("clientId")).toBe("text");
 
-    expect(fieldPlaceholder("clientSecret", undefined, true)).toBe("Stored, leave empty to keep");
+    expect(fieldPlaceholder("clientSecret", undefined, true)).toBe("Unchanged");
     expect(fieldPlaceholder("baseUrl", "https://default.com", false)).toBe("https://default.com");
   });
 });
 
-describe(draftIssue, () => {
-  it("requires a name", () => {
-    const draft: Draft = {
-      provider: "falcon",
-      name: "  ",
-      enabled: true,
-      baseUrl: "https://api.crowdstrike.com",
-      clientId: "id",
-      clientSecret: "secret",
-      apiToken: "",
-      tenantId: "",
-    };
+describe(draftIssues, () => {
+  const complete: Draft = {
+    provider: "falcon",
+    name: "Falcon",
+    enabled: true,
+    baseUrl: "https://api.crowdstrike.com",
+    clientId: "id",
+    clientSecret: "secret",
+    apiToken: "",
+    tenantId: "",
+  };
+  const creating = { editing: false, hasSecret: false };
 
-    expect(draftIssue(draft, falconProvider, { editing: false, hasSecret: false })).toBe(
-      "Name is required",
-    );
+  it("asks for a name", () => {
+    expect(draftIssues({ ...complete, name: "  " }, falcon, creating)).toStrictEqual({
+      name: "Give the integration a name.",
+    });
   });
 
-  it("requires a provider", () => {
-    const draft: Draft = {
-      provider: "falcon",
-      name: "Falcon",
-      enabled: true,
-      baseUrl: "https://api.crowdstrike.com",
-      clientId: "id",
-      clientSecret: "secret",
-      apiToken: "",
-      tenantId: "",
-    };
-
-    expect(draftIssue(draft, undefined, { editing: false, hasSecret: false })).toBe(
-      "Provider is required",
-    );
+  it("asks for every empty provider field by its label", () => {
+    expect(
+      draftIssues({ ...complete, clientId: "", clientSecret: "" }, falcon, creating),
+    ).toStrictEqual({
+      clientId: "Enter the client ID.",
+      clientSecret: "Enter the client secret.",
+    });
   });
 
-  it("requires provider-specific fields on create", () => {
-    const draft: Draft = {
-      provider: "falcon",
-      name: "Falcon",
-      enabled: true,
-      baseUrl: "https://api.crowdstrike.com",
-      clientId: "",
-      clientSecret: "secret",
-      apiToken: "",
-      tenantId: "",
-    };
-
-    expect(draftIssue(draft, falconProvider, { editing: false, hasSecret: false })).toBe(
-      "Client ID is required",
-    );
+  it("keeps an acronym's capitals in the message", () => {
+    expect(draftIssues({ ...complete, provider: "kolide" }, kolide, creating)).toStrictEqual({
+      apiToken: "Enter the API token.",
+    });
   });
 
-  it("allows empty secret when editing an integration with stored secret", () => {
-    const draft: Draft = {
-      provider: "falcon",
-      name: "Falcon",
-      enabled: true,
-      baseUrl: "https://api.crowdstrike.com",
-      clientId: "client-id",
-      clientSecret: "",
-      apiToken: "",
-      tenantId: "",
-    };
-
-    expect(draftIssue(draft, falconProvider, { editing: true, hasSecret: true })).toBeNull();
+  it("lets an edit leave a stored secret empty", () => {
+    expect(
+      draftIssues({ ...complete, clientSecret: "" }, falcon, { editing: true, hasSecret: true }),
+    ).toStrictEqual({});
   });
 });
 

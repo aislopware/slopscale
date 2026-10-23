@@ -1,12 +1,9 @@
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { PlusIcon, UserPlusIcon } from "@phosphor-icons/react";
-import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { CreateUserDialog } from "~/components/users/dialogs.tsx";
-import { useUserMutations } from "~/components/users/mutations.ts";
 
 export interface QuickActionsProps {
   readonly me: Me;
@@ -19,24 +16,12 @@ export interface QuickActionsProps {
  * caller has no scope for it, so the row never offers a dead end.
  */
 export function QuickActions({ me }: QuickActionsProps): ReactElement {
-  const [userOpen, setUserOpen] = useState(false);
-  const userMutations = useUserMutations();
-
   return (
     <>
       {can(me, "users") ? (
-        <>
-          <Button
-            variant="secondary"
-            icon={UserPlusIcon}
-            onClick={() => {
-              setUserOpen(true);
-            }}
-          >
-            Add user
-          </Button>
-          <CreateUserDialog open={userOpen} onOpenChange={setUserOpen} mutations={userMutations} />
-        </>
+        <LinkButton href="/users/new" variant="secondary" icon={UserPlusIcon}>
+          Add user
+        </LinkButton>
       ) : null}
       {can(me, "auth_keys") ? (
         <LinkButton href="/machines/add" variant="primary" icon={PlusIcon}>

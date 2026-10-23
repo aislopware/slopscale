@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { accessRulesQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { GroupEditor } from "~/components/access/group-editor.tsx";
+import { FormLayout } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
@@ -25,7 +26,7 @@ function NewGroupPage(): ReactElement {
   useBreadcrumb("New group");
 
   return (
-    <>
+    <FormLayout>
       <PageHeader
         title="New group"
         docs="ref/access-control"
@@ -37,6 +38,6 @@ function NewGroupPage(): ReactElement {
         users={users.data?.users ?? []}
         canEdit={can(me, "policy_file")}
       />
-    </>
+    </FormLayout>
   );
 }

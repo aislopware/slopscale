@@ -7,13 +7,13 @@ import type { ReactElement } from "react";
 import type { Policy } from "~/api/queries.ts";
 import { policyBlocks } from "~/components/policy/blocks.ts";
 import { BuildingBlocks } from "~/components/policy/building-blocks.tsx";
-import { EditorBanner } from "~/components/policy/editor-page.tsx";
-import { LeaveGuard } from "~/components/policy/leave-guard.tsx";
 import { PolicyEditor } from "~/components/policy/policy-editor.tsx";
 import type { PolicyEditorHandle } from "~/components/policy/policy-editor.tsx";
 import { usePolicyDraft } from "~/components/policy/use-policy-draft.ts";
 import type { PolicyDraft } from "~/components/policy/use-policy-draft.ts";
 import { Callout } from "~/components/ui/callout.tsx";
+import { FormError } from "~/components/ui/form-page.tsx";
+import { LeaveGuard } from "~/components/ui/leave-guard.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -110,7 +110,7 @@ export function PolicyFileTab({
         meta={<DraftState dirty={draft.dirty} updatedAt={policy.updatedAt} />}
         actions={<Actions draft={draft} canEdit={canEdit} />}
       />
-      <EditorBanner title={draft.issue?.title} message={draft.issue?.message} />
+      <FormError title={draft.issue?.title} message={draft.issue?.message} />
       {!enforces && !hasRules ? (
         <Callout
           tone="warning"

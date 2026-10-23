@@ -7,6 +7,7 @@ import { accessRulesQuery, groupsQuery, posturesQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { isBuiltinRule } from "~/components/access/model.ts";
 import { RuleEditor } from "~/components/access/rule-editor.tsx";
+import { FormLayout } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
@@ -35,7 +36,7 @@ function RulePage(): ReactElement {
   // A built-in rule belongs to the server: it can be switched off from the list, not rewritten.
   if (rule === undefined || isBuiltinRule(rule)) {
     return (
-      <>
+      <FormLayout width="wide">
         <PageHeader title={rule?.name ?? "Rule not found"} docs="ref/access-control" />
         <Section title="Rule" bodyClassName="p-0">
           <SectionEmpty
@@ -54,12 +55,12 @@ function RulePage(): ReactElement {
             }
           />
         </Section>
-      </>
+      </FormLayout>
     );
   }
 
   return (
-    <>
+    <FormLayout width="wide">
       <PageHeader
         title={rule.name}
         kicker="Rule"
@@ -75,6 +76,6 @@ function RulePage(): ReactElement {
         policyFileEnforces={policyFileEnforces}
         canEdit={can(me, "policy_file")}
       />
-    </>
+    </FormLayout>
   );
 }

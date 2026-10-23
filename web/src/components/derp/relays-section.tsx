@@ -1,15 +1,15 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
+import { cn } from "@cloudflare/kumo/utils";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Derp } from "~/api/queries.ts";
-import type { DerpCustomRegion, DerpRelay } from "~/api/schema.gen.ts";
+import type { DerpRelay } from "~/api/schema.gen.ts";
 import { withoutRegion } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
-import { RegionForm } from "~/components/derp/region-form.tsx";
-import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
@@ -49,7 +49,7 @@ export function RelaysSection({
   readonly canEdit: boolean;
   readonly mutations: DerpMutations;
 }): ReactElement {
-  const [dialog, setDialog] = useState<"closed" | "new" | DerpCustomRegion>("closed");
+  const navigate = useNavigate();
   const settings = derp.effective;
   const pending = mutations.set.isPending;
 
@@ -58,22 +58,17 @@ export function RelaysSection({
       title="Your relays"
       description="Regions of relays you run, merged on top of the fetched maps."
       bodyClassName="p-0"
-      {...(canEdit
-        ? {
-            actions: (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={PlusIcon}
-                onClick={() => {
-                  setDialog("new");
-                }}
-              >
-                Add region
-              </Button>
-            ),
-          }
-        : {})}
+      actions={
+        canEdit ? (
+          <LinkButton href="/relays/own/new" variant="secondary" size="sm" icon={PlusIcon}>
+            Add region
+          </LinkButton>
+        ) : (
+          <Button variant="secondary" size="sm" icon={PlusIcon} disabled>
+            Add region
+          </Button>
+        )
+      }
     >
       {settings.regions.length === 0 ? (
         <SectionEmpty
@@ -85,9 +80,13 @@ export function RelaysSection({
           <SectionRow key={region.id} className="flex items-start justify-between gap-4 py-2.5">
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex items-baseline gap-2">
-                <span className="font-mono text-sm font-medium text-kumo-strong">
+                <Link
+                  to="/relays/own/$regionId"
+                  params={{ regionId: String(region.id) }}
+                  className={cn("font-mono text-sm font-medium", rowLinkClass)}
+                >
                   {region.id} · {region.code}
-                </span>
+                </Link>
                 {region.name === undefined ||
                 region.name === "" ||
                 region.name === region.code ? null : (
@@ -105,54 +104,33 @@ export function RelaysSection({
                 ))}
               </ul>
             </div>
-            {canEdit ? (
-              <RowMenu label={`Actions for region ${region.code}`} disabled={pending}>
-                <DropdownMenu.Item
-                  icon={PencilSimpleIcon}
-                  onClick={() => {
-                    setDialog(region);
-                  }}
-                >
-                  Edit…
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator />
-                <DropdownMenu.Item
-                  icon={TrashIcon}
-                  variant="danger"
-                  onClick={() => {
-                    mutations.apply(withoutRegion(settings, region.id), `Removed ${region.code}`);
-                  }}
-                >
-                  Remove
-                </DropdownMenu.Item>
-              </RowMenu>
-            ) : null}
+            <RowMenu label={`Actions for region ${region.code}`} disabled={pending}>
+              <DropdownMenu.Item
+                icon={PencilSimpleIcon}
+                onClick={() => {
+                  void navigate({
+                    to: "/relays/own/$regionId",
+                    params: { regionId: String(region.id) },
+                  });
+                }}
+              >
+                {canEdit ? "Edit" : "View"}
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator />
+              <DropdownMenu.Item
+                icon={TrashIcon}
+                variant="danger"
+                disabled={!canEdit}
+                onClick={() => {
+                  mutations.apply(withoutRegion(settings, region.id), `Removed ${region.code}`);
+                }}
+              >
+                Remove
+              </DropdownMenu.Item>
+            </RowMenu>
           </SectionRow>
         ))
       )}
-      <DialogRoot
-        open={dialog !== "closed"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialog("closed");
-          }
-        }}
-      >
-        <DialogContent
-          size="lg"
-          title={dialog === "new" ? "Add region" : "Edit region"}
-          description="A region groups relays that are close to each other. A machine picks the region with the lowest latency."
-        >
-          <RegionForm
-            editing={dialog === "new" || dialog === "closed" ? null : dialog}
-            derp={derp}
-            mutations={mutations}
-            onDone={() => {
-              setDialog("closed");
-            }}
-          />
-        </DialogContent>
-      </DialogRoot>
     </Section>
   );
 }

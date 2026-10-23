@@ -1,20 +1,20 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 
 import type { LogStream } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { logStreamColumns } from "~/components/logstreams/columns.tsx";
-import { LogStreamDialog } from "~/components/logstreams/dialogs.tsx";
-import { useLogStreamMutations } from "~/components/logstreams/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
+
+const newStreamPath = "/integrations/log-streams/new";
 
 export function LogStreamsTab({
   me,
@@ -29,8 +29,6 @@ export function LogStreamsTab({
 }): ReactElement {
   const query = useDeferredValue(search);
   const canEdit = can(me, "logs:configuration");
-  const [creating, setCreating] = useState(false);
-  const mutations = useLogStreamMutations();
 
   const table = useAppTable({
     data: streams,
@@ -47,16 +45,15 @@ export function LogStreamsTab({
     <>
       <TableToolbar
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New log stream
-          </Button>
+          canEdit ? (
+            <LinkButton href={newStreamPath} variant="primary" icon={PlusIcon}>
+              New log stream
+            </LinkButton>
+          ) : (
+            <Button variant="primary" icon={PlusIcon} disabled>
+              New log stream
+            </Button>
+          )
         }
       >
         <SearchInput
@@ -77,15 +74,9 @@ export function LogStreamsTab({
                 description="Ship the audit log to Splunk, Elasticsearch, Datadog, Axiom, Loki or any HTTP collector."
                 contents={
                   canEdit ? (
-                    <Button
-                      variant="secondary"
-                      icon={PlusIcon}
-                      onClick={() => {
-                        setCreating(true);
-                      }}
-                    >
+                    <LinkButton href={newStreamPath} variant="secondary" icon={PlusIcon}>
                       Add your first log stream
-                    </Button>
+                    </LinkButton>
                   ) : undefined
                 }
               />
@@ -109,7 +100,6 @@ export function LogStreamsTab({
           }
         />
       </TableGroup>
-      <LogStreamDialog open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );
 }

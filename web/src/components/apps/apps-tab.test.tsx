@@ -89,6 +89,7 @@ function page(): ReactElement {
     routeTree: rootRoute.addChildren([
       createRoute({ getParentRoute: () => rootRoute, path: "/" }),
       createRoute({ getParentRoute: () => rootRoute, path: "/routes" }),
+      createRoute({ getParentRoute: () => rootRoute, path: "/apps/$appId" }),
     ]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
@@ -121,14 +122,27 @@ describe(AppsTab, () => {
     expect(scrollsSideways(screen.container)).toBe(false);
   });
 
+  it("links each app's name to its page", async () => {
+    const screen = await render(page());
+
+    await expect
+      .element(screen.getByRole("link", { name: "crm" }))
+      .toHaveAttribute("href", "/apps/1");
+    await expect
+      .element(screen.getByRole("link", { name: "wiki" }))
+      .toHaveAttribute("href", "/apps/2");
+  });
+
   it("links the pending count to the routes waiting for approval", async () => {
     const screen = await render(page());
-    const links = screen.getByRole("link");
+    // Both apps wait on three routes; the rows are sorted by name under the header row.
+    const pending = (row: number): ReturnType<typeof screen.getByRole> =>
+      screen.getByRole("row").nth(row).getByRole("link", { name: "3", exact: true });
 
     // One connector waiting names it as well; several can only turn the chip on.
     await expect
-      .element(links.nth(0))
+      .element(pending(1))
       .toHaveAttribute("href", "/routes?pending=true&q=connector-1.example-tailnet.ts.net");
-    await expect.element(links.nth(1)).toHaveAttribute("href", "/routes?pending=true");
+    await expect.element(pending(2)).toHaveAttribute("href", "/routes?pending=true");
   });
 });

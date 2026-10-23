@@ -1,15 +1,13 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 
 import type { PostureIntegration, PostureProvider } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { usePostureIntegrationMutations } from "~/components/posture-integrations/mutations.ts";
 import { postureIntegrationColumns } from "~/components/posture-integrations/posture-integration-columns.tsx";
-import { PostureIntegrationDialog } from "~/components/posture-integrations/posture-integration-dialogs.tsx";
 import { ProviderPicker } from "~/components/posture-integrations/provider-picker.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
@@ -32,10 +30,6 @@ export function PostureIntegrationsTab({
 }): ReactElement {
   const query = useDeferredValue(search);
   const canEdit = can(me, "devices:posture_attributes");
-  const [creating, setCreating] = useState(false);
-  // The provider picked from the tiles, which the form starts with; empty when the button opened it.
-  const [picked, setPicked] = useState("");
-  const mutations = usePostureIntegrationMutations();
 
   const table = useAppTable({
     data: integrations,
@@ -52,17 +46,15 @@ export function PostureIntegrationsTab({
     <>
       <TableToolbar
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setPicked("");
-              setCreating(true);
-            }}
-          >
-            New posture integration
-          </Button>
+          canEdit ? (
+            <LinkButton href="/integrations/posture/new" variant="primary" icon={PlusIcon}>
+              New posture integration
+            </LinkButton>
+          ) : (
+            <Button variant="primary" icon={PlusIcon} disabled>
+              New posture integration
+            </Button>
+          )
         }
       >
         {/* Nothing to search until something is connected; the tiles below are the list. */}
@@ -75,14 +67,7 @@ export function PostureIntegrationsTab({
         )}
       </TableToolbar>
       {total === 0 ? (
-        <ProviderPicker
-          providers={providers}
-          disabled={!canEdit}
-          onPick={(provider) => {
-            setPicked(provider);
-            setCreating(true);
-          }}
-        />
+        <ProviderPicker providers={providers} disabled={!canEdit} />
       ) : (
         <TableGroup>
           <DataTable
@@ -107,13 +92,6 @@ export function PostureIntegrationsTab({
           />
         </TableGroup>
       )}
-      <PostureIntegrationDialog
-        providers={providers}
-        provider={picked}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
     </>
   );
 }

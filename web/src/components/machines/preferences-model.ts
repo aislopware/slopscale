@@ -4,9 +4,9 @@ import type { NodePreferences, UpdateNodePreferencesRequestBody } from "~/api/sc
 export const remoteConfigCommand = "tailscale set --remote-config";
 
 /**
- * The switches, in the order the section and the dialog list them. The label is what fits beside a
- * value in half a column; what the setting actually does is the hint, which both the section and
- * the dialog put one hover, tap or focus away rather than on the line.
+ * The switches, in the order the section lists them. The label is what fits beside a value in half
+ * a column; what the setting actually does is the hint, which the section puts one hover, tap or
+ * focus away and the preferences page writes under the switch.
  */
 export const preferenceSwitches = [
   {
@@ -62,7 +62,7 @@ export type PreferenceSwitch = (typeof preferenceSwitches)[number]["key"];
 /**
  * The changed fields only. The endpoint takes a partial: a field the body leaves out is a field the
  * client keeps, so sending the whole set back would overwrite whatever the machine's own owner
- * changed while the dialog was open.
+ * changed while the page was open.
  */
 export function preferenceChanges(
   draft: NodePreferences,
@@ -98,21 +98,9 @@ function sameRoutes(draft: readonly string[], current: readonly string[]): boole
   );
 }
 
-/** Whether anything at all would be sent, which is what holds the dialog's save button. */
+/** Whether anything at all would be sent; a save with nothing to send only goes back. */
 export function hasPreferenceChanges(changes: UpdateNodePreferencesRequestBody): boolean {
   return Object.keys(changes).length > 0;
-}
-
-/**
- * Whether the dialog may send what it has. An empty hostname is a valid preference — it tells the
- * client to use the machine's own OS name — so it never holds the form; only a wrong row in a list
- * does, along with there being nothing to send.
- */
-export function canSavePreferences(
-  changes: UpdateNodePreferencesRequestBody,
-  invalidLists: boolean,
-): boolean {
-  return !invalidLists && hasPreferenceChanges(changes);
 }
 
 /** The exit node in use, by stable id or address; empty means the machine routes for itself. */

@@ -1,17 +1,15 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { cn } from "@cloudflare/kumo/utils";
 import { ArrowRightIcon, HardDrivesIcon, PlugIcon, PlusIcon } from "@phosphor-icons/react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { Service } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { reachStates, toServiceRows } from "~/components/services/model.ts";
+import { reachStates, servicePathLabel, toServiceRows } from "~/components/services/model.ts";
 import type { ServiceRow } from "~/components/services/model.ts";
-import { useServiceMutations } from "~/components/services/mutations.ts";
-import { ServiceDialog } from "~/components/services/service-dialogs.tsx";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { rowLinkClass } from "~/components/table/styles.ts";
@@ -58,9 +56,6 @@ export function ServicesTab({
 }: ServicesTabProps): ReactElement {
   const canEdit = can(me, "services");
   const query = useDeferredValue(search);
-  const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
-  const mutations = useServiceMutations();
   const rows = useMemo(
     () => toServiceRows(services).toSorted((left, right) => left.name.localeCompare(right.name)),
     [services],
@@ -73,16 +68,15 @@ export function ServicesTab({
     <>
       <TableToolbar
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New service
-          </Button>
+          canEdit ? (
+            <LinkButton href="/services/new" variant="primary" icon={PlusIcon}>
+              New service
+            </LinkButton>
+          ) : (
+            <Button variant="primary" icon={PlusIcon} disabled>
+              New service
+            </Button>
+          )
         }
       >
         <SearchInput
@@ -126,14 +120,6 @@ export function ServicesTab({
           <TableFooter>{`Showing ${shown.length} of ${countServices(total)}`}</TableFooter>
         )}
       </TableGroup>
-      <ServiceDialog
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-        onCreated={(label) => {
-          void navigate({ to: "/services/$label", params: { label } });
-        }}
-      />
     </>
   );
 }
@@ -166,7 +152,7 @@ function ServiceCard({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <Link
             to="/services/$label"
-            params={{ label: service.label }}
+            params={{ label: servicePathLabel(service.name) }}
             className="w-fit max-w-full truncate text-lg font-medium text-kumo-default hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
           >
             {service.displayName === "" ? service.name : service.displayName}
@@ -187,7 +173,7 @@ function ServiceCard({
       <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 text-sm text-kumo-subtle">
         <Link
           to="/services/$label"
-          params={{ label: service.label }}
+          params={{ label: servicePathLabel(service.name) }}
           className={cn("inline-flex items-center gap-1", rowLinkClass)}
         >
           {hostSummary(service)}

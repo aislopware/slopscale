@@ -1,6 +1,7 @@
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { cn } from "@cloudflare/kumo/utils";
 import { GlobeIcon, PathIcon } from "@phosphor-icons/react";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -15,7 +16,7 @@ import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { narrowOnlyClass } from "~/components/table/styles.ts";
+import { narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
@@ -103,17 +104,9 @@ export const networkColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, groups, nodes, enforcing } = table.options.meta ?? {};
+      const { me } = table.options.meta ?? {};
 
-      return me === undefined ? null : (
-        <NetworkMenu
-          network={row.original}
-          groups={groups ?? []}
-          nodes={nodes ?? []}
-          enforcing={enforcing === true}
-          me={me}
-        />
-      );
+      return me === undefined ? null : <NetworkMenu network={row.original} me={me} />;
     },
     meta: { className: "w-12 text-right", sticky: "right" },
   }),
@@ -133,7 +126,13 @@ function NameCell({
         <span className="flex h-lh items-center text-kumo-subtle">
           {network.exitNode ? <GlobeIcon size={iconSize} /> : <PathIcon size={iconSize} />}
         </span>
-        <span className="truncate font-medium text-kumo-default">{network.name}</span>
+        <Link
+          to="/networks/$networkId"
+          params={{ networkId: network.id }}
+          className={cn("truncate font-medium", rowLinkClass)}
+        >
+          {network.name}
+        </Link>
       </span>
       {network.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{network.description}</span>

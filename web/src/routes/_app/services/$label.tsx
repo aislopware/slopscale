@@ -1,3 +1,5 @@
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -10,6 +12,7 @@ import { HostsSection } from "~/components/services/hosts-section.tsx";
 import {
   reachStates,
   serviceLabel,
+  servicePathLabel,
   serviceReach,
   serviceTitle,
 } from "~/components/services/model.ts";
@@ -42,7 +45,9 @@ function ServicePage(): ReactElement {
   const { label } = Route.useParams();
   const { services } = useSuspenseQuery(servicesQuery).data;
   const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
-  const service = services.find((candidate) => serviceLabel(candidate.name) === label);
+  const service = services.find(
+    (candidate) => serviceLabel(candidate.name) === serviceLabel(label),
+  );
 
   useBreadcrumb(service === undefined ? null : serviceTitle(service));
 
@@ -99,13 +104,28 @@ function ServiceHeader({
         </>
       }
       actions={
-        <ServiceMenu
-          service={service}
-          me={me}
-          onDeleted={() => {
-            void navigate({ to: "/services" });
-          }}
-        />
+        <>
+          {can(me, "services") ? (
+            <LinkButton
+              href={`/services/${servicePathLabel(service.name)}/edit`}
+              variant="secondary"
+              icon={PencilSimpleIcon}
+            >
+              Edit
+            </LinkButton>
+          ) : (
+            <Button variant="secondary" icon={PencilSimpleIcon} disabled>
+              Edit
+            </Button>
+          )}
+          <ServiceMenu
+            service={service}
+            me={me}
+            onDeleted={() => {
+              void navigate({ to: "/services" });
+            }}
+          />
+        </>
       }
     />
   );

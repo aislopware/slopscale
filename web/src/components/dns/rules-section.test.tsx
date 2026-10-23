@@ -1,4 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
@@ -61,11 +68,22 @@ function cellOf(element: Element): Element {
 }
 
 function renderSection(rules: readonly DnsRule[], canEdit: boolean): ReturnType<typeof render> {
+  const rootRoute = createRootRoute({
+    component: () => <Harness rules={rules} canEdit={canEdit} />,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([
+      createRoute({ getParentRoute: () => rootRoute, path: "/" }),
+      createRoute({ getParentRoute: () => rootRoute, path: "/dns/split/rules/new" }),
+      createRoute({ getParentRoute: () => rootRoute, path: "/dns/split/rules/$ruleId" }),
+    ]),
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
   return render(
     <QueryClientProvider client={client}>
-      <Harness rules={rules} canEdit={canEdit} />
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
 }
@@ -79,16 +97,33 @@ describe(DnsRulesSection, () => {
     await expect.element(screen.getByText("10.0.0.53")).toBeVisible();
     await expect.element(screen.getByText("Engineering")).toBeVisible();
     await expect.element(screen.getByText("Disabled")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Add rule" })).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("button", { name: "Add rule" })).toBeDisabled();
+
+    await screen.getByRole("button", { name: "Actions for DNS rule Corp DNS" }).click();
+    await expect.element(screen.getByRole("menuitem", { name: "View" })).toBeVisible();
+    await expect.element(screen.getByRole("menuitem", { name: "Delete…" })).toBeDisabled();
   });
 
-  it("opens the editor from a rule and the creator from the header", async () => {
+  it("links a rule to its page and the header to the creator", async () => {
+    const screen = await renderSection([rule], true);
+
+    await expect
+      .element(screen.getByRole("link", { name: "Corp DNS" }))
+      .toHaveAttribute("href", "/dns/split/rules/7");
+    await expect
+      .element(screen.getByRole("link", { name: "Add rule" }))
+      .toHaveAttribute("href", "/dns/split/rules/new");
+  });
+
+  it("asks before deleting a rule", async () => {
     const screen = await renderSection([rule], true);
 
     await screen.getByRole("button", { name: "Actions for DNS rule Corp DNS" }).click();
-    await screen.getByRole("menuitem", { name: "Edit…" }).click();
-    await expect.element(screen.getByRole("dialog", { name: "Edit DNS rule" })).toBeVisible();
-    await expect.element(screen.getByLabelText("Name")).toHaveValue("Corp DNS");
+    await screen.getByRole("menuitem", { name: "Delete…" }).click();
+
+    await expect
+      .element(screen.getByRole("alertdialog", { name: "Delete DNS rule?" }))
+      .toBeVisible();
   });
 
   // Design spec §4.A: the ⋯ column is pinned like every other table's, and the nameservers wrap
@@ -98,19 +133,14 @@ describe(DnsRulesSection, () => {
       [{ ...rule, nameservers: ["2001:4860:4860::8888", "149.112.112.112"] }],
       true,
     );
-    const menu = screen.getByRole("button", { name: "Actions for DNS rule Corp DNS" }).element();
-    const cell = cellOf(menu);
+    const button = screen.getByRole("button", { name: "Actions for DNS rule Corp DNS" });
+
+    await expect.element(button).toBeVisible();
+
+    const cell = cellOf(button.element());
     const address = screen.getByText("2001:4860:4860::8888", { exact: false }).element();
 
     expect(getComputedStyle(cell).position).toBe("sticky");
     expect(getComputedStyle(address).whiteSpace).toBe("nowrap");
-  });
-
-  it("refuses to create a rule until it has a name, domains, nameservers and a group", async () => {
-    const screen = await renderSection([], true);
-
-    await screen.getByRole("button", { name: "Add rule" }).click();
-    await expect.element(screen.getByRole("dialog", { name: "Add DNS rule" })).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Add rule" })).toBeDisabled();
   });
 });

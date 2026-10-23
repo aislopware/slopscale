@@ -1,20 +1,17 @@
 import { cn } from "@cloudflare/kumo/utils";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { OAuthClient, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import type { Me } from "~/auth/me.ts";
 import { emptyUsers } from "~/components/keys/api-columns.tsx";
 import { issuerHost } from "~/components/keys/federated.ts";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
-import { OAuthClientDetailsDialog } from "~/components/keys/oauth-details-dialog.tsx";
-import { EditOAuthClientDialog } from "~/components/keys/oauth-dialogs.tsx";
 import { scopeLabel } from "~/components/keys/scopes.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { narrowOnlyClass } from "~/components/table/styles.ts";
+import { narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
@@ -89,7 +86,6 @@ export const oauthClientColumns = helper.columns([
       <ClientMenu
         client={row.original}
         disabled={table.options.meta?.me === undefined || !can(table.options.meta.me, "oauth_keys")}
-        me={table.options.meta?.me}
       />
     ),
     meta: { className: "w-12 text-right", sticky: "right" },
@@ -99,8 +95,8 @@ export const oauthClientColumns = helper.columns([
 /**
  * What the row says under the client id. The subject and the issuer host each take a line of their
  * own and truncate on their own: on one line the host took the room the subject needed, which left
- * a federated subject as "repo:acm…" even on a wide screen. The whole value is in the details
- * dialog, and in the title of each line for a pointer that hovers it.
+ * a federated subject as "repo:acm…" even on a wide screen. The whole value is on the client's
+ * page, and in the title of each line for a pointer that hovers it.
  */
 function ClientSubtext({ client }: { readonly client: OAuthClient }): ReactElement | null {
   if (client.keyType === "federated") {
@@ -131,27 +127,21 @@ function ClientSubtext({ client }: { readonly client: OAuthClient }): ReactEleme
 /**
  * The client id with subject/issuer host for federated rows or description under it. The cell is
  * capped rather than left to grow: a federated subject is a long line, and a column that widens to
- * fit one pushes the tags beside it under the pinned actions. The id opens the details, where the
- * values are whole and copyable, so a truncated line is never the end of the story.
+ * fit one pushes the tags beside it under the pinned actions. The id links to the client's page,
+ * where the values are whole and copyable, so a truncated line is never the end of the story.
  */
 function ClientCell({ client }: { readonly client: OAuthClient }): ReactElement {
-  const [showing, setShowing] = useState(false);
   const isFederated = client.keyType === "federated";
 
   return (
     <div className="flex max-w-72 min-w-0 flex-col gap-0.5">
-      <button
-        type="button"
-        title={`Details for ${client.clientId}`}
-        className="-mx-1 max-w-full truncate rounded-sm px-1 text-left font-mono text-[0.9em] text-kumo-default hover:bg-kumo-tint hover:underline focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
-        onClick={(event) => {
-          // The row itself is not a link, but the actions column is; keep the click here.
-          event.stopPropagation();
-          setShowing(true);
-        }}
+      <Link
+        to="/keys/oauth/$clientId"
+        params={{ clientId: client.clientId }}
+        className={cn("max-w-full truncate font-mono text-[0.9em]", rowLinkClass)}
       >
         {client.clientId}
-      </button>
+      </Link>
       <ClientSubtext client={client} />
       {isFederated && client.description !== "" ? (
         <span className="truncate text-sm text-kumo-subtle" title={client.description}>
@@ -165,7 +155,6 @@ function ClientCell({ client }: { readonly client: OAuthClient }): ReactElement 
       >
         {client.scopes.map((scope) => scopeLabel(scope)).join(" · ")}
       </span>
-      <OAuthClientDetailsDialog client={client} open={showing} onOpenChange={setShowing} />
     </div>
   );
 }
@@ -195,57 +184,44 @@ function CreatorCell({
 function ClientMenu({
   client,
   disabled,
-  me,
 }: {
   readonly client: OAuthClient;
   readonly disabled: boolean;
-  readonly me?: Me | undefined;
 }): ReactElement {
-  const [editing, setEditing] = useState(false);
-  const [showing, setShowing] = useState(false);
+  const navigate = useNavigate();
   const { revoke } = useOAuthClientMutations();
   const isFederated = client.keyType === "federated";
   const resourceType = isFederated ? "identity" : "OAuth client";
 
   return (
-    <>
-      <KeyActions
-        label={`Actions for ${resourceType} ${client.clientId}`}
-        disabled={disabled}
-        details={{
-          onSelect: () => {
-            setShowing(true);
-          },
-        }}
-        edit={{
-          onSelect: () => {
-            setEditing(true);
-          },
-        }}
-        remove={{
-          resourceType,
-          resourceName: client.clientId,
-          buttonText: isFederated ? "Delete identity" : undefined,
-          menuItemText: isFederated ? "Delete identity…" : undefined,
-          pending: revoke.isPending,
-          error: revoke.isError ? errorMessage(revoke.error) : undefined,
-          run: (done) => {
-            revoke.mutate(
-              { params: { path: { clientId: client.clientId } } },
-              {
-                onSuccess: () => {
-                  toast.success(
-                    isFederated ? "Federated identity deleted" : "OAuth client revoked",
-                  );
-                  done();
-                },
+    <KeyActions
+      label={`Actions for ${resourceType} ${client.clientId}`}
+      disabled={disabled}
+      open={{
+        writable: !disabled,
+        onSelect: () => {
+          void navigate({ to: "/keys/oauth/$clientId", params: { clientId: client.clientId } });
+        },
+      }}
+      remove={{
+        resourceType,
+        resourceName: client.clientId,
+        buttonText: isFederated ? "Delete identity" : undefined,
+        menuItemText: isFederated ? "Delete identity…" : undefined,
+        pending: revoke.isPending,
+        error: revoke.isError ? errorMessage(revoke.error) : undefined,
+        run: (done) => {
+          revoke.mutate(
+            { params: { path: { clientId: client.clientId } } },
+            {
+              onSuccess: () => {
+                toast.success(isFederated ? "Federated identity deleted" : "OAuth client revoked");
+                done();
               },
-            );
-          },
-        }}
-      />
-      <EditOAuthClientDialog client={client} me={me} open={editing} onOpenChange={setEditing} />
-      <OAuthClientDetailsDialog client={client} open={showing} onOpenChange={setShowing} />
-    </>
+            },
+          );
+        },
+      }}
+    />
   );
 }

@@ -12,8 +12,8 @@ import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { InviteResultView } from "~/components/users/invite-dialog.tsx";
-import type { InviteResult } from "~/components/users/invite-dialog.tsx";
+import { InviteResultView } from "~/components/users/invite-link.tsx";
+import type { InviteResult } from "~/components/users/invite-link.tsx";
 import { cannotChangeUsers } from "~/components/users/menu.tsx";
 import { useInviteMutations } from "~/components/users/mutations.ts";
 

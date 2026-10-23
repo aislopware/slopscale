@@ -10,6 +10,20 @@ export function serviceLabel(name: string): string {
   return name.startsWith(servicePrefix) ? name.slice(servicePrefix.length) : name;
 }
 
+/** Words the console's own service pages take after /services/, which a label could also be. */
+const reservedPaths = new Set(["new"]);
+
+/**
+ * What a service's page address carries: its label, or its full name when the label is a word the
+ * console's own pages use ("svc:new", since /services/new is the create page). A label never holds
+ * a colon, so the full name cannot be mistaken for another service's label.
+ */
+export function servicePathLabel(name: string): string {
+  const label = serviceLabel(name);
+
+  return reservedPaths.has(label) ? servicePrefix + label : label;
+}
+
 /** The full name for a label the operator typed. The server accepts either; the console sends this. */
 export function serviceName(label: string): string {
   return servicePrefix + serviceLabel(label.trim().toLowerCase());

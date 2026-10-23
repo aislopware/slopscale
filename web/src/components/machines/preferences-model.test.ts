@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { NodePreferences } from "~/api/schema.gen.ts";
 import {
-  canSavePreferences,
   exitNodeLabel,
   hasPreferenceChanges,
   preferenceChanges,
@@ -56,8 +55,8 @@ describe(preferenceChanges, () => {
     );
   });
 
-  // The dialog keeps the answer it opened on and diffs against that. Diffing against a fresher
-  // answer would send back a switch the machine's own owner flipped while the dialog was open.
+  // The page keeps the answer it opened on and diffs against that. Diffing against a fresher
+  // answer would send back a switch the machine's own owner flipped while the page was open.
   it("sends nothing when only the machine's own answer moved on", () => {
     const draft = { ...current };
     const answeredAgain = { ...current, shieldsUp: true, hostname: "renamed-on-the-machine" };
@@ -78,27 +77,20 @@ describe(preferenceChanges, () => {
 
 // An empty hostname is a preference, not a half-filled field: it tells the client to use the
 // machine's own operating system name, which is what most machines run with.
-describe(canSavePreferences, () => {
+describe(hasPreferenceChanges, () => {
   it("saves a switch while the hostname field is empty, and sends only the switch", () => {
     const nameless = { ...current, hostname: "" };
     const changes = preferenceChanges({ ...nameless, shieldsUp: true }, nameless);
 
     expect(changes).toStrictEqual({ shieldsUp: true });
-    expect(canSavePreferences(changes, false)).toBe(true);
+    expect(hasPreferenceChanges(changes)).toBe(true);
   });
 
   it("sends the empty hostname as a change when the operator cleared it", () => {
     const changes = preferenceChanges({ ...current, hostname: "" }, current);
 
     expect(changes).toStrictEqual({ hostname: "" });
-    expect(canSavePreferences(changes, false)).toBe(true);
-  });
-
-  it("holds the form while a list is half typed, and while nothing changed", () => {
-    const changes = preferenceChanges({ ...current, acceptRoutes: true }, current);
-
-    expect(canSavePreferences(changes, true)).toBe(false);
-    expect(canSavePreferences({}, false)).toBe(false);
+    expect(hasPreferenceChanges(changes)).toBe(true);
   });
 });
 

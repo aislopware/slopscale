@@ -1,7 +1,6 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -10,7 +9,6 @@ import type { Node } from "~/api/queries.ts";
 import type { NodePreferences } from "~/api/schema.gen.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { PreferencesDialog } from "~/components/machines/preferences-dialog.tsx";
 import {
   exitNodeLabel,
   preferenceSwitches,
@@ -38,7 +36,6 @@ export function PreferencesSection({
   readonly node: Node;
   readonly me: Me;
 }): ReactElement {
-  const [editing, setEditing] = useState(false);
   const preferences = useQuery({ ...nodePreferencesQuery(node.id), enabled: node.online });
   const editable = node.remoteConfig && can(me, "devices:core");
 
@@ -52,16 +49,14 @@ export function PreferencesSection({
       }
       actions={
         editable && preferences.data !== undefined ? (
-          <Button
+          <LinkButton
+            href={`/machines/${node.id}/preferences`}
             variant="secondary"
             size="sm"
             icon={<PencilSimpleIcon size={buttonIconSize} />}
-            onClick={() => {
-              setEditing(true);
-            }}
           >
             Edit
-          </Button>
+          </LinkButton>
         ) : undefined
       }
       bodyClassName="p-0"
@@ -76,12 +71,6 @@ export function PreferencesSection({
         preferences={preferences.data}
         loading={preferences.isPending}
         error={preferences.isError ? errorMessage(preferences.error) : undefined}
-      />
-      <PreferencesDialog
-        node={node}
-        preferences={preferences.data}
-        open={editing}
-        onOpenChange={setEditing}
       />
     </Section>
   );

@@ -6,7 +6,11 @@ import { errorMessage } from "~/api/error.ts";
 import type { Node, Service } from "~/api/queries.ts";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { AnnouncementStatus, untaggedReason } from "~/components/services/hosts-section.tsx";
-import { machineServices, serviceLabel, withServiceApproved } from "~/components/services/model.ts";
+import {
+  machineServices,
+  servicePathLabel,
+  withServiceApproved,
+} from "~/components/services/model.ts";
 import type { MachineService } from "~/components/services/model.ts";
 import { Code } from "~/components/ui/code.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
@@ -133,7 +137,7 @@ function ServiceName({ service }: { readonly service: MachineService }): ReactEl
   return (
     <Link
       to="/services/$label"
-      params={{ label: serviceLabel(service.name) }}
+      params={{ label: servicePathLabel(service.name) }}
       className="flex min-w-0 font-medium text-kumo-default hover:text-kumo-link hover:underline"
     >
       {name}

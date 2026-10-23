@@ -7,7 +7,7 @@ import type { ReactElement, ReactNode } from "react";
 import { copyText } from "~/lib/copy.ts";
 
 const iconSize = 14;
-const resetAfterMs = 1500;
+const resetAfterMs = 2000;
 
 /**
  * A monospace value that copies itself when clicked, drawn like Kumo's InlineCopyText: the copy
