@@ -9,7 +9,7 @@ import { editableSettings } from "~/components/dns/model.ts";
 import { useDnsMutations } from "~/components/dns/mutations.ts";
 import { NameserversSection } from "~/components/dns/nameservers-section.tsx";
 import { SearchDomainsSection } from "~/components/dns/search-section.tsx";
-import { DnsSourceActions } from "~/components/dns/source.tsx";
+import { DnsSourceActions, DnsSourceNote } from "~/components/dns/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/dns/nameservers")({
@@ -31,6 +31,7 @@ function NameserversPage(): ReactElement {
         title="Nameservers"
         docs="ref/dns"
         description="The resolvers every machine uses, MagicDNS, and the search domains that complete short names."
+        meta={<DnsSourceNote dns={dns.data} />}
         actions={<DnsSourceActions dns={dns.data} canEdit={canEdit} mutations={mutations} />}
       />
       <MagicDnsSection dns={dns.data} />

@@ -6,7 +6,11 @@ import { derpQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { EmbeddedSection } from "~/components/derp/embedded-section.tsx";
 import { useDerpMutations } from "~/components/derp/mutations.ts";
-import { DerpSourceActions, StaleSettingsBanner } from "~/components/derp/source.tsx";
+import {
+  DerpSourceActions,
+  DerpSourceNote,
+  StaleSettingsBanner,
+} from "~/components/derp/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/relays/embedded")({
@@ -28,6 +32,7 @@ function EmbeddedPage(): ReactElement {
         title="Embedded relay"
         docs="ref/derp"
         description="The relay built into this server, the region it joins and how it verifies clients."
+        meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}
       />
       <StaleSettingsBanner mutations={mutations} />

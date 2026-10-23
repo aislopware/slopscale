@@ -7,6 +7,7 @@ import { can } from "~/auth/me.ts";
 import { useDerpMutations } from "~/components/derp/mutations.ts";
 import {
   DerpSourceActions,
+  DerpSourceNote,
   FetchErrorBanner,
   StaleSettingsBanner,
 } from "~/components/derp/source.tsx";
@@ -32,6 +33,7 @@ function SourcesPage(): ReactElement {
         title="Sources"
         docs="ref/derp"
         description="The map URLs and files the map is built from, and how often they are fetched again."
+        meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}
       />
       <StaleSettingsBanner mutations={mutations} />

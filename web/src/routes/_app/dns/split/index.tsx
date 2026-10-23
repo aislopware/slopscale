@@ -8,7 +8,7 @@ import { editableSettings } from "~/components/dns/model.ts";
 import { useDnsMutations } from "~/components/dns/mutations.ts";
 import { useDnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { DnsRulesSection } from "~/components/dns/rules-section.tsx";
-import { DnsSourceActions } from "~/components/dns/source.tsx";
+import { DnsSourceActions, DnsSourceNote } from "~/components/dns/source.tsx";
 import { SplitDnsSection } from "~/components/dns/split-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -38,6 +38,7 @@ function SplitDnsPage(): ReactElement {
         title="Split DNS"
         docs="ref/dns"
         description="Domains answered by nameservers of their own, for every machine or only for the groups you pick."
+        meta={<DnsSourceNote dns={dns.data} />}
         actions={<DnsSourceActions dns={dns.data} canEdit={canEdit} mutations={mutations} />}
       />
       <SplitDnsSection

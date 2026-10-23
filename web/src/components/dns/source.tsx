@@ -1,6 +1,10 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
-import { ArrowCounterClockwiseIcon, FileTextIcon, InfoIcon } from "@phosphor-icons/react";
+import {
+  ArrowCounterClockwiseIcon,
+  FileTextIcon,
+  InfoIcon,
+  PencilSimpleIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -13,25 +17,50 @@ import { HoverPopover } from "~/components/ui/hover-popover.tsx";
 
 /**
  * Where a page's settings come from, the way the dashboard's DNS records page says "DNS Setup:
- * Full" beside its documentation button: a secondary pill in the page header, the explanation one
- * hover or focus away, and once the console has replaced the file a secondary "Reset to config
- * file" next to it. It goes in `PageHeader`'s actions, so the notice no longer takes a band of the
- * page on every visit.
+ * Full": a fact in `PageHeader`'s meta line, with the explanation one hover or focus away, so the
+ * notice no longer takes a band of the page on every visit.
  */
-export function SourceActions({
+export function SourceNote({
   overridden,
-  canEdit,
   fromFile,
   fromConsole,
-  reset,
 }: {
   /** Whether the console's stored settings replace the file's. */
   readonly overridden: boolean;
-  readonly canEdit: boolean;
   /** What editing here does while the file is in charge. */
   readonly fromFile: ReactNode;
   /** What the console's settings replace, and how to go back. */
   readonly fromConsole: ReactNode;
+}): ReactElement {
+  const Icon = overridden ? PencilSimpleIcon : FileTextIcon;
+
+  return (
+    <HoverPopover
+      title={
+        overridden ? "Settings were changed in the console" : "Settings come from the config file"
+      }
+      detail={overridden ? fromConsole : fromFile}
+    >
+      <span className="inline-flex items-center gap-1">
+        <Icon aria-hidden className="size-3" />
+        {overridden ? "Source: Console" : "Source: Config file"}
+        <InfoIcon aria-hidden className="size-3 opacity-70" />
+      </span>
+    </HoverPopover>
+  );
+}
+
+/**
+ * The way back to the file once the console has replaced it: a secondary "Reset to config file" in
+ * `PageHeader`'s actions, behind a confirmation. Nothing while the file is in charge.
+ */
+export function SourceActions({
+  overridden,
+  canEdit,
+  reset,
+}: {
+  readonly overridden: boolean;
+  readonly canEdit: boolean;
   readonly reset: {
     readonly title: string;
     readonly description: string;
@@ -39,39 +68,24 @@ export function SourceActions({
     readonly error: string | undefined;
     readonly onConfirm: (done: () => void) => void;
   };
-}): ReactElement {
+}): ReactElement | null {
   const [confirming, setConfirming] = useState(false);
+
+  if (!overridden || !canEdit) {
+    return null;
+  }
 
   return (
     <>
-      <HoverPopover
-        title={
-          overridden ? "Settings were changed in the console" : "Settings come from the config file"
-        }
-        detail={overridden ? fromConsole : fromFile}
-        triggerClassName="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus"
+      <Button
+        variant="secondary"
+        icon={ArrowCounterClockwiseIcon}
+        onClick={() => {
+          setConfirming(true);
+        }}
       >
-        <Badge
-          variant="secondary"
-          icon={overridden ? <ArrowCounterClockwiseIcon /> : <FileTextIcon />}
-        >
-          <span className="inline-flex items-center gap-1">
-            {overridden ? "Source: Console" : "Source: Config file"}
-            <InfoIcon aria-hidden className="size-3 opacity-70" />
-          </span>
-        </Badge>
-      </HoverPopover>
-      {overridden && canEdit ? (
-        <Button
-          variant="secondary"
-          icon={ArrowCounterClockwiseIcon}
-          onClick={() => {
-            setConfirming(true);
-          }}
-        >
-          Reset to config file
-        </Button>
-      ) : null}
+        Reset to config file
+      </Button>
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -90,20 +104,11 @@ export function SourceActions({
   );
 }
 
-/** Where the DNS settings come from, and the way back to the file once they were edited here. */
-export function DnsSourceActions({
-  dns,
-  canEdit,
-  mutations,
-}: {
-  readonly dns: Dns;
-  readonly canEdit: boolean;
-  readonly mutations: DnsMutations;
-}): ReactElement {
+/** Where the DNS settings come from. */
+export function DnsSourceNote({ dns }: { readonly dns: Dns }): ReactElement {
   return (
-    <SourceActions
+    <SourceNote
       overridden={dns.overridden}
-      canEdit={canEdit}
       fromFile={
         <>
           Changes made here are stored in the database and replace the file&rsquo;s <Code>dns</Code>{" "}
@@ -116,6 +121,24 @@ export function DnsSourceActions({
           the file says.
         </>
       }
+    />
+  );
+}
+
+/** The way back to the file once the DNS settings were edited here. */
+export function DnsSourceActions({
+  dns,
+  canEdit,
+  mutations,
+}: {
+  readonly dns: Dns;
+  readonly canEdit: boolean;
+  readonly mutations: DnsMutations;
+}): ReactElement | null {
+  return (
+    <SourceActions
+      overridden={dns.overridden}
+      canEdit={canEdit}
       reset={{
         title: "Reset DNS settings?",
         description:

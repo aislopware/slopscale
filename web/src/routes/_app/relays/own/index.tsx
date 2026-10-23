@@ -6,7 +6,11 @@ import { derpQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { useDerpMutations } from "~/components/derp/mutations.ts";
 import { RelaysSection } from "~/components/derp/relays-section.tsx";
-import { DerpSourceActions, StaleSettingsBanner } from "~/components/derp/source.tsx";
+import {
+  DerpSourceActions,
+  DerpSourceNote,
+  StaleSettingsBanner,
+} from "~/components/derp/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/relays/own/")({
@@ -28,6 +32,7 @@ function OwnRelaysPage(): ReactElement {
         title="Your relays"
         docs="ref/derp"
         description="Regions you add by hand, for relays you run yourself. They are merged into the map on top of the sources."
+        meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}
       />
       <StaleSettingsBanner mutations={mutations} />

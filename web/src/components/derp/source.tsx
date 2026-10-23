@@ -5,24 +5,15 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
-import { SourceActions } from "~/components/dns/source.tsx";
+import { SourceActions, SourceNote } from "~/components/dns/source.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { Code } from "~/components/ui/code.tsx";
 
-/** Where the relay settings come from, and the way back to the file once they were edited here. */
-export function DerpSourceActions({
-  derp,
-  canEdit,
-  mutations,
-}: {
-  readonly derp: Derp;
-  readonly canEdit: boolean;
-  readonly mutations: DerpMutations;
-}): ReactElement {
+/** Where the relay settings come from. */
+export function DerpSourceNote({ derp }: { readonly derp: Derp }): ReactElement {
   return (
-    <SourceActions
+    <SourceNote
       overridden={derp.overridden}
-      canEdit={canEdit}
       fromFile={
         <>
           Changes made here are stored in the database and replace the file&rsquo;s{" "}
@@ -36,6 +27,24 @@ export function DerpSourceActions({
           the file says.
         </>
       }
+    />
+  );
+}
+
+/** The way back to the file once the relay settings were edited here. */
+export function DerpSourceActions({
+  derp,
+  canEdit,
+  mutations,
+}: {
+  readonly derp: Derp;
+  readonly canEdit: boolean;
+  readonly mutations: DerpMutations;
+}): ReactElement | null {
+  return (
+    <SourceActions
+      overridden={derp.overridden}
+      canEdit={canEdit}
       reset={{
         title: "Reset relay settings?",
         description:
