@@ -72,6 +72,7 @@ import { Route as AppIntegrationsWebhooksIndexRouteImport } from './routes/_app/
 import { Route as AppIntegrationsWebhooksWebhookIdRouteImport } from './routes/_app/integrations/webhooks/$webhookId'
 import { Route as AppIntegrationsWebhooksNewRouteImport } from './routes/_app/integrations/webhooks/new'
 import { Route as AppKeysApiNewRouteImport } from './routes/_app/keys/api_.new'
+import { Route as AppKeysOauthClientIdRouteImport } from './routes/_app/keys/oauth_.$clientId'
 import { Route as AppKeysOauthNewRouteImport } from './routes/_app/keys/oauth_.new'
 import { Route as AppKeysPreAuthNewRouteImport } from './routes/_app/keys/pre-auth_.new'
 import { Route as AppMachinesNodeIdIndexRouteImport } from './routes/_app/machines/$nodeId.index'
@@ -93,6 +94,7 @@ import { Route as AppSettingsTrafficCollectionRouteImport } from './routes/_app/
 import { Route as AppSettingsTrafficGatewaysRouteImport } from './routes/_app/settings/traffic/gateways'
 import { Route as AppTrafficMachinesIndexRouteImport } from './routes/_app/traffic/machines/index'
 import { Route as AppTrafficMachinesNodeIdRouteImport } from './routes/_app/traffic/machines/$nodeId'
+import { Route as AppKeysOauthFederatedNewRouteImport } from './routes/_app/keys/oauth_.federated.new'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -416,6 +418,11 @@ const AppKeysApiNewRoute = AppKeysApiNewRouteImport.update({
   path: '/api/new',
   getParentRoute: () => AppKeysRouteRoute,
 } as any)
+const AppKeysOauthClientIdRoute = AppKeysOauthClientIdRouteImport.update({
+  id: '/oauth_/$clientId',
+  path: '/oauth/$clientId',
+  getParentRoute: () => AppKeysRouteRoute,
+} as any)
 const AppKeysOauthNewRoute = AppKeysOauthNewRouteImport.update({
   id: '/oauth_/new',
   path: '/oauth/new',
@@ -527,6 +534,12 @@ const AppTrafficMachinesNodeIdRoute =
     path: '/machines/$nodeId',
     getParentRoute: () => AppTrafficRouteRoute,
   } as any)
+const AppKeysOauthFederatedNewRoute =
+  AppKeysOauthFederatedNewRouteImport.update({
+    id: '/oauth_/federated/new',
+    path: '/oauth/federated/new',
+    getParentRoute: () => AppKeysRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -587,6 +600,7 @@ export interface FileRoutesByFullPath {
   '/integrations/webhooks/$webhookId': typeof AppIntegrationsWebhooksWebhookIdRoute
   '/integrations/webhooks/new': typeof AppIntegrationsWebhooksNewRoute
   '/keys/api/new': typeof AppKeysApiNewRoute
+  '/keys/oauth/$clientId': typeof AppKeysOauthClientIdRoute
   '/keys/oauth/new': typeof AppKeysOauthNewRoute
   '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
   '/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
@@ -611,6 +625,7 @@ export interface FileRoutesByFullPath {
   '/policy/rules/': typeof AppPolicyRulesIndexRoute
   '/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines/': typeof AppTrafficMachinesIndexRoute
+  '/keys/oauth/federated/new': typeof AppKeysOauthFederatedNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -663,6 +678,7 @@ export interface FileRoutesByTo {
   '/integrations/webhooks/$webhookId': typeof AppIntegrationsWebhooksWebhookIdRoute
   '/integrations/webhooks/new': typeof AppIntegrationsWebhooksNewRoute
   '/keys/api/new': typeof AppKeysApiNewRoute
+  '/keys/oauth/$clientId': typeof AppKeysOauthClientIdRoute
   '/keys/oauth/new': typeof AppKeysOauthNewRoute
   '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
   '/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
@@ -687,6 +703,7 @@ export interface FileRoutesByTo {
   '/policy/rules': typeof AppPolicyRulesIndexRoute
   '/settings/traffic': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines': typeof AppTrafficMachinesIndexRoute
+  '/keys/oauth/federated/new': typeof AppKeysOauthFederatedNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -750,6 +767,7 @@ export interface FileRoutesById {
   '/_app/integrations/webhooks/$webhookId': typeof AppIntegrationsWebhooksWebhookIdRoute
   '/_app/integrations/webhooks/new': typeof AppIntegrationsWebhooksNewRoute
   '/_app/keys/api_/new': typeof AppKeysApiNewRoute
+  '/_app/keys/oauth_/$clientId': typeof AppKeysOauthClientIdRoute
   '/_app/keys/oauth_/new': typeof AppKeysOauthNewRoute
   '/_app/keys/pre-auth_/new': typeof AppKeysPreAuthNewRoute
   '/_app/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
@@ -774,6 +792,7 @@ export interface FileRoutesById {
   '/_app/policy/rules/': typeof AppPolicyRulesIndexRoute
   '/_app/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/_app/traffic/machines/': typeof AppTrafficMachinesIndexRoute
+  '/_app/keys/oauth_/federated/new': typeof AppKeysOauthFederatedNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -836,6 +855,7 @@ export interface FileRouteTypes {
     | '/integrations/webhooks/$webhookId'
     | '/integrations/webhooks/new'
     | '/keys/api/new'
+    | '/keys/oauth/$clientId'
     | '/keys/oauth/new'
     | '/keys/pre-auth/new'
     | '/machines/$nodeId/diagnostics'
@@ -860,6 +880,7 @@ export interface FileRouteTypes {
     | '/policy/rules/'
     | '/settings/traffic/'
     | '/traffic/machines/'
+    | '/keys/oauth/federated/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -912,6 +933,7 @@ export interface FileRouteTypes {
     | '/integrations/webhooks/$webhookId'
     | '/integrations/webhooks/new'
     | '/keys/api/new'
+    | '/keys/oauth/$clientId'
     | '/keys/oauth/new'
     | '/keys/pre-auth/new'
     | '/machines/$nodeId/diagnostics'
@@ -936,6 +958,7 @@ export interface FileRouteTypes {
     | '/policy/rules'
     | '/settings/traffic'
     | '/traffic/machines'
+    | '/keys/oauth/federated/new'
   id:
     | '__root__'
     | '/_app'
@@ -998,6 +1021,7 @@ export interface FileRouteTypes {
     | '/_app/integrations/webhooks/$webhookId'
     | '/_app/integrations/webhooks/new'
     | '/_app/keys/api_/new'
+    | '/_app/keys/oauth_/$clientId'
     | '/_app/keys/oauth_/new'
     | '/_app/keys/pre-auth_/new'
     | '/_app/machines/$nodeId/diagnostics'
@@ -1022,6 +1046,7 @@ export interface FileRouteTypes {
     | '/_app/policy/rules/'
     | '/_app/settings/traffic/'
     | '/_app/traffic/machines/'
+    | '/_app/keys/oauth_/federated/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1473,6 +1498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppKeysApiNewRouteImport
       parentRoute: typeof AppKeysRouteRoute
     }
+    '/_app/keys/oauth_/$clientId': {
+      id: '/_app/keys/oauth_/$clientId'
+      path: '/oauth/$clientId'
+      fullPath: '/keys/oauth/$clientId'
+      preLoaderRoute: typeof AppKeysOauthClientIdRouteImport
+      parentRoute: typeof AppKeysRouteRoute
+    }
     '/_app/keys/oauth_/new': {
       id: '/_app/keys/oauth_/new'
       path: '/oauth/new'
@@ -1620,6 +1652,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrafficMachinesNodeIdRouteImport
       parentRoute: typeof AppTrafficRouteRoute
     }
+    '/_app/keys/oauth_/federated/new': {
+      id: '/_app/keys/oauth_/federated/new'
+      path: '/oauth/federated/new'
+      fullPath: '/keys/oauth/federated/new'
+      preLoaderRoute: typeof AppKeysOauthFederatedNewRouteImport
+      parentRoute: typeof AppKeysRouteRoute
+    }
   }
 }
 
@@ -1678,8 +1717,10 @@ interface AppKeysRouteRouteChildren {
   AppKeysPreAuthRoute: typeof AppKeysPreAuthRoute
   AppKeysIndexRoute: typeof AppKeysIndexRoute
   AppKeysApiNewRoute: typeof AppKeysApiNewRoute
+  AppKeysOauthClientIdRoute: typeof AppKeysOauthClientIdRoute
   AppKeysOauthNewRoute: typeof AppKeysOauthNewRoute
   AppKeysPreAuthNewRoute: typeof AppKeysPreAuthNewRoute
+  AppKeysOauthFederatedNewRoute: typeof AppKeysOauthFederatedNewRoute
 }
 
 const AppKeysRouteRouteChildren: AppKeysRouteRouteChildren = {
@@ -1688,8 +1729,10 @@ const AppKeysRouteRouteChildren: AppKeysRouteRouteChildren = {
   AppKeysPreAuthRoute: AppKeysPreAuthRoute,
   AppKeysIndexRoute: AppKeysIndexRoute,
   AppKeysApiNewRoute: AppKeysApiNewRoute,
+  AppKeysOauthClientIdRoute: AppKeysOauthClientIdRoute,
   AppKeysOauthNewRoute: AppKeysOauthNewRoute,
   AppKeysPreAuthNewRoute: AppKeysPreAuthNewRoute,
+  AppKeysOauthFederatedNewRoute: AppKeysOauthFederatedNewRoute,
 }
 
 const AppKeysRouteRouteWithChildren = AppKeysRouteRoute._addFileChildren(

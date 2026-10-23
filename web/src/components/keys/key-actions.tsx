@@ -41,16 +41,12 @@ export interface DeleteAction extends KeyAction {
   readonly summary?: ReactNode;
 }
 
-export interface EditEntry {
-  readonly onSelect: () => void;
-  readonly reason?: string | undefined;
-}
-
 /**
- * The read-only view of a record. It changes nothing, so it is never disabled by the caller's
- * credentials: an operator who may read a key may read what it says.
+ * Opens the record's own page: "Edit" there, or "View" for a caller whose credentials may not
+ * change it. Reading changes nothing, so the entry is never disabled.
  */
-export interface DetailsEntry {
+export interface OpenEntry {
+  readonly writable: boolean;
   readonly onSelect: () => void;
 }
 
@@ -68,8 +64,7 @@ export interface KeyActionsProps {
   /** Accessible name of the trigger, such as "Actions for key tskey-abc". */
   readonly label: string;
   readonly disabled?: boolean;
-  readonly details?: DetailsEntry | undefined;
-  readonly edit?: EditEntry | undefined;
+  readonly open?: OpenEntry | undefined;
   /** Present only for a credential whose secret can be replaced in place, such as an API key. */
   readonly rotate?: RotateEntry;
   /** Absent for a credential that cannot expire, such as an OAuth client. */
@@ -80,46 +75,30 @@ export interface KeyActionsProps {
 type Dialog = "expire" | "delete";
 
 /**
- * The entries above the destructive ones: reading the record, editing it and rotating its secret.
- * Only the first is offered to a caller whose credentials may not change keys, since it changes
- * nothing.
+ * The entries above the destructive ones: opening the record's page and rotating its secret. Only
+ * the first is offered to a caller whose credentials may not change keys, since it may only read.
  */
 function ReadEntries({
-  details,
   disabled,
-  edit,
+  open,
   rotate,
 }: {
-  readonly details: DetailsEntry | undefined;
   readonly disabled: boolean;
-  readonly edit: EditEntry | undefined;
+  readonly open: OpenEntry | undefined;
   readonly rotate: RotateEntry | undefined;
 }): ReactElement {
   return (
     <>
-      {details === undefined ? null : (
-        <DropdownMenu.Item
-          icon={EyeIcon}
-          onClick={() => {
-            details.onSelect();
-          }}
-        >
-          View details…
-        </DropdownMenu.Item>
-      )}
-      {edit === undefined ? null : (
+      {open === undefined ? null : (
         <>
-          <DisabledReason reason={disabled ? readOnlyReason : edit.reason}>
-            <DropdownMenu.Item
-              icon={PencilSimpleIcon}
-              disabled={disabled || edit.reason !== undefined}
-              onClick={() => {
-                edit.onSelect();
-              }}
-            >
-              Edit…
-            </DropdownMenu.Item>
-          </DisabledReason>
+          <DropdownMenu.Item
+            icon={open.writable ? PencilSimpleIcon : EyeIcon}
+            onClick={() => {
+              open.onSelect();
+            }}
+          >
+            {open.writable ? "Edit" : "View"}
+          </DropdownMenu.Item>
           <DropdownMenu.Separator />
         </>
       )}
@@ -147,8 +126,7 @@ function ReadEntries({
 export function KeyActions({
   label,
   disabled = false,
-  details,
-  edit,
+  open,
   rotate,
   expire,
   remove,
@@ -161,7 +139,7 @@ export function KeyActions({
   return (
     <>
       <RowMenu label={label}>
-        <ReadEntries details={details} disabled={disabled} edit={edit} rotate={rotate} />
+        <ReadEntries disabled={disabled} open={open} rotate={rotate} />
         {expire === undefined ? null : (
           <>
             <DropdownMenu.Item
