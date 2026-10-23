@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -163,34 +162,15 @@ func openSQLite(cfg types.SqliteConfig) (*sql.DB, error) {
 }
 
 func openPostgres(cfg types.PostgresConfig) (*sql.DB, error) {
-	dsn := fmt.Sprintf(
-		"host=%s dbname=%s user=%s",
-		cfg.Host,
-		cfg.Name,
-		cfg.User,
-	)
+	redacted := cfg
+	redacted.Pass = ""
 
 	log.Info().
 		Str("database", types.DatabasePostgres).
-		Str("path", dsn).
+		Str("path", redacted.DSN()).
 		Msg("Opening database")
 
-	sslEnabled, err := strconv.ParseBool(cfg.Ssl)
-	if err == nil {
-		if !sslEnabled {
-			dsn += " sslmode=disable"
-		}
-	} else {
-		dsn += " sslmode=" + cfg.Ssl
-	}
-
-	if cfg.Port != 0 {
-		dsn += " port=" + strconv.Itoa(cfg.Port)
-	}
-
-	if cfg.Pass != "" {
-		dsn += " password=" + cfg.Pass
-	}
+	dsn := cfg.DSN()
 
 	// The pool is pgx's own rather than database/sql's: it keeps a floor of
 	// open connections, health-checks idle ones and jitters their lifetime,

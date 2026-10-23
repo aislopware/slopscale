@@ -268,6 +268,56 @@ type PostgresConfig struct {
 	ConnMaxIdleTimeSecs int
 }
 
+// DSN returns the connection string as a postgres:// URL. net/url escapes
+// every part, so a password, user, host or database name with spaces,
+// quotes or other reserved characters reaches the driver intact instead of
+// cutting the string short or adding parameters. A Host starting with "/"
+// is a Unix socket directory and goes in the host query parameter.
+//
+// Ssl keeps its meaning: "true" leaves the driver default, "false" sets
+// sslmode=disable, and any other non-empty value is used as the sslmode.
+func (cfg PostgresConfig) DSN() string {
+	dsn := url.URL{Scheme: "postgres", Path: "/" + cfg.Name}
+
+	switch {
+	case cfg.Pass != "":
+		dsn.User = url.UserPassword(cfg.User, cfg.Pass)
+	case cfg.User != "":
+		dsn.User = url.User(cfg.User)
+	}
+
+	query := url.Values{}
+	port := strconv.Itoa(cfg.Port)
+
+	switch {
+	case strings.HasPrefix(cfg.Host, "/"):
+		query.Set("host", cfg.Host)
+
+		if cfg.Port != 0 {
+			query.Set("port", port)
+		}
+	case cfg.Port != 0:
+		dsn.Host = net.JoinHostPort(cfg.Host, port)
+	case strings.Contains(cfg.Host, ":"):
+		dsn.Host = "[" + cfg.Host + "]" // bare IPv6 literal
+	default:
+		dsn.Host = cfg.Host
+	}
+
+	sslEnabled, err := strconv.ParseBool(cfg.Ssl)
+
+	switch {
+	case err == nil && !sslEnabled:
+		query.Set("sslmode", "disable")
+	case err != nil && cfg.Ssl != "":
+		query.Set("sslmode", cfg.Ssl)
+	}
+
+	dsn.RawQuery = query.Encode()
+
+	return dsn.String()
+}
+
 // QueryLogConfig controls the SQL query log written at debug level.
 type QueryLogConfig struct {
 	// Enabled turns the query log on. It follows database.debug.
