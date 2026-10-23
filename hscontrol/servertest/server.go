@@ -87,6 +87,12 @@ func WithSeededRule() ServerOption {
 	return func(c *serverConfig) { c.seededRule = true }
 }
 
+// WithNodeStoreBatchTimeout overrides the harness's short NodeStore write
+// batch; 0 means the server default.
+func WithNodeStoreBatchTimeout(d time.Duration) ServerOption {
+	return func(c *serverConfig) { c.nodeStoreBatch = d }
+}
+
 // WithBatchDelay sets the batcher's change coalescing delay.
 func WithBatchDelay(d time.Duration) ServerOption {
 	return func(c *serverConfig) { c.batchDelay = d }
@@ -314,6 +320,15 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	if err != nil {
 		tb.Fatalf("servertest: NewSlopscale: %v", err)
 	}
+
+	// Registered first so it runs last, after clients, HTTP and the
+	// background subsystems have stopped.
+	tb.Cleanup(func() {
+		closeErr := app.GetState().Close()
+		if closeErr != nil {
+			tb.Errorf("servertest: close state: %v", closeErr)
+		}
+	})
 
 	if !sc.seededRule {
 		disableSeededRule(tb, app.GetState())
