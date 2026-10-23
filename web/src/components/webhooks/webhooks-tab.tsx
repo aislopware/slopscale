@@ -1,7 +1,7 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 
 import type { Webhook } from "~/api/queries.ts";
@@ -12,9 +12,9 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
-import { useWebhookMutations } from "~/components/webhooks/mutations.ts";
 import { webhookColumns } from "~/components/webhooks/webhook-columns.tsx";
-import { WebhookDialog } from "~/components/webhooks/webhook-dialogs.tsx";
+
+const newWebhookPath = "/integrations/webhooks/new";
 
 export function WebhooksTab({
   me,
@@ -31,8 +31,6 @@ export function WebhooksTab({
 }): ReactElement {
   const query = useDeferredValue(search);
   const canEdit = can(me, "webhooks");
-  const [creating, setCreating] = useState(false);
-  const mutations = useWebhookMutations();
 
   const table = useAppTable({
     data: webhooks,
@@ -49,16 +47,15 @@ export function WebhooksTab({
     <>
       <TableToolbar
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New webhook
-          </Button>
+          canEdit ? (
+            <LinkButton href={newWebhookPath} variant="primary" icon={PlusIcon}>
+              New webhook
+            </LinkButton>
+          ) : (
+            <Button variant="primary" icon={PlusIcon} disabled>
+              New webhook
+            </Button>
+          )
         }
       >
         <SearchInput
@@ -79,15 +76,9 @@ export function WebhooksTab({
                 description="Post events to your own endpoint, a chat channel, Telegram, ntfy or email."
                 contents={
                   canEdit ? (
-                    <Button
-                      variant="secondary"
-                      icon={PlusIcon}
-                      onClick={() => {
-                        setCreating(true);
-                      }}
-                    >
+                    <LinkButton href={newWebhookPath} variant="secondary" icon={PlusIcon}>
                       Add your first webhook
-                    </Button>
+                    </LinkButton>
                   ) : undefined
                 }
               />
@@ -111,12 +102,6 @@ export function WebhooksTab({
           }
         />
       </TableGroup>
-      <WebhookDialog
-        eventTypes={eventTypes}
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-      />
     </>
   );
 }

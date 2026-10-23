@@ -87,7 +87,6 @@ export function TestConnection({
         <Button
           type="button"
           variant="secondary"
-          size="sm"
           loading={status.kind === "testing"}
           disabled={disabled}
           onClick={onTest}

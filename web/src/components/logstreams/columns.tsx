@@ -1,4 +1,6 @@
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { cn } from "@cloudflare/kumo/utils";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { LogStream } from "~/api/queries.ts";
@@ -10,6 +12,7 @@ import {
   streamState,
 } from "~/components/logstreams/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
@@ -64,7 +67,13 @@ export const logStreamColumns = helper.columns([
 function StreamCell({ stream }: { readonly stream: LogStream }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate font-medium text-kumo-default">{stream.name}</span>
+      <Link
+        to="/integrations/log-streams/$streamId"
+        params={{ streamId: stream.id }}
+        className={cn("truncate font-medium", rowLinkClass)}
+      >
+        {stream.name}
+      </Link>
       <Tooltip content={stream.url}>
         <UrlText url={stream.url} className="truncate text-xs" />
       </Tooltip>

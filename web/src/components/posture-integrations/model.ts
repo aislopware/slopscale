@@ -154,7 +154,7 @@ export function fieldPlaceholder(
   keeps: boolean,
 ): string {
   if (keeps) {
-    return "Stored, leave empty to keep";
+    return "Unchanged";
   }
   if (field === "baseUrl" && baseUrlDefault !== undefined) {
     return baseUrlDefault;
@@ -200,30 +200,39 @@ export interface DraftIssueOptions {
   readonly hasSecret: boolean;
 }
 
-export function draftIssue(
-  draft: Draft,
-  provider: PostureProvider | undefined,
-  options: DraftIssueOptions,
-): string | null {
-  if (draft.name.trim() === "") {
-    return "Name is required";
-  }
+/** A field's label inside a sentence: "the client ID", "the API token". */
+function fieldInSentence(field: string): string {
+  const label = fieldLabel(field);
+  const [first = ""] = label.split(" ");
 
-  if (provider === undefined) {
-    return "Provider is required";
+  return first === first.toUpperCase() ? label : label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+/**
+ * What is wrong with each field of the draft, keyed by the field (`name` for the name), or nothing.
+ * A page shows them under the fields after the first save.
+ */
+export function draftIssues(
+  draft: Draft,
+  provider: PostureProvider,
+  options: DraftIssueOptions,
+): Readonly<Record<string, string>> {
+  const issues: Record<string, string> = {};
+
+  if (draft.name.trim() === "") {
+    issues["name"] = "Give the integration a name.";
   }
 
   for (const field of provider.fields) {
-    if (isFieldRequired(field, options.editing, options.hasSecret)) {
-      const value = getDraftFieldValue(draft, field);
-
-      if (value.trim() === "") {
-        return `${fieldLabel(field)} is required`;
-      }
+    if (
+      isFieldRequired(field, options.editing, options.hasSecret) &&
+      getDraftFieldValue(draft, field).trim() === ""
+    ) {
+      issues[field] = `Enter the ${fieldInSentence(field)}.`;
     }
   }
 
-  return null;
+  return issues;
 }
 
 export function toRequestBody(

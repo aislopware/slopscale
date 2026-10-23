@@ -8,7 +8,7 @@ import { deliveryState } from "~/components/webhooks/model.ts";
 import { WebhooksTab, countWebhooks } from "~/components/webhooks/webhooks-tab.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/integrations/webhooks")({
+export const Route = createFileRoute("/_app/integrations/webhooks/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([

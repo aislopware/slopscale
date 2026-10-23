@@ -32,9 +32,6 @@ import { Route as AppDnsNameserversRouteImport } from './routes/_app/dns/nameser
 import { Route as AppDnsRecordsRouteImport } from './routes/_app/dns/records'
 import { Route as AppDnsSplitRouteImport } from './routes/_app/dns/split'
 import { Route as AppIntegrationsIndexRouteImport } from './routes/_app/integrations/index'
-import { Route as AppIntegrationsLogStreamsRouteImport } from './routes/_app/integrations/log-streams'
-import { Route as AppIntegrationsPostureRouteImport } from './routes/_app/integrations/posture'
-import { Route as AppIntegrationsWebhooksRouteImport } from './routes/_app/integrations/webhooks'
 import { Route as AppKeysIndexRouteImport } from './routes/_app/keys/index'
 import { Route as AppKeysApiRouteImport } from './routes/_app/keys/api'
 import { Route as AppKeysOauthRouteImport } from './routes/_app/keys/oauth'
@@ -65,6 +62,15 @@ import { Route as AppTrafficDestinationsRouteImport } from './routes/_app/traffi
 import { Route as AppTrafficDnsRouteImport } from './routes/_app/traffic/dns'
 import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/overview'
 import { Route as FocusMachinesAddRouteImport } from './routes/_focus/machines/add'
+import { Route as AppIntegrationsLogStreamsIndexRouteImport } from './routes/_app/integrations/log-streams/index'
+import { Route as AppIntegrationsLogStreamsStreamIdRouteImport } from './routes/_app/integrations/log-streams/$streamId'
+import { Route as AppIntegrationsLogStreamsNewRouteImport } from './routes/_app/integrations/log-streams/new'
+import { Route as AppIntegrationsPostureIndexRouteImport } from './routes/_app/integrations/posture/index'
+import { Route as AppIntegrationsPostureIntegrationIdRouteImport } from './routes/_app/integrations/posture/$integrationId'
+import { Route as AppIntegrationsPostureNewRouteImport } from './routes/_app/integrations/posture/new'
+import { Route as AppIntegrationsWebhooksIndexRouteImport } from './routes/_app/integrations/webhooks/index'
+import { Route as AppIntegrationsWebhooksWebhookIdRouteImport } from './routes/_app/integrations/webhooks/$webhookId'
+import { Route as AppIntegrationsWebhooksNewRouteImport } from './routes/_app/integrations/webhooks/new'
 import { Route as AppKeysApiNewRouteImport } from './routes/_app/keys/api_.new'
 import { Route as AppKeysOauthNewRouteImport } from './routes/_app/keys/oauth_.new'
 import { Route as AppKeysPreAuthNewRouteImport } from './routes/_app/keys/pre-auth_.new'
@@ -199,22 +205,6 @@ const AppDnsSplitRoute = AppDnsSplitRouteImport.update({
 const AppIntegrationsIndexRoute = AppIntegrationsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppIntegrationsRouteRoute,
-} as any)
-const AppIntegrationsLogStreamsRoute =
-  AppIntegrationsLogStreamsRouteImport.update({
-    id: '/log-streams',
-    path: '/log-streams',
-    getParentRoute: () => AppIntegrationsRouteRoute,
-  } as any)
-const AppIntegrationsPostureRoute = AppIntegrationsPostureRouteImport.update({
-  id: '/posture',
-  path: '/posture',
-  getParentRoute: () => AppIntegrationsRouteRoute,
-} as any)
-const AppIntegrationsWebhooksRoute = AppIntegrationsWebhooksRouteImport.update({
-  id: '/webhooks',
-  path: '/webhooks',
   getParentRoute: () => AppIntegrationsRouteRoute,
 } as any)
 const AppKeysIndexRoute = AppKeysIndexRouteImport.update({
@@ -367,6 +357,60 @@ const FocusMachinesAddRoute = FocusMachinesAddRouteImport.update({
   path: '/machines/add',
   getParentRoute: () => FocusRoute,
 } as any)
+const AppIntegrationsLogStreamsIndexRoute =
+  AppIntegrationsLogStreamsIndexRouteImport.update({
+    id: '/log-streams/',
+    path: '/log-streams/',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsLogStreamsStreamIdRoute =
+  AppIntegrationsLogStreamsStreamIdRouteImport.update({
+    id: '/log-streams/$streamId',
+    path: '/log-streams/$streamId',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsLogStreamsNewRoute =
+  AppIntegrationsLogStreamsNewRouteImport.update({
+    id: '/log-streams/new',
+    path: '/log-streams/new',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsPostureIndexRoute =
+  AppIntegrationsPostureIndexRouteImport.update({
+    id: '/posture/',
+    path: '/posture/',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsPostureIntegrationIdRoute =
+  AppIntegrationsPostureIntegrationIdRouteImport.update({
+    id: '/posture/$integrationId',
+    path: '/posture/$integrationId',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsPostureNewRoute =
+  AppIntegrationsPostureNewRouteImport.update({
+    id: '/posture/new',
+    path: '/posture/new',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsWebhooksIndexRoute =
+  AppIntegrationsWebhooksIndexRouteImport.update({
+    id: '/webhooks/',
+    path: '/webhooks/',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsWebhooksWebhookIdRoute =
+  AppIntegrationsWebhooksWebhookIdRouteImport.update({
+    id: '/webhooks/$webhookId',
+    path: '/webhooks/$webhookId',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
+const AppIntegrationsWebhooksNewRoute =
+  AppIntegrationsWebhooksNewRouteImport.update({
+    id: '/webhooks/new',
+    path: '/webhooks/new',
+    getParentRoute: () => AppIntegrationsRouteRoute,
+  } as any)
 const AppKeysApiNewRoute = AppKeysApiNewRouteImport.update({
   id: '/api_/new',
   path: '/api/new',
@@ -505,9 +549,6 @@ export interface FileRoutesByFullPath {
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
   '/dns/split': typeof AppDnsSplitRoute
-  '/integrations/log-streams': typeof AppIntegrationsLogStreamsRoute
-  '/integrations/posture': typeof AppIntegrationsPostureRoute
-  '/integrations/webhooks': typeof AppIntegrationsWebhooksRoute
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
@@ -539,6 +580,12 @@ export interface FileRoutesByFullPath {
   '/services/': typeof AppServicesIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
   '/traffic/': typeof AppTrafficIndexRoute
+  '/integrations/log-streams/$streamId': typeof AppIntegrationsLogStreamsStreamIdRoute
+  '/integrations/log-streams/new': typeof AppIntegrationsLogStreamsNewRoute
+  '/integrations/posture/$integrationId': typeof AppIntegrationsPostureIntegrationIdRoute
+  '/integrations/posture/new': typeof AppIntegrationsPostureNewRoute
+  '/integrations/webhooks/$webhookId': typeof AppIntegrationsWebhooksWebhookIdRoute
+  '/integrations/webhooks/new': typeof AppIntegrationsWebhooksNewRoute
   '/keys/api/new': typeof AppKeysApiNewRoute
   '/keys/oauth/new': typeof AppKeysOauthNewRoute
   '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
@@ -555,6 +602,9 @@ export interface FileRoutesByFullPath {
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/integrations/log-streams/': typeof AppIntegrationsLogStreamsIndexRoute
+  '/integrations/posture/': typeof AppIntegrationsPostureIndexRoute
+  '/integrations/webhooks/': typeof AppIntegrationsWebhooksIndexRoute
   '/machines/$nodeId/': typeof AppMachinesNodeIdIndexRoute
   '/policy/groups/': typeof AppPolicyGroupsIndexRoute
   '/policy/postures/': typeof AppPolicyPosturesIndexRoute
@@ -576,9 +626,6 @@ export interface FileRoutesByTo {
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
   '/dns/split': typeof AppDnsSplitRoute
-  '/integrations/log-streams': typeof AppIntegrationsLogStreamsRoute
-  '/integrations/posture': typeof AppIntegrationsPostureRoute
-  '/integrations/webhooks': typeof AppIntegrationsWebhooksRoute
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
@@ -609,6 +656,12 @@ export interface FileRoutesByTo {
   '/services': typeof AppServicesIndexRoute
   '/settings': typeof AppSettingsIndexRoute
   '/traffic': typeof AppTrafficIndexRoute
+  '/integrations/log-streams/$streamId': typeof AppIntegrationsLogStreamsStreamIdRoute
+  '/integrations/log-streams/new': typeof AppIntegrationsLogStreamsNewRoute
+  '/integrations/posture/$integrationId': typeof AppIntegrationsPostureIntegrationIdRoute
+  '/integrations/posture/new': typeof AppIntegrationsPostureNewRoute
+  '/integrations/webhooks/$webhookId': typeof AppIntegrationsWebhooksWebhookIdRoute
+  '/integrations/webhooks/new': typeof AppIntegrationsWebhooksNewRoute
   '/keys/api/new': typeof AppKeysApiNewRoute
   '/keys/oauth/new': typeof AppKeysOauthNewRoute
   '/keys/pre-auth/new': typeof AppKeysPreAuthNewRoute
@@ -625,6 +678,9 @@ export interface FileRoutesByTo {
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/integrations/log-streams': typeof AppIntegrationsLogStreamsIndexRoute
+  '/integrations/posture': typeof AppIntegrationsPostureIndexRoute
+  '/integrations/webhooks': typeof AppIntegrationsWebhooksIndexRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdIndexRoute
   '/policy/groups': typeof AppPolicyGroupsIndexRoute
   '/policy/postures': typeof AppPolicyPosturesIndexRoute
@@ -656,9 +712,6 @@ export interface FileRoutesById {
   '/_app/dns/nameservers': typeof AppDnsNameserversRoute
   '/_app/dns/records': typeof AppDnsRecordsRoute
   '/_app/dns/split': typeof AppDnsSplitRoute
-  '/_app/integrations/log-streams': typeof AppIntegrationsLogStreamsRoute
-  '/_app/integrations/posture': typeof AppIntegrationsPostureRoute
-  '/_app/integrations/webhooks': typeof AppIntegrationsWebhooksRoute
   '/_app/keys/api': typeof AppKeysApiRoute
   '/_app/keys/oauth': typeof AppKeysOauthRoute
   '/_app/keys/pre-auth': typeof AppKeysPreAuthRoute
@@ -690,6 +743,12 @@ export interface FileRoutesById {
   '/_app/services/': typeof AppServicesIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
   '/_app/traffic/': typeof AppTrafficIndexRoute
+  '/_app/integrations/log-streams/$streamId': typeof AppIntegrationsLogStreamsStreamIdRoute
+  '/_app/integrations/log-streams/new': typeof AppIntegrationsLogStreamsNewRoute
+  '/_app/integrations/posture/$integrationId': typeof AppIntegrationsPostureIntegrationIdRoute
+  '/_app/integrations/posture/new': typeof AppIntegrationsPostureNewRoute
+  '/_app/integrations/webhooks/$webhookId': typeof AppIntegrationsWebhooksWebhookIdRoute
+  '/_app/integrations/webhooks/new': typeof AppIntegrationsWebhooksNewRoute
   '/_app/keys/api_/new': typeof AppKeysApiNewRoute
   '/_app/keys/oauth_/new': typeof AppKeysOauthNewRoute
   '/_app/keys/pre-auth_/new': typeof AppKeysPreAuthNewRoute
@@ -706,6 +765,9 @@ export interface FileRoutesById {
   '/_app/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/_app/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/_app/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/_app/integrations/log-streams/': typeof AppIntegrationsLogStreamsIndexRoute
+  '/_app/integrations/posture/': typeof AppIntegrationsPostureIndexRoute
+  '/_app/integrations/webhooks/': typeof AppIntegrationsWebhooksIndexRoute
   '/_app/machines/$nodeId/': typeof AppMachinesNodeIdIndexRoute
   '/_app/policy/groups/': typeof AppPolicyGroupsIndexRoute
   '/_app/policy/postures/': typeof AppPolicyPosturesIndexRoute
@@ -736,9 +798,6 @@ export interface FileRouteTypes {
     | '/dns/nameservers'
     | '/dns/records'
     | '/dns/split'
-    | '/integrations/log-streams'
-    | '/integrations/posture'
-    | '/integrations/webhooks'
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
@@ -770,6 +829,12 @@ export interface FileRouteTypes {
     | '/services/'
     | '/settings/'
     | '/traffic/'
+    | '/integrations/log-streams/$streamId'
+    | '/integrations/log-streams/new'
+    | '/integrations/posture/$integrationId'
+    | '/integrations/posture/new'
+    | '/integrations/webhooks/$webhookId'
+    | '/integrations/webhooks/new'
     | '/keys/api/new'
     | '/keys/oauth/new'
     | '/keys/pre-auth/new'
@@ -786,6 +851,9 @@ export interface FileRouteTypes {
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/integrations/log-streams/'
+    | '/integrations/posture/'
+    | '/integrations/webhooks/'
     | '/machines/$nodeId/'
     | '/policy/groups/'
     | '/policy/postures/'
@@ -807,9 +875,6 @@ export interface FileRouteTypes {
     | '/dns/nameservers'
     | '/dns/records'
     | '/dns/split'
-    | '/integrations/log-streams'
-    | '/integrations/posture'
-    | '/integrations/webhooks'
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
@@ -840,6 +905,12 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/traffic'
+    | '/integrations/log-streams/$streamId'
+    | '/integrations/log-streams/new'
+    | '/integrations/posture/$integrationId'
+    | '/integrations/posture/new'
+    | '/integrations/webhooks/$webhookId'
+    | '/integrations/webhooks/new'
     | '/keys/api/new'
     | '/keys/oauth/new'
     | '/keys/pre-auth/new'
@@ -856,6 +927,9 @@ export interface FileRouteTypes {
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/integrations/log-streams'
+    | '/integrations/posture'
+    | '/integrations/webhooks'
     | '/machines/$nodeId'
     | '/policy/groups'
     | '/policy/postures'
@@ -886,9 +960,6 @@ export interface FileRouteTypes {
     | '/_app/dns/nameservers'
     | '/_app/dns/records'
     | '/_app/dns/split'
-    | '/_app/integrations/log-streams'
-    | '/_app/integrations/posture'
-    | '/_app/integrations/webhooks'
     | '/_app/keys/api'
     | '/_app/keys/oauth'
     | '/_app/keys/pre-auth'
@@ -920,6 +991,12 @@ export interface FileRouteTypes {
     | '/_app/services/'
     | '/_app/settings/'
     | '/_app/traffic/'
+    | '/_app/integrations/log-streams/$streamId'
+    | '/_app/integrations/log-streams/new'
+    | '/_app/integrations/posture/$integrationId'
+    | '/_app/integrations/posture/new'
+    | '/_app/integrations/webhooks/$webhookId'
+    | '/_app/integrations/webhooks/new'
     | '/_app/keys/api_/new'
     | '/_app/keys/oauth_/new'
     | '/_app/keys/pre-auth_/new'
@@ -936,6 +1013,9 @@ export interface FileRouteTypes {
     | '/_app/settings/traffic/collection'
     | '/_app/settings/traffic/gateways'
     | '/_app/traffic/machines/$nodeId'
+    | '/_app/integrations/log-streams/'
+    | '/_app/integrations/posture/'
+    | '/_app/integrations/webhooks/'
     | '/_app/machines/$nodeId/'
     | '/_app/policy/groups/'
     | '/_app/policy/postures/'
@@ -1111,27 +1191,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/integrations/'
       preLoaderRoute: typeof AppIntegrationsIndexRouteImport
-      parentRoute: typeof AppIntegrationsRouteRoute
-    }
-    '/_app/integrations/log-streams': {
-      id: '/_app/integrations/log-streams'
-      path: '/log-streams'
-      fullPath: '/integrations/log-streams'
-      preLoaderRoute: typeof AppIntegrationsLogStreamsRouteImport
-      parentRoute: typeof AppIntegrationsRouteRoute
-    }
-    '/_app/integrations/posture': {
-      id: '/_app/integrations/posture'
-      path: '/posture'
-      fullPath: '/integrations/posture'
-      preLoaderRoute: typeof AppIntegrationsPostureRouteImport
-      parentRoute: typeof AppIntegrationsRouteRoute
-    }
-    '/_app/integrations/webhooks': {
-      id: '/_app/integrations/webhooks'
-      path: '/webhooks'
-      fullPath: '/integrations/webhooks'
-      preLoaderRoute: typeof AppIntegrationsWebhooksRouteImport
       parentRoute: typeof AppIntegrationsRouteRoute
     }
     '/_app/keys/': {
@@ -1344,6 +1403,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FocusMachinesAddRouteImport
       parentRoute: typeof FocusRoute
     }
+    '/_app/integrations/log-streams/': {
+      id: '/_app/integrations/log-streams/'
+      path: '/log-streams'
+      fullPath: '/integrations/log-streams/'
+      preLoaderRoute: typeof AppIntegrationsLogStreamsIndexRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/log-streams/$streamId': {
+      id: '/_app/integrations/log-streams/$streamId'
+      path: '/log-streams/$streamId'
+      fullPath: '/integrations/log-streams/$streamId'
+      preLoaderRoute: typeof AppIntegrationsLogStreamsStreamIdRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/log-streams/new': {
+      id: '/_app/integrations/log-streams/new'
+      path: '/log-streams/new'
+      fullPath: '/integrations/log-streams/new'
+      preLoaderRoute: typeof AppIntegrationsLogStreamsNewRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/posture/': {
+      id: '/_app/integrations/posture/'
+      path: '/posture'
+      fullPath: '/integrations/posture/'
+      preLoaderRoute: typeof AppIntegrationsPostureIndexRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/posture/$integrationId': {
+      id: '/_app/integrations/posture/$integrationId'
+      path: '/posture/$integrationId'
+      fullPath: '/integrations/posture/$integrationId'
+      preLoaderRoute: typeof AppIntegrationsPostureIntegrationIdRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/posture/new': {
+      id: '/_app/integrations/posture/new'
+      path: '/posture/new'
+      fullPath: '/integrations/posture/new'
+      preLoaderRoute: typeof AppIntegrationsPostureNewRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/webhooks/': {
+      id: '/_app/integrations/webhooks/'
+      path: '/webhooks'
+      fullPath: '/integrations/webhooks/'
+      preLoaderRoute: typeof AppIntegrationsWebhooksIndexRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/webhooks/$webhookId': {
+      id: '/_app/integrations/webhooks/$webhookId'
+      path: '/webhooks/$webhookId'
+      fullPath: '/integrations/webhooks/$webhookId'
+      preLoaderRoute: typeof AppIntegrationsWebhooksWebhookIdRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
+    '/_app/integrations/webhooks/new': {
+      id: '/_app/integrations/webhooks/new'
+      path: '/webhooks/new'
+      fullPath: '/integrations/webhooks/new'
+      preLoaderRoute: typeof AppIntegrationsWebhooksNewRouteImport
+      parentRoute: typeof AppIntegrationsRouteRoute
+    }
     '/_app/keys/api_/new': {
       id: '/_app/keys/api_/new'
       path: '/api/new'
@@ -1520,17 +1642,31 @@ const AppDnsRouteRouteWithChildren = AppDnsRouteRoute._addFileChildren(
 )
 
 interface AppIntegrationsRouteRouteChildren {
-  AppIntegrationsLogStreamsRoute: typeof AppIntegrationsLogStreamsRoute
-  AppIntegrationsPostureRoute: typeof AppIntegrationsPostureRoute
-  AppIntegrationsWebhooksRoute: typeof AppIntegrationsWebhooksRoute
   AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
+  AppIntegrationsLogStreamsStreamIdRoute: typeof AppIntegrationsLogStreamsStreamIdRoute
+  AppIntegrationsLogStreamsNewRoute: typeof AppIntegrationsLogStreamsNewRoute
+  AppIntegrationsPostureIntegrationIdRoute: typeof AppIntegrationsPostureIntegrationIdRoute
+  AppIntegrationsPostureNewRoute: typeof AppIntegrationsPostureNewRoute
+  AppIntegrationsWebhooksWebhookIdRoute: typeof AppIntegrationsWebhooksWebhookIdRoute
+  AppIntegrationsWebhooksNewRoute: typeof AppIntegrationsWebhooksNewRoute
+  AppIntegrationsLogStreamsIndexRoute: typeof AppIntegrationsLogStreamsIndexRoute
+  AppIntegrationsPostureIndexRoute: typeof AppIntegrationsPostureIndexRoute
+  AppIntegrationsWebhooksIndexRoute: typeof AppIntegrationsWebhooksIndexRoute
 }
 
 const AppIntegrationsRouteRouteChildren: AppIntegrationsRouteRouteChildren = {
-  AppIntegrationsLogStreamsRoute: AppIntegrationsLogStreamsRoute,
-  AppIntegrationsPostureRoute: AppIntegrationsPostureRoute,
-  AppIntegrationsWebhooksRoute: AppIntegrationsWebhooksRoute,
   AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,
+  AppIntegrationsLogStreamsStreamIdRoute:
+    AppIntegrationsLogStreamsStreamIdRoute,
+  AppIntegrationsLogStreamsNewRoute: AppIntegrationsLogStreamsNewRoute,
+  AppIntegrationsPostureIntegrationIdRoute:
+    AppIntegrationsPostureIntegrationIdRoute,
+  AppIntegrationsPostureNewRoute: AppIntegrationsPostureNewRoute,
+  AppIntegrationsWebhooksWebhookIdRoute: AppIntegrationsWebhooksWebhookIdRoute,
+  AppIntegrationsWebhooksNewRoute: AppIntegrationsWebhooksNewRoute,
+  AppIntegrationsLogStreamsIndexRoute: AppIntegrationsLogStreamsIndexRoute,
+  AppIntegrationsPostureIndexRoute: AppIntegrationsPostureIndexRoute,
+  AppIntegrationsWebhooksIndexRoute: AppIntegrationsWebhooksIndexRoute,
 }
 
 const AppIntegrationsRouteRouteWithChildren =

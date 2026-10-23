@@ -8,7 +8,7 @@ import { PostureIntegrationsTab } from "~/components/posture-integrations/postur
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/integrations/posture")({
+export const Route = createFileRoute("/_app/integrations/posture/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([

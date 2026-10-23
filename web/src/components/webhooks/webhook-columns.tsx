@@ -1,10 +1,11 @@
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Webhook } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { narrowOnlyClass } from "~/components/table/styles.ts";
+import { narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
@@ -55,11 +56,9 @@ export const webhookColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, eventTypes } = table.options.meta ?? {};
+      const { me } = table.options.meta ?? {};
 
-      return me === undefined ? null : (
-        <WebhookMenu webhook={row.original} eventTypes={eventTypes ?? []} me={me} />
-      );
+      return me === undefined ? null : <WebhookMenu webhook={row.original} me={me} />;
     },
     meta: { className: "w-12 text-right", sticky: "right" },
   }),
@@ -69,7 +68,13 @@ function EndpointCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <Tooltip content={webhook.url}>
-        <UrlText url={webhook.url} className="truncate text-sm [&>span:nth-child(2)]:font-medium" />
+        <Link
+          to="/integrations/webhooks/$webhookId"
+          params={{ webhookId: webhook.id }}
+          className={cn("min-w-0 truncate", rowLinkClass)}
+        >
+          <UrlText url={webhook.url} className="text-sm [&>span:nth-child(2)]:font-medium" />
+        </Link>
       </Tooltip>
       {webhook.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{webhook.description}</span>

@@ -8,7 +8,7 @@ import { LogStreamsTab, countStreams } from "~/components/logstreams/tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/integrations/log-streams")({
+export const Route = createFileRoute("/_app/integrations/log-streams/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await context.queryClient.query(logStreamsQuery);

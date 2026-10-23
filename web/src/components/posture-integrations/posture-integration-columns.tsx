@@ -1,4 +1,6 @@
 import { Popover } from "@cloudflare/kumo/components/popover";
+import { cn } from "@cloudflare/kumo/utils";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { PostureIntegration } from "~/api/queries.ts";
@@ -10,6 +12,7 @@ import {
 } from "~/components/posture-integrations/model.ts";
 import { PostureIntegrationMenu } from "~/components/posture-integrations/posture-integration-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
@@ -60,14 +63,10 @@ export const postureIntegrationColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, postureProviders } = table.options.meta ?? {};
+      const { me } = table.options.meta ?? {};
 
       return me === undefined ? null : (
-        <PostureIntegrationMenu
-          integration={row.original}
-          providers={postureProviders ?? []}
-          me={me}
-        />
+        <PostureIntegrationMenu integration={row.original} me={me} />
       );
     },
     meta: { className: "w-12 text-right", sticky: "right" },
@@ -77,7 +76,13 @@ export const postureIntegrationColumns = helper.columns([
 function NameCell({ integration }: { readonly integration: PostureIntegration }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate font-medium text-kumo-default">{integration.name}</span>
+      <Link
+        to="/integrations/posture/$integrationId"
+        params={{ integrationId: integration.id }}
+        className={cn("truncate font-medium", rowLinkClass)}
+      >
+        {integration.name}
+      </Link>
       <span className="truncate font-mono text-xs text-kumo-subtle">{integration.prefix}</span>
     </div>
   );
