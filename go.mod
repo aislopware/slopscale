@@ -1,9 +1,9 @@
 module github.com/aislopware/slopscale
 
-go 1.27.2
+go 1.27.3
 
 require (
-	codeberg.org/miekg/dns v0.6.118
+	codeberg.org/miekg/dns v0.6.119
 	github.com/arl/statsviz v0.8.2
 	github.com/caddyserver/certmagic v0.25.6
 	github.com/cenkalti/backoff/v7 v7.0.1
@@ -41,7 +41,7 @@ require (
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
 	github.com/moby/patternmatcher v0.6.1
-	github.com/oapi-codegen/runtime v1.7.0
+	github.com/oapi-codegen/runtime v1.8.0
 	github.com/ory/dockertest/v4 v4.0.1
 	github.com/oschwald/maxminddb-golang/v2 v2.8.0
 	github.com/prometheus/client_golang v1.25.0
@@ -72,7 +72,7 @@ require (
 	golang.org/x/term v0.47.0
 	golang.org/x/time v0.16.0
 	pgregory.net/rapid v1.3.0
-	tailscale.com v1.105.0-pre.0.20261013235713-a6a4c25c26e9
+	tailscale.com v1.105.0-pre.0.20261020132111-eaf3fc8daf90
 	tailscale.com/client/tailscale/v2 v2.12.0
 )
 
@@ -137,7 +137,7 @@ require (
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hdevalence/ed25519consensus v0.2.0 // indirect
-	github.com/hetznercloud/hcloud-go/v2 v2.27.0 // indirect
+	github.com/hetznercloud/hcloud-go/v2 v2.53.0 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -146,7 +146,7 @@ require (
 	github.com/jsimonetti/rtnetlink v1.4.2 // indirect
 	github.com/kamstrup/intmap v0.5.2 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.4.1 // indirect
 	github.com/knadh/koanf/maps v0.1.3 // indirect
 	github.com/letsencrypt/challtestsrv v1.4.2 // indirect
 	github.com/lib/pq v1.12.3 // indirect
@@ -158,7 +158,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/mittwald/go-powerdns v0.6.6 // indirect
+	github.com/mittwald/go-powerdns v0.6.7 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
@@ -169,10 +169,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/peterbourgon/ff/v3 v3.4.0 // indirect
-	github.com/pires/go-proxyproto v0.15.0 // indirect
+	github.com/pires/go-proxyproto v0.16.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
-	github.com/prometheus/procfs v0.22.0 // indirect
+	github.com/prometheus/procfs v0.23.0 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/safchain/ethtool v0.7.0 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
