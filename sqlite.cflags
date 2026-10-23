@@ -7,6 +7,10 @@
 # string, and PRAGMA writable_schema and friends are refused.
 -DSQLITE_DQS=0
 -DSQLITE_DEFAULT_DEFENSIVE=1
+# Optimise. Setting CGO_CFLAGS drops Go's default "-O2 -g", and zig cc (the
+# release cross builds) compiles at -O0 without it: SQLite ran ~30% slower,
+# writes about twice as slow.
+-O2
 # Performance: skip the memory-statistics bookkeeping on every allocation,
 # the expression depth accounting, the progress callback and the shared
 # cache, none of which slopscale uses; stack-allocate VDBE cursors.
