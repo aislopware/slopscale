@@ -1488,6 +1488,12 @@ func (s *State) NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap {
 	return s.polMan.NodeCapMaps()
 }
 
+// NodeCapMapsForPeers returns one policy snapshot holding the requested
+// peers' caps. It may include other entries; inner maps are read-only.
+func (s *State) NodeCapMapsForPeers(peers views.Slice[types.NodeView]) map[types.NodeID]tailcfg.NodeCapMap {
+	return s.polMan.NodeCapMapsForPeers(peers)
+}
+
 // NodeCanHaveTag checks if a node is allowed to have a specific tag.
 func (s *State) NodeCanHaveTag(node types.NodeView, tag string) bool {
 	return s.polMan.NodeCanHaveTag(node, tag)

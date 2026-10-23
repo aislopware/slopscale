@@ -471,10 +471,8 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		return nil, err
 	}
 
-	// Snapshot the per-node policy CapMap once per peer-list build
-	// instead of locking the policy manager per peer. The per-call
-	// path used to take pm.mu N times for an N-peer response.
-	allCapMaps := b.mapper.state.NodeCapMaps()
+	// Snapshot these peers' policy caps under one policy-manager lock.
+	peerCapMaps := b.mapper.state.NodeCapMapsForPeers(peers)
 	globalExitNodes := b.mapper.state.HasGlobalExitNode()
 	exitPriorities := b.mapper.state.ExitNodePrioritiesFor(node)
 	serviceRoutes := b.mapper.state.ServiceRoutesByHost(node)
@@ -493,7 +491,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 				b.mapper.state.RoutesForPeer(node, peer, matchers),
 				serviceRoutes[id],
 			)
-		}, b.mapper.cfg, allCapMaps[peer.ID()])
+		}, b.mapper.cfg, peerCapMaps[peer.ID()])
 		if err == nil {
 			markShared(tn, node, peer)
 		}
@@ -526,7 +524,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		// the peer satisfies the cap's emission condition; every other
 		// cap stays off the peer view, leaving CapMap empty for most
 		// peers. [policyv2.PeerCapMap] encodes those conditions.
-		tn.CapMap = policyv2.PeerCapMap(peer, allCapMaps[peer.ID()], globalExitNodes)
+		tn.CapMap = policyv2.PeerCapMap(peer, peerCapMaps[peer.ID()], globalExitNodes)
 
 		if priority, ok := exitPriorities[peer.ID()]; ok {
 			setExitNodePriority(tn, priority)

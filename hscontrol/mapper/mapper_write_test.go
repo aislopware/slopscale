@@ -61,10 +61,10 @@ func TestBackfillNodeIPsReachesBackfilledNode(t *testing.T) {
 	nodes := database.CreateRegisteredNodesForTest(user, 2, "bf")
 	target := nodes[0].ID
 
-	_, err = database.DB.Exec(`UPDATE nodes SET ipv6 = NULL WHERE id = ?`, target)
+	_, err = database.DB.ExecContext(t.Context(), `UPDATE nodes SET ipv6 = NULL WHERE id = ?`, target)
 	require.NoError(t, err)
 	// Backfill copies the stored Hostinfo, which a registered client always has.
-	_, err = database.DB.Exec(`UPDATE nodes SET host_info = '{}'`)
+	_, err = database.DB.ExecContext(t.Context(), `UPDATE nodes SET host_info = '{}'`)
 	require.NoError(t, err)
 	require.NoError(t, database.Close())
 

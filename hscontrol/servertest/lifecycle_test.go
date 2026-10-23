@@ -680,3 +680,15 @@ func describeNetmap(c *servertest.TestClient) string {
 
 	return out.String()
 }
+
+// TestServerStateCleanup checks that the harness closes the database once
+// the test that created the server ends.
+//
+//nolint:paralleltest // the parent reads srv after the subtest's cleanups ran
+func TestServerStateCleanup(t *testing.T) {
+	var srv *servertest.TestServer
+
+	t.Run("server", func(t *testing.T) { srv = servertest.NewServer(t) })
+
+	require.ErrorContains(t, srv.State().DB().DB.PingContext(t.Context()), "database is closed")
+}

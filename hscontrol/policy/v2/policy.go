@@ -1787,6 +1787,40 @@ func (pm *PolicyManager) NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap {
 	return out
 }
 
+// NodeCapMapsForPeers snapshots the requested peers' caps under one lock.
+// It may include unselected entries when copying the whole compiled table is
+// less work. The outer map is caller-owned; inner maps are shared and
+// read-only. An empty selection or no compiled capabilities returns nil.
+func (pm *PolicyManager) NodeCapMapsForPeers(
+	peers views.Slice[types.NodeView],
+) map[types.NodeID]tailcfg.NodeCapMap {
+	if pm == nil || peers.Len() == 0 {
+		return nil
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	if len(pm.nodeAttrsMap) == 0 {
+		return nil
+	}
+
+	out := make(map[types.NodeID]tailcfg.NodeCapMap, min(peers.Len(), len(pm.nodeAttrsMap)))
+	if peers.Len() >= len(pm.nodeAttrsMap) {
+		maps.Copy(out, pm.nodeAttrsMap)
+
+		return out
+	}
+
+	for _, peer := range peers.All() {
+		if caps, ok := pm.nodeAttrsMap[peer.ID()]; ok {
+			out[peer.ID()] = caps
+		}
+	}
+
+	return out
+}
+
 // NodesWithChangedCapMap returns the IDs of nodes whose nodeAttrs
 // CapMap shifted across one or more [PolicyManager.updateLocked] calls
 // since the last drain. The buffer drains on return.
@@ -1835,24 +1869,36 @@ func (pm *PolicyManager) peerPositionsLocked(nodes views.Slice[types.NodeView], 
 	return pm.perNodePeerListsLocked(nodes, routes)
 }
 
-// globalPeerListsLocked scans every node pair under the global filter and
-// returns each node's peers, indexed by the node's position in nodes.
+// globalPeerListsLocked returns each node's peers under the global filter,
+// indexed by the node's position in nodes. Two nodes are peers when either
+// may reach the other.
+//
+// A matcher lets a reach b when a is on its source side and b on its
+// destination side, tested as [types.NodeView.CanAccessWithRoutes] tests
+// them, and each side depends on one node only. So both sides are
+// evaluated once per node as sets over pm.matchers, and a reaches b iff
+// a's source set and b's destination set intersect: O(n * matchers)
+// matcher tests plus O(n^2) word ANDs instead of O(n^2 * matchers) tests.
 func (pm *PolicyManager) globalPeerListsLocked(
 	nodes views.Slice[types.NodeView],
 	routes []nodeRoutes,
 ) [][]int32 {
+	srcOf, dstOf := pm.globalMatcherSetsLocked(nodes, routes)
+
+	ids := make([]types.NodeID, nodes.Len())
+	for i := range nodes.Len() {
+		ids[i] = nodes.At(i).ID()
+	}
+
 	peers := make([][]int32, nodes.Len())
 
-	for i := range nodes.Len() {
-		nodeI, ri := nodes.At(i), routes[i]
-
-		for j := i + 1; j < nodes.Len(); j++ {
-			nodeJ := nodes.At(j)
-			if nodeI.ID() == nodeJ.ID() {
+	for i := range ids {
+		for j := i + 1; j < len(ids); j++ {
+			if ids[i] == ids[j] {
 				continue
 			}
 
-			if pm.globalPeersLocked(nodeI, nodeJ, ri, routes[j]) {
+			if srcOf[i].intersects(dstOf[j]) || srcOf[j].intersects(dstOf[i]) {
 				peers[i] = append(peers[i], int32(j))
 				peers[j] = append(peers[j], int32(i))
 			}
@@ -1862,8 +1908,81 @@ func (pm *PolicyManager) globalPeerListsLocked(
 	return peers
 }
 
-// perNodePeerListsLocked does the same scan for autogroup:self and via
-// grants, where each node has its own filter.
+// matcherSetWordBits is the number of matchers one word of a [matcherSet]
+// holds.
+const matcherSetWordBits = 64
+
+// matcherSet is a set of positions in pm.matchers. Bit k stands for
+// pm.matchers[k]: it lives in word k/64 at position k%64. nil is empty.
+type matcherSet []uint64
+
+// with adds matcher k to s. An empty s is allocated with the given
+// number of words first.
+func (s matcherSet) with(k, words int) matcherSet {
+	if s == nil {
+		s = make(matcherSet, words)
+	}
+
+	s[k/matcherSetWordBits] |= 1 << (k % matcherSetWordBits)
+
+	return s
+}
+
+// intersects reports whether s and o share a matcher.
+func (s matcherSet) intersects(o matcherSet) bool {
+	if s == nil || o == nil {
+		return false
+	}
+
+	for w := range s {
+		if s[w]&o[w] != 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// globalMatcherSetsLocked returns, per position in nodes, the global
+// matchers the node is a source of and a destination of. A node is a
+// source by its IPs or approved subnet routes, and a destination by its
+// IPs, approved subnet routes, or as an exit node for the internet.
+func (pm *PolicyManager) globalMatcherSetsLocked(
+	nodes views.Slice[types.NodeView],
+	routes []nodeRoutes,
+) ([]matcherSet, []matcherSet) {
+	words := (len(pm.matchers) + matcherSetWordBits - 1) / matcherSetWordBits
+	srcOf := make([]matcherSet, nodes.Len())
+	dstOf := make([]matcherSet, nodes.Len())
+
+	for i := range nodes.Len() {
+		n := nodes.At(i)
+		if !n.Valid() {
+			continue
+		}
+
+		ips, r := n.IPs(), routes[i]
+		routed := len(r.subnet) > 0
+
+		for k := range pm.matchers {
+			m := &pm.matchers[k]
+
+			if m.SrcsContainsIPs(ips...) || (routed && m.SrcsOverlapsPrefixes(r.subnet...)) {
+				srcOf[i] = srcOf[i].with(k, words)
+			}
+
+			if m.DestsContainsIP(ips...) || (routed && m.DestsOverlapsPrefixes(r.subnet...)) ||
+				(r.isExit && m.DestsIsTheInternet()) {
+				dstOf[i] = dstOf[i].with(k, words)
+			}
+		}
+	}
+
+	return srcOf, dstOf
+}
+
+// perNodePeerListsLocked scans every node pair for autogroup:self, shares
+// and via grants, where each node has its own filter.
 func (pm *PolicyManager) perNodePeerListsLocked(
 	nodes views.Slice[types.NodeView],
 	routes []nodeRoutes,
@@ -1895,13 +2014,6 @@ func (pm *PolicyManager) perNodePeerListsLocked(
 	}
 
 	return peers
-}
-
-// globalPeersLocked reports whether a and b see each other under the
-// global filter: either may reach the other.
-func (pm *PolicyManager) globalPeersLocked(a, b types.NodeView, ra, rb nodeRoutes) bool {
-	return a.CanAccessWithRoutes(pm.matchers, b, ra.subnet, rb.subnet, rb.isExit) ||
-		b.CanAccessWithRoutes(pm.matchers, a, rb.subnet, ra.subnet, ra.isExit)
 }
 
 // matchersForNodeLocked derives a node's unreduced matchers from the

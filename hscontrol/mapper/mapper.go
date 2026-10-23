@@ -69,7 +69,7 @@ func generateUserProfiles(
 	node types.NodeView,
 	peers views.Slice[types.NodeView],
 ) []tailcfg.UserProfile {
-	userMap := make(map[uint]*types.UserView)
+	userMap := make(map[uint]types.UserView)
 
 	user := node.Owner()
 	if !user.Valid() {
@@ -80,7 +80,7 @@ func generateUserProfiles(
 		return nil
 	}
 
-	userMap[user.ID()] = &user
+	userMap[user.ID()] = user
 
 	for _, peer := range peers.All() {
 		peerUser := peer.Owner()
@@ -88,7 +88,7 @@ func generateUserProfiles(
 			continue
 		}
 
-		userMap[peerUser.ID()] = &peerUser
+		userMap[peerUser.ID()] = peerUser
 	}
 
 	var profiles []tailcfg.UserProfile

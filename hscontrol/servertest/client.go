@@ -60,9 +60,11 @@ type TestClient struct {
 	pollDone   chan struct{}
 
 	// Accumulated state from [tailcfg.MapResponse] callbacks.
-	mu      sync.RWMutex
-	netmap  *netmap.NetworkMap
-	history []*netmap.NetworkMap
+	mu              sync.RWMutex
+	netmap          *netmap.NetworkMap
+	history         []*netmap.NetworkMap
+	updatesReceived int
+	noHistory       bool
 
 	// deltaUpdates and deltaRemoved: see [WithDeltaUpdates].
 	deltaUpdates bool
@@ -80,8 +82,17 @@ type TestClient struct {
 // ClientOption configures a [TestClient].
 type ClientOption func(*clientConfig)
 
+// WithoutNetmapHistory keeps only the latest netmap and one queued update,
+// so scale tests do not hold every client's old peer lists.
+// [TestClient.UpdateCount] still counts every full netmap received.
+func WithoutNetmapHistory() ClientOption {
+	return func(c *clientConfig) { c.noHistory = true }
+}
+
 type clientConfig struct {
 	ephemeral bool
+	// noHistory: see [WithoutNetmapHistory].
+	noHistory bool
 	// deltaUpdates: see [WithDeltaUpdates].
 	deltaUpdates bool
 	// loginFlags go with every register request; LoginEphemeral asks the
@@ -357,18 +368,24 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 		tb.Fatalf("servertest: NewDirect(%s): %v", name, err)
 	}
 
+	updateBuffer := 64
+	if cc.noHistory {
+		updateBuffer = 1
+	}
+
 	tc := &TestClient{
 		Name:       name,
 		server:     server,
 		direct:     direct,
 		authKey:    authKey,
 		loginFlags: cc.loginFlags,
-		updates:    make(chan *netmap.NetworkMap, 64),
+		updates:    make(chan *netmap.NetworkMap, updateBuffer),
 		bus:        bus,
 		dialer:     dialer,
 		tracker:    tracker,
 
 		deltaUpdates: cc.deltaUpdates,
+		noHistory:    cc.noHistory,
 	}
 
 	tb.Cleanup(func() {
@@ -469,7 +486,11 @@ func (c *TestClient) UpdateFullNetmap(nm *netmap.NetworkMap) {
 
 	c.mu.Lock()
 	c.netmap = nm
-	c.history = append(c.history, nm)
+	c.updatesReceived++
+
+	if !c.noHistory {
+		c.history = append(c.history, nm)
+	}
 	c.mu.Unlock()
 
 	// Non-blocking send to the updates channel.
@@ -750,10 +771,11 @@ func (c *TestClient) UpdateCount() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return len(c.history)
+	return c.updatesReceived
 }
 
-// History returns a copy of all [netmap.NetworkMap] snapshots in order.
+// History returns the kept [netmap.NetworkMap] snapshots in order. It is
+// empty when [WithoutNetmapHistory] is set.
 func (c *TestClient) History() []*netmap.NetworkMap {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
