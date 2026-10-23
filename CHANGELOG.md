@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.60.0](https://github.com/aislopware/slopscale/compare/v0.59.0...v0.60.0) (2026-10-23)
+
+
+### Changes
+
+* create and edit tailnet resources on their own pages instead of dialogs ([#70](https://github.com/aislopware/slopscale/issues/70)) ([b16b913](https://github.com/aislopware/slopscale/commit/b16b9136034e797ebf48a73a2e9336a98b4f77d4))
+
 ## [0.59.0](https://github.com/aislopware/slopscale/compare/v0.58.2...v0.59.0) (2026-10-20)
 
 
