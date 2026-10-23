@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Node, Service, ServiceHost } from "~/api/queries.ts";
 import {
+  servicePathLabel,
   approvedServicesOf,
   hostedServices,
   machineServices,
@@ -113,6 +114,16 @@ function service(name: string, hosts: ServiceHost[] = []): Service {
     updatedAt: stamp,
   };
 }
+
+describe(servicePathLabel, () => {
+  it("addresses a service by its label", () => {
+    expect(servicePathLabel("svc:web")).toBe("web");
+  });
+
+  it("addresses a service named like the create page by its full name", () => {
+    expect(servicePathLabel("svc:new")).toBe("svc:new");
+  });
+});
 
 describe(serviceNameIssue, () => {
   it.each(["web", "web-2", "a".repeat(63)])("accepts %s", (label) => {

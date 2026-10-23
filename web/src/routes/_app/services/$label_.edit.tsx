@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 
 import { servicesQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import { serviceLabel, serviceTitle } from "~/components/services/model.ts";
+import { serviceLabel, servicePathLabel, serviceTitle } from "~/components/services/model.ts";
 import { ServiceEditor } from "~/components/services/service-editor.tsx";
 import { RouteNotFound } from "~/components/ui/error-page.tsx";
 import { FormLayout } from "~/components/ui/form-page.tsx";
@@ -24,13 +24,15 @@ function EditServicePage(): ReactElement {
   const { me } = Route.useRouteContext();
   const { label } = Route.useParams();
   const { services } = useSuspenseQuery(servicesQuery).data;
-  const service = services.find((candidate) => serviceLabel(candidate.name) === label);
+  const service = services.find(
+    (candidate) => serviceLabel(candidate.name) === serviceLabel(label),
+  );
 
   useBreadcrumb(
     service === undefined ? null : "Edit",
     service === undefined
       ? undefined
-      : { label: serviceTitle(service), to: `/services/${serviceLabel(service.name)}` },
+      : { label: serviceTitle(service), to: `/services/${servicePathLabel(service.name)}` },
   );
 
   if (service === undefined) {

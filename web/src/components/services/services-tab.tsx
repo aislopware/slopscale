@@ -8,7 +8,7 @@ import type { ReactElement } from "react";
 import type { Service } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { reachStates, toServiceRows } from "~/components/services/model.ts";
+import { reachStates, servicePathLabel, toServiceRows } from "~/components/services/model.ts";
 import type { ServiceRow } from "~/components/services/model.ts";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
@@ -152,7 +152,7 @@ function ServiceCard({
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <Link
             to="/services/$label"
-            params={{ label: service.label }}
+            params={{ label: servicePathLabel(service.name) }}
             className="w-fit max-w-full truncate text-lg font-medium text-kumo-default hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
           >
             {service.displayName === "" ? service.name : service.displayName}
@@ -173,7 +173,7 @@ function ServiceCard({
       <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 text-sm text-kumo-subtle">
         <Link
           to="/services/$label"
-          params={{ label: service.label }}
+          params={{ label: servicePathLabel(service.name) }}
           className={cn("inline-flex items-center gap-1", rowLinkClass)}
         >
           {hostSummary(service)}

@@ -12,6 +12,7 @@ import {
   serviceLabel,
   serviceName,
   serviceNameIssue,
+  servicePathLabel,
 } from "~/components/services/model.ts";
 import { useServiceMutations } from "~/components/services/mutations.ts";
 import { DeleteServiceDialog } from "~/components/services/service-dialogs.tsx";
@@ -91,12 +92,12 @@ export function ServiceEditor({ service, canEdit }: ServiceEditorProps): ReactEl
   const issues = draftIssues(draft, creating);
   const label = submitted || left.label === true ? issues.label : undefined;
   const ports = submitted || left.ports === true ? issues.ports : undefined;
-  const detailPath = `/services/${serviceLabel(service?.name ?? "")}`;
+  const detailPath = `/services/${servicePathLabel(service?.name ?? "")}`;
 
   const toService = (name: string): void => {
     void navigate({
       to: "/services/$label",
-      params: { label: serviceLabel(name) },
+      params: { label: servicePathLabel(name) },
       ignoreBlocker: true,
     });
   };

@@ -12,6 +12,7 @@ import { HostsSection } from "~/components/services/hosts-section.tsx";
 import {
   reachStates,
   serviceLabel,
+  servicePathLabel,
   serviceReach,
   serviceTitle,
 } from "~/components/services/model.ts";
@@ -44,7 +45,9 @@ function ServicePage(): ReactElement {
   const { label } = Route.useParams();
   const { services } = useSuspenseQuery(servicesQuery).data;
   const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
-  const service = services.find((candidate) => serviceLabel(candidate.name) === label);
+  const service = services.find(
+    (candidate) => serviceLabel(candidate.name) === serviceLabel(label),
+  );
 
   useBreadcrumb(service === undefined ? null : serviceTitle(service));
 
@@ -104,7 +107,7 @@ function ServiceHeader({
         <>
           {can(me, "services") ? (
             <LinkButton
-              href={`/services/${serviceLabel(service.name)}/edit`}
+              href={`/services/${servicePathLabel(service.name)}/edit`}
               variant="secondary"
               icon={PencilSimpleIcon}
             >

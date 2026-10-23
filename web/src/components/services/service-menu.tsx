@@ -7,7 +7,7 @@ import type { ReactElement } from "react";
 import type { Service } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { serviceLabel } from "~/components/services/model.ts";
+import { serviceLabel, servicePathLabel } from "~/components/services/model.ts";
 import { useServiceMutations } from "~/components/services/mutations.ts";
 import { DeleteServiceDialog } from "~/components/services/service-dialogs.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
@@ -37,7 +37,7 @@ export function ServiceMenu({
           onClick={() => {
             void navigate({
               to: "/services/$label/edit",
-              params: { label: serviceLabel(service.name) },
+              params: { label: servicePathLabel(service.name) },
             });
           }}
         >
