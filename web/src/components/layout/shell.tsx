@@ -84,7 +84,7 @@ export function Shell({
             <Sidebar.Close className="md:hidden" />
           </Sidebar.Header>
           <Sidebar.Content>
-            <Sidebar.Group className="pb-1">
+            <Sidebar.Group className="pb-3">
               <Sidebar.Menu>
                 <QuickSearchButton
                   onOpen={() => {
