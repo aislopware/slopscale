@@ -1,51 +1,39 @@
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
-import type { Group, Network, Node } from "~/api/queries.ts";
+import type { Network } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
-import { DeleteNetworkDialog, NetworkDialog } from "~/components/networks/network-dialogs.tsx";
+import { DeleteNetworkDialog } from "~/components/networks/network-dialogs.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 
-type Dialog = "edit" | "delete";
-
-/** Edit and delete for one network, gated by the routes scope. */
+/** Edit and delete for one network, gated by the routes scope. Editing opens the network's page. */
 export function NetworkMenu({
   network,
-  groups,
-  nodes,
-  enforcing,
   me,
 }: {
   readonly network: Network;
-  readonly groups: readonly Group[];
-  readonly nodes: readonly Node[];
-  readonly enforcing: boolean;
   readonly me: Me;
 }): ReactElement {
-  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = useNavigate();
   const mutations = useNetworkMutations();
   const writable = can(me, "devices:routes");
-  const close = (open: boolean): void => {
-    if (!open) {
-      setDialog(null);
-    }
-  };
 
   return (
     <>
       <RowMenu label={`Actions for network ${network.name}`}>
         <DropdownMenu.Item
           icon={PencilSimpleIcon}
-          disabled={!writable}
           onClick={() => {
-            setDialog("edit");
+            void navigate({ to: "/networks/$networkId", params: { networkId: network.id } });
           }}
         >
-          Edit…
+          {writable ? "Edit" : "View"}
         </DropdownMenu.Item>
         <DropdownMenu.Separator />
         <DropdownMenu.Item
@@ -53,25 +41,16 @@ export function NetworkMenu({
           variant="danger"
           disabled={!writable}
           onClick={() => {
-            setDialog("delete");
+            setDeleting(true);
           }}
         >
           Delete…
         </DropdownMenu.Item>
       </RowMenu>
-      <NetworkDialog
-        network={network}
-        groups={groups}
-        nodes={nodes}
-        enforcing={enforcing}
-        open={dialog === "edit"}
-        onOpenChange={close}
-        mutations={mutations}
-      />
       <DeleteNetworkDialog
         network={network}
-        open={dialog === "delete"}
-        onOpenChange={close}
+        open={deleting}
+        onOpenChange={setDeleting}
         mutations={mutations}
       />
     </>

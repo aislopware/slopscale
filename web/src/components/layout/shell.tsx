@@ -6,7 +6,7 @@ import type { Icon } from "@phosphor-icons/react";
 import { MagnifyingGlassIcon, QuestionIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { accessRequestsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
@@ -20,6 +20,7 @@ import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/n
 import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { pageGridClass } from "~/components/ui/page.tsx";
 import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
+import type { Crumb } from "~/lib/breadcrumbs.tsx";
 import { docsBase } from "~/lib/docs.ts";
 import { pendingRouteCount } from "~/lib/node.ts";
 
@@ -380,9 +381,30 @@ function Trail({
   const current = place?.item;
   const page = place?.child;
   const detail = page !== undefined && pathname !== page.to && leaf !== null ? leaf : null;
-  const last: string | null = page?.label ?? leaf;
+  // The links before the current crumb: the page of a branch above a detail, then the record a
+  // sub-page belongs to.
+  const links: Crumb[] = [];
+  let last: string | null = null;
 
-  useDocumentTitle(documentTitle(brand.title, current?.label, detail ?? last));
+  if (page === undefined) {
+    last = leaf?.leaf ?? null;
+
+    if (leaf?.parent !== undefined) {
+      links.push(leaf.parent);
+    }
+  } else if (detail === null) {
+    last = page.label;
+  } else {
+    links.push({ label: page.label, to: page.to });
+
+    if (detail.parent !== undefined) {
+      links.push(detail.parent);
+    }
+
+    last = detail.leaf;
+  }
+
+  useDocumentTitle(documentTitle(brand.title, current?.label, last));
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -395,15 +417,13 @@ function Trail({
             {current.label}
           </Breadcrumbs.Link>
           <Breadcrumbs.Separator />
-          {detail === null || page === undefined ? (
-            <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
-          ) : (
-            <>
-              <Breadcrumbs.Link href={page.to}>{page.label}</Breadcrumbs.Link>
+          {links.map((link) => (
+            <Fragment key={link.to}>
+              <Breadcrumbs.Link href={link.to}>{link.label}</Breadcrumbs.Link>
               <Breadcrumbs.Separator />
-              <Breadcrumbs.Current>{detail}</Breadcrumbs.Current>
-            </>
-          )}
+            </Fragment>
+          ))}
+          <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
         </Breadcrumbs>
       )}
     </div>

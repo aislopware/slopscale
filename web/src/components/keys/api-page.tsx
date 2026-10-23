@@ -1,10 +1,10 @@
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { EyeIcon, PlusIcon, UserIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import { usersQuery } from "~/api/queries.ts";
@@ -18,10 +18,12 @@ import { useApiKeyMutations } from "~/components/keys/mutations.ts";
 import { scopeItems } from "~/components/keys/scopes.ts";
 import {
   ChoiceChips,
-  FormError,
-  FormFooter,
+  FormBar,
+  FormLayout,
+  FormPage,
   FormSection,
   SelectionCards,
+  nameFieldClass,
 } from "~/components/ui/form-page.tsx";
 import type { SelectionCard } from "~/components/ui/form-page.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
@@ -75,39 +77,37 @@ function scopesFor(permissions: Permissions, picked: readonly string[]): string[
 /**
  * Creating an API key on a page of its own, the dashboard's "Create API token": the key's name, its
  * permissions as template cards (the owner's, read-only, or picked scopes), who it acts as, and its
- * expiration as chips, then Cancel on the left and the action on the right. The secret is shown on
- * the same page once it exists.
+ * expiration as chips, then the save bar with Cancel and the action. The secret is shown on the
+ * same page once it exists.
  */
 export function CreateApiKeyPage({ me }: { readonly me: Me }): ReactElement {
   const [created, setCreated] = useState<string | null>(null);
 
   return created === null ? (
-    <>
+    <FormLayout>
       <PageHeader
         title="Create API key"
         docs="ref/api"
         description="The key authenticates calls to the v1 API with its owner's permissions, or with the scopes you pick."
       />
       <ApiKeyForm me={me} onCreated={setCreated} />
-    </>
+    </FormLayout>
   ) : (
-    <>
+    <FormLayout>
       <PageHeader
         title="API key created"
         docs="ref/api"
         description="Copy the key before you leave this page. It is not shown again."
       />
-      <div className="flex flex-col gap-4">
-        <FormSection title="Your key">
-          <RevealedSecret value={created} note="The key is shown only once. Copy it now." />
-        </FormSection>
-        <FormFooter>
-          <LinkButton href={listPath} variant="primary">
-            Done
-          </LinkButton>
-        </FormFooter>
-      </div>
-    </>
+      <FormSection title="Your key">
+        <RevealedSecret value={created} note="The key is shown only once. Copy it now." />
+      </FormSection>
+      <FormBar>
+        <LinkButton href={listPath} variant="primary">
+          Done
+        </LinkButton>
+      </FormBar>
+    </FormLayout>
   );
 }
 
@@ -139,12 +139,11 @@ function ApiKeyForm({
     }
   };
 
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
+  function submit(): boolean {
     setTried(true);
 
-    if (scopeIssue !== undefined || create.isPending) {
-      return;
+    if (scopeIssue !== undefined) {
+      return false;
     }
 
     create.mutate(
@@ -162,18 +161,26 @@ function ApiKeyForm({
         },
       },
     );
+
+    return true;
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <FormError
-        title="The key was not created"
-        message={create.isError ? errorMessage(create.error) : undefined}
-      />
+    <FormPage
+      noun="API key"
+      creating
+      canEdit
+      error={create.isError ? errorMessage(create.error) : undefined}
+      errorTitle="The key was not created"
+      pending={create.isPending}
+      dirty={description !== "" || permissions !== "owner" || picked.length > 0 || expiry !== "90d"}
+      onSubmit={submit}
+      cancelTo={listPath}
+    >
       <FormSection title="Key description" info="What the key is for, so it can be told apart.">
         <Input
           aria-label="Key description"
-          className="max-w-[450px]"
+          className={nameFieldClass}
           value={description}
           placeholder="CI deploy, monitoring…"
           onChange={(event) => {
@@ -221,12 +228,7 @@ function ApiKeyForm({
           }}
         />
       </FormSection>
-      <FormFooter cancelTo={listPath}>
-        <Button type="submit" variant="primary" loading={create.isPending}>
-          Create API key
-        </Button>
-      </FormFooter>
-    </form>
+    </FormPage>
   );
 }
 

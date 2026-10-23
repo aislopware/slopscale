@@ -14,9 +14,9 @@ import { DeletePostureDialog } from "~/components/access/posture-dialogs.tsx";
 import { ExampleTiles, ScheduleFields } from "~/components/access/posture-fields.tsx";
 import { isClock, isWeekday, parseExpressions } from "~/components/access/posture-model.ts";
 import type { Weekday } from "~/components/access/posture-model.ts";
-import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import { SettingToggle } from "~/components/policy/rule-builder.tsx";
 import { fieldError } from "~/components/ui/field-error.ts";
+import { FieldGrid, FormPage, useDraft } from "~/components/ui/form-page.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { useDebounced } from "~/lib/use-debounced.ts";
@@ -293,7 +293,7 @@ export function PostureEditor({
   }
 
   return (
-    <EditorPage
+    <FormPage
       noun="posture"
       creating={posture === undefined}
       canEdit={canEdit}
@@ -301,9 +301,7 @@ export function PostureEditor({
       pending={mutation.isPending}
       dirty={dirty}
       onSubmit={save}
-      onCancel={() => {
-        void navigate({ to: "/policy/postures" });
-      }}
+      cancelTo="/policy/postures"
       onDelete={() => {
         setDeleting(true);
       }}
@@ -343,6 +341,6 @@ export function PostureEditor({
           ) : null}
         </SettingToggle>
       </Section>
-    </EditorPage>
+    </FormPage>
   );
 }

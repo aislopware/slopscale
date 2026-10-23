@@ -9,7 +9,6 @@ import { DeleteGroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isSynced } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { nodeItems, userItems } from "~/components/access/pickers.ts";
-import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import {
   ConditionRow,
   LogicBadge,
@@ -17,6 +16,7 @@ import {
   conditionLabel,
 } from "~/components/policy/rule-builder.tsx";
 import { fieldError } from "~/components/ui/field-error.ts";
+import { FieldGrid, FormPage, useDraft } from "~/components/ui/form-page.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -227,7 +227,7 @@ export function GroupEditor({
   }
 
   return (
-    <EditorPage
+    <FormPage
       noun="group"
       creating={group === undefined}
       canEdit={canEdit}
@@ -235,9 +235,7 @@ export function GroupEditor({
       pending={mutation.isPending}
       dirty={dirty}
       onSubmit={save}
-      onCancel={() => {
-        void navigate({ to: "/policy/groups" });
-      }}
+      cancelTo="/policy/groups"
       onDelete={() => {
         setDeleting(true);
       }}
@@ -266,7 +264,7 @@ export function GroupEditor({
           }}
         />
       </Section>
-    </EditorPage>
+    </FormPage>
   );
 }
 

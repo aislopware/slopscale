@@ -19,9 +19,9 @@ import {
   ruleSnippet,
 } from "~/components/access/rule-hujson.ts";
 import { previewColumns } from "~/components/access/rule-preview.tsx";
-import { EditorPage, FieldGrid, useDraft } from "~/components/policy/editor-page.tsx";
 import { BuilderHeading, RulePreview, SettingToggle } from "~/components/policy/rule-builder.tsx";
 import { fieldError } from "~/components/ui/field-error.ts";
+import { FieldGrid, FormPage, useDraft } from "~/components/ui/form-page.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import type { EditorProblem } from "~/lib/editor/problems.ts";
@@ -298,7 +298,7 @@ export function RuleEditor({
   }
 
   return (
-    <EditorPage
+    <FormPage
       noun="rule"
       creating={rule === undefined}
       canEdit={canEdit}
@@ -306,9 +306,7 @@ export function RuleEditor({
       pending={mutation.isPending}
       dirty={dirty}
       onSubmit={save}
-      onCancel={() => {
-        void navigate({ to: "/policy/rules" });
-      }}
+      cancelTo="/policy/rules"
       onDelete={() => {
         setDeleting(true);
       }}
@@ -347,6 +345,6 @@ export function RuleEditor({
         <RulePreview columns={previewColumns(draft, { groups, postures, toOwnMachines })} />
       </Section>
       <DetailsSection draft={draft} errors={shown} onChange={update} />
-    </EditorPage>
+    </FormPage>
   );
 }

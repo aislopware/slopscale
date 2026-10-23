@@ -76,6 +76,7 @@ export function TagField({
   suggestions,
   required = false,
   disabled = false,
+  error,
 }: {
   readonly label?: ReactNode;
   readonly description?: ReactNode;
@@ -86,6 +87,8 @@ export function TagField({
   readonly suggestions: readonly string[];
   readonly required?: boolean;
   readonly disabled?: boolean;
+  /** What is wrong with the chosen tags, shown when the draft being typed is fine. */
+  readonly error?: string | undefined;
 }): ReactElement {
   const [query, setQuery] = useState("");
   const draft = normalizeTag(query);
@@ -115,7 +118,7 @@ export function TagField({
       required={required}
       label={label}
       {...(description === undefined ? {} : { description })}
-      {...fieldError(issue ?? undefined)}
+      {...fieldError(issue ?? error)}
       // The rows are ranked here, so the list is not filtered again by the text.
       filter={null}
       autoHighlight

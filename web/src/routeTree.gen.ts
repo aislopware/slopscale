@@ -20,7 +20,6 @@ import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDnsRouteRouteImport } from './routes/_app/dns/route'
 import { Route as AppIntegrationsRouteRouteImport } from './routes/_app/integrations/route'
 import { Route as AppKeysRouteRouteImport } from './routes/_app/keys/route'
-import { Route as AppNetworksRouteImport } from './routes/_app/networks'
 import { Route as AppPolicyRouteRouteImport } from './routes/_app/policy/route'
 import { Route as AppRelaysRouteRouteImport } from './routes/_app/relays/route'
 import { Route as AppRoutesRouteImport } from './routes/_app/routes'
@@ -42,6 +41,9 @@ import { Route as AppKeysOauthRouteImport } from './routes/_app/keys/oauth'
 import { Route as AppKeysPreAuthRouteImport } from './routes/_app/keys/pre-auth'
 import { Route as AppMachinesIndexRouteImport } from './routes/_app/machines/index'
 import { Route as AppMachinesNodeIdRouteImport } from './routes/_app/machines/$nodeId'
+import { Route as AppNetworksIndexRouteImport } from './routes/_app/networks/index'
+import { Route as AppNetworksNetworkIdRouteImport } from './routes/_app/networks/$networkId'
+import { Route as AppNetworksNewRouteImport } from './routes/_app/networks/new'
 import { Route as AppPolicyIndexRouteImport } from './routes/_app/policy/index'
 import { Route as AppPolicyFileRouteImport } from './routes/_app/policy/file'
 import { Route as AppPolicyGraphRouteImport } from './routes/_app/policy/graph'
@@ -137,11 +139,6 @@ const AppIntegrationsRouteRoute = AppIntegrationsRouteRouteImport.update({
 const AppKeysRouteRoute = AppKeysRouteRouteImport.update({
   id: '/keys',
   path: '/keys',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppNetworksRoute = AppNetworksRouteImport.update({
-  id: '/networks',
-  path: '/networks',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPolicyRouteRoute = AppPolicyRouteRouteImport.update({
@@ -248,6 +245,21 @@ const AppMachinesIndexRoute = AppMachinesIndexRouteImport.update({
 const AppMachinesNodeIdRoute = AppMachinesNodeIdRouteImport.update({
   id: '/machines/$nodeId',
   path: '/machines/$nodeId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNetworksIndexRoute = AppNetworksIndexRouteImport.update({
+  id: '/networks/',
+  path: '/networks/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNetworksNetworkIdRoute = AppNetworksNetworkIdRouteImport.update({
+  id: '/networks/$networkId',
+  path: '/networks/$networkId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppNetworksNewRoute = AppNetworksNewRouteImport.update({
+  id: '/networks/new',
+  path: '/networks/new',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPolicyIndexRoute = AppPolicyIndexRouteImport.update({
@@ -485,7 +497,6 @@ export interface FileRoutesByFullPath {
   '/access': typeof AppAccessRoute
   '/apps': typeof AppAppsRoute
   '/audit': typeof AppAuditRoute
-  '/networks': typeof AppNetworksRoute
   '/routes': typeof AppRoutesRoute
   '/sessions': typeof AppSessionsRoute
   '/sign-ins': typeof AppSignInsRoute
@@ -501,6 +512,8 @@ export interface FileRoutesByFullPath {
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRouteWithChildren
+  '/networks/$networkId': typeof AppNetworksNetworkIdRoute
+  '/networks/new': typeof AppNetworksNewRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
   '/policy/requests': typeof AppPolicyRequestsRoute
@@ -520,6 +533,7 @@ export interface FileRoutesByFullPath {
   '/integrations/': typeof AppIntegrationsIndexRoute
   '/keys/': typeof AppKeysIndexRoute
   '/machines/': typeof AppMachinesIndexRoute
+  '/networks/': typeof AppNetworksIndexRoute
   '/policy/': typeof AppPolicyIndexRoute
   '/relays/': typeof AppRelaysIndexRoute
   '/services/': typeof AppServicesIndexRoute
@@ -555,7 +569,6 @@ export interface FileRoutesByTo {
   '/access': typeof AppAccessRoute
   '/apps': typeof AppAppsRoute
   '/audit': typeof AppAuditRoute
-  '/networks': typeof AppNetworksRoute
   '/routes': typeof AppRoutesRoute
   '/sessions': typeof AppSessionsRoute
   '/sign-ins': typeof AppSignInsRoute
@@ -569,6 +582,8 @@ export interface FileRoutesByTo {
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
+  '/networks/$networkId': typeof AppNetworksNetworkIdRoute
+  '/networks/new': typeof AppNetworksNewRoute
   '/policy/file': typeof AppPolicyFileRoute
   '/policy/graph': typeof AppPolicyGraphRoute
   '/policy/requests': typeof AppPolicyRequestsRoute
@@ -588,6 +603,7 @@ export interface FileRoutesByTo {
   '/integrations': typeof AppIntegrationsIndexRoute
   '/keys': typeof AppKeysIndexRoute
   '/machines': typeof AppMachinesIndexRoute
+  '/networks': typeof AppNetworksIndexRoute
   '/policy': typeof AppPolicyIndexRoute
   '/relays': typeof AppRelaysIndexRoute
   '/services': typeof AppServicesIndexRoute
@@ -631,7 +647,6 @@ export interface FileRoutesById {
   '/_app/access': typeof AppAccessRoute
   '/_app/apps': typeof AppAppsRoute
   '/_app/audit': typeof AppAuditRoute
-  '/_app/networks': typeof AppNetworksRoute
   '/_app/routes': typeof AppRoutesRoute
   '/_app/sessions': typeof AppSessionsRoute
   '/_app/sign-ins': typeof AppSignInsRoute
@@ -648,6 +663,8 @@ export interface FileRoutesById {
   '/_app/keys/oauth': typeof AppKeysOauthRoute
   '/_app/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/_app/machines/$nodeId': typeof AppMachinesNodeIdRouteWithChildren
+  '/_app/networks/$networkId': typeof AppNetworksNetworkIdRoute
+  '/_app/networks/new': typeof AppNetworksNewRoute
   '/_app/policy/file': typeof AppPolicyFileRoute
   '/_app/policy/graph': typeof AppPolicyGraphRoute
   '/_app/policy/requests': typeof AppPolicyRequestsRoute
@@ -667,6 +684,7 @@ export interface FileRoutesById {
   '/_app/integrations/': typeof AppIntegrationsIndexRoute
   '/_app/keys/': typeof AppKeysIndexRoute
   '/_app/machines/': typeof AppMachinesIndexRoute
+  '/_app/networks/': typeof AppNetworksIndexRoute
   '/_app/policy/': typeof AppPolicyIndexRoute
   '/_app/relays/': typeof AppRelaysIndexRoute
   '/_app/services/': typeof AppServicesIndexRoute
@@ -710,7 +728,6 @@ export interface FileRouteTypes {
     | '/access'
     | '/apps'
     | '/audit'
-    | '/networks'
     | '/routes'
     | '/sessions'
     | '/sign-ins'
@@ -726,6 +743,8 @@ export interface FileRouteTypes {
     | '/keys/oauth'
     | '/keys/pre-auth'
     | '/machines/$nodeId'
+    | '/networks/$networkId'
+    | '/networks/new'
     | '/policy/file'
     | '/policy/graph'
     | '/policy/requests'
@@ -745,6 +764,7 @@ export interface FileRouteTypes {
     | '/integrations/'
     | '/keys/'
     | '/machines/'
+    | '/networks/'
     | '/policy/'
     | '/relays/'
     | '/services/'
@@ -780,7 +800,6 @@ export interface FileRouteTypes {
     | '/access'
     | '/apps'
     | '/audit'
-    | '/networks'
     | '/routes'
     | '/sessions'
     | '/sign-ins'
@@ -794,6 +813,8 @@ export interface FileRouteTypes {
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
+    | '/networks/$networkId'
+    | '/networks/new'
     | '/policy/file'
     | '/policy/graph'
     | '/policy/requests'
@@ -813,6 +834,7 @@ export interface FileRouteTypes {
     | '/integrations'
     | '/keys'
     | '/machines'
+    | '/networks'
     | '/policy'
     | '/relays'
     | '/services'
@@ -855,7 +877,6 @@ export interface FileRouteTypes {
     | '/_app/access'
     | '/_app/apps'
     | '/_app/audit'
-    | '/_app/networks'
     | '/_app/routes'
     | '/_app/sessions'
     | '/_app/sign-ins'
@@ -872,6 +893,8 @@ export interface FileRouteTypes {
     | '/_app/keys/oauth'
     | '/_app/keys/pre-auth'
     | '/_app/machines/$nodeId'
+    | '/_app/networks/$networkId'
+    | '/_app/networks/new'
     | '/_app/policy/file'
     | '/_app/policy/graph'
     | '/_app/policy/requests'
@@ -891,6 +914,7 @@ export interface FileRouteTypes {
     | '/_app/integrations/'
     | '/_app/keys/'
     | '/_app/machines/'
+    | '/_app/networks/'
     | '/_app/policy/'
     | '/_app/relays/'
     | '/_app/services/'
@@ -1003,13 +1027,6 @@ declare module '@tanstack/react-router' {
       path: '/keys'
       fullPath: '/keys'
       preLoaderRoute: typeof AppKeysRouteRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/networks': {
-      id: '/_app/networks'
-      path: '/networks'
-      fullPath: '/networks'
-      preLoaderRoute: typeof AppNetworksRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/policy': {
@@ -1157,6 +1174,27 @@ declare module '@tanstack/react-router' {
       path: '/machines/$nodeId'
       fullPath: '/machines/$nodeId'
       preLoaderRoute: typeof AppMachinesNodeIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/networks/': {
+      id: '/_app/networks/'
+      path: '/networks'
+      fullPath: '/networks/'
+      preLoaderRoute: typeof AppNetworksIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/networks/$networkId': {
+      id: '/_app/networks/$networkId'
+      path: '/networks/$networkId'
+      fullPath: '/networks/$networkId'
+      preLoaderRoute: typeof AppNetworksNetworkIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/networks/new': {
+      id: '/_app/networks/new'
+      path: '/networks/new'
+      fullPath: '/networks/new'
+      preLoaderRoute: typeof AppNetworksNewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/policy/': {
@@ -1648,7 +1686,6 @@ interface AppRouteChildren {
   AppAccessRoute: typeof AppAccessRoute
   AppAppsRoute: typeof AppAppsRoute
   AppAuditRoute: typeof AppAuditRoute
-  AppNetworksRoute: typeof AppNetworksRoute
   AppRoutesRoute: typeof AppRoutesRoute
   AppSessionsRoute: typeof AppSessionsRoute
   AppSignInsRoute: typeof AppSignInsRoute
@@ -1656,10 +1693,13 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppSettingsTrafficRouteRoute: typeof AppSettingsTrafficRouteRouteWithChildren
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRouteWithChildren
+  AppNetworksNetworkIdRoute: typeof AppNetworksNetworkIdRoute
+  AppNetworksNewRoute: typeof AppNetworksNewRoute
   AppServicesLabelRoute: typeof AppServicesLabelRoute
   AppSettingsServerRoute: typeof AppSettingsServerRoute
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
   AppMachinesIndexRoute: typeof AppMachinesIndexRoute
+  AppNetworksIndexRoute: typeof AppNetworksIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
@@ -1676,7 +1716,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccessRoute: AppAccessRoute,
   AppAppsRoute: AppAppsRoute,
   AppAuditRoute: AppAuditRoute,
-  AppNetworksRoute: AppNetworksRoute,
   AppRoutesRoute: AppRoutesRoute,
   AppSessionsRoute: AppSessionsRoute,
   AppSignInsRoute: AppSignInsRoute,
@@ -1684,10 +1723,13 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppSettingsTrafficRouteRoute: AppSettingsTrafficRouteRouteWithChildren,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRouteWithChildren,
+  AppNetworksNetworkIdRoute: AppNetworksNetworkIdRoute,
+  AppNetworksNewRoute: AppNetworksNewRoute,
   AppServicesLabelRoute: AppServicesLabelRoute,
   AppSettingsServerRoute: AppSettingsServerRoute,
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
   AppMachinesIndexRoute: AppMachinesIndexRoute,
+  AppNetworksIndexRoute: AppNetworksIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,

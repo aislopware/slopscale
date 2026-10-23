@@ -1,8 +1,8 @@
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { LinkButton } from "@cloudflare/kumo/components/button";
 import { KeyIcon, RepeatIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import { groupsQuery, usersQuery } from "~/api/queries.ts";
@@ -20,7 +20,13 @@ import {
 import type { PreAuthKeyChoices } from "~/components/keys/preauth-fields.tsx";
 import { JoinCommand } from "~/components/machines/join-command.tsx";
 import { useKnownTags } from "~/components/tags/use-known-tags.ts";
-import { FormError, FormFooter, FormSection, SelectionCards } from "~/components/ui/form-page.tsx";
+import {
+  FormBar,
+  FormLayout,
+  FormPage,
+  FormSection,
+  SelectionCards,
+} from "~/components/ui/form-page.tsx";
 import type { SelectionCard } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -50,23 +56,23 @@ interface Draft extends PreAuthKeyChoices {
 /**
  * Creating a pre-auth key on a page of its own, laid out like the dashboard's "Create API token":
  * one layered card per decision (who the machines belong to, how often the key works, what the
- * machines are, when it expires, what they join), then Cancel on the left and the action on the
- * right. Once the key exists the page turns into the one place it can be read.
+ * machines are, when it expires, what they join), then the save bar with Cancel and the action.
+ * Once the key exists the page turns into the one place it can be read.
  */
 export function CreatePreAuthKeyPage({ me }: { readonly me: Me }): ReactElement {
   const [created, setCreated] = useState<string | null>(null);
 
   return created === null ? (
-    <>
+    <FormLayout>
       <PageHeader
         title="Create pre-auth key"
         docs="ref/registration"
         description="A machine registers with the key instead of signing in, so it belongs to the user you pick, or to the tags you give it."
       />
       <PreAuthKeyForm me={me} onCreated={setCreated} />
-    </>
+    </FormLayout>
   ) : (
-    <>
+    <FormLayout>
       <PageHeader
         title="Pre-auth key created"
         docs="ref/registration"
@@ -82,14 +88,26 @@ export function CreatePreAuthKeyPage({ me }: { readonly me: Me }): ReactElement 
         >
           <JoinCommand authKey={created} />
         </FormSection>
-        <FormFooter>
-          <LinkButton href={listPath} variant="primary">
-            Done
-          </LinkButton>
-        </FormFooter>
       </div>
-    </>
+      <FormBar>
+        <LinkButton href={listPath} variant="primary">
+          Done
+        </LinkButton>
+      </FormBar>
+    </FormLayout>
   );
+}
+
+function initialDraft(me: Me): Draft {
+  return {
+    userId: me.user?.id ?? "",
+    usage: "single",
+    expiry: "7d",
+    ephemeral: false,
+    preauthorized: true,
+    tags: [],
+    groupIds: [],
+  };
 }
 
 function PreAuthKeyForm({
@@ -104,15 +122,8 @@ function PreAuthKeyForm({
   const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const knownTags = useKnownTags(me);
   const { create } = usePreAuthKeyMutations();
-  const [draft, setDraft] = useState<Draft>({
-    userId: me.user?.id ?? "",
-    usage: "single",
-    expiry: "7d",
-    ephemeral: false,
-    preauthorized: true,
-    tags: [],
-    groupIds: [],
-  });
+  const initial = initialDraft(me);
+  const [draft, setDraft] = useState<Draft>(initial);
   const userList = users.data?.users ?? [];
   const userId = draft.userId === "" ? (userList[0]?.id ?? "") : draft.userId;
 
@@ -125,8 +136,11 @@ function PreAuthKeyForm({
     }
   };
 
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
+  function submit(): boolean {
+    if (userId === "") {
+      return false;
+    }
+
     create.mutate(
       {
         body: {
@@ -145,14 +159,22 @@ function PreAuthKeyForm({
         },
       },
     );
+
+    return true;
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <FormError
-        title="The key was not created"
-        message={create.isError ? errorMessage(create.error) : undefined}
-      />
+    <FormPage
+      noun="key"
+      creating
+      canEdit
+      error={create.isError ? errorMessage(create.error) : undefined}
+      errorTitle="The key was not created"
+      pending={create.isPending}
+      dirty={JSON.stringify(draft) !== JSON.stringify(initial)}
+      onSubmit={submit}
+      cancelTo={listPath}
+    >
       <FormSection
         title="Owner"
         info="A machine registered with the key belongs to this user, unless the key tags it."
@@ -197,11 +219,6 @@ function PreAuthKeyForm({
           onChange={update}
         />
       </FormSection>
-      <FormFooter cancelTo={listPath}>
-        <Button type="submit" variant="primary" loading={create.isPending} disabled={userId === ""}>
-          Create key
-        </Button>
-      </FormFooter>
-    </form>
+    </FormPage>
   );
 }

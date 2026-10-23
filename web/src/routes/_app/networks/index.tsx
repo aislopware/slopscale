@@ -7,7 +7,7 @@ import { NetworksTab } from "~/components/networks/networks-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/networks")({
+export const Route = createFileRoute("/_app/networks/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await Promise.all([
