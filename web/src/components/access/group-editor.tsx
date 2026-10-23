@@ -16,9 +16,8 @@ import {
   conditionLabel,
 } from "~/components/policy/rule-builder.tsx";
 import { fieldError } from "~/components/ui/field-error.ts";
-import { FieldGrid, FormPage, useDraft } from "~/components/ui/form-page.tsx";
+import { FieldGrid, FormPage, FormSection, useDraft } from "~/components/ui/form-page.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
-import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 const nameHint = "Letters, digits, spaces, dots, dashes and underscores, and unique.";
@@ -55,7 +54,7 @@ function BasicSection({
   readonly onChange: Change;
 }): ReactElement {
   return (
-    <Section title="Basic information" bodyClassName="p-4">
+    <FormSection title="Group details">
       <FieldGrid>
         <Input
           label="Group name"
@@ -82,7 +81,7 @@ function BasicSection({
           }}
         />
       </FieldGrid>
-    </Section>
+    </FormSection>
   );
 }
 
@@ -101,10 +100,9 @@ function MembersSection({
   readonly onChange: Change;
 }): ReactElement {
   return (
-    <Section
+    <FormSection
       title="Members"
-      description="Rules and networks name the group, so this is the one place to change who they cover."
-      bodyClassName="flex flex-col gap-4 p-4"
+      info="Rules and networks name the group, so this is the one place to change who they cover."
     >
       <div className="flex items-start gap-3">
         <span className="flex h-lh items-center">
@@ -157,7 +155,7 @@ function MembersSection({
           </p>
         </ConditionRow>
       </div>
-    </Section>
+    </FormSection>
   );
 }
 
@@ -254,7 +252,7 @@ export function GroupEditor({
     >
       <BasicSection draft={draft} synced={synced} nameError={nameError} onChange={update} />
       <MembersSection draft={draft} synced={synced} nodes={nodes} users={users} onChange={update} />
-      <Section title="Requests" bodyClassName="p-4">
+      <FormSection title="Requests">
         <SettingToggle
           title="Users may request access"
           description="A signed-in user can ask to join this group for a while. An approver decides under Requests."
@@ -263,7 +261,7 @@ export function GroupEditor({
             update({ requestable });
           }}
         />
-      </Section>
+      </FormSection>
     </FormPage>
   );
 }

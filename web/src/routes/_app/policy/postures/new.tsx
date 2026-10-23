@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { accessRulesQuery, posturesQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { PostureEditor } from "~/components/access/posture-editor.tsx";
+import { FormLayout } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
@@ -26,7 +27,7 @@ function NewPosturePage(): ReactElement {
   useBreadcrumb("New posture");
 
   return (
-    <>
+    <FormLayout>
       <PageHeader
         title="New posture"
         docs="ref/device-trust"
@@ -37,6 +38,6 @@ function NewPosturePage(): ReactElement {
         geoIpAvailable={geoIpAvailable}
         canEdit={can(me, "policy_file")}
       />
-    </>
+    </FormLayout>
   );
 }

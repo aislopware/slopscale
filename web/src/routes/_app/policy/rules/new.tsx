@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { accessRulesQuery, groupsQuery, posturesQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { RuleEditor } from "~/components/access/rule-editor.tsx";
+import { FormLayout } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
@@ -28,7 +29,7 @@ function NewRulePage(): ReactElement {
   useBreadcrumb("New rule");
 
   return (
-    <>
+    <FormLayout width="wide">
       <PageHeader
         title="New rule"
         docs="ref/access-control"
@@ -41,6 +42,6 @@ function NewRulePage(): ReactElement {
         policyFileEnforces={policyFileEnforces}
         canEdit={can(me, "policy_file")}
       />
-    </>
+    </FormLayout>
   );
 }

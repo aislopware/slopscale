@@ -8,6 +8,7 @@ import { can } from "~/auth/me.ts";
 import { GroupEditor } from "~/components/access/group-editor.tsx";
 import { isBuiltin, isSynced, rulesUsingGroup } from "~/components/access/model.ts";
 import { plural } from "~/components/overview/plural.ts";
+import { FormLayout } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
@@ -36,7 +37,7 @@ function GroupPage(): ReactElement {
   // The built-in groups are the server's: their members follow the tailnet, not a list.
   if (group === undefined || isBuiltin(group)) {
     return (
-      <>
+      <FormLayout>
         <PageHeader title={group?.name ?? "Group not found"} docs="ref/access-control" />
         <Section title="Group" bodyClassName="p-0">
           <SectionEmpty
@@ -55,14 +56,14 @@ function GroupPage(): ReactElement {
             }
           />
         </Section>
-      </>
+      </FormLayout>
     );
   }
 
   const used = rulesUsingGroup(rules, group).length;
 
   return (
-    <>
+    <FormLayout>
       <PageHeader
         title={group.name}
         kicker={isSynced(group) ? "Group · synced from the identity provider" : "Group"}
@@ -78,6 +79,6 @@ function GroupPage(): ReactElement {
         users={users.data?.users ?? []}
         canEdit={can(me, "policy_file")}
       />
-    </>
+    </FormLayout>
   );
 }

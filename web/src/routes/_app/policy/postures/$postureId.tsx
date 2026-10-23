@@ -7,6 +7,7 @@ import { accessRulesQuery, posturesQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { PostureEditor } from "~/components/access/posture-editor.tsx";
 import { rulesUsingPosture } from "~/components/access/posture-model.ts";
+import { FormLayout } from "~/components/ui/form-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
@@ -40,7 +41,7 @@ function PosturePage(): ReactElement {
 
   if (posture === undefined) {
     return (
-      <>
+      <FormLayout>
         <PageHeader title="Posture not found" docs="ref/device-trust" />
         <Section title="Posture" bodyClassName="p-0">
           <SectionEmpty
@@ -53,12 +54,12 @@ function PosturePage(): ReactElement {
             }
           />
         </Section>
-      </>
+      </FormLayout>
     );
   }
 
   return (
-    <>
+    <FormLayout>
       <PageHeader
         title={posture.name}
         kicker="Posture"
@@ -73,6 +74,6 @@ function PosturePage(): ReactElement {
         geoIpAvailable={geoIpAvailable}
         canEdit={can(me, "policy_file")}
       />
-    </>
+    </FormLayout>
   );
 }
