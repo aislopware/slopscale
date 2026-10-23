@@ -1,21 +1,20 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
+import { cn } from "@cloudflare/kumo/utils";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
-import { errorMessage } from "~/api/error.ts";
 import type { DnsRule, Group } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { AddressList, ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
-import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
+import { DeleteDnsRuleDialog } from "~/components/dns/rule-delete-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
-import { ConfirmDialog, ConfirmSummary } from "~/components/ui/confirm-dialog.tsx";
+import { rowLinkClass } from "~/components/table/styles.ts";
 import { Domain } from "~/components/ui/domain.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
-
-type Dialog = "closed" | "new" | { readonly edit: DnsRule } | { readonly remove: DnsRule };
 
 /** Split DNS that only some groups receive, one row per rule. */
 export function DnsRulesSection({
@@ -29,36 +28,25 @@ export function DnsRulesSection({
   readonly canEdit: boolean;
   readonly mutations: DnsRuleMutations;
 }): ReactElement {
-  const [dialog, setDialog] = useState<Dialog>("closed");
-  const close = (open: boolean): void => {
-    if (!open) {
-      setDialog("closed");
-    }
-  };
-  const editing = typeof dialog === "object" && "edit" in dialog ? dialog.edit : undefined;
-  const removing = typeof dialog === "object" && "remove" in dialog ? dialog.remove : undefined;
+  const [removing, setRemoving] = useState<DnsRule | undefined>();
+  const navigate = useNavigate();
 
   return (
     <Section
       title="Split DNS per group"
       description="Split DNS that only the machines in some groups receive, on top of the split DNS above."
       panel={false}
-      {...(canEdit
-        ? {
-            actions: (
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={PlusIcon}
-                onClick={() => {
-                  setDialog("new");
-                }}
-              >
-                Add rule
-              </Button>
-            ),
-          }
-        : {})}
+      actions={
+        canEdit ? (
+          <LinkButton href="/dns/split/rules/new" variant="secondary" size="sm" icon={PlusIcon}>
+            Add rule
+          </LinkButton>
+        ) : (
+          <Button variant="secondary" size="sm" icon={PlusIcon} disabled>
+            Add rule
+          </Button>
+        )
+      }
     >
       <ListTable
         columns={[
@@ -67,7 +55,7 @@ export function DnsRulesSection({
           { key: "servers", label: "Nameservers" },
           { key: "groups", label: "Groups", className: "w-[18%] min-w-32" },
         ]}
-        actions={canEdit}
+        actions
         empty={
           rules.length === 0 ? (
             <SectionEmpty
@@ -84,49 +72,23 @@ export function DnsRulesSection({
             groups={groups}
             canEdit={canEdit}
             onEdit={() => {
-              setDialog({ edit: rule });
+              void navigate({ to: "/dns/split/rules/$ruleId", params: { ruleId: rule.id } });
             }}
             onRemove={() => {
-              setDialog({ remove: rule });
+              setRemoving(rule);
             }}
           />
         ))}
       </ListTable>
-      <DnsRuleDialog
-        key={editing?.id ?? "new"}
-        rule={editing}
-        groups={groups}
-        open={dialog === "new" || editing !== undefined}
-        onOpenChange={close}
-        mutations={mutations}
-      />
-      <ConfirmDialog
+      <DeleteDnsRuleDialog
+        rule={removing}
         open={removing !== undefined}
-        onOpenChange={close}
-        title="Delete DNS rule?"
-        description="The machines in its groups stop using its nameservers for these domains."
-        summary={
-          removing === undefined ? undefined : (
-            <ConfirmSummary name={removing.name}>
-              <span className="font-mono text-xs">{removing.domains.join(", ")}</span>
-            </ConfirmSummary>
-          )
-        }
-        confirmLabel="Delete"
-        loading={mutations.remove.isPending}
-        error={mutations.remove.isError ? errorMessage(mutations.remove.error) : undefined}
-        onConfirm={() => {
-          if (removing !== undefined) {
-            mutations.remove.mutate(
-              { params: { path: { id: removing.id } } },
-              {
-                onSuccess: () => {
-                  setDialog("closed");
-                },
-              },
-            );
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoving(undefined);
           }
         }}
+        mutations={mutations}
       />
     </Section>
   );
@@ -150,7 +112,13 @@ function RuleRow({
     <ListRow>
       <ListCell>
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate font-medium text-kumo-default">{rule.name}</span>
+          <Link
+            to="/dns/split/rules/$ruleId"
+            params={{ ruleId: rule.id }}
+            className={cn("truncate font-medium", rowLinkClass)}
+          >
+            {rule.name}
+          </Link>
           {rule.enabled ? null : <span className="text-xs text-kumo-subtle">Disabled</span>}
         </span>
       </ListCell>
@@ -167,19 +135,22 @@ function RuleRow({
       <ListCell>
         <GroupNames ids={rule.groupIds} groups={groups} emptyLabel="No group" />
       </ListCell>
-      {canEdit ? (
-        <ListCell actions>
-          <RowMenu label={`Actions for DNS rule ${rule.name}`}>
-            <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
-              Edit…
-            </DropdownMenu.Item>
-            <DropdownMenu.Separator />
-            <DropdownMenu.Item icon={TrashIcon} variant="danger" onClick={onRemove}>
-              Delete…
-            </DropdownMenu.Item>
-          </RowMenu>
-        </ListCell>
-      ) : null}
+      <ListCell actions>
+        <RowMenu label={`Actions for DNS rule ${rule.name}`}>
+          <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
+            {canEdit ? "Edit" : "View"}
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item
+            icon={TrashIcon}
+            variant="danger"
+            disabled={!canEdit}
+            onClick={onRemove}
+          >
+            Delete…
+          </DropdownMenu.Item>
+        </RowMenu>
+      </ListCell>
     </ListRow>
   );
 }

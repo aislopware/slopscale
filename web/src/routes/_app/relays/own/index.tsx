@@ -9,7 +9,7 @@ import { RelaysSection } from "~/components/derp/relays-section.tsx";
 import { DerpSourceActions, StaleSettingsBanner } from "~/components/derp/source.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-export const Route = createFileRoute("/_app/relays/own")({
+export const Route = createFileRoute("/_app/relays/own/")({
   loader: async ({ context }) => {
     await context.queryClient.query(derpQuery);
   },

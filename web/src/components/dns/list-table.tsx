@@ -37,12 +37,15 @@ function pinnedClass(overflowing: boolean): string {
 export function ListTable({
   columns,
   actions = false,
+  actionsClassName,
   empty,
   children,
 }: {
   readonly columns: readonly ListColumn[];
   /** Whether the rows end in a ⋯ menu, which gets the pinned 50px column. */
   readonly actions?: boolean;
+  /** Widens the actions column for a text button such as Edit; its cells take the same class. */
+  readonly actionsClassName?: string;
   /** Rendered under the header instead of the rows; null while there are rows. */
   readonly empty: ReactNode;
   readonly children: ReactNode;
@@ -60,7 +63,10 @@ export function ListTable({
                   </Table.Head>
                 ))}
                 {actions ? (
-                  <Table.Head sticky="right" className={pinnedClass(overflowing)}>
+                  <Table.Head
+                    sticky="right"
+                    className={cn(pinnedClass(overflowing), actionsClassName)}
+                  >
                     <span className="sr-only">Actions</span>
                   </Table.Head>
                 ) : null}

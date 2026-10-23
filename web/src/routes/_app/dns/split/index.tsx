@@ -12,7 +12,7 @@ import { DnsSourceActions } from "~/components/dns/source.tsx";
 import { SplitDnsSection } from "~/components/dns/split-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-export const Route = createFileRoute("/_app/dns/split")({
+export const Route = createFileRoute("/_app/dns/split/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(dnsQuery),

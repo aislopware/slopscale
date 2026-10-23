@@ -179,16 +179,22 @@ export function domainError(value: string): string | null {
 
 /** Why a record cannot be saved, or null when it can. */
 export function recordError(record: DnsRecord): string | null {
+  return recordNameError(record) ?? recordValueError(record);
+}
+
+/** What is wrong with a record's name, or null. */
+export function recordNameError(record: DnsRecord): string | null {
   const name = normalizeDomain(record.name);
 
   if (name === "") {
     return "Enter a name.";
   }
 
-  if (!isDomain(name)) {
-    return "Use a full name such as grafana.example.com.";
-  }
+  return isDomain(name) ? null : "Use a full name such as grafana.example.com.";
+}
 
+/** What is wrong with a record's value for its type, or null. */
+export function recordValueError(record: DnsRecord): string | null {
   const value = record.value.trim();
 
   if (value === "") {

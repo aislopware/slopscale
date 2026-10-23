@@ -1,37 +1,22 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { Input, Textarea } from "@cloudflare/kumo/components/input";
-import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import { PlusIcon } from "@phosphor-icons/react";
+import { Fragment, useState } from "react";
+import type { ReactElement } from "react";
 
-import { errorMessage } from "~/api/error.ts";
 import type { DnsSettings } from "~/api/schema.gen.ts";
+import { EditToggle, editToggleId, focusEditToggle } from "~/components/dns/inline-row-editor.tsx";
 import { AddressList, ListCell, ListRow, ListTable } from "~/components/dns/list-table.tsx";
 import {
-  domainError,
-  nameserversError,
-  normalizeDomain,
-  parseList,
   splitEntries,
   splitKeptWithExitNode,
-  withSplit,
   withSplitUseWithExitNode,
-  withoutSplit,
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { ExitNodeToggle } from "~/components/dns/nameservers-section.tsx";
-import { FormFooter } from "~/components/machines/dialogs.tsx";
-import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
+import { SplitAddForm, SplitInlineEditor } from "~/components/dns/split-forms.tsx";
+import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
 import { Domain } from "~/components/ui/domain.tsx";
-import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
-import { toast } from "~/components/ui/toast.ts";
-
-interface Editing {
-  readonly domain: string;
-  readonly servers: readonly string[];
-}
 
 export function SplitDnsSection({
   settings,
@@ -42,8 +27,14 @@ export function SplitDnsSection({
   readonly canEdit: boolean;
   readonly mutations: DnsMutations;
 }): ReactElement {
-  const [dialog, setDialog] = useState<"closed" | "new" | Editing>("closed");
+  const [adding, setAdding] = useState(false);
+  // The one row whose editor is open, by domain.
+  const [open, setOpen] = useState<string | null>(null);
   const entries = splitEntries(settings);
+  const close = (domain: string): void => {
+    setOpen(null);
+    focusEditToggle(editToggleId("split", domain));
+  };
 
   return (
     <Section
@@ -58,7 +49,7 @@ export function SplitDnsSection({
                 size="sm"
                 icon={PlusIcon}
                 onClick={() => {
-                  setDialog("new");
+                  setAdding(true);
                 }}
               >
                 Add domain
@@ -74,6 +65,7 @@ export function SplitDnsSection({
           { key: "exit", label: "Exit node", className: "w-56" },
         ]}
         actions={canEdit}
+        actionsClassName="w-20 px-2"
         empty={
           entries.length === 0 ? (
             <SectionEmpty
@@ -84,38 +76,45 @@ export function SplitDnsSection({
         }
       >
         {entries.map(([domain, servers]) => (
-          <SplitRow
-            key={domain}
-            domain={domain}
-            servers={servers}
-            settings={settings}
-            canEdit={canEdit}
-            mutations={mutations}
-            onEdit={() => {
-              setDialog({ domain, servers });
-            }}
-          />
+          <Fragment key={domain}>
+            <SplitRow
+              domain={domain}
+              servers={servers}
+              settings={settings}
+              canEdit={canEdit}
+              open={open === domain}
+              mutations={mutations}
+              onToggle={() => {
+                setOpen(open === domain ? null : domain);
+              }}
+            />
+            {open === domain ? (
+              <SplitInlineEditor
+                editing={{ domain, servers }}
+                settings={settings}
+                mutations={mutations}
+                onClose={() => {
+                  close(domain);
+                }}
+                onDeleted={() => {
+                  setOpen(null);
+                }}
+              />
+            ) : null}
+          </Fragment>
         ))}
       </ListTable>
-      <DialogRoot
-        open={dialog !== "closed"}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDialog("closed");
-          }
-        }}
-      >
+      <DialogRoot open={adding} onOpenChange={setAdding}>
         <DialogContent
-          size="base"
-          title={dialog === "new" ? "Add split DNS domain" : "Edit split DNS domain"}
+          size="xl"
+          title="Add split DNS domain"
           description="Queries for the domain and everything under it go to these resolvers instead of the global ones."
         >
-          <SplitForm
-            editing={dialog === "new" || dialog === "closed" ? null : dialog}
+          <SplitAddForm
             settings={settings}
             mutations={mutations}
             onDone={() => {
-              setDialog("closed");
+              setAdding(false);
             }}
           />
         </DialogContent>
@@ -124,135 +123,23 @@ export function SplitDnsSection({
   );
 }
 
-/** What stops the form from saving, per field; a domain that already has an entry counts. */
-function splitIssues(
-  settings: DnsSettings,
-  editing: Editing | null,
-  { domain, servers }: { readonly domain: string; readonly servers: readonly string[] },
-): { readonly domain: string | null; readonly servers: string | null } {
-  const taken =
-    editing?.domain !== domain && settings.splitNameservers[domain] !== undefined
-      ? "This domain already has resolvers. Edit that entry instead."
-      : null;
-
-  return { domain: domainError(domain) ?? taken, servers: nameserversError(servers) };
-}
-
-function SplitForm({
-  editing,
-  settings,
-  mutations,
-  onDone,
-}: {
-  readonly editing: Editing | null;
-  readonly settings: DnsSettings;
-  readonly mutations: DnsMutations;
-  readonly onDone: () => void;
-}): ReactElement {
-  const [domain, setDomain] = useState(editing?.domain ?? "");
-  const [servers, setServers] = useState(editing?.servers.join("\n") ?? "");
-  const [touched, setTouched] = useState(false);
-
-  // A failure from the last form must not greet this one. Only `reset` goes in the dependencies:
-  // the mutation object is rebuilt on every render and `reset` itself notifies, so depending on
-  // the whole object ran the effect after every render it caused, without end.
-  const { reset } = mutations.set;
-
-  useEffect(() => {
-    reset();
-  }, [reset]);
-  const cleanDomain = normalizeDomain(domain);
-  const list = parseList(servers);
-  const issues = splitIssues(settings, editing, { domain: cleanDomain, servers: list });
-  const issue = issues.domain ?? issues.servers;
-
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    setTouched(true);
-
-    if (issue !== null) {
-      return;
-    }
-
-    mutations.set.mutate(
-      {
-        body: withSplit(settings, {
-          domain: cleanDomain,
-          servers: list,
-          previous: editing?.domain,
-        }),
-      },
-      {
-        onSuccess: () => {
-          toast.success(editing === null ? "Split DNS domain added" : "Split DNS domain updated");
-          onDone();
-        },
-      },
-    );
-  }
-
-  return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
-      <Input
-        label="Domain"
-        value={domain}
-        placeholder="corp.example.com"
-        spellCheck={false}
-        autoComplete="off"
-        onChange={(event) => {
-          setDomain(event.target.value);
-        }}
-        onBlur={() => {
-          setTouched(true);
-        }}
-        {...(touched && issues.domain !== null ? { error: issues.domain } : {})}
-      />
-      <Textarea
-        label="Nameservers"
-        description="One per line. An IP, an IP with port, or a DNS-over-HTTPS URL."
-        value={servers}
-        placeholder={"10.0.0.53\n10.0.0.54"}
-        spellCheck={false}
-        autoResize
-        minRows={3}
-        maxRows={8}
-        onChange={(event) => {
-          setServers(event.target.value);
-        }}
-        onBlur={() => {
-          setTouched(true);
-        }}
-        {...(touched && issues.domain === null && issues.servers !== null
-          ? { error: issues.servers }
-          : {})}
-      />
-      <DialogError
-        message={mutations.set.isError ? errorMessage(mutations.set.error) : undefined}
-      />
-      <FormFooter
-        label={editing === null ? "Add" : "Save"}
-        pending={mutations.set.isPending}
-        disabled={cleanDomain === "" || list.length === 0}
-      />
-    </form>
-  );
-}
-
-/** One split DNS domain: its resolvers, whether an exit node keeps them, and its menu. */
+/** One split DNS domain: its resolvers, whether an exit node keeps them, and its Edit button. */
 function SplitRow({
   domain,
   servers,
   settings,
   canEdit,
+  open,
   mutations,
-  onEdit,
+  onToggle,
 }: {
   readonly domain: string;
   readonly servers: readonly string[];
   readonly settings: DnsSettings;
   readonly canEdit: boolean;
+  readonly open: boolean;
   readonly mutations: DnsMutations;
-  readonly onEdit: () => void;
+  readonly onToggle: () => void;
 }): ReactElement {
   const pending = mutations.set.isPending;
 
@@ -282,22 +169,14 @@ function SplitRow({
         />
       </ListCell>
       {canEdit ? (
-        <ListCell actions>
-          <RowMenu label={`Actions for split DNS ${domain}`} disabled={pending}>
-            <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
-              Edit…
-            </DropdownMenu.Item>
-            <DropdownMenu.Separator />
-            <DropdownMenu.Item
-              icon={TrashIcon}
-              variant="danger"
-              onClick={() => {
-                mutations.apply(withoutSplit(settings, domain), `Removed ${domain}`);
-              }}
-            >
-              Remove
-            </DropdownMenu.Item>
-          </RowMenu>
+        <ListCell actions className="w-20 px-2">
+          <EditToggle
+            id={editToggleId("split", domain)}
+            open={open}
+            label={domain}
+            disabled={pending && !open}
+            onToggle={onToggle}
+          />
         </ListCell>
       ) : null}
     </ListRow>

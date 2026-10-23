@@ -1,32 +1,19 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
-import { useRef, useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import { useState } from "react";
+import type { ReactElement } from "react";
 
-import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
-import {
-  customRegionIds,
-  firstError,
-  serverDraft,
-  serverFieldErrors,
-  serverFromDraft,
-  withServer,
-} from "~/components/derp/model.ts";
-import type { ServerDraft } from "~/components/derp/model.ts";
+import { EmbeddedDetailsForm } from "~/components/derp/embedded-form.tsx";
+import { serverDraft, serverFromDraft, withServer } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
-import { focusFirstInvalid } from "~/components/derp/region-form.tsx";
-import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
-import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { SettingsCard, SettingsRow } from "~/components/ui/settings-card.tsx";
 import { Note, Status } from "~/components/ui/status.tsx";
-import { toast } from "~/components/ui/toast.ts";
 
 function Muted({ children }: { readonly children: string }): ReactElement {
   return <span className="text-kumo-subtle">{children}</span>;
@@ -141,7 +128,10 @@ function facts(derp: Derp): readonly Definition[] {
   ];
 }
 
-/** The relay slopscale runs itself: a switch, its facts and a form for the details. */
+/**
+ * The relay slopscale runs itself: a switch, and its facts in a card that turns into their fields
+ * in place for an edit.
+ */
 export function EmbeddedSection({
   derp,
   canEdit,
@@ -189,229 +179,44 @@ export function EmbeddedSection({
           }
         />
       </SettingsCard>
-      <Section
-        title="Details"
-        description="The relay this server runs on its own URL, so there is always one next to the control server."
-        bodyClassName="p-0"
-        {...(canEdit && canRun
-          ? {
-              actions: (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={PencilSimpleIcon}
-                  onClick={() => {
-                    setEditing(true);
-                  }}
-                >
-                  Edit details
-                </Button>
-              ),
-            }
-          : {})}
-      >
-        <DefinitionList items={facts(derp)} />
-      </Section>
-      <DialogRoot open={editing} onOpenChange={setEditing}>
-        <DialogContent
-          size="base"
-          title="Embedded relay details"
-          description="How the relay is published to the machines. Changing the STUN address restarts STUN but not the relay."
+      {editing ? (
+        <EmbeddedDetailsForm
+          derp={derp}
+          mutations={mutations}
+          onDone={() => {
+            setEditing(false);
+            requestAnimationFrame(() => {
+              document.querySelector<HTMLElement>("#embedded-relay-edit")?.focus();
+            });
+          }}
+        />
+      ) : (
+        <Section
+          title="Details"
+          description="The relay this server runs on its own URL, so there is always one next to the control server."
+          bodyClassName="p-0"
+          {...(canEdit && canRun
+            ? {
+                actions: (
+                  <Button
+                    id="embedded-relay-edit"
+                    variant="secondary"
+                    size="sm"
+                    icon={PencilSimpleIcon}
+                    aria-label="Edit details"
+                    onClick={() => {
+                      setEditing(true);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                ),
+              }
+            : {})}
         >
-          <ServerForm
-            derp={derp}
-            mutations={mutations}
-            onDone={() => {
-              setEditing(false);
-            }}
-          />
-        </DialogContent>
-      </DialogRoot>
+          <DefinitionList items={facts(derp)} />
+        </Section>
+      )}
     </>
-  );
-}
-
-function ServerForm({
-  derp,
-  mutations,
-  onDone,
-}: {
-  readonly derp: Derp;
-  readonly mutations: DerpMutations;
-  readonly onDone: () => void;
-}): ReactElement {
-  const settings = derp.effective;
-  const form = useRef<HTMLFormElement>(null);
-  const [draft, setDraft] = useState<ServerDraft>(() => serverDraft(settings.server));
-  const [touched, setTouched] = useState(false);
-  const errors = serverFieldErrors(draft, customRegionIds(settings));
-  const issue = firstError(errors);
-
-  function update(patch: Partial<ServerDraft>): void {
-    setDraft((current) => ({ ...current, ...patch }));
-  }
-
-  function submit(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    setTouched(true);
-
-    if (issue !== null) {
-      focusFirstInvalid(form.current);
-
-      return;
-    }
-
-    mutations.set.mutate(
-      { body: withServer(settings, serverFromDraft(draft, settings.server.enabled)) },
-      {
-        onSuccess: () => {
-          toast.success("Embedded relay updated");
-          onDone();
-        },
-      },
-    );
-  }
-
-  const field = (props: {
-    readonly field: keyof ServerDraft;
-    readonly label: string;
-    readonly placeholder: string;
-    readonly description?: string;
-  }): ReactElement => (
-    <ServerField
-      {...props}
-      value={String(draft[props.field])}
-      error={touched ? errors[props.field] : undefined}
-      onChange={(value) => {
-        update({ [props.field]: value });
-      }}
-      onBlur={() => {
-        setTouched(true);
-      }}
-    />
-  );
-
-  return (
-    <form ref={form} onSubmit={submit} className="flex flex-col gap-4">
-      <div className="grid items-start gap-4 sm:grid-cols-2">
-        {field({
-          field: "regionId",
-          label: "Region id",
-          placeholder: "999",
-          description: "Replaces a fetched region with the same id.",
-        })}
-        {field({
-          field: "regionCode",
-          label: "Region code",
-          placeholder: "slopscale",
-          description: "The short code clients show.",
-        })}
-      </div>
-      {field({
-        field: "regionName",
-        label: "Region name",
-        placeholder: "Slopscale embedded relay",
-        description: "Leave empty to use the code.",
-      })}
-      <StunSwitch
-        checked={draft.stunEnabled}
-        onChange={(on) => {
-          update({ stunEnabled: on });
-        }}
-      />
-      {draft.stunEnabled
-        ? field({
-            field: "stunAddr",
-            label: "STUN address",
-            placeholder: "0.0.0.0:3478",
-            description: "The UDP host:port STUN listens on. Open it on the firewall.",
-          })
-        : null}
-      <div className="grid items-start gap-4 sm:grid-cols-2">
-        {field({
-          field: "ipv4",
-          label: "Public IPv4",
-          placeholder: "198.51.100.1",
-          description: "Published in the DERP map so machines reach the relay when DNS is down.",
-        })}
-        {field({
-          field: "ipv6",
-          label: "Public IPv6",
-          placeholder: "2001:db8::1",
-          description: "Published in the DERP map so machines reach the relay when DNS is down.",
-        })}
-      </div>
-      <Switch
-        label="Admit only this tailnet's machines"
-        checked={draft.verifyClients}
-        onCheckedChange={(on) => {
-          update({ verifyClients: on });
-        }}
-      />
-      <DialogError
-        message={mutations.set.isError ? errorMessage(mutations.set.error) : undefined}
-      />
-      <FormFooter label="Save" pending={mutations.set.isPending} />
-    </form>
-  );
-}
-
-function ServerField({
-  label,
-  placeholder,
-  description,
-  value,
-  error,
-  onChange,
-  onBlur,
-}: {
-  readonly field: keyof ServerDraft;
-  readonly label: string;
-  readonly placeholder: string;
-  readonly description?: string;
-  readonly value: string;
-  readonly error: string | undefined;
-  readonly onChange: (value: string) => void;
-  readonly onBlur: () => void;
-}): ReactElement {
-  return (
-    <Input
-      className="w-full"
-      label={label}
-      value={value}
-      placeholder={placeholder}
-      spellCheck={false}
-      autoComplete="off"
-      {...(description === undefined ? {} : { description })}
-      {...(error === undefined ? {} : { error })}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-      onBlur={onBlur}
-    />
-  );
-}
-
-function StunSwitch({
-  checked,
-  onChange,
-}: {
-  readonly checked: boolean;
-  readonly onChange: (checked: boolean) => void;
-}): ReactElement {
-  return (
-    <Switch
-      checked={checked}
-      onCheckedChange={onChange}
-      label={
-        <span className="flex flex-col gap-0.5">
-          <span className="font-medium text-kumo-default">Answer STUN</span>
-          <span className="text-xs text-kumo-subtle">
-            Turn off when machines on the relay&apos;s own network reach it through their router and
-            report a hard NAT.
-          </span>
-        </span>
-      }
-    />
   );
 }
