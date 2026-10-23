@@ -123,14 +123,15 @@ function UsersPage(): ReactElement {
         docs="ref/roles"
         description="Everyone who signs in to the tailnet. A user's role bounds what they may change here; the policy decides what their machines reach."
         meta={describe(total, pending)}
+      />
+      <TableToolbar
         actions={
           <>
             <InviteUserButton me={me} />
             <AddUserButton me={me} />
           </>
         }
-      />
-      <TableToolbar>
+      >
         <SearchInput
           value={text}
           placeholder="Search by name, email or role"

@@ -56,7 +56,7 @@ export function GroupsTab({
 
   return (
     <>
-      <TableToolbar>
+      <TableToolbar actions={<NewGroupButton me={me} />}>
         <SearchInput
           value={search}
           placeholder="Search by name or description"
@@ -90,11 +90,8 @@ export function GroupsTab({
   );
 }
 
-/**
- * The groups page's create action, in its page header beside the title as the dashboard's "Add a
- * policy" is. It opens the group editor page.
- */
-export function NewGroupButton({ me }: { readonly me: Me }): ReactElement {
+/** The groups list's create action, right of the search. It opens the group editor page. */
+function NewGroupButton({ me }: { readonly me: Me }): ReactElement {
   return (
     <LinkButton
       href="/policy/groups/new"

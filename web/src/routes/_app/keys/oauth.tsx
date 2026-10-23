@@ -2,8 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { oauthClientsQuery } from "~/api/queries.ts";
-import { can } from "~/auth/me.ts";
-import { CreateKeyLink } from "~/components/keys/create-link.tsx";
 import { OAuthPanel } from "~/components/keys/panels.tsx";
 import { keyControls, keysSearchSchema } from "~/components/keys/search.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -31,21 +29,6 @@ function OAuthClientsPage(): ReactElement {
         title="OAuth clients"
         docs="ref/api"
         description="Client credentials for the v2 API, each limited to its own scopes and tags."
-        actions={
-          <>
-            <CreateKeyLink
-              to="/keys/oauth/federated/new"
-              label="New federated identity"
-              variant="secondary"
-              allowed={can(me, "oauth_keys")}
-            />
-            <CreateKeyLink
-              to="/keys/oauth/new"
-              label="New OAuth client"
-              allowed={can(me, "oauth_keys")}
-            />
-          </>
-        }
       />
       <OAuthPanel me={me} controls={controls} />
     </>

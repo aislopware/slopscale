@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 
 /**
- * A key list's create action in its page header: a link to the create page, the dashboard's "Create
+ * A key list's create action in its toolbar: a link to the create page, the dashboard's "Create
  * Token", or the same button switched off with the reason when the caller may not create.
  */
 export function CreateKeyLink({

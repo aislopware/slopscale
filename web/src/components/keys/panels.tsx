@@ -15,6 +15,7 @@ import {
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { apiKeyColumns, emptyUsers } from "~/components/keys/api-columns.tsx";
+import { CreateKeyLink } from "~/components/keys/create-link.tsx";
 import { matchesKind } from "~/components/keys/federated.ts";
 import { oauthClientColumns } from "~/components/keys/oauth-columns.tsx";
 import { preAuthKeyColumns } from "~/components/keys/preauth-columns.tsx";
@@ -50,7 +51,7 @@ export interface PanelControls {
 }
 
 /**
- * The pre-auth keys list. Creating one is a page of its own, linked from the page header, as the
+ * The pre-auth keys list. Creating one is a page of its own, linked from the toolbar, as the
  * dashboard's "Create Token" is.
  */
 export function PreAuthPanel({
@@ -85,6 +86,9 @@ export function PreAuthPanel({
       controls={controls}
       tabs={countedTabs(preAuthStatusTabs, statusOf)}
       placeholder="Search by key, user or tag"
+      actions={
+        <CreateKeyLink to="/keys/pre-auth/new" label="Create key" allowed={can(me, "auth_keys")} />
+      }
     >
       <PanelTable
         table={table}
@@ -101,7 +105,7 @@ export function PreAuthPanel({
   );
 }
 
-/** The API keys list; creating one is a page of its own, linked from the page header. */
+/** The API keys list; creating one is a page of its own, linked from the toolbar. */
 export function ApiPanel({
   me,
   controls,
@@ -132,6 +136,8 @@ export function ApiPanel({
       controls={controls}
       tabs={countedTabs(apiStatusTabs, statusOf)}
       placeholder="Search by prefix"
+      // Every caller may mint keys of their own, so the action is never off.
+      actions={<CreateKeyLink to="/keys/api/new" label="Create API key" allowed />}
     >
       <PanelTable
         table={table}
@@ -156,7 +162,7 @@ const oauthKindTabs: readonly { value: KindFilter; label: string }[] = [
 
 /**
  * The OAuth clients and federated identities list. Each is created, and edited, on a page of its
- * own, linked from the page header and from the client id.
+ * own, linked from the toolbar and from the client id.
  */
 export function OAuthPanel({
   me,
@@ -190,6 +196,21 @@ export function OAuthPanel({
       tabValue={controls.kind}
       onTabChange={controls.handleKindChange}
       placeholder="Search by client, subject or issuer"
+      actions={
+        <>
+          <CreateKeyLink
+            to="/keys/oauth/federated/new"
+            label="New federated identity"
+            variant="secondary"
+            allowed={can(me, "oauth_keys")}
+          />
+          <CreateKeyLink
+            to="/keys/oauth/new"
+            label="New OAuth client"
+            allowed={can(me, "oauth_keys")}
+          />
+        </>
+      }
     >
       <PanelTable
         table={table}
@@ -213,6 +234,7 @@ function KeyPanel({
   tabValue,
   onTabChange,
   placeholder,
+  actions,
   children,
 }: {
   readonly controls: PanelControls;
@@ -221,6 +243,8 @@ function KeyPanel({
   readonly tabValue?: string | undefined;
   readonly onTabChange?: ((value: string) => void) | undefined;
   readonly placeholder: string;
+  /** The list's create action, right of the search. */
+  readonly actions: ReactNode;
   readonly children: ReactNode;
 }): ReactElement {
   const currentTab = tabValue ?? controls.status;
@@ -228,7 +252,7 @@ function KeyPanel({
 
   return (
     <>
-      <TableToolbar>
+      <TableToolbar actions={actions}>
         <SearchInput
           value={controls.query}
           placeholder={placeholder}

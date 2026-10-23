@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 
 import { accessRulesQuery, groupsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import { GroupsTab, NewGroupButton } from "~/components/access/groups-tab.tsx";
+import { GroupsTab } from "~/components/access/groups-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
@@ -43,7 +43,6 @@ function GroupsPage(): ReactElement {
         docs="ref/access-control"
         description="Named sets of users, machines and tags. Rules and networks refer to groups, so membership is the one place to change who is covered."
         meta={groups.length === 1 ? "1 group" : `${groups.length} groups`}
-        actions={<NewGroupButton me={me} />}
       />
       <GroupsTab
         me={me}

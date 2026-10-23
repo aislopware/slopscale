@@ -6,7 +6,10 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 
-/** The page header's create action, a link to the add page; a disabled button for a reader. */
+/**
+ * The users list's create action, right of the search: a link to the add page; a disabled button
+ * for a reader.
+ */
 export function AddUserButton({ me }: { readonly me: Me }): ReactElement {
   return can(me, "users") ? (
     <LinkButton href="/users/new" variant="primary" icon={PlusIcon}>
