@@ -64,15 +64,18 @@ export function CreatedKey({
 export function RevealedSecret({
   value,
   note,
+  noun = "key",
 }: {
   readonly value: string;
   readonly note: ReactNode;
+  /** What the value is, in the banner and the copy button: "key", "secret". */
+  readonly noun?: string;
 }): ReactElement {
   return (
     <>
       <Banner
         icon={<CheckCircleIcon weight="fill" />}
-        title="Copy the key now"
+        title={`Copy the ${noun} now`}
         description={note}
       />
       {/* The secret wraps onto as many lines as it needs: a truncated key is a lost key, and this
@@ -80,7 +83,7 @@ export function RevealedSecret({
       <div className="rounded-lg bg-kumo-tint p-3 ring ring-kumo-line">
         <CopyText
           value={value}
-          label="Copy key"
+          label={`Copy ${noun}`}
           wrap
           className="w-full items-start justify-between gap-2 text-left"
         />

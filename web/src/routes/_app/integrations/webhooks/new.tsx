@@ -50,6 +50,7 @@ function NewWebhookPage(): ReactElement {
       />
       <FormSection title="Signing secret">
         <RevealedSecret
+          noun="secret"
           value={secret}
           note="The secret signs every delivery so the receiver can verify it. It is shown only once."
         />

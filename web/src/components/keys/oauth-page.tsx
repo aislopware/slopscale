@@ -47,7 +47,11 @@ export function CreateOAuthClientPage({ me }: { readonly me: Me }): ReactElement
         description="Copy the secret before you leave this page. It is not shown again."
       />
       <FormSection title="Client secret">
-        <RevealedSecret value={created} note="The secret is shown only once. Copy it now." />
+        <RevealedSecret
+          noun="secret"
+          value={created}
+          note="The secret is shown only once. Copy it now."
+        />
       </FormSection>
       <FormBar>
         <LinkButton href={listPath} variant="primary">
