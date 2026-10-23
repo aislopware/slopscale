@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [0.60.1](https://github.com/aislopware/slopscale/compare/v0.60.0...v0.60.1) (2026-10-23)
+
+
+### Fixes
+
+* **db:** connect to PostgreSQL when a password or other setting holds spaces, quotes or reserved characters ([7e48779](https://github.com/aislopware/slopscale/commit/7e48779be8445f379bdeeab6fa34184a39ef95f9))
+* **web:** match the dashboard's gap under the sidebar quick search ([bd012a8](https://github.com/aislopware/slopscale/commit/bd012a856e03b094f7b14cb4bf333ef8774f4b19))
+* **web:** put every list's create button beside its search ([60a5e79](https://github.com/aislopware/slopscale/commit/60a5e7932a1f642d43990d947768eae3cbe4c915))
+* **web:** show where DNS and relay settings come from under the page description ([fc68c20](https://github.com/aislopware/slopscale/commit/fc68c20fbde4dca521d3f8e7a4f0c862df1a5b35))
+
+
+### Performance
+
+* **db:** compile the bundled SQLite with optimisation, about 30% faster in release builds ([7e48779](https://github.com/aislopware/slopscale/commit/7e48779be8445f379bdeeab6fa34184a39ef95f9))
+* **mapper:** copy only the rendered peers' capabilities and stop refiltering broadcasts ([7e48779](https://github.com/aislopware/slopscale/commit/7e48779be8445f379bdeeab6fa34184a39ef95f9))
+* **policy/v2:** build global peer maps from a per-node matcher index, hundreds of times faster on large tailnets ([7e48779](https://github.com/aislopware/slopscale/commit/7e48779be8445f379bdeeab6fa34184a39ef95f9))
+
+
+### Dependencies
+
+* build with Go 1.27.3 and track Tailscale 1.105.78 ([7e48779](https://github.com/aislopware/slopscale/commit/7e48779be8445f379bdeeab6fa34184a39ef95f9))
+
 ## [0.60.0](https://github.com/aislopware/slopscale/compare/v0.59.0...v0.60.0) (2026-10-23)
 
 
