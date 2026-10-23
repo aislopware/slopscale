@@ -1,13 +1,12 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ReactElement } from "react";
 
 import { accessRequestOptionsQuery, myAccessRequestsQuery } from "~/api/queries.ts";
-import { useAccessMutations } from "~/components/access/mutations.ts";
-import { RequestAccessDialog } from "~/components/access/request-access-dialog.tsx";
+import { askReason } from "~/components/access/request-access-page.tsx";
 import { requestColumns } from "~/components/access/request-columns.tsx";
 import { toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
@@ -27,15 +26,6 @@ export const Route = createFileRoute("/_app/access")({
   component: MyAccessPage,
 });
 
-/** Why asking is not possible, or nothing when it is. */
-function askReason(hasUser: boolean, hasGroups: boolean): string | undefined {
-  if (!hasUser) {
-    return "These credentials are not a user";
-  }
-
-  return hasGroups ? undefined : "No group takes requests right now";
-}
-
 /** Why the list is empty, and what would fill it. */
 function emptyText(hasUser: boolean, hasGroups: boolean): string {
   if (!hasUser) {
@@ -54,8 +44,6 @@ function MyAccessPage(): ReactElement {
   const { me } = Route.useRouteContext();
   const { requests } = useSuspenseQuery(myAccessRequestsQuery).data;
   const options = useSuspenseQuery(accessRequestOptionsQuery).data;
-  const [requesting, setRequesting] = useState(false);
-  const mutations = useAccessMutations();
   const rows = useMemo(
     () =>
       toRequestRows(requests, {
@@ -86,16 +74,15 @@ function MyAccessPage(): ReactElement {
         meta={active === 0 ? undefined : `${active} active ${active === 1 ? "grant" : "grants"}`}
         actions={
           <DisabledReason reason={askReason(me.user !== undefined, options.groups.length > 0)}>
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canAsk}
-              onClick={() => {
-                setRequesting(true);
-              }}
-            >
-              Request access
-            </Button>
+            {canAsk ? (
+              <LinkButton href="/access/request" variant="primary" icon={PlusIcon}>
+                Request access
+              </LinkButton>
+            ) : (
+              <Button variant="primary" icon={PlusIcon} disabled>
+                Request access
+              </Button>
+            )}
           </DisabledReason>
         }
       />
@@ -110,12 +97,6 @@ function MyAccessPage(): ReactElement {
           }
         />
       </TableGroup>
-      <RequestAccessDialog
-        options={options}
-        open={requesting}
-        onOpenChange={setRequesting}
-        mutations={mutations}
-      />
     </>
   );
 }

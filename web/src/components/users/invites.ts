@@ -43,6 +43,21 @@ export const invitableRoles: readonly RoleOption[] = roleOptions.filter(
   (option) => option.value !== "owner",
 );
 
+/**
+ * What is wrong with an email address, or null: one local part, one at sign, one domain with a dot.
+ * The server checks the rest.
+ */
+export function emailIssue(value: string): string | null {
+  const at = value.indexOf("@");
+  const plausible =
+    at > 0 &&
+    at === value.lastIndexOf("@") &&
+    value.slice(at + 1).includes(".") &&
+    !/\s/u.test(value);
+
+  return plausible ? null : "Use an address such as alice@example.com.";
+}
+
 /** What an invitation is waiting on, which is what its row's badge says. */
 export type InviteState = "pending" | "expired" | "accepted";
 

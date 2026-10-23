@@ -27,6 +27,7 @@ import { Route as AppSessionsRouteImport } from './routes/_app/sessions'
 import { Route as AppSignInsRouteImport } from './routes/_app/sign-ins'
 import { Route as AppTrafficRouteRouteImport } from './routes/_app/traffic/route'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
+import { Route as AppAccessRequestRouteImport } from './routes/_app/access_.request'
 import { Route as AppDnsIndexRouteImport } from './routes/_app/dns/index'
 import { Route as AppDnsNameserversRouteImport } from './routes/_app/dns/nameservers'
 import { Route as AppDnsRecordsRouteImport } from './routes/_app/dns/records'
@@ -61,6 +62,8 @@ import { Route as AppTrafficIndexRouteImport } from './routes/_app/traffic/index
 import { Route as AppTrafficDestinationsRouteImport } from './routes/_app/traffic/destinations'
 import { Route as AppTrafficDnsRouteImport } from './routes/_app/traffic/dns'
 import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/overview'
+import { Route as AppUsersInviteRouteImport } from './routes/_app/users_.invite'
+import { Route as AppUsersNewRouteImport } from './routes/_app/users_.new'
 import { Route as FocusMachinesAddRouteImport } from './routes/_focus/machines/add'
 import { Route as AppIntegrationsLogStreamsIndexRouteImport } from './routes/_app/integrations/log-streams/index'
 import { Route as AppIntegrationsLogStreamsStreamIdRouteImport } from './routes/_app/integrations/log-streams/$streamId'
@@ -79,6 +82,7 @@ import { Route as AppMachinesNodeIdIndexRouteImport } from './routes/_app/machin
 import { Route as AppMachinesNodeIdDiagnosticsRouteImport } from './routes/_app/machines/$nodeId.diagnostics'
 import { Route as AppMachinesNodeIdRoutesRouteImport } from './routes/_app/machines/$nodeId.routes'
 import { Route as AppMachinesNodeIdSettingsRouteImport } from './routes/_app/machines/$nodeId.settings'
+import { Route as AppMachinesNodeIdPreferencesRouteImport } from './routes/_app/machines/$nodeId_.preferences'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
 import { Route as AppPolicyGroupsIndexRouteImport } from './routes/_app/policy/groups/index'
 import { Route as AppPolicyGroupsGroupIdRouteImport } from './routes/_app/policy/groups/$groupId'
@@ -182,6 +186,11 @@ const AppTrafficRouteRoute = AppTrafficRouteRouteImport.update({
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAccessRequestRoute = AppAccessRequestRouteImport.update({
+  id: '/access_/request',
+  path: '/access/request',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDnsIndexRoute = AppDnsIndexRouteImport.update({
@@ -354,6 +363,16 @@ const AppTrafficOverviewRoute = AppTrafficOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => AppTrafficRouteRoute,
 } as any)
+const AppUsersInviteRoute = AppUsersInviteRouteImport.update({
+  id: '/users_/invite',
+  path: '/users/invite',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsersNewRoute = AppUsersNewRouteImport.update({
+  id: '/users_/new',
+  path: '/users/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const FocusMachinesAddRoute = FocusMachinesAddRouteImport.update({
   id: '/machines/add',
   path: '/machines/add',
@@ -454,6 +473,12 @@ const AppMachinesNodeIdSettingsRoute =
     id: '/settings',
     path: '/settings',
     getParentRoute: () => AppMachinesNodeIdRoute,
+  } as any)
+const AppMachinesNodeIdPreferencesRoute =
+  AppMachinesNodeIdPreferencesRouteImport.update({
+    id: '/machines/$nodeId_/preferences',
+    path: '/machines/$nodeId/preferences',
+    getParentRoute: () => AppRoute,
   } as any)
 const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
   id: '/machines/$nodeId_/ssh',
@@ -559,6 +584,7 @@ export interface FileRoutesByFullPath {
   '/sign-ins': typeof AppSignInsRoute
   '/users': typeof AppUsersRoute
   '/settings/traffic': typeof AppSettingsTrafficRouteRouteWithChildren
+  '/access/request': typeof AppAccessRequestRoute
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
   '/dns/split': typeof AppDnsSplitRoute
@@ -582,6 +608,8 @@ export interface FileRoutesByFullPath {
   '/traffic/destinations': typeof AppTrafficDestinationsRoute
   '/traffic/dns': typeof AppTrafficDnsRoute
   '/traffic/overview': typeof AppTrafficOverviewRoute
+  '/users/invite': typeof AppUsersInviteRoute
+  '/users/new': typeof AppUsersNewRoute
   '/machines/add': typeof FocusMachinesAddRoute
   '/dns/': typeof AppDnsIndexRoute
   '/integrations/': typeof AppIntegrationsIndexRoute
@@ -606,6 +634,7 @@ export interface FileRoutesByFullPath {
   '/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
   '/machines/$nodeId/routes': typeof AppMachinesNodeIdRoutesRoute
   '/machines/$nodeId/settings': typeof AppMachinesNodeIdSettingsRoute
+  '/machines/$nodeId/preferences': typeof AppMachinesNodeIdPreferencesRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
   '/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
   '/policy/groups/new': typeof AppPolicyGroupsNewRoute
@@ -638,6 +667,7 @@ export interface FileRoutesByTo {
   '/sessions': typeof AppSessionsRoute
   '/sign-ins': typeof AppSignInsRoute
   '/users': typeof AppUsersRoute
+  '/access/request': typeof AppAccessRequestRoute
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
   '/dns/split': typeof AppDnsSplitRoute
@@ -660,6 +690,8 @@ export interface FileRoutesByTo {
   '/traffic/destinations': typeof AppTrafficDestinationsRoute
   '/traffic/dns': typeof AppTrafficDnsRoute
   '/traffic/overview': typeof AppTrafficOverviewRoute
+  '/users/invite': typeof AppUsersInviteRoute
+  '/users/new': typeof AppUsersNewRoute
   '/machines/add': typeof FocusMachinesAddRoute
   '/dns': typeof AppDnsIndexRoute
   '/integrations': typeof AppIntegrationsIndexRoute
@@ -684,6 +716,7 @@ export interface FileRoutesByTo {
   '/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
   '/machines/$nodeId/routes': typeof AppMachinesNodeIdRoutesRoute
   '/machines/$nodeId/settings': typeof AppMachinesNodeIdSettingsRoute
+  '/machines/$nodeId/preferences': typeof AppMachinesNodeIdPreferencesRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
   '/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
   '/policy/groups/new': typeof AppPolicyGroupsNewRoute
@@ -726,6 +759,7 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/': typeof AppIndexRoute
   '/_app/settings/traffic': typeof AppSettingsTrafficRouteRouteWithChildren
+  '/_app/access_/request': typeof AppAccessRequestRoute
   '/_app/dns/nameservers': typeof AppDnsNameserversRoute
   '/_app/dns/records': typeof AppDnsRecordsRoute
   '/_app/dns/split': typeof AppDnsSplitRoute
@@ -749,6 +783,8 @@ export interface FileRoutesById {
   '/_app/traffic/destinations': typeof AppTrafficDestinationsRoute
   '/_app/traffic/dns': typeof AppTrafficDnsRoute
   '/_app/traffic/overview': typeof AppTrafficOverviewRoute
+  '/_app/users_/invite': typeof AppUsersInviteRoute
+  '/_app/users_/new': typeof AppUsersNewRoute
   '/_focus/machines/add': typeof FocusMachinesAddRoute
   '/_app/dns/': typeof AppDnsIndexRoute
   '/_app/integrations/': typeof AppIntegrationsIndexRoute
@@ -773,6 +809,7 @@ export interface FileRoutesById {
   '/_app/machines/$nodeId/diagnostics': typeof AppMachinesNodeIdDiagnosticsRoute
   '/_app/machines/$nodeId/routes': typeof AppMachinesNodeIdRoutesRoute
   '/_app/machines/$nodeId/settings': typeof AppMachinesNodeIdSettingsRoute
+  '/_app/machines/$nodeId_/preferences': typeof AppMachinesNodeIdPreferencesRoute
   '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
   '/_app/policy/groups/$groupId': typeof AppPolicyGroupsGroupIdRoute
   '/_app/policy/groups/new': typeof AppPolicyGroupsNewRoute
@@ -814,6 +851,7 @@ export interface FileRouteTypes {
     | '/sign-ins'
     | '/users'
     | '/settings/traffic'
+    | '/access/request'
     | '/dns/nameservers'
     | '/dns/records'
     | '/dns/split'
@@ -837,6 +875,8 @@ export interface FileRouteTypes {
     | '/traffic/destinations'
     | '/traffic/dns'
     | '/traffic/overview'
+    | '/users/invite'
+    | '/users/new'
     | '/machines/add'
     | '/dns/'
     | '/integrations/'
@@ -861,6 +901,7 @@ export interface FileRouteTypes {
     | '/machines/$nodeId/diagnostics'
     | '/machines/$nodeId/routes'
     | '/machines/$nodeId/settings'
+    | '/machines/$nodeId/preferences'
     | '/machines/$nodeId/ssh'
     | '/policy/groups/$groupId'
     | '/policy/groups/new'
@@ -893,6 +934,7 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/sign-ins'
     | '/users'
+    | '/access/request'
     | '/dns/nameservers'
     | '/dns/records'
     | '/dns/split'
@@ -915,6 +957,8 @@ export interface FileRouteTypes {
     | '/traffic/destinations'
     | '/traffic/dns'
     | '/traffic/overview'
+    | '/users/invite'
+    | '/users/new'
     | '/machines/add'
     | '/dns'
     | '/integrations'
@@ -939,6 +983,7 @@ export interface FileRouteTypes {
     | '/machines/$nodeId/diagnostics'
     | '/machines/$nodeId/routes'
     | '/machines/$nodeId/settings'
+    | '/machines/$nodeId/preferences'
     | '/machines/$nodeId/ssh'
     | '/policy/groups/$groupId'
     | '/policy/groups/new'
@@ -980,6 +1025,7 @@ export interface FileRouteTypes {
     | '/_app/users'
     | '/_app/'
     | '/_app/settings/traffic'
+    | '/_app/access_/request'
     | '/_app/dns/nameservers'
     | '/_app/dns/records'
     | '/_app/dns/split'
@@ -1003,6 +1049,8 @@ export interface FileRouteTypes {
     | '/_app/traffic/destinations'
     | '/_app/traffic/dns'
     | '/_app/traffic/overview'
+    | '/_app/users_/invite'
+    | '/_app/users_/new'
     | '/_focus/machines/add'
     | '/_app/dns/'
     | '/_app/integrations/'
@@ -1027,6 +1075,7 @@ export interface FileRouteTypes {
     | '/_app/machines/$nodeId/diagnostics'
     | '/_app/machines/$nodeId/routes'
     | '/_app/machines/$nodeId/settings'
+    | '/_app/machines/$nodeId_/preferences'
     | '/_app/machines/$nodeId_/ssh'
     | '/_app/policy/groups/$groupId'
     | '/_app/policy/groups/new'
@@ -1181,6 +1230,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AppUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/access_/request': {
+      id: '/_app/access_/request'
+      path: '/access/request'
+      fullPath: '/access/request'
+      preLoaderRoute: typeof AppAccessRequestRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dns/': {
@@ -1421,6 +1477,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrafficOverviewRouteImport
       parentRoute: typeof AppTrafficRouteRoute
     }
+    '/_app/users_/invite': {
+      id: '/_app/users_/invite'
+      path: '/users/invite'
+      fullPath: '/users/invite'
+      preLoaderRoute: typeof AppUsersInviteRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/users_/new': {
+      id: '/_app/users_/new'
+      path: '/users/new'
+      fullPath: '/users/new'
+      preLoaderRoute: typeof AppUsersNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_focus/machines/add': {
       id: '/_focus/machines/add'
       path: '/machines/add'
@@ -1546,6 +1616,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/machines/$nodeId/settings'
       preLoaderRoute: typeof AppMachinesNodeIdSettingsRouteImport
       parentRoute: typeof AppMachinesNodeIdRoute
+    }
+    '/_app/machines/$nodeId_/preferences': {
+      id: '/_app/machines/$nodeId_/preferences'
+      path: '/machines/$nodeId/preferences'
+      fullPath: '/machines/$nodeId/preferences'
+      preLoaderRoute: typeof AppMachinesNodeIdPreferencesRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/machines/$nodeId_/ssh': {
       id: '/_app/machines/$nodeId_/ssh'
@@ -1871,16 +1948,20 @@ interface AppRouteChildren {
   AppUsersRoute: typeof AppUsersRoute
   AppIndexRoute: typeof AppIndexRoute
   AppSettingsTrafficRouteRoute: typeof AppSettingsTrafficRouteRouteWithChildren
+  AppAccessRequestRoute: typeof AppAccessRequestRoute
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRouteWithChildren
   AppNetworksNetworkIdRoute: typeof AppNetworksNetworkIdRoute
   AppNetworksNewRoute: typeof AppNetworksNewRoute
   AppServicesLabelRoute: typeof AppServicesLabelRoute
   AppSettingsServerRoute: typeof AppSettingsServerRoute
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
+  AppUsersInviteRoute: typeof AppUsersInviteRoute
+  AppUsersNewRoute: typeof AppUsersNewRoute
   AppMachinesIndexRoute: typeof AppMachinesIndexRoute
   AppNetworksIndexRoute: typeof AppNetworksIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppMachinesNodeIdPreferencesRoute: typeof AppMachinesNodeIdPreferencesRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
 }
 
@@ -1901,16 +1982,20 @@ const AppRouteChildren: AppRouteChildren = {
   AppUsersRoute: AppUsersRoute,
   AppIndexRoute: AppIndexRoute,
   AppSettingsTrafficRouteRoute: AppSettingsTrafficRouteRouteWithChildren,
+  AppAccessRequestRoute: AppAccessRequestRoute,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRouteWithChildren,
   AppNetworksNetworkIdRoute: AppNetworksNetworkIdRoute,
   AppNetworksNewRoute: AppNetworksNewRoute,
   AppServicesLabelRoute: AppServicesLabelRoute,
   AppSettingsServerRoute: AppSettingsServerRoute,
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
+  AppUsersInviteRoute: AppUsersInviteRoute,
+  AppUsersNewRoute: AppUsersNewRoute,
   AppMachinesIndexRoute: AppMachinesIndexRoute,
   AppNetworksIndexRoute: AppNetworksIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppMachinesNodeIdPreferencesRoute: AppMachinesNodeIdPreferencesRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
 }
 

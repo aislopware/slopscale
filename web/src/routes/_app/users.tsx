@@ -16,9 +16,8 @@ import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableGroup, TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
-import { AddUserButton, FirstUserEmpty } from "~/components/users/add-user.tsx";
+import { AddUserButton, FirstUserEmpty, InviteUserButton } from "~/components/users/add-user.tsx";
 import { columns } from "~/components/users/columns.tsx";
-import { InviteUserButton } from "~/components/users/invite-dialog.tsx";
 import { PendingInvites } from "~/components/users/invites-panel.tsx";
 import { isAdminRole } from "~/components/users/roles.ts";
 
