@@ -1,8 +1,8 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { cn } from "@cloudflare/kumo/utils";
 import { ArrowRightIcon, HardDrivesIcon, PlugIcon, PlusIcon } from "@phosphor-icons/react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
 
 import type { Service } from "~/api/queries.ts";
@@ -10,8 +10,6 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { reachStates, toServiceRows } from "~/components/services/model.ts";
 import type { ServiceRow } from "~/components/services/model.ts";
-import { useServiceMutations } from "~/components/services/mutations.ts";
-import { ServiceDialog } from "~/components/services/service-dialogs.tsx";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { rowLinkClass } from "~/components/table/styles.ts";
@@ -58,9 +56,6 @@ export function ServicesTab({
 }: ServicesTabProps): ReactElement {
   const canEdit = can(me, "services");
   const query = useDeferredValue(search);
-  const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
-  const mutations = useServiceMutations();
   const rows = useMemo(
     () => toServiceRows(services).toSorted((left, right) => left.name.localeCompare(right.name)),
     [services],
@@ -73,16 +68,15 @@ export function ServicesTab({
     <>
       <TableToolbar
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            onClick={() => {
-              setCreating(true);
-            }}
-          >
-            New service
-          </Button>
+          canEdit ? (
+            <LinkButton href="/services/new" variant="primary" icon={PlusIcon}>
+              New service
+            </LinkButton>
+          ) : (
+            <Button variant="primary" icon={PlusIcon} disabled>
+              New service
+            </Button>
+          )
         }
       >
         <SearchInput
@@ -126,14 +120,6 @@ export function ServicesTab({
           <TableFooter>{`Showing ${shown.length} of ${countServices(total)}`}</TableFooter>
         )}
       </TableGroup>
-      <ServiceDialog
-        open={creating}
-        onOpenChange={setCreating}
-        mutations={mutations}
-        onCreated={(label) => {
-          void navigate({ to: "/services/$label", params: { label } });
-        }}
-      />
     </>
   );
 }

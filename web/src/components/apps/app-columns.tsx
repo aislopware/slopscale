@@ -16,7 +16,7 @@ import {
 } from "~/components/apps/model.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
-import { narrowOnlyClass } from "~/components/table/styles.ts";
+import { narrowOnlyClass, rowLinkClass } from "~/components/table/styles.ts";
 import { DomainList } from "~/components/ui/domain.tsx";
 import { MachineName } from "~/components/ui/machine-name.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -84,7 +84,13 @@ export const appColumns = helper.columns([
 function NameCell({ app }: { readonly app: App }): ReactElement {
   return (
     <div className="flex max-w-72 min-w-0 flex-col gap-0.5">
-      <span className="truncate font-medium text-kumo-default">{app.name}</span>
+      <Link
+        to="/apps/$appId"
+        params={{ appId: app.id }}
+        className={cn("truncate font-medium", rowLinkClass)}
+      >
+        {app.name}
+      </Link>
       {app.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{app.description}</span>
       )}

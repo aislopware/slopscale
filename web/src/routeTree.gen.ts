@@ -15,7 +15,6 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppAccessRouteImport } from './routes/_app/access'
-import { Route as AppAppsRouteImport } from './routes/_app/apps'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDnsRouteRouteImport } from './routes/_app/dns/route'
 import { Route as AppIntegrationsRouteRouteImport } from './routes/_app/integrations/route'
@@ -28,10 +27,12 @@ import { Route as AppSignInsRouteImport } from './routes/_app/sign-ins'
 import { Route as AppTrafficRouteRouteImport } from './routes/_app/traffic/route'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
 import { Route as AppAccessRequestRouteImport } from './routes/_app/access_.request'
+import { Route as AppAppsIndexRouteImport } from './routes/_app/apps/index'
+import { Route as AppAppsAppIdRouteImport } from './routes/_app/apps/$appId'
+import { Route as AppAppsNewRouteImport } from './routes/_app/apps/new'
 import { Route as AppDnsIndexRouteImport } from './routes/_app/dns/index'
 import { Route as AppDnsNameserversRouteImport } from './routes/_app/dns/nameservers'
 import { Route as AppDnsRecordsRouteImport } from './routes/_app/dns/records'
-import { Route as AppDnsSplitRouteImport } from './routes/_app/dns/split'
 import { Route as AppIntegrationsIndexRouteImport } from './routes/_app/integrations/index'
 import { Route as AppKeysIndexRouteImport } from './routes/_app/keys/index'
 import { Route as AppKeysApiRouteImport } from './routes/_app/keys/api'
@@ -50,10 +51,10 @@ import { Route as AppRelaysIndexRouteImport } from './routes/_app/relays/index'
 import { Route as AppRelaysEmbeddedRouteImport } from './routes/_app/relays/embedded'
 import { Route as AppRelaysLatencyRouteImport } from './routes/_app/relays/latency'
 import { Route as AppRelaysMapRouteImport } from './routes/_app/relays/map'
-import { Route as AppRelaysOwnRouteImport } from './routes/_app/relays/own'
 import { Route as AppRelaysSourcesRouteImport } from './routes/_app/relays/sources'
 import { Route as AppServicesIndexRouteImport } from './routes/_app/services/index'
 import { Route as AppServicesLabelRouteImport } from './routes/_app/services/$label'
+import { Route as AppServicesNewRouteImport } from './routes/_app/services/new'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
 import { Route as AppSettingsTailnetRouteImport } from './routes/_app/settings/tailnet'
@@ -65,6 +66,7 @@ import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/ov
 import { Route as AppUsersInviteRouteImport } from './routes/_app/users_.invite'
 import { Route as AppUsersNewRouteImport } from './routes/_app/users_.new'
 import { Route as FocusMachinesAddRouteImport } from './routes/_focus/machines/add'
+import { Route as AppDnsSplitIndexRouteImport } from './routes/_app/dns/split/index'
 import { Route as AppIntegrationsLogStreamsIndexRouteImport } from './routes/_app/integrations/log-streams/index'
 import { Route as AppIntegrationsLogStreamsStreamIdRouteImport } from './routes/_app/integrations/log-streams/$streamId'
 import { Route as AppIntegrationsLogStreamsNewRouteImport } from './routes/_app/integrations/log-streams/new'
@@ -93,11 +95,17 @@ import { Route as AppPolicyPosturesNewRouteImport } from './routes/_app/policy/p
 import { Route as AppPolicyRulesIndexRouteImport } from './routes/_app/policy/rules/index'
 import { Route as AppPolicyRulesRuleIdRouteImport } from './routes/_app/policy/rules/$ruleId'
 import { Route as AppPolicyRulesNewRouteImport } from './routes/_app/policy/rules/new'
+import { Route as AppRelaysOwnIndexRouteImport } from './routes/_app/relays/own/index'
+import { Route as AppRelaysOwnRegionIdRouteImport } from './routes/_app/relays/own/$regionId'
+import { Route as AppRelaysOwnNewRouteImport } from './routes/_app/relays/own/new'
+import { Route as AppServicesLabelEditRouteImport } from './routes/_app/services/$label_.edit'
 import { Route as AppSettingsTrafficIndexRouteImport } from './routes/_app/settings/traffic/index'
 import { Route as AppSettingsTrafficCollectionRouteImport } from './routes/_app/settings/traffic/collection'
 import { Route as AppSettingsTrafficGatewaysRouteImport } from './routes/_app/settings/traffic/gateways'
 import { Route as AppTrafficMachinesIndexRouteImport } from './routes/_app/traffic/machines/index'
 import { Route as AppTrafficMachinesNodeIdRouteImport } from './routes/_app/traffic/machines/$nodeId'
+import { Route as AppDnsSplitRulesRuleIdRouteImport } from './routes/_app/dns/split/rules.$ruleId'
+import { Route as AppDnsSplitRulesNewRouteImport } from './routes/_app/dns/split/rules.new'
 import { Route as AppKeysOauthFederatedNewRouteImport } from './routes/_app/keys/oauth_.federated.new'
 
 const AppRoute = AppRouteImport.update({
@@ -126,11 +134,6 @@ const AppSplatRoute = AppSplatRouteImport.update({
 const AppAccessRoute = AppAccessRouteImport.update({
   id: '/access',
   path: '/access',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAppsRoute = AppAppsRouteImport.update({
-  id: '/apps',
-  path: '/apps',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAuditRoute = AppAuditRouteImport.update({
@@ -193,6 +196,21 @@ const AppAccessRequestRoute = AppAccessRequestRouteImport.update({
   path: '/access/request',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAppsIndexRoute = AppAppsIndexRouteImport.update({
+  id: '/apps/',
+  path: '/apps/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAppsAppIdRoute = AppAppsAppIdRouteImport.update({
+  id: '/apps/$appId',
+  path: '/apps/$appId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAppsNewRoute = AppAppsNewRouteImport.update({
+  id: '/apps/new',
+  path: '/apps/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDnsIndexRoute = AppDnsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -206,11 +224,6 @@ const AppDnsNameserversRoute = AppDnsNameserversRouteImport.update({
 const AppDnsRecordsRoute = AppDnsRecordsRouteImport.update({
   id: '/records',
   path: '/records',
-  getParentRoute: () => AppDnsRouteRoute,
-} as any)
-const AppDnsSplitRoute = AppDnsSplitRouteImport.update({
-  id: '/split',
-  path: '/split',
   getParentRoute: () => AppDnsRouteRoute,
 } as any)
 const AppIntegrationsIndexRoute = AppIntegrationsIndexRouteImport.update({
@@ -303,11 +316,6 @@ const AppRelaysMapRoute = AppRelaysMapRouteImport.update({
   path: '/map',
   getParentRoute: () => AppRelaysRouteRoute,
 } as any)
-const AppRelaysOwnRoute = AppRelaysOwnRouteImport.update({
-  id: '/own',
-  path: '/own',
-  getParentRoute: () => AppRelaysRouteRoute,
-} as any)
 const AppRelaysSourcesRoute = AppRelaysSourcesRouteImport.update({
   id: '/sources',
   path: '/sources',
@@ -321,6 +329,11 @@ const AppServicesIndexRoute = AppServicesIndexRouteImport.update({
 const AppServicesLabelRoute = AppServicesLabelRouteImport.update({
   id: '/services/$label',
   path: '/services/$label',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppServicesNewRoute = AppServicesNewRouteImport.update({
+  id: '/services/new',
+  path: '/services/new',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
@@ -377,6 +390,11 @@ const FocusMachinesAddRoute = FocusMachinesAddRouteImport.update({
   id: '/machines/add',
   path: '/machines/add',
   getParentRoute: () => FocusRoute,
+} as any)
+const AppDnsSplitIndexRoute = AppDnsSplitIndexRouteImport.update({
+  id: '/split/',
+  path: '/split/',
+  getParentRoute: () => AppDnsRouteRoute,
 } as any)
 const AppIntegrationsLogStreamsIndexRoute =
   AppIntegrationsLogStreamsIndexRouteImport.update({
@@ -531,6 +549,26 @@ const AppPolicyRulesNewRoute = AppPolicyRulesNewRouteImport.update({
   path: '/rules/new',
   getParentRoute: () => AppPolicyRouteRoute,
 } as any)
+const AppRelaysOwnIndexRoute = AppRelaysOwnIndexRouteImport.update({
+  id: '/own/',
+  path: '/own/',
+  getParentRoute: () => AppRelaysRouteRoute,
+} as any)
+const AppRelaysOwnRegionIdRoute = AppRelaysOwnRegionIdRouteImport.update({
+  id: '/own/$regionId',
+  path: '/own/$regionId',
+  getParentRoute: () => AppRelaysRouteRoute,
+} as any)
+const AppRelaysOwnNewRoute = AppRelaysOwnNewRouteImport.update({
+  id: '/own/new',
+  path: '/own/new',
+  getParentRoute: () => AppRelaysRouteRoute,
+} as any)
+const AppServicesLabelEditRoute = AppServicesLabelEditRouteImport.update({
+  id: '/services/$label_/edit',
+  path: '/services/$label/edit',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsTrafficIndexRoute = AppSettingsTrafficIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -559,6 +597,16 @@ const AppTrafficMachinesNodeIdRoute =
     path: '/machines/$nodeId',
     getParentRoute: () => AppTrafficRouteRoute,
   } as any)
+const AppDnsSplitRulesRuleIdRoute = AppDnsSplitRulesRuleIdRouteImport.update({
+  id: '/split/rules/$ruleId',
+  path: '/split/rules/$ruleId',
+  getParentRoute: () => AppDnsRouteRoute,
+} as any)
+const AppDnsSplitRulesNewRoute = AppDnsSplitRulesNewRouteImport.update({
+  id: '/split/rules/new',
+  path: '/split/rules/new',
+  getParentRoute: () => AppDnsRouteRoute,
+} as any)
 const AppKeysOauthFederatedNewRoute =
   AppKeysOauthFederatedNewRouteImport.update({
     id: '/oauth_/federated/new',
@@ -577,7 +625,6 @@ export interface FileRoutesByFullPath {
   '/traffic': typeof AppTrafficRouteRouteWithChildren
   '/$': typeof AppSplatRoute
   '/access': typeof AppAccessRoute
-  '/apps': typeof AppAppsRoute
   '/audit': typeof AppAuditRoute
   '/routes': typeof AppRoutesRoute
   '/sessions': typeof AppSessionsRoute
@@ -585,9 +632,10 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/settings/traffic': typeof AppSettingsTrafficRouteRouteWithChildren
   '/access/request': typeof AppAccessRequestRoute
+  '/apps/$appId': typeof AppAppsAppIdRoute
+  '/apps/new': typeof AppAppsNewRoute
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
-  '/dns/split': typeof AppDnsSplitRoute
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
@@ -600,9 +648,9 @@ export interface FileRoutesByFullPath {
   '/relays/embedded': typeof AppRelaysEmbeddedRoute
   '/relays/latency': typeof AppRelaysLatencyRoute
   '/relays/map': typeof AppRelaysMapRoute
-  '/relays/own': typeof AppRelaysOwnRoute
   '/relays/sources': typeof AppRelaysSourcesRoute
   '/services/$label': typeof AppServicesLabelRoute
+  '/services/new': typeof AppServicesNewRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
   '/traffic/destinations': typeof AppTrafficDestinationsRoute
@@ -611,6 +659,7 @@ export interface FileRoutesByFullPath {
   '/users/invite': typeof AppUsersInviteRoute
   '/users/new': typeof AppUsersNewRoute
   '/machines/add': typeof FocusMachinesAddRoute
+  '/apps/': typeof AppAppsIndexRoute
   '/dns/': typeof AppDnsIndexRoute
   '/integrations/': typeof AppIntegrationsIndexRoute
   '/keys/': typeof AppKeysIndexRoute
@@ -642,9 +691,13 @@ export interface FileRoutesByFullPath {
   '/policy/postures/new': typeof AppPolicyPosturesNewRoute
   '/policy/rules/$ruleId': typeof AppPolicyRulesRuleIdRoute
   '/policy/rules/new': typeof AppPolicyRulesNewRoute
+  '/relays/own/$regionId': typeof AppRelaysOwnRegionIdRoute
+  '/relays/own/new': typeof AppRelaysOwnNewRoute
+  '/services/$label/edit': typeof AppServicesLabelEditRoute
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/dns/split/': typeof AppDnsSplitIndexRoute
   '/integrations/log-streams/': typeof AppIntegrationsLogStreamsIndexRoute
   '/integrations/posture/': typeof AppIntegrationsPostureIndexRoute
   '/integrations/webhooks/': typeof AppIntegrationsWebhooksIndexRoute
@@ -652,8 +705,11 @@ export interface FileRoutesByFullPath {
   '/policy/groups/': typeof AppPolicyGroupsIndexRoute
   '/policy/postures/': typeof AppPolicyPosturesIndexRoute
   '/policy/rules/': typeof AppPolicyRulesIndexRoute
+  '/relays/own/': typeof AppRelaysOwnIndexRoute
   '/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines/': typeof AppTrafficMachinesIndexRoute
+  '/dns/split/rules/$ruleId': typeof AppDnsSplitRulesRuleIdRoute
+  '/dns/split/rules/new': typeof AppDnsSplitRulesNewRoute
   '/keys/oauth/federated/new': typeof AppKeysOauthFederatedNewRoute
 }
 export interface FileRoutesByTo {
@@ -661,16 +717,16 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
   '/access': typeof AppAccessRoute
-  '/apps': typeof AppAppsRoute
   '/audit': typeof AppAuditRoute
   '/routes': typeof AppRoutesRoute
   '/sessions': typeof AppSessionsRoute
   '/sign-ins': typeof AppSignInsRoute
   '/users': typeof AppUsersRoute
   '/access/request': typeof AppAccessRequestRoute
+  '/apps/$appId': typeof AppAppsAppIdRoute
+  '/apps/new': typeof AppAppsNewRoute
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
-  '/dns/split': typeof AppDnsSplitRoute
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
@@ -682,9 +738,9 @@ export interface FileRoutesByTo {
   '/relays/embedded': typeof AppRelaysEmbeddedRoute
   '/relays/latency': typeof AppRelaysLatencyRoute
   '/relays/map': typeof AppRelaysMapRoute
-  '/relays/own': typeof AppRelaysOwnRoute
   '/relays/sources': typeof AppRelaysSourcesRoute
   '/services/$label': typeof AppServicesLabelRoute
+  '/services/new': typeof AppServicesNewRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
   '/traffic/destinations': typeof AppTrafficDestinationsRoute
@@ -693,6 +749,7 @@ export interface FileRoutesByTo {
   '/users/invite': typeof AppUsersInviteRoute
   '/users/new': typeof AppUsersNewRoute
   '/machines/add': typeof FocusMachinesAddRoute
+  '/apps': typeof AppAppsIndexRoute
   '/dns': typeof AppDnsIndexRoute
   '/integrations': typeof AppIntegrationsIndexRoute
   '/keys': typeof AppKeysIndexRoute
@@ -724,9 +781,13 @@ export interface FileRoutesByTo {
   '/policy/postures/new': typeof AppPolicyPosturesNewRoute
   '/policy/rules/$ruleId': typeof AppPolicyRulesRuleIdRoute
   '/policy/rules/new': typeof AppPolicyRulesNewRoute
+  '/relays/own/$regionId': typeof AppRelaysOwnRegionIdRoute
+  '/relays/own/new': typeof AppRelaysOwnNewRoute
+  '/services/$label/edit': typeof AppServicesLabelEditRoute
   '/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/dns/split': typeof AppDnsSplitIndexRoute
   '/integrations/log-streams': typeof AppIntegrationsLogStreamsIndexRoute
   '/integrations/posture': typeof AppIntegrationsPostureIndexRoute
   '/integrations/webhooks': typeof AppIntegrationsWebhooksIndexRoute
@@ -734,8 +795,11 @@ export interface FileRoutesByTo {
   '/policy/groups': typeof AppPolicyGroupsIndexRoute
   '/policy/postures': typeof AppPolicyPosturesIndexRoute
   '/policy/rules': typeof AppPolicyRulesIndexRoute
+  '/relays/own': typeof AppRelaysOwnIndexRoute
   '/settings/traffic': typeof AppSettingsTrafficIndexRoute
   '/traffic/machines': typeof AppTrafficMachinesIndexRoute
+  '/dns/split/rules/$ruleId': typeof AppDnsSplitRulesRuleIdRoute
+  '/dns/split/rules/new': typeof AppDnsSplitRulesNewRoute
   '/keys/oauth/federated/new': typeof AppKeysOauthFederatedNewRoute
 }
 export interface FileRoutesById {
@@ -751,7 +815,6 @@ export interface FileRoutesById {
   '/_app/traffic': typeof AppTrafficRouteRouteWithChildren
   '/_app/$': typeof AppSplatRoute
   '/_app/access': typeof AppAccessRoute
-  '/_app/apps': typeof AppAppsRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/routes': typeof AppRoutesRoute
   '/_app/sessions': typeof AppSessionsRoute
@@ -760,9 +823,10 @@ export interface FileRoutesById {
   '/_app/': typeof AppIndexRoute
   '/_app/settings/traffic': typeof AppSettingsTrafficRouteRouteWithChildren
   '/_app/access_/request': typeof AppAccessRequestRoute
+  '/_app/apps/$appId': typeof AppAppsAppIdRoute
+  '/_app/apps/new': typeof AppAppsNewRoute
   '/_app/dns/nameservers': typeof AppDnsNameserversRoute
   '/_app/dns/records': typeof AppDnsRecordsRoute
-  '/_app/dns/split': typeof AppDnsSplitRoute
   '/_app/keys/api': typeof AppKeysApiRoute
   '/_app/keys/oauth': typeof AppKeysOauthRoute
   '/_app/keys/pre-auth': typeof AppKeysPreAuthRoute
@@ -775,9 +839,9 @@ export interface FileRoutesById {
   '/_app/relays/embedded': typeof AppRelaysEmbeddedRoute
   '/_app/relays/latency': typeof AppRelaysLatencyRoute
   '/_app/relays/map': typeof AppRelaysMapRoute
-  '/_app/relays/own': typeof AppRelaysOwnRoute
   '/_app/relays/sources': typeof AppRelaysSourcesRoute
   '/_app/services/$label': typeof AppServicesLabelRoute
+  '/_app/services/new': typeof AppServicesNewRoute
   '/_app/settings/server': typeof AppSettingsServerRoute
   '/_app/settings/tailnet': typeof AppSettingsTailnetRoute
   '/_app/traffic/destinations': typeof AppTrafficDestinationsRoute
@@ -786,6 +850,7 @@ export interface FileRoutesById {
   '/_app/users_/invite': typeof AppUsersInviteRoute
   '/_app/users_/new': typeof AppUsersNewRoute
   '/_focus/machines/add': typeof FocusMachinesAddRoute
+  '/_app/apps/': typeof AppAppsIndexRoute
   '/_app/dns/': typeof AppDnsIndexRoute
   '/_app/integrations/': typeof AppIntegrationsIndexRoute
   '/_app/keys/': typeof AppKeysIndexRoute
@@ -817,9 +882,13 @@ export interface FileRoutesById {
   '/_app/policy/postures/new': typeof AppPolicyPosturesNewRoute
   '/_app/policy/rules/$ruleId': typeof AppPolicyRulesRuleIdRoute
   '/_app/policy/rules/new': typeof AppPolicyRulesNewRoute
+  '/_app/relays/own/$regionId': typeof AppRelaysOwnRegionIdRoute
+  '/_app/relays/own/new': typeof AppRelaysOwnNewRoute
+  '/_app/services/$label_/edit': typeof AppServicesLabelEditRoute
   '/_app/settings/traffic/collection': typeof AppSettingsTrafficCollectionRoute
   '/_app/settings/traffic/gateways': typeof AppSettingsTrafficGatewaysRoute
   '/_app/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/_app/dns/split/': typeof AppDnsSplitIndexRoute
   '/_app/integrations/log-streams/': typeof AppIntegrationsLogStreamsIndexRoute
   '/_app/integrations/posture/': typeof AppIntegrationsPostureIndexRoute
   '/_app/integrations/webhooks/': typeof AppIntegrationsWebhooksIndexRoute
@@ -827,8 +896,11 @@ export interface FileRoutesById {
   '/_app/policy/groups/': typeof AppPolicyGroupsIndexRoute
   '/_app/policy/postures/': typeof AppPolicyPosturesIndexRoute
   '/_app/policy/rules/': typeof AppPolicyRulesIndexRoute
+  '/_app/relays/own/': typeof AppRelaysOwnIndexRoute
   '/_app/settings/traffic/': typeof AppSettingsTrafficIndexRoute
   '/_app/traffic/machines/': typeof AppTrafficMachinesIndexRoute
+  '/_app/dns/split/rules/$ruleId': typeof AppDnsSplitRulesRuleIdRoute
+  '/_app/dns/split/rules/new': typeof AppDnsSplitRulesNewRoute
   '/_app/keys/oauth_/federated/new': typeof AppKeysOauthFederatedNewRoute
 }
 export interface FileRouteTypes {
@@ -844,7 +916,6 @@ export interface FileRouteTypes {
     | '/traffic'
     | '/$'
     | '/access'
-    | '/apps'
     | '/audit'
     | '/routes'
     | '/sessions'
@@ -852,9 +923,10 @@ export interface FileRouteTypes {
     | '/users'
     | '/settings/traffic'
     | '/access/request'
+    | '/apps/$appId'
+    | '/apps/new'
     | '/dns/nameservers'
     | '/dns/records'
-    | '/dns/split'
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
@@ -867,9 +939,9 @@ export interface FileRouteTypes {
     | '/relays/embedded'
     | '/relays/latency'
     | '/relays/map'
-    | '/relays/own'
     | '/relays/sources'
     | '/services/$label'
+    | '/services/new'
     | '/settings/server'
     | '/settings/tailnet'
     | '/traffic/destinations'
@@ -878,6 +950,7 @@ export interface FileRouteTypes {
     | '/users/invite'
     | '/users/new'
     | '/machines/add'
+    | '/apps/'
     | '/dns/'
     | '/integrations/'
     | '/keys/'
@@ -909,9 +982,13 @@ export interface FileRouteTypes {
     | '/policy/postures/new'
     | '/policy/rules/$ruleId'
     | '/policy/rules/new'
+    | '/relays/own/$regionId'
+    | '/relays/own/new'
+    | '/services/$label/edit'
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/dns/split/'
     | '/integrations/log-streams/'
     | '/integrations/posture/'
     | '/integrations/webhooks/'
@@ -919,8 +996,11 @@ export interface FileRouteTypes {
     | '/policy/groups/'
     | '/policy/postures/'
     | '/policy/rules/'
+    | '/relays/own/'
     | '/settings/traffic/'
     | '/traffic/machines/'
+    | '/dns/split/rules/$ruleId'
+    | '/dns/split/rules/new'
     | '/keys/oauth/federated/new'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -928,16 +1008,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/$'
     | '/access'
-    | '/apps'
     | '/audit'
     | '/routes'
     | '/sessions'
     | '/sign-ins'
     | '/users'
     | '/access/request'
+    | '/apps/$appId'
+    | '/apps/new'
     | '/dns/nameservers'
     | '/dns/records'
-    | '/dns/split'
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
@@ -949,9 +1029,9 @@ export interface FileRouteTypes {
     | '/relays/embedded'
     | '/relays/latency'
     | '/relays/map'
-    | '/relays/own'
     | '/relays/sources'
     | '/services/$label'
+    | '/services/new'
     | '/settings/server'
     | '/settings/tailnet'
     | '/traffic/destinations'
@@ -960,6 +1040,7 @@ export interface FileRouteTypes {
     | '/users/invite'
     | '/users/new'
     | '/machines/add'
+    | '/apps'
     | '/dns'
     | '/integrations'
     | '/keys'
@@ -991,9 +1072,13 @@ export interface FileRouteTypes {
     | '/policy/postures/new'
     | '/policy/rules/$ruleId'
     | '/policy/rules/new'
+    | '/relays/own/$regionId'
+    | '/relays/own/new'
+    | '/services/$label/edit'
     | '/settings/traffic/collection'
     | '/settings/traffic/gateways'
     | '/traffic/machines/$nodeId'
+    | '/dns/split'
     | '/integrations/log-streams'
     | '/integrations/posture'
     | '/integrations/webhooks'
@@ -1001,8 +1086,11 @@ export interface FileRouteTypes {
     | '/policy/groups'
     | '/policy/postures'
     | '/policy/rules'
+    | '/relays/own'
     | '/settings/traffic'
     | '/traffic/machines'
+    | '/dns/split/rules/$ruleId'
+    | '/dns/split/rules/new'
     | '/keys/oauth/federated/new'
   id:
     | '__root__'
@@ -1017,7 +1105,6 @@ export interface FileRouteTypes {
     | '/_app/traffic'
     | '/_app/$'
     | '/_app/access'
-    | '/_app/apps'
     | '/_app/audit'
     | '/_app/routes'
     | '/_app/sessions'
@@ -1026,9 +1113,10 @@ export interface FileRouteTypes {
     | '/_app/'
     | '/_app/settings/traffic'
     | '/_app/access_/request'
+    | '/_app/apps/$appId'
+    | '/_app/apps/new'
     | '/_app/dns/nameservers'
     | '/_app/dns/records'
-    | '/_app/dns/split'
     | '/_app/keys/api'
     | '/_app/keys/oauth'
     | '/_app/keys/pre-auth'
@@ -1041,9 +1129,9 @@ export interface FileRouteTypes {
     | '/_app/relays/embedded'
     | '/_app/relays/latency'
     | '/_app/relays/map'
-    | '/_app/relays/own'
     | '/_app/relays/sources'
     | '/_app/services/$label'
+    | '/_app/services/new'
     | '/_app/settings/server'
     | '/_app/settings/tailnet'
     | '/_app/traffic/destinations'
@@ -1052,6 +1140,7 @@ export interface FileRouteTypes {
     | '/_app/users_/invite'
     | '/_app/users_/new'
     | '/_focus/machines/add'
+    | '/_app/apps/'
     | '/_app/dns/'
     | '/_app/integrations/'
     | '/_app/keys/'
@@ -1083,9 +1172,13 @@ export interface FileRouteTypes {
     | '/_app/policy/postures/new'
     | '/_app/policy/rules/$ruleId'
     | '/_app/policy/rules/new'
+    | '/_app/relays/own/$regionId'
+    | '/_app/relays/own/new'
+    | '/_app/services/$label_/edit'
     | '/_app/settings/traffic/collection'
     | '/_app/settings/traffic/gateways'
     | '/_app/traffic/machines/$nodeId'
+    | '/_app/dns/split/'
     | '/_app/integrations/log-streams/'
     | '/_app/integrations/posture/'
     | '/_app/integrations/webhooks/'
@@ -1093,8 +1186,11 @@ export interface FileRouteTypes {
     | '/_app/policy/groups/'
     | '/_app/policy/postures/'
     | '/_app/policy/rules/'
+    | '/_app/relays/own/'
     | '/_app/settings/traffic/'
     | '/_app/traffic/machines/'
+    | '/_app/dns/split/rules/$ruleId'
+    | '/_app/dns/split/rules/new'
     | '/_app/keys/oauth_/federated/new'
   fileRoutesById: FileRoutesById
 }
@@ -1146,13 +1242,6 @@ declare module '@tanstack/react-router' {
       path: '/access'
       fullPath: '/access'
       preLoaderRoute: typeof AppAccessRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/apps': {
-      id: '/_app/apps'
-      path: '/apps'
-      fullPath: '/apps'
-      preLoaderRoute: typeof AppAppsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/audit': {
@@ -1239,6 +1328,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccessRequestRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/apps/': {
+      id: '/_app/apps/'
+      path: '/apps'
+      fullPath: '/apps/'
+      preLoaderRoute: typeof AppAppsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/apps/$appId': {
+      id: '/_app/apps/$appId'
+      path: '/apps/$appId'
+      fullPath: '/apps/$appId'
+      preLoaderRoute: typeof AppAppsAppIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/apps/new': {
+      id: '/_app/apps/new'
+      path: '/apps/new'
+      fullPath: '/apps/new'
+      preLoaderRoute: typeof AppAppsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dns/': {
       id: '/_app/dns/'
       path: '/'
@@ -1258,13 +1368,6 @@ declare module '@tanstack/react-router' {
       path: '/records'
       fullPath: '/dns/records'
       preLoaderRoute: typeof AppDnsRecordsRouteImport
-      parentRoute: typeof AppDnsRouteRoute
-    }
-    '/_app/dns/split': {
-      id: '/_app/dns/split'
-      path: '/split'
-      fullPath: '/dns/split'
-      preLoaderRoute: typeof AppDnsSplitRouteImport
       parentRoute: typeof AppDnsRouteRoute
     }
     '/_app/integrations/': {
@@ -1393,13 +1496,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRelaysMapRouteImport
       parentRoute: typeof AppRelaysRouteRoute
     }
-    '/_app/relays/own': {
-      id: '/_app/relays/own'
-      path: '/own'
-      fullPath: '/relays/own'
-      preLoaderRoute: typeof AppRelaysOwnRouteImport
-      parentRoute: typeof AppRelaysRouteRoute
-    }
     '/_app/relays/sources': {
       id: '/_app/relays/sources'
       path: '/sources'
@@ -1419,6 +1515,13 @@ declare module '@tanstack/react-router' {
       path: '/services/$label'
       fullPath: '/services/$label'
       preLoaderRoute: typeof AppServicesLabelRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/services/new': {
+      id: '/_app/services/new'
+      path: '/services/new'
+      fullPath: '/services/new'
+      preLoaderRoute: typeof AppServicesNewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/settings/': {
@@ -1497,6 +1600,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/machines/add'
       preLoaderRoute: typeof FocusMachinesAddRouteImport
       parentRoute: typeof FocusRoute
+    }
+    '/_app/dns/split/': {
+      id: '/_app/dns/split/'
+      path: '/split'
+      fullPath: '/dns/split/'
+      preLoaderRoute: typeof AppDnsSplitIndexRouteImport
+      parentRoute: typeof AppDnsRouteRoute
     }
     '/_app/integrations/log-streams/': {
       id: '/_app/integrations/log-streams/'
@@ -1694,6 +1804,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPolicyRulesNewRouteImport
       parentRoute: typeof AppPolicyRouteRoute
     }
+    '/_app/relays/own/': {
+      id: '/_app/relays/own/'
+      path: '/own'
+      fullPath: '/relays/own/'
+      preLoaderRoute: typeof AppRelaysOwnIndexRouteImport
+      parentRoute: typeof AppRelaysRouteRoute
+    }
+    '/_app/relays/own/$regionId': {
+      id: '/_app/relays/own/$regionId'
+      path: '/own/$regionId'
+      fullPath: '/relays/own/$regionId'
+      preLoaderRoute: typeof AppRelaysOwnRegionIdRouteImport
+      parentRoute: typeof AppRelaysRouteRoute
+    }
+    '/_app/relays/own/new': {
+      id: '/_app/relays/own/new'
+      path: '/own/new'
+      fullPath: '/relays/own/new'
+      preLoaderRoute: typeof AppRelaysOwnNewRouteImport
+      parentRoute: typeof AppRelaysRouteRoute
+    }
+    '/_app/services/$label_/edit': {
+      id: '/_app/services/$label_/edit'
+      path: '/services/$label/edit'
+      fullPath: '/services/$label/edit'
+      preLoaderRoute: typeof AppServicesLabelEditRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/traffic/': {
       id: '/_app/settings/traffic/'
       path: '/'
@@ -1729,6 +1867,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTrafficMachinesNodeIdRouteImport
       parentRoute: typeof AppTrafficRouteRoute
     }
+    '/_app/dns/split/rules/$ruleId': {
+      id: '/_app/dns/split/rules/$ruleId'
+      path: '/split/rules/$ruleId'
+      fullPath: '/dns/split/rules/$ruleId'
+      preLoaderRoute: typeof AppDnsSplitRulesRuleIdRouteImport
+      parentRoute: typeof AppDnsRouteRoute
+    }
+    '/_app/dns/split/rules/new': {
+      id: '/_app/dns/split/rules/new'
+      path: '/split/rules/new'
+      fullPath: '/dns/split/rules/new'
+      preLoaderRoute: typeof AppDnsSplitRulesNewRouteImport
+      parentRoute: typeof AppDnsRouteRoute
+    }
     '/_app/keys/oauth_/federated/new': {
       id: '/_app/keys/oauth_/federated/new'
       path: '/oauth/federated/new'
@@ -1742,15 +1894,19 @@ declare module '@tanstack/react-router' {
 interface AppDnsRouteRouteChildren {
   AppDnsNameserversRoute: typeof AppDnsNameserversRoute
   AppDnsRecordsRoute: typeof AppDnsRecordsRoute
-  AppDnsSplitRoute: typeof AppDnsSplitRoute
   AppDnsIndexRoute: typeof AppDnsIndexRoute
+  AppDnsSplitIndexRoute: typeof AppDnsSplitIndexRoute
+  AppDnsSplitRulesRuleIdRoute: typeof AppDnsSplitRulesRuleIdRoute
+  AppDnsSplitRulesNewRoute: typeof AppDnsSplitRulesNewRoute
 }
 
 const AppDnsRouteRouteChildren: AppDnsRouteRouteChildren = {
   AppDnsNameserversRoute: AppDnsNameserversRoute,
   AppDnsRecordsRoute: AppDnsRecordsRoute,
-  AppDnsSplitRoute: AppDnsSplitRoute,
   AppDnsIndexRoute: AppDnsIndexRoute,
+  AppDnsSplitIndexRoute: AppDnsSplitIndexRoute,
+  AppDnsSplitRulesRuleIdRoute: AppDnsSplitRulesRuleIdRoute,
+  AppDnsSplitRulesNewRoute: AppDnsSplitRulesNewRoute,
 }
 
 const AppDnsRouteRouteWithChildren = AppDnsRouteRoute._addFileChildren(
@@ -1856,18 +2012,22 @@ interface AppRelaysRouteRouteChildren {
   AppRelaysEmbeddedRoute: typeof AppRelaysEmbeddedRoute
   AppRelaysLatencyRoute: typeof AppRelaysLatencyRoute
   AppRelaysMapRoute: typeof AppRelaysMapRoute
-  AppRelaysOwnRoute: typeof AppRelaysOwnRoute
   AppRelaysSourcesRoute: typeof AppRelaysSourcesRoute
   AppRelaysIndexRoute: typeof AppRelaysIndexRoute
+  AppRelaysOwnRegionIdRoute: typeof AppRelaysOwnRegionIdRoute
+  AppRelaysOwnNewRoute: typeof AppRelaysOwnNewRoute
+  AppRelaysOwnIndexRoute: typeof AppRelaysOwnIndexRoute
 }
 
 const AppRelaysRouteRouteChildren: AppRelaysRouteRouteChildren = {
   AppRelaysEmbeddedRoute: AppRelaysEmbeddedRoute,
   AppRelaysLatencyRoute: AppRelaysLatencyRoute,
   AppRelaysMapRoute: AppRelaysMapRoute,
-  AppRelaysOwnRoute: AppRelaysOwnRoute,
   AppRelaysSourcesRoute: AppRelaysSourcesRoute,
   AppRelaysIndexRoute: AppRelaysIndexRoute,
+  AppRelaysOwnRegionIdRoute: AppRelaysOwnRegionIdRoute,
+  AppRelaysOwnNewRoute: AppRelaysOwnNewRoute,
+  AppRelaysOwnIndexRoute: AppRelaysOwnIndexRoute,
 }
 
 const AppRelaysRouteRouteWithChildren = AppRelaysRouteRoute._addFileChildren(
@@ -1940,7 +2100,6 @@ interface AppRouteChildren {
   AppTrafficRouteRoute: typeof AppTrafficRouteRouteWithChildren
   AppSplatRoute: typeof AppSplatRoute
   AppAccessRoute: typeof AppAccessRoute
-  AppAppsRoute: typeof AppAppsRoute
   AppAuditRoute: typeof AppAuditRoute
   AppRoutesRoute: typeof AppRoutesRoute
   AppSessionsRoute: typeof AppSessionsRoute
@@ -1949,20 +2108,25 @@ interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppSettingsTrafficRouteRoute: typeof AppSettingsTrafficRouteRouteWithChildren
   AppAccessRequestRoute: typeof AppAccessRequestRoute
+  AppAppsAppIdRoute: typeof AppAppsAppIdRoute
+  AppAppsNewRoute: typeof AppAppsNewRoute
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRouteWithChildren
   AppNetworksNetworkIdRoute: typeof AppNetworksNetworkIdRoute
   AppNetworksNewRoute: typeof AppNetworksNewRoute
   AppServicesLabelRoute: typeof AppServicesLabelRoute
+  AppServicesNewRoute: typeof AppServicesNewRoute
   AppSettingsServerRoute: typeof AppSettingsServerRoute
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
   AppUsersInviteRoute: typeof AppUsersInviteRoute
   AppUsersNewRoute: typeof AppUsersNewRoute
+  AppAppsIndexRoute: typeof AppAppsIndexRoute
   AppMachinesIndexRoute: typeof AppMachinesIndexRoute
   AppNetworksIndexRoute: typeof AppNetworksIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
   AppMachinesNodeIdPreferencesRoute: typeof AppMachinesNodeIdPreferencesRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
+  AppServicesLabelEditRoute: typeof AppServicesLabelEditRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -1974,7 +2138,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppTrafficRouteRoute: AppTrafficRouteRouteWithChildren,
   AppSplatRoute: AppSplatRoute,
   AppAccessRoute: AppAccessRoute,
-  AppAppsRoute: AppAppsRoute,
   AppAuditRoute: AppAuditRoute,
   AppRoutesRoute: AppRoutesRoute,
   AppSessionsRoute: AppSessionsRoute,
@@ -1983,20 +2146,25 @@ const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppSettingsTrafficRouteRoute: AppSettingsTrafficRouteRouteWithChildren,
   AppAccessRequestRoute: AppAccessRequestRoute,
+  AppAppsAppIdRoute: AppAppsAppIdRoute,
+  AppAppsNewRoute: AppAppsNewRoute,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRouteWithChildren,
   AppNetworksNetworkIdRoute: AppNetworksNetworkIdRoute,
   AppNetworksNewRoute: AppNetworksNewRoute,
   AppServicesLabelRoute: AppServicesLabelRoute,
+  AppServicesNewRoute: AppServicesNewRoute,
   AppSettingsServerRoute: AppSettingsServerRoute,
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
   AppUsersInviteRoute: AppUsersInviteRoute,
   AppUsersNewRoute: AppUsersNewRoute,
+  AppAppsIndexRoute: AppAppsIndexRoute,
   AppMachinesIndexRoute: AppMachinesIndexRoute,
   AppNetworksIndexRoute: AppNetworksIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
   AppMachinesNodeIdPreferencesRoute: AppMachinesNodeIdPreferencesRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
+  AppServicesLabelEditRoute: AppServicesLabelEditRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -1,4 +1,4 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
@@ -9,10 +9,8 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { appColumns } from "~/components/apps/app-columns.tsx";
 import type { AppRow } from "~/components/apps/app-columns.tsx";
-import { AppDialog } from "~/components/apps/app-dialogs.tsx";
 import { useLearnedCounts } from "~/components/apps/learned.ts";
 import { connectorMachineCounts, totalPendingRoutes } from "~/components/apps/model.ts";
-import { useAppMutations } from "~/components/apps/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
@@ -33,8 +31,6 @@ export interface AppsTabProps {
 export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): ReactElement {
   const canEdit = can(me, "policy_file");
   const query = useDeferredValue(search);
-  const [creating, setCreating] = useState(false);
-  const mutations = useAppMutations();
   const learned = useLearnedCounts(apps, me);
   const [facet, setFacet] = useState<AppFacet>("all");
   const facets = useMemo(() => appFacets(apps), [apps]);
@@ -65,16 +61,15 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
         )}
         <TableToolbar
           actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New app
-            </Button>
+            canEdit ? (
+              <LinkButton href="/apps/new" variant="primary" icon={PlusIcon}>
+                New app
+              </LinkButton>
+            ) : (
+              <Button variant="primary" icon={PlusIcon} disabled>
+                New app
+              </Button>
+            )
           }
         >
           <SearchInput
@@ -111,7 +106,6 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
           }
         />
       </TableGroup>
-      <AppDialog me={me} open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );
 }

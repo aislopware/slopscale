@@ -1,3 +1,5 @@
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -99,13 +101,28 @@ function ServiceHeader({
         </>
       }
       actions={
-        <ServiceMenu
-          service={service}
-          me={me}
-          onDeleted={() => {
-            void navigate({ to: "/services" });
-          }}
-        />
+        <>
+          {can(me, "services") ? (
+            <LinkButton
+              href={`/services/${serviceLabel(service.name)}/edit`}
+              variant="secondary"
+              icon={PencilSimpleIcon}
+            >
+              Edit
+            </LinkButton>
+          ) : (
+            <Button variant="secondary" icon={PencilSimpleIcon} disabled>
+              Edit
+            </Button>
+          )}
+          <ServiceMenu
+            service={service}
+            me={me}
+            onDeleted={() => {
+              void navigate({ to: "/services" });
+            }}
+          />
+        </>
       }
     />
   );

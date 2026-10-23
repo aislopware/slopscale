@@ -8,7 +8,7 @@ import { countApps, totalPendingRoutes } from "~/components/apps/model.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
-export const Route = createFileRoute("/_app/apps")({
+export const Route = createFileRoute("/_app/apps/")({
   validateSearch: textSearchSchema,
   loader: async ({ context }) => {
     await context.queryClient.query(appsQuery);
