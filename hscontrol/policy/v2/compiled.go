@@ -729,6 +729,51 @@ func buildSrcIPStrings(
 	return srcIPStrs
 }
 
+// resolvedDestination is a destination resolved once and reused for every
+// rule compiled from the same grant.
+type resolvedDestination struct {
+	Alias
+
+	addresses ResolvedAddresses
+	err       error
+}
+
+func (dst resolvedDestination) Resolve(
+	_ *Policy,
+	_ types.Users,
+	_ views.Slice[types.NodeView],
+) (ResolvedAddresses, error) {
+	return dst.addresses, dst.err
+}
+
+// resolveDestsOnce resolves each destination once when the grant would
+// otherwise resolve it per protocol and again for its app capabilities.
+// Wildcards stay as they are: their rules use "*" rather than addresses.
+func (pol *Policy) resolveDestsOnce(
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+	grant Grant,
+	dests Aliases,
+) Aliases {
+	protocols := len(grant.InternetProtocols)
+	if protocols < 2 && (protocols == 0 || grant.App == nil) {
+		return dests
+	}
+
+	resolved := make(Aliases, len(dests))
+	for i, dst := range dests {
+		resolved[i] = dst
+		if _, wildcard := dst.(Asterix); wildcard {
+			continue
+		}
+
+		addresses, err := dst.Resolve(pol, users, nodes)
+		resolved[i] = resolvedDestination{Alias: dst, addresses: addresses, err: err}
+	}
+
+	return resolved
+}
+
 // compileOtherDests compiles filter rules for non-self, non-via
 // destinations. This produces both [tailcfg.FilterRule.DstPorts] rules
 // (from [Grant.InternetProtocols]) and [tailcfg.CapGrant] rules (from
@@ -742,6 +787,8 @@ func (pol *Policy) compileOtherDests(
 	srcIPStrings []string,
 ) []tailcfg.FilterRule {
 	var rules []tailcfg.FilterRule
+
+	otherDests = pol.resolveDestsOnce(users, nodes, grant, otherDests)
 
 	// DstPorts rules from InternetProtocols.
 	for _, ipp := range grant.InternetProtocols {
