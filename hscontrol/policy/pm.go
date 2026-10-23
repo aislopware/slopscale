@@ -148,6 +148,12 @@ type PolicyManager interface {
 	// values are shared with the manager and read-only.
 	NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap
 
+	// NodeCapMapsForPeers snapshots the requested peers' caps under one
+	// lock. It may include unselected entries when copying the whole
+	// compiled table is less work. The outer map is caller-owned; inner
+	// maps are shared and read-only. An empty selection returns nil.
+	NodeCapMapsForPeers(peers views.Slice[types.NodeView]) map[types.NodeID]tailcfg.NodeCapMap
+
 	// NodesWithChangedCapMap returns the IDs of nodes whose nodeAttrs
 	// CapMap shifted during recent updateLocked calls. The buffer
 	// drains on read; callers consume it once per update cycle to

@@ -18,8 +18,11 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/aislopware/slopscale/hscontrol/wire"
 	"github.com/puzpuzpuz/xsync/v4"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
 
@@ -854,6 +857,147 @@ func BenchmarkFullMapResponse(b *testing.B) {
 		err = wire.MarshalWrite(io.Discard, resp)
 		if err != nil {
 			b.Fatal(err)
+		}
+	}
+}
+
+// baselineAddToBatch freezes addToBatch before broadcasts skipped the
+// per-recipient refilter.
+func baselineAddToBatch(b *Batcher, changes ...change.Change) {
+	for _, ch := range changes {
+		for _, removedID := range ch.DeletedNodes {
+			if nc, existed := b.nodes.LoadAndDelete(removedID); existed {
+				b.totalNodes.Add(-1)
+
+				if nc != nil {
+					nc.close()
+				}
+
+				log.Debug().
+					Uint64(zf.NodeID, removedID.Uint64()).
+					Msg("removed deleted node from batcher")
+			}
+		}
+	}
+
+	if change.HasFull(changes) {
+		b.nodes.Range(func(_ types.NodeID, nc *multiChannelNodeConn) bool {
+			if nc == nil {
+				return true
+			}
+
+			nc.collapsePendingToFull(changes)
+
+			return true
+		})
+
+		return
+	}
+
+	broadcast, targeted := change.SplitTargetedAndBroadcast(changes)
+
+	for _, ch := range targeted {
+		if nc, ok := b.nodes.Load(ch.TargetNode); ok && nc != nil {
+			nc.appendPending(ch)
+		}
+	}
+
+	if len(broadcast) > 0 {
+		b.nodes.Range(func(nodeID types.NodeID, nc *multiChannelNodeConn) bool {
+			if nc == nil {
+				return true
+			}
+
+			filtered := change.FilterForNode(nodeID, broadcast)
+
+			if len(filtered) > 0 {
+				nc.appendPending(filtered...)
+			}
+
+			return true
+		})
+	}
+}
+
+var batchIngressImplementations = []struct {
+	name string
+	add  func(*Batcher, ...change.Change)
+}{
+	{"baseline", baselineAddToBatch},
+	{"candidate", (*Batcher).addToBatch},
+}
+
+// BenchmarkBatchIngressPaired measures enqueue work only; fixture
+// construction, delivery-count checks and draining are outside the timer.
+func BenchmarkBatchIngressPaired(b *testing.B) {
+	level := zerolog.GlobalLevel()
+
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+	defer zerolog.SetGlobalLevel(level)
+
+	seen := time.Now()
+
+	for _, nodes := range []int{100, 1000, 10000} {
+		for _, batch := range []int{1, 8, 64} {
+			for _, mode := range []struct {
+				name  string
+				mixed bool
+				burst int
+			}{
+				{"broadcast", false, 1},
+				{"mixed", true, 1},
+				{"burst", false, 4},
+			} {
+				for _, impl := range batchIngressImplementations {
+					name := fmt.Sprintf("nodes=%d/batch=%d/%s/%s", nodes, batch, mode.name, impl.name)
+					b.Run(name, func(b *testing.B) {
+						b.StopTimer()
+
+						batcher, _ := benchBatcher(nodes, 1)
+						b.Cleanup(batcher.Close)
+
+						conns := make([]*multiChannelNodeConn, nodes)
+						for i := range conns {
+							conns[i], _ = batcher.nodes.Load(types.NodeID(i + 1))
+						}
+
+						changes := make([]change.Change, 0, batch+2)
+						for i := range batch {
+							changes = append(changes, change.NodeOnline(types.NodeID(i+1), seen))
+						}
+
+						if mode.mixed {
+							changes = append(changes, change.SelfUpdate(1), change.SelfUpdate(10001))
+						}
+
+						b.ReportAllocs()
+						b.ResetTimer()
+
+						for range b.N {
+							b.StartTimer()
+
+							for range mode.burst {
+								impl.add(batcher, changes...)
+							}
+
+							b.StopTimer()
+
+							for i, nc := range conns {
+								want := batch * mode.burst
+								if mode.mixed && i == 0 {
+									want += mode.burst
+								}
+
+								if got := len(nc.drainPending()); got != want {
+									b.Fatalf("node %d: got %d changes, want %d", i+1, got, want)
+								}
+							}
+						}
+
+						b.ReportMetric(float64(mode.burst), "calls/op")
+					})
+				}
+			}
 		}
 	}
 }
