@@ -460,24 +460,25 @@ func (pm *PolicyManager) SetSSHRecording(recording SSHRecording) (bool, error) {
 	return changed, nil
 }
 
-// SSHRecordingFor returns the recorders and failure action for the
-// session a check-mode rule admits from src to dst as localUser, so the
-// final action control returns carries them like the accept action
-// would. The rule is the one [PolicyManager.SSHCheckParams] picks. Nil
-// when no rule matches or the rule records nothing.
-func (pm *PolicyManager) SSHRecordingFor(
+// SSHCheckAccept returns the action a check-mode session from src to dst
+// as localUser gets once the check passes: the accept action of the rule
+// [PolicyManager.SSHCheckParams] picks, with its forwarding and recorders,
+// because the final action replaces the rule's. Accept is left false for
+// the caller to set. Without a matching rule it forwards nothing and
+// records nothing.
+func (pm *PolicyManager) SSHCheckAccept(
 	baseURL string, srcNodeID, dstNodeID types.NodeID, localUser string,
-) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction) {
+) tailcfg.SSHAction {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
 	if pm.pol == nil || len(pm.pol.SSHs) == 0 {
-		return nil, nil
+		return tailcfg.SSHAction{}
 	}
 
 	srcNode, dstNode := pm.findNodePairLocked(srcNodeID, dstNodeID)
 	if !srcNode.Valid() || !dstNode.Valid() {
-		return nil, nil
+		return tailcfg.SSHAction{}
 	}
 
 	for _, rule := range pm.pol.SSHs {
@@ -485,15 +486,14 @@ func (pm *PolicyManager) SSHRecordingFor(
 			continue
 		}
 
+		action := sshAccept(rule)
+		action.Accept = false
 		recorders, enforce := pm.pol.recordersFor(rule, pm.sshRecording, pm.users, pm.nodes)
-		if len(recorders) == 0 {
-			return nil, nil
-		}
 
-		return recorders, recordingFailure(baseURL, enforce)
+		return withRecording(action, baseURL, recorders, enforce)
 	}
 
-	return nil, nil
+	return tailcfg.SSHAction{}
 }
 
 func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {

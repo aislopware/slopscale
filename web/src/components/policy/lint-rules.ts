@@ -308,6 +308,12 @@ function lintAcceptEnv(lint: Lint, value: JsonNode): void {
 
 const sshRecorder = { side: "dst", allowed: ["tag", "host", "prefix"], what: "recorder" } as const;
 
+const sshBoolKeys: ReadonlySet<string> = new Set([
+  "enforceRecorder",
+  "allowLocalPortForwarding",
+  "allowRemotePortForwarding",
+]);
+
 export function lintSsh(lint: Lint, node: JsonNode): void {
   const object = lint.object(node, "an SSH rule");
 
@@ -347,8 +353,8 @@ export function lintSsh(lint: Lint, node: JsonNode): void {
       lintAcceptEnv(lint, value);
     } else if (key.name === "recorder") {
       lint.aliases(value, sshRecorder);
-    } else if (key.name === "enforceRecorder") {
-      lint.bool(value, "enforceRecorder");
+    } else if (sshBoolKeys.has(key.name)) {
+      lint.bool(value, key.name);
     }
   }
 

@@ -620,9 +620,13 @@ func (s *State) TailnetLockSyncSend(aums []tkatype.MarshaledAUM) (string, change
 	return head.String(), c, nil
 }
 
-// TailnetLockDisable switches the lock off with a disablement secret a
-// node holds, as `tailscale lock disable` does.
-func (s *State) TailnetLockDisable(secret []byte) (change.Change, error) {
+// TailnetLockDisable switches the lock off with a disablement secret
+// node submitted, as `tailscale lock disable` does. Only a signing node
+// may: the secret travels in the clear through the client's local API,
+// so whoever captures it there must not be able to switch the lock off
+// from any other node. The console and the API keep their own path,
+// [State.DisableTailnetLock], for when no signing node is left.
+func (s *State) TailnetLockDisable(node types.NodeView, secret []byte) (change.Change, error) {
 	l := s.tailnetLock
 
 	l.mu.Lock()
@@ -632,11 +636,39 @@ func (s *State) TailnetLockDisable(secret []byte) (change.Change, error) {
 		return change.Change{}, types.ErrTailnetLockDisabled
 	}
 
+	if !l.isSigner(node) {
+		// A valid secret from a node that may not use it means the secret
+		// left the signing nodes; the operator should know.
+		log.Warn().Caller().
+			Uint64("node.id", node.ID().Uint64()).
+			Str("node.name", node.GivenName()).
+			Bool("secret_valid", l.authority.ValidDisablement(secret)).
+			Msg("tailnet lock disable refused: the node is not a signing node")
+
+		return change.Change{}, types.ErrTailnetLockNotSigner
+	}
+
 	if !l.authority.ValidDisablement(secret) {
 		return change.Change{}, types.ErrTailnetLockBadSecret
 	}
 
 	return s.disableTailnetLockLocked(l, secret)
+}
+
+// isSigner reports whether node is a signing node: its tailnet lock key
+// is one the authority trusts and its node key carries a signature the
+// authority accepts. The client reports its lock key itself, so the
+// signature keeps a node that was never signed, such as one enrolled
+// with a stolen auth key, out even when it claims a trusted key. It runs
+// under mu with the lock on.
+func (l *tailnetLock) isSigner(node types.NodeView) bool {
+	if !node.Valid() || node.NLKey().IsZero() || !l.authority.KeyTrusted(node.NLKey().KeyID()) {
+		return false
+	}
+
+	sig := node.KeySignature().AsSlice()
+
+	return len(sig) > 0 && l.authority.NodeKeyAuthorized(node.NodeKey(), sig) == nil
 }
 
 // DisableTailnetLock switches the lock off with the support disablement

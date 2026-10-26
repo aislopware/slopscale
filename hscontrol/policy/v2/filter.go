@@ -209,12 +209,19 @@ func (pol *Policy) compileFilterRulesForNode(
 	)
 }
 
-var sshAccept = tailcfg.SSHAction{
-	Reject:                    false,
-	Accept:                    true,
-	AllowAgentForwarding:      true,
-	AllowLocalPortForwarding:  true,
-	AllowRemotePortForwarding: true,
+// sshAccept is the action an accept rule sends, and what a check rule's
+// session gets once the check passes. Agent forwarding is always on: the
+// agent socket lives in a directory tailscaled creates itself. Port
+// forwarding is only on when the rule asks for it, because tailscaled
+// binds and dials a forward's Unix sockets as root, so a forward is root
+// on the host whichever login the rule allows.
+func sshAccept(rule SSH) tailcfg.SSHAction {
+	return tailcfg.SSHAction{
+		Accept:                    true,
+		AllowAgentForwarding:      true,
+		AllowLocalPortForwarding:  rule.AllowLocalPortForwarding,
+		AllowRemotePortForwarding: rule.AllowRemotePortForwarding,
+	}
 }
 
 // checkPeriodFromRule extracts the check period duration from an [SSH] rule.
@@ -302,7 +309,7 @@ func (pol *Policy) compileSSHPolicy(
 
 		switch rule.Action {
 		case SSHActionAccept:
-			action = sshAccept
+			action = sshAccept(rule)
 		case SSHActionCheck:
 			action = sshCheck(baseURL)
 		default:

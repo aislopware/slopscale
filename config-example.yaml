@@ -760,6 +760,16 @@ auto_update:
 #   #
 #   # register_cache_max_entries: 1024
 #
+#   # Maximum number of pending interactive registrations one source network
+#   # (an IPv4 address, or an IPv6 /64) may hold in the auth cache. Past it
+#   # the network's new registrations are refused until one of its pending
+#   # logins completes or expires, so one network cannot evict the others'.
+#   # The source is the client address after trusted_proxies is applied:
+#   # behind a reverse proxy that is not listed there, every client shares
+#   # the proxy's address and therefore this one limit.
+#   #
+#   # register_cache_max_per_source: 16
+#
 #   # NodeStore write batching configuration.
 #   # The NodeStore batches write operations before rebuilding peer relationships,
 #   # which is computationally expensive. Batching reduces rebuild frequency.

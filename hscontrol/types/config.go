@@ -863,6 +863,13 @@ type Tuning struct {
 	// A value of 0 falls back to defaultRegisterCacheMaxEntries (1024).
 	RegisterCacheMaxEntries int
 
+	// RegisterCacheMaxPerSource bounds how many unauthenticated pending
+	// registrations one source network (an IPv4 address, an IPv6 /64) may
+	// hold in the auth cache. Past it a new registration from that network
+	// is refused rather than evicting anyone else's pending login.
+	// A value of 0 falls back to defaultRegisterCacheMaxPerSource (16).
+	RegisterCacheMaxPerSource int
+
 	// NodeStoreBatchSize controls how many write operations are accumulated
 	// before rebuilding the in-memory node snapshot.
 	//
@@ -2307,10 +2314,11 @@ func LoadServerConfig() (*Config, error) {
 
 				return DefaultBatcherWorkers()
 			}(),
-			RegisterCacheExpiration: conf.GetDuration("tuning.register_cache_expiration"),
-			RegisterCacheMaxEntries: conf.GetInt("tuning.register_cache_max_entries"),
-			NodeStoreBatchSize:      conf.GetInt("tuning.node_store_batch_size"),
-			NodeStoreBatchTimeout:   conf.GetDuration("tuning.node_store_batch_timeout"),
+			RegisterCacheExpiration:   conf.GetDuration("tuning.register_cache_expiration"),
+			RegisterCacheMaxEntries:   conf.GetInt("tuning.register_cache_max_entries"),
+			RegisterCacheMaxPerSource: conf.GetInt("tuning.register_cache_max_per_source"),
+			NodeStoreBatchSize:        conf.GetInt("tuning.node_store_batch_size"),
+			NodeStoreBatchTimeout:     conf.GetDuration("tuning.node_store_batch_timeout"),
 		},
 	}, nil
 }

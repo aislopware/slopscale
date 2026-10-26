@@ -124,11 +124,13 @@ func TestStateDebugRegistrationCache(t *testing.T) {
 	s, _ := debugTestState(t)
 
 	assert.Equal(t, map[string]any{
-		"type":        "expirable-lru",
-		"expiration":  registerCacheExpiration.String(),
-		"max_entries": defaultRegisterCacheMaxEntries,
-		"current_len": 0,
-		"status":      "active",
+		"type":              "expirable-lru",
+		"expiration":        registerCacheExpiration.String(),
+		"max_entries":       defaultRegisterCacheMaxEntries,
+		"current_len":       0,
+		"status":            "active",
+		"max_per_source":    defaultRegisterCacheMaxPerSource,
+		"pending_by_source": map[string]int{},
 	}, s.DebugRegistrationCache())
 }
 

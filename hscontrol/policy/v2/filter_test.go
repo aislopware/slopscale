@@ -449,10 +449,8 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 	nodes := types.Nodes{&nodeTaggedServer, &nodeTaggedDB, &nodeUser2Untagged}
 
 	acceptAction := &tailcfg.SSHAction{
-		Accept:                    true,
-		AllowAgentForwarding:      true,
-		AllowLocalPortForwarding:  true,
-		AllowRemotePortForwarding: true,
+		Accept:               true,
+		AllowAgentForwarding: true,
 	}
 	user2Principal := []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.3"}}
 
@@ -715,10 +713,8 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 	nodes := types.Nodes{&nodeTaggedServer, &nodeAlice, &nodeBob, &nodeCharlie, &nodeDave}
 
 	acceptAction := &tailcfg.SSHAction{
-		Accept:                    true,
-		AllowAgentForwarding:      true,
-		AllowLocalPortForwarding:  true,
-		AllowRemotePortForwarding: true,
+		Accept:               true,
+		AllowAgentForwarding: true,
 	}
 
 	tests := []struct {
@@ -1251,10 +1247,8 @@ func TestSSHIntegrationReproduction(t *testing.T) {
 			Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.2"}},
 			SSHUsers:   map[string]string{"root": "", "ssh-it-user": "ssh-it-user"},
 			Action: &tailcfg.SSHAction{
-				Accept:                    true,
-				AllowAgentForwarding:      true,
-				AllowLocalPortForwarding:  true,
-				AllowRemotePortForwarding: true,
+				Accept:               true,
+				AllowAgentForwarding: true,
 			},
 		},
 	}}
@@ -1309,10 +1303,8 @@ func TestSSHJSONSerialization(t *testing.T) {
 				"admin":       "admin",
 			},
 			Action: &tailcfg.SSHAction{
-				Accept:                    true,
-				AllowAgentForwarding:      true,
-				AllowLocalPortForwarding:  true,
-				AllowRemotePortForwarding: true,
+				Accept:               true,
+				AllowAgentForwarding: true,
 			},
 		},
 	}}

@@ -76,6 +76,8 @@ ______________________________________________________________________
 - A subset of [Autogroups](#autogroups) are available.
 - A [service](/ref/services) is a destination, `svc:web`, and
   `autoApprovers.services` names who may host one.
+- Tailscale SSH rules forward no ports unless they ask for it; see [SSH port
+  forwarding](#ssh-port-forwarding).
 
 ## Autogroups
 
@@ -238,6 +240,41 @@ Used in Tailscale SSH rules to allow access to any user except root. Can only be
 
 This autogroup resolves to all IP addresses (`0.0.0.0/0` and `::/0`) which also includes all IP addresses outside the
 standard Tailscale IP ranges. This autogroup can only be used as source.
+
+## SSH port forwarding
+
+A Tailscale SSH session may forward ports and Unix sockets (`ssh -L`, `ssh -D`, `ssh -R`) only when its rule asks for
+it. Agent forwarding (`ssh -A`) is always allowed.
+
+```json title="policy.json"
+{
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["group:dev"],
+      "dst": ["tag:dev-box"],
+      "users": ["autogroup:nonroot"],
+      "allowLocalPortForwarding": true
+    }
+  ]
+}
+```
+
+- `allowLocalPortForwarding` allows `ssh -L` and `ssh -D`, which editors such as VS Code Remote-SSH need.
+- `allowRemotePortForwarding` allows `ssh -R`.
+
+Tailscale allows both on every rule. Slopscale does not, because the SSH server inside `tailscaled` runs as root and
+forwards as root, whatever login the rule names. A login that may forward can open Unix sockets only root may open, such
+as Docker's or systemd's, and can replace root-owned sockets in `/tmp`. That makes it root on the machine. The
+[Tailworm report](https://tailworm.com/) (findings 1 to 3) shows this against stock clients up to at least 1.104.2.
+Tailscale's main branch forwards with the login's own privileges since 2026-10-24
+([eba00ab](https://github.com/tailscale/tailscale/commit/eba00ab363)); until that reaches a release and every
+destination runs it, treat a rule that allows forwarding as a root login to every machine in its `dst`. A
+`check` rule does not help: the check gates the start of the session, and forwarding happens inside it, so the switches
+work the same on `check` rules.
+
+Keep the rules that allow forwarding narrow: one source and one destination, ideally machines the user already has
+root on.
 
 ## Node Attributes
 

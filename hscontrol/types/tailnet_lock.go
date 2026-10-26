@@ -37,6 +37,14 @@ var (
 	// ErrTailnetLockNotAdmin is returned when a node that is not owned by
 	// an administrator tries to enable the lock.
 	ErrTailnetLockNotAdmin = errors.New("only a node owned by an owner or admin may enable tailnet lock")
+	// ErrTailnetLockNotSigner is returned when a node that is not a
+	// signing node submits a disablement secret: a secret captured in
+	// transit must not let any node switch the lock off.
+	ErrTailnetLockNotSigner = errors.New(
+		"only a signing node may disable tailnet lock: run `tailscale lock disable` on a signed node " +
+			"whose tailnet lock key is trusted (see `tailscale lock status`), " +
+			"or disable it from the console or the API",
+	)
 )
 
 // TailnetLockSettings is what the settings table records about tailnet

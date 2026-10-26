@@ -94,7 +94,7 @@ func registerTailnetLock(api huma.API, b Backend) {
 		Description: "Switches the lock off with the disablement secret the initialising client minted " +
 			"for the operator (`tailscale lock init --gen-disablement-for-support`). Every node " +
 			"drops its lock state and its node key signature. Refused when no such secret was recorded; " +
-			"`tailscale lock disable <secret>` on a node works with any disablement secret.",
+			"`tailscale lock disable <secret>` works with any disablement secret, but only on a signing node.",
 		Tags:     []string{tagSettings},
 		Security: bearerAuth,
 	}, scope.FeatureSettings), "tailnet_lock.disable", "", ""), func(

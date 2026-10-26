@@ -56,7 +56,9 @@ and indicates that the reverse proxy is in charge of terminating TLS.
 
 Slopscale ignores `True-Client-IP`, `X-Real-IP` and `X-Forwarded-For` headers unless the request's TCP peer matches the
 `trusted_proxies` configuration option. Set this to the CIDR(s) your reverse proxy connects from so the real client IP
-appears in access logs.
+appears in access logs. The limit on pending interactive registrations per network
+(`tuning.register_cache_max_per_source`, 16 per IPv4 address or IPv6 /64) counts that address too; without
+`trusted_proxies` every client shares the proxy's.
 
 ```yaml title="config.yaml"
 trusted_proxies:

@@ -3298,6 +3298,13 @@ type SSH struct {
 	// and ends it when the recording breaks; otherwise the session goes
 	// on unrecorded and the failure is logged.
 	EnforceRecorder bool `json:"enforceRecorder,omitempty"`
+	// AllowLocalPortForwarding lets the sessions this rule admits forward
+	// local ports and Unix sockets (ssh -L, -D); AllowRemotePortForwarding
+	// lets them forward remote ones (ssh -R). Both are off unless the rule
+	// asks: tailscaled forwards as root whatever login the rule names, so
+	// a forward reaches what root reaches. See docs/content/ref/policy.mdx.
+	AllowLocalPortForwarding  bool `json:"allowLocalPortForwarding,omitempty"`
+	AllowRemotePortForwarding bool `json:"allowRemotePortForwarding,omitempty"`
 }
 
 // SSHRecorderAliases is what an [SSH] rule's recorder may name: tags,

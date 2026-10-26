@@ -5228,7 +5228,7 @@ type ClientInterface interface {
 
 	// DisableTailnetLock Disable tailnet lock
 	//
-	// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+	// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` works with any disablement secret, but only on a signing node.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -9413,7 +9413,7 @@ func (c *Client) GetTailnetLock(ctx context.Context, reqEditors ...RequestEditor
 
 // DisableTailnetLock Disable tailnet lock
 //
-// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` works with any disablement secret, but only on a signing node.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -19206,7 +19206,7 @@ type ClientWithResponsesInterface interface {
 
 	// DisableTailnetLockWithResponse Disable tailnet lock
 	//
-	// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+	// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` works with any disablement secret, but only on a signing node.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -30941,7 +30941,7 @@ func (c *ClientWithResponses) GetTailnetLockWithResponse(ctx context.Context, re
 
 // DisableTailnetLockWithResponse Disable tailnet lock
 //
-// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` works with any disablement secret, but only on a signing node.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
