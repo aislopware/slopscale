@@ -74,6 +74,9 @@ type AccessRequestOption struct {
 	ID          string `format:"uint64"              json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
+	// AutoApprove and MaxRequestSeconds are set on a group only.
+	AutoApprove       bool  `doc:"Whether the group grants requests as filed." json:"autoApprove,omitempty"`
+	MaxRequestSeconds int64 `doc:"Longest request in seconds; 0 for no cap."   json:"maxRequestSeconds,omitempty"`
 }
 
 type (
@@ -212,6 +215,7 @@ func registerAccessRequestReads(api huma.API, b Backend) {
 		for _, g := range opts.Groups {
 			out.Body.Groups = append(out.Body.Groups, AccessRequestOption{
 				ID: formatID(uint64(g.ID)), Name: g.Name, Description: g.Description,
+				AutoApprove: g.AutoApprove, MaxRequestSeconds: int64(g.MaxDuration / time.Second),
 			})
 		}
 
@@ -305,7 +309,8 @@ func registerAccessRequestWrites(api huma.API, b Backend) {
 		Path:        "/api/v1/access-request",
 		Summary:     "Request access",
 		Description: "Files the caller's ask to join a requestable group for a while, for one of " +
-			"their machines or for every machine they own. The credential must belong to a user.",
+			"their machines or for every machine they own. The credential must belong to a user. " +
+			"A group that approves by itself grants the request at once.",
 		Tags:     []string{tagAccessControl},
 		Security: bearerAuth,
 	}, "access_request.create", "access_request", ""), func(
@@ -337,10 +342,12 @@ func registerAccessRequestWrites(api huma.API, b Backend) {
 			req.NodeID = &nodeID
 		}
 
-		created, err := b.State.CreateAccessRequest(req)
+		created, c, err := b.State.CreateAccessRequest(req)
 		if err != nil {
 			return nil, mapError("filing access request", err)
 		}
+
+		b.Change(c)
 
 		audit.Target(ctx, "access_request", created.ID.String(), "")
 		audit.Detail(ctx, "groupId", in.Body.GroupID)

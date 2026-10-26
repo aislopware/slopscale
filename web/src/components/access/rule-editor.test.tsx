@@ -18,12 +18,14 @@ const stamp = "2026-01-01T12:00:00Z";
 
 function group(id: string, name: string, builtin = ""): Group {
   return {
+    autoApprove: false,
     builtin,
     source: "",
     createdAt: stamp,
     description: "",
     expiries: [],
     id,
+    maxRequestSeconds: 0,
     name,
     nodeIds: [],
     requestable: false,

@@ -80,7 +80,7 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	})
 	require.ErrorIs(t, err, types.ErrRuleSelfBoth)
 
-	_, _, err = s.UpdateGroup(all.ID, "Everyone", "", false)
+	_, _, err = s.UpdateGroup(all.ID, "Everyone", "", types.GroupRequests{})
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)
 
 	_, err = s.DeleteGroup(all.ID)
@@ -90,19 +90,19 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)
 
 	// Names are validated and unique.
-	_, _, err = s.CreateGroup("  ", "", false)
+	_, _, err = s.CreateGroup("  ", "", types.GroupRequests{})
 	require.ErrorIs(t, err, types.ErrGroupNameEmpty)
 
-	_, _, err = s.CreateGroup("bad/name", "", false)
+	_, _, err = s.CreateGroup("bad/name", "", types.GroupRequests{})
 	require.ErrorIs(t, err, types.ErrGroupNameInvalid)
 
-	eng, _, err := s.CreateGroup("Engineering", "", false)
+	eng, _, err := s.CreateGroup("Engineering", "", types.GroupRequests{})
 	require.NoError(t, err)
 
-	_, _, err = s.CreateGroup("Engineering", "", false)
+	_, _, err = s.CreateGroup("Engineering", "", types.GroupRequests{})
 	require.ErrorIs(t, err, types.ErrGroupNameTaken)
 
-	servers, _, err := s.CreateGroup("Servers", "", false)
+	servers, _, err := s.CreateGroup("Servers", "", types.GroupRequests{})
 	require.NoError(t, err)
 
 	// Membership by user and by node; unknown members are refused.
@@ -194,7 +194,7 @@ func TestPreAuthKeyGroupsEnrolNode(t *testing.T) {
 	s := newRoleTestState(t)
 	alice := createUserWithRole(t, s, "alice", "")
 
-	servers, _, err := s.CreateGroup("Servers", "", false)
+	servers, _, err := s.CreateGroup("Servers", "", types.GroupRequests{})
 	require.NoError(t, err)
 
 	uid := types.UserID(alice.ID)
@@ -225,7 +225,7 @@ func TestExpireAccessSweepsOnFirstCall(t *testing.T) {
 	s := newRoleTestState(t)
 	alice := createUserWithRole(t, s, "alice", "")
 
-	eng, _, err := s.CreateGroup("Engineering", "", false)
+	eng, _, err := s.CreateGroup("Engineering", "", types.GroupRequests{})
 	require.NoError(t, err)
 
 	// Straight to the database: the API refuses an expiry in the past,

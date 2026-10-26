@@ -83,7 +83,9 @@ func (s *State) GetGroup(id types.GroupID) (types.AccessGroup, error) {
 }
 
 // CreateGroup adds a group with no members.
-func (s *State) CreateGroup(name, description string, requestable bool) (types.AccessGroup, change.Change, error) {
+func (s *State) CreateGroup(
+	name, description string, requests types.GroupRequests,
+) (types.AccessGroup, change.Change, error) {
 	name = strings.TrimSpace(name)
 
 	err := types.ValidateGroupName(name)
@@ -91,7 +93,12 @@ func (s *State) CreateGroup(name, description string, requestable bool) (types.A
 		return types.AccessGroup{}, change.Change{}, err
 	}
 
-	group, err := s.db.CreateGroup(name, strings.TrimSpace(description), requestable)
+	err = requests.Validate()
+	if err != nil {
+		return types.AccessGroup{}, change.Change{}, err
+	}
+
+	group, err := s.db.CreateGroup(name, strings.TrimSpace(description), requests)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -111,7 +118,7 @@ func (s *State) CreateGroup(name, description string, requestable bool) (types.A
 // keeps its name: the sync finds it by the claim's name, so a renamed
 // one would be recreated empty at the next sign-in.
 func (s *State) UpdateGroup(
-	id types.GroupID, name, description string, requestable bool,
+	id types.GroupID, name, description string, requests types.GroupRequests,
 ) (types.AccessGroup, change.Change, error) {
 	existing, err := s.GetGroup(id)
 	if err != nil {
@@ -133,7 +140,12 @@ func (s *State) UpdateGroup(
 		return types.AccessGroup{}, change.Change{}, types.ErrGroupSyncedName
 	}
 
-	group, err := s.db.UpdateGroup(id, name, strings.TrimSpace(description), requestable)
+	err = requests.Validate()
+	if err != nil {
+		return types.AccessGroup{}, change.Change{}, err
+	}
+
+	group, err := s.db.UpdateGroup(id, name, strings.TrimSpace(description), requests)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}

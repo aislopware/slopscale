@@ -1,6 +1,6 @@
 ---
 title: "Temporary access"
-description: "Grant access that ends on its own: expiring access rules and group memberships, requestable groups decided by approvers, and revoking a grant early."
+description: "Grant access that ends on its own: expiring access rules and group memberships, requestable groups decided by approvers or granted on request, and revoking a grant early."
 ---
 
 Access that ends on its own: a rule with an expiry, a group membership
@@ -65,6 +65,7 @@ pending next to it in the sidebar.
 
 ```console
 slopscale groups create --name "Prod" --requestable
+slopscale groups rename -i 4 --name "Prod" --max-duration 8h
 slopscale access-requests create --group 4 --node 12 --duration 2h --reason "deploy"
 slopscale access-requests list --status pending
 slopscale access-requests approve -i 1 --duration 1h --note "one hour is enough"
@@ -72,6 +73,40 @@ slopscale access-requests deny -i 2 --note "ask the team lead first"
 slopscale access-requests revoke -i 1 --note "incident over"
 slopscale access-requests cancel -i 3
 ```
+
+## Self-service groups
+
+A requestable group can also cap how long one request may ask for and
+approve requests by itself. A request longer than the cap is refused
+with the cap in the answer; with auto-approve on, a request within it is
+granted the moment it is filed, recorded as decided by `auto-approved`,
+with no approver involved and no `accessRequestCreated` event, only
+`accessRequestApproved`. When the grant runs out the member asks again.
+Auto-approve needs the group to be requestable; the cap is between five
+minutes and thirty days, or none. Neither setting changes a request
+already filed, and an approver deciding a pending one may still pick any
+duration.
+
+The use it was made for is metered exit node access. An exit node
+[network](/ref/networks) whose group is such a group hands the exit
+routes only to the machines with a grant in effect, so everyone else
+sees the exit node without being able to use it, and a member who needs
+it asks for up to an hour at a time:
+
+```console
+slopscale groups create --name "Exit node access" --requestable \
+  --auto-approve --max-duration 1h
+slopscale networks create --name "Office internet" --prefix 0.0.0.0/0 \
+  --router 27 --group 7
+slopscale access-requests create --group 7 --node 12 --duration 1h
+```
+
+The control server takes the route away when the grant ends, but it
+cannot switch the client's exit node off: a machine still set to use
+that exit node loses internet access until its user picks another one
+or none. In the console the group editor has _Longest request_ and
+_Approve requests automatically_ under _Requests_, and _My access_
+offers only the durations the group takes.
 
 Through the API, `GET /api/v1/access-request/options` lists what the
 caller may ask for, `POST /api/v1/access-request` files a request,

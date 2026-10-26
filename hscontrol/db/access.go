@@ -25,6 +25,10 @@ type (
 		Source      string
 		CreatedAt   *time.Time
 		UpdatedAt   *time.Time
+		AutoApprove bool
+		// MaxRequestSeconds is [types.GroupRequests.MaxDuration] in
+		// seconds, 0 for none.
+		MaxRequestSeconds int64
 	}
 	groupNodeRow struct {
 		ID        uint64 `sql:"primary_key"`
@@ -118,6 +122,8 @@ func (r groupRow) group() types.AccessGroup {
 		Description: r.Description,
 		Builtin:     r.Builtin,
 		Requestable: r.Requestable,
+		AutoApprove: r.AutoApprove,
+		MaxDuration: time.Duration(r.MaxRequestSeconds) * time.Second,
 		Source:      r.Source,
 	}
 
@@ -381,13 +387,15 @@ func ensureGroupCreated(q Querier, group types.AccessGroup) (types.AccessGroup, 
 func insertGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) {
 	now := time.Now().UTC()
 	row := groupRow{
-		Name:        group.Name,
-		Description: group.Description,
-		Builtin:     group.Builtin,
-		Requestable: group.Requestable,
-		Source:      group.Source,
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
+		Name:              group.Name,
+		Description:       group.Description,
+		Builtin:           group.Builtin,
+		Requestable:       group.Requestable,
+		Source:            group.Source,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+		AutoApprove:       group.AutoApprove,
+		MaxRequestSeconds: int64(group.MaxDuration / time.Second),
 	}
 
 	var inserted idRow
@@ -410,9 +418,11 @@ func insertGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) 
 }
 
 // CreateGroup adds an operator-made group.
-func (hsdb *HSDatabase) CreateGroup(name, description string, requestable bool) (types.AccessGroup, error) {
+func (hsdb *HSDatabase) CreateGroup(
+	name, description string, requests types.GroupRequests,
+) (types.AccessGroup, error) {
 	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
-		return insertGroup(tx, types.AccessGroup{Name: name, Description: description, Requestable: requestable})
+		return insertGroup(tx, types.AccessGroup{Name: name, Description: description, GroupRequests: requests})
 	})
 }
 
@@ -476,18 +486,23 @@ func getGroup(q Querier, id types.GroupID) (types.AccessGroup, error) {
 	return group, nil
 }
 
-// UpdateGroup renames or re-describes a group.
+// UpdateGroup renames or re-describes a group and sets how it takes
+// access requests.
 func (hsdb *HSDatabase) UpdateGroup(
-	id types.GroupID, name, description string, requestable bool,
+	id types.GroupID, name, description string, requests types.GroupRequests,
 ) (types.AccessGroup, error) {
 	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
 		now := time.Now().UTC()
 
 		affected, err := tx.executor().exec(
 			table.Groups.UPDATE(
-				table.Groups.Name, table.Groups.Description, table.Groups.Requestable, table.Groups.UpdatedAt,
+				table.Groups.Name, table.Groups.Description, table.Groups.Requestable,
+				table.Groups.AutoApprove, table.Groups.MaxRequestSeconds, table.Groups.UpdatedAt,
 			).
-				SET(name, description, requestable, now).
+				SET(
+					name, description, requests.Requestable,
+					requests.AutoApprove, int64(requests.MaxDuration/time.Second), now,
+				).
 				WHERE(table.Groups.ID.EQ(jet.Uint64(uint64(id)))),
 		)
 		if err != nil {

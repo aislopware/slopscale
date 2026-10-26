@@ -723,6 +723,21 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609271000-traffic-private-split",
 			run: migrateTrafficPrivateSplit,
 		},
+		{
+			// Self-service access: groups gain auto_approve, which grants
+			// a request as it is filed, and max_request_seconds, the
+			// longest one request may ask for. Existing groups keep an
+			// approver and no cap of their own.
+			id: "202610261000-group-request-limits",
+			run: func(tx *Tx) error {
+				err := tx.ex.addColumnIfMissing("groups", "auto_approve", typeBoolFalse)
+				if err != nil {
+					return err
+				}
+
+				return tx.ex.addColumnIfMissing("groups", "max_request_seconds", typeIntegerZero)
+			},
+		},
 	}
 }
 

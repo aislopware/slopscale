@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -21,7 +22,7 @@ func init() {
 	createGroupCmd.Flags().StringP("name", "n", "", "Group name")
 	mustMarkRequired(createGroupCmd, "name")
 	createGroupCmd.Flags().StringP("description", "d", "", "Group description")
-	createGroupCmd.Flags().Bool("requestable", false, "Let members request to join the group for a while")
+	groupRequestFlags(createGroupCmd)
 	groupsCmd.AddCommand(createGroupCmd)
 
 	renameGroupCmd.Flags().Uint64P("identifier", "i", 0, "Group identifier (ID)")
@@ -29,7 +30,7 @@ func init() {
 	renameGroupCmd.Flags().StringP("name", "n", "", "New group name")
 	mustMarkRequired(renameGroupCmd, "name")
 	renameGroupCmd.Flags().StringP("description", "d", "", "Group description")
-	renameGroupCmd.Flags().Bool("requestable", false, "Let members request to join the group for a while")
+	groupRequestFlags(renameGroupCmd)
 	groupsCmd.AddCommand(renameGroupCmd)
 
 	deleteGroupCmd.Flags().Uint64P("identifier", "i", 0, "Group identifier (ID)")
@@ -113,6 +114,32 @@ var listGroupsCmd = &cobra.Command{
 	),
 }
 
+func groupRequestFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("requestable", false, "Let members request to join the group for a while")
+	cmd.Flags().Bool("auto-approve", false, "Grant requests as they are filed, with no approver (needs --requestable)")
+	cmd.Flags().Duration("max-duration", 0, "The longest one request may ask for, such as 1h; 0 for no cap")
+}
+
+// applyGroupRequestFlags sets on the body the request settings given on
+// the command line and leaves the others as they are.
+func applyGroupRequestFlags(cmd *cobra.Command, body *clientv1.GroupRequestBody) {
+	if cmd.Flags().Changed("requestable") {
+		requestable, _ := cmd.Flags().GetBool("requestable")
+		body.Requestable = &requestable
+	}
+
+	if cmd.Flags().Changed("auto-approve") {
+		autoApprove, _ := cmd.Flags().GetBool("auto-approve")
+		body.AutoApprove = &autoApprove
+	}
+
+	if cmd.Flags().Changed("max-duration") {
+		maxDuration, _ := cmd.Flags().GetDuration("max-duration")
+		seconds := int64(maxDuration / time.Second)
+		body.MaxRequestSeconds = &seconds
+	}
+}
+
 var createGroupCmd = &cobra.Command{
 	Use:     cmdCreate,
 	Short:   "Create a group",
@@ -121,12 +148,8 @@ var createGroupCmd = &cobra.Command{
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			name, _ := cmd.Flags().GetString("name")
 
-			requestable, _ := cmd.Flags().GetBool("requestable")
-
-			req := clientv1.CreateGroupJSONRequestBody{
-				Name:        name,
-				Requestable: &requestable,
-			}
+			req := clientv1.CreateGroupJSONRequestBody{Name: name}
+			applyGroupRequestFlags(cmd, &req)
 
 			if cmd.Flags().Changed("description") {
 				desc, _ := cmd.Flags().GetString("description")
@@ -149,7 +172,7 @@ var createGroupCmd = &cobra.Command{
 
 var renameGroupCmd = &cobra.Command{
 	Use:     "rename",
-	Short:   "Rename a group",
+	Short:   "Rename a group or change how it takes requests",
 	Aliases: []string{"mv"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -158,12 +181,27 @@ var renameGroupCmd = &cobra.Command{
 
 			name, _ := cmd.Flags().GetString("name")
 
-			requestable, _ := cmd.Flags().GetBool("requestable")
-
-			req := clientv1.UpdateGroupJSONRequestBody{
-				Name:        name,
-				Requestable: &requestable,
+			// The update replaces the description and the request
+			// settings, so start from what the group has and change only
+			// what was given.
+			current, err := client.GetGroupWithResponse(ctx, groupID)
+			if err != nil {
+				return fmt.Errorf("reading group: %w", err)
 			}
+
+			if current.StatusCode() != http.StatusOK {
+				return apiError(current.StatusCode(), current.ApplicationproblemJSONDefault)
+			}
+
+			group := current.JSON200.Group
+			req := clientv1.UpdateGroupJSONRequestBody{
+				Name:              name,
+				Description:       &group.Description,
+				Requestable:       &group.Requestable,
+				AutoApprove:       &group.AutoApprove,
+				MaxRequestSeconds: &group.MaxRequestSeconds,
+			}
+			applyGroupRequestFlags(cmd, &req)
 
 			if cmd.Flags().Changed("description") {
 				desc, _ := cmd.Flags().GetString("description")

@@ -192,11 +192,18 @@ components:
     AccessRequestOption:
       additionalProperties: false
       properties:
+        autoApprove:
+          description: Whether the group grants requests as filed.
+          type: boolean
         description:
           type: string
         id:
           format: uint64
           type: string
+        maxRequestSeconds:
+          description: Longest request in seconds; 0 for no cap.
+          format: int64
+          type: integer
         name:
           type: string
       required:
@@ -1445,6 +1452,9 @@ components:
     Group:
       additionalProperties: false
       properties:
+        autoApprove:
+          description: Whether a request is granted as it is filed, with no approver.
+          type: boolean
         builtin:
           description: Empty for operator-made groups, else "all" or "self".
           type: string
@@ -1460,6 +1470,10 @@ components:
         id:
           format: uint64
           type: string
+        maxRequestSeconds:
+          description: Longest one request may ask for, in seconds; 0 for no cap.
+          format: int64
+          type: integer
         name:
           type: string
         nodeIds:
@@ -1485,6 +1499,8 @@ components:
         - description
         - builtin
         - requestable
+        - autoApprove
+        - maxRequestSeconds
         - source
         - nodeIds
         - userIds
@@ -1532,8 +1548,15 @@ components:
     GroupRequestBody:
       additionalProperties: false
       properties:
+        autoApprove:
+          description: Grant requests as filed; needs requestable.
+          type: boolean
         description:
           type: string
+        maxRequestSeconds:
+          description: Longest request in seconds; 0 for no cap.
+          format: int64
+          type: integer
         name:
           type: string
         nodeIds:
@@ -4817,7 +4840,7 @@ paths:
       tags:
         - Access control
     post:
-      description: Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+      description: Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
       operationId: createAccessRequest
       requestBody:
         content:

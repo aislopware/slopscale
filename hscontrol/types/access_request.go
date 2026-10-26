@@ -2,6 +2,7 @@ package types
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -91,18 +92,56 @@ const (
 
 // Errors of the access request flow.
 var (
-	ErrAccessRequestNotFound       = errors.New("access request not found")
-	ErrAccessRequestDecided        = errors.New("access request was already decided")
-	ErrAccessRequestNoUser         = errors.New("an access request needs a user; the credential has none")
-	ErrAccessRequestNotRequestable = errors.New("the group does not take access requests")
-	ErrAccessRequestDuration       = errors.New("access request duration must be between 5 minutes and 30 days")
-	ErrAccessRequestTextTooLong    = errors.New("access request text must be at most 500 characters")
-	ErrAccessRequestNodeOwner      = errors.New("the machine must belong to the requester")
-	ErrAccessRequestOwn            = errors.New("nobody decides their own access request")
-	ErrAccessRequestPendingExists  = errors.New("a request for the same group and machine is already pending")
-	ErrAccessRequestNotActive      = errors.New("only access that is in effect can be revoked")
-	ErrAccessRequestActive         = errors.New("revoke the access before deleting the request")
+	ErrAccessRequestNotFound          = errors.New("access request not found")
+	ErrAccessRequestDecided           = errors.New("access request was already decided")
+	ErrAccessRequestNoUser            = errors.New("an access request needs a user; the credential has none")
+	ErrAccessRequestNotRequestable    = errors.New("the group does not take access requests")
+	ErrAccessRequestDuration          = errors.New("access request duration must be between 5 minutes and 30 days")
+	ErrAccessRequestTextTooLong       = errors.New("access request text must be at most 500 characters")
+	ErrAccessRequestNodeOwner         = errors.New("the machine must belong to the requester")
+	ErrAccessRequestOwn               = errors.New("nobody decides their own access request")
+	ErrAccessRequestPendingExists     = errors.New("a request for the same group and machine is already pending")
+	ErrAccessRequestNotActive         = errors.New("only access that is in effect can be revoked")
+	ErrAccessRequestActive            = errors.New("revoke the access before deleting the request")
+	ErrAccessRequestOverGroupMax      = errors.New("the group takes shorter requests")
+	ErrGroupMaxRequestDuration        = errors.New("a group's longest request must be between 5 minutes and 30 days")
+	ErrGroupAutoApproveNotRequestable = errors.New("only a requestable group can approve requests by itself")
 )
+
+// GroupRequests is how a group takes access requests.
+type GroupRequests struct {
+	// Requestable lets members ask to join the group for a while.
+	Requestable bool
+	// AutoApprove grants a request the moment it is filed, with no
+	// approver; the group's cap on its length is the only check.
+	AutoApprove bool
+	// MaxDuration caps how long one request may ask for; zero leaves
+	// only [MaxAccessRequestDuration].
+	MaxDuration time.Duration
+}
+
+// Validate checks the settings an operator gives a group.
+func (r GroupRequests) Validate() error {
+	if r.AutoApprove && !r.Requestable {
+		return ErrGroupAutoApproveNotRequestable
+	}
+
+	if r.MaxDuration != 0 &&
+		(r.MaxDuration < MinAccessRequestDuration || r.MaxDuration > MaxAccessRequestDuration) {
+		return ErrGroupMaxRequestDuration
+	}
+
+	return nil
+}
+
+// CheckDuration refuses a request longer than the group's cap.
+func (r GroupRequests) CheckDuration(d time.Duration) error {
+	if r.MaxDuration != 0 && d > r.MaxDuration {
+		return fmt.Errorf("%w: at most %s", ErrAccessRequestOverGroupMax, r.MaxDuration)
+	}
+
+	return nil
+}
 
 // ValidateAccessRequestDuration checks the bounds.
 func ValidateAccessRequestDuration(d time.Duration) error {

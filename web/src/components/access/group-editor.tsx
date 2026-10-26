@@ -9,6 +9,8 @@ import { DeleteGroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isSynced } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { nodeItems, userItems } from "~/components/access/pickers.ts";
+import { DurationSelect } from "~/components/access/request-dialogs.tsx";
+import { durationChoices } from "~/components/access/request-model.ts";
 import {
   ConditionRow,
   LogicBadge,
@@ -19,6 +21,7 @@ import { fieldError } from "~/components/ui/field-error.ts";
 import { FieldGrid, FormPage, FormSection, useDraft } from "~/components/ui/form-page.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { formatDuration } from "~/lib/time.ts";
 
 const nameHint = "Letters, digits, spaces, dots, dashes and underscores, and unique.";
 
@@ -28,6 +31,9 @@ interface Draft {
   readonly userIds: readonly string[];
   readonly nodeIds: readonly string[];
   readonly requestable: boolean;
+  readonly autoApprove: boolean;
+  /** The longest one request may ask for, in seconds; 0 leaves only the server's bounds. */
+  readonly maxRequestSeconds: number;
 }
 
 function draftFrom(group: Group | undefined): Draft {
@@ -37,7 +43,20 @@ function draftFrom(group: Group | undefined): Draft {
     userIds: group?.userIds ?? [],
     nodeIds: group?.nodeIds ?? [],
     requestable: group?.requestable ?? false,
+    autoApprove: group?.autoApprove ?? false,
+    maxRequestSeconds: group?.maxRequestSeconds ?? 0,
   };
+}
+
+/** "No limit", the presets the request page offers, and a cap set elsewhere that is none of them. */
+function limitChoices(current: number): { seconds: number; label: string }[] {
+  const choices = [{ seconds: 0, label: "No limit" }, ...durationChoices];
+
+  return choices.some((choice) => choice.seconds === current)
+    ? choices
+    : [...choices, { seconds: current, label: formatDuration(current) }].toSorted(
+        (left, right) => left.seconds - right.seconds,
+      );
 }
 
 type Change = (patch: Partial<Draft>) => void;
@@ -207,6 +226,10 @@ export function GroupEditor({
       nodeIds: [...draft.nodeIds],
       ...(synced ? {} : { userIds: [...draft.userIds] }),
       requestable: draft.requestable,
+      // The update replaces both, so they go with every save; the server refuses approving by
+      // itself on a group nobody may request.
+      autoApprove: draft.requestable && draft.autoApprove,
+      maxRequestSeconds: draft.maxRequestSeconds,
     };
     const done = {
       onSuccess: (): void => {
@@ -252,17 +275,58 @@ export function GroupEditor({
     >
       <BasicSection draft={draft} synced={synced} nameError={nameError} onChange={update} />
       <MembersSection draft={draft} synced={synced} nodes={nodes} users={users} onChange={update} />
-      <FormSection title="Requests">
+      <RequestsSection draft={draft} onChange={update} />
+    </FormPage>
+  );
+}
+
+/** Whether users may ask to join, and when they may, whether asking is enough and for how long. */
+function RequestsSection({
+  draft,
+  onChange,
+}: {
+  readonly draft: Draft;
+  readonly onChange: Change;
+}): ReactElement {
+  return (
+    <FormSection title="Requests">
+      <SettingToggle
+        title="Users may request access"
+        description={
+          draft.requestable && draft.autoApprove
+            ? "A signed-in user can ask to join this group for a while."
+            : "A signed-in user can ask to join this group for a while. An approver decides under Requests."
+        }
+        checked={draft.requestable}
+        onCheckedChange={(requestable) => {
+          onChange(requestable ? { requestable } : { requestable, autoApprove: false });
+        }}
+      >
+        {draft.requestable ? (
+          <div className="max-w-md">
+            <DurationSelect
+              label="Longest request"
+              description="One request may ask for at most this long."
+              choices={limitChoices(draft.maxRequestSeconds)}
+              value={draft.maxRequestSeconds}
+              onValueChange={(maxRequestSeconds) => {
+                onChange({ maxRequestSeconds });
+              }}
+            />
+          </div>
+        ) : null}
+      </SettingToggle>
+      {draft.requestable ? (
         <SettingToggle
-          title="Users may request access"
-          description="A signed-in user can ask to join this group for a while. An approver decides under Requests."
-          checked={draft.requestable}
-          onCheckedChange={(requestable) => {
-            update({ requestable });
+          title="Approve requests automatically"
+          description="Requests are granted as soon as they are filed, without an approver."
+          checked={draft.autoApprove}
+          onCheckedChange={(autoApprove) => {
+            onChange({ autoApprove });
           }}
         />
-      </FormSection>
-    </FormPage>
+      ) : null}
+    </FormSection>
   );
 }
 

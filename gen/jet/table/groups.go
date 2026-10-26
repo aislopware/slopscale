@@ -17,14 +17,16 @@ type groupsTable struct {
 	sqlite.Table
 
 	// Columns
-	ID          sqlite.ColumnInteger
-	Name        sqlite.ColumnString
-	Description sqlite.ColumnString
-	Builtin     sqlite.ColumnString
-	Requestable sqlite.ColumnBool
-	Source      sqlite.ColumnString
-	CreatedAt   sqlite.ColumnTimestamp
-	UpdatedAt   sqlite.ColumnTimestamp
+	ID                sqlite.ColumnInteger
+	Name              sqlite.ColumnString
+	Description       sqlite.ColumnString
+	Builtin           sqlite.ColumnString
+	Requestable       sqlite.ColumnBool
+	AutoApprove       sqlite.ColumnBool
+	MaxRequestSeconds sqlite.ColumnInteger
+	Source            sqlite.ColumnString
+	CreatedAt         sqlite.ColumnTimestamp
+	UpdatedAt         sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -66,31 +68,35 @@ func newGroupsTable(schemaName, tableName, alias string) *GroupsTable {
 
 func newGroupsTableImpl(schemaName, tableName, alias string) groupsTable {
 	var (
-		IDColumn          = sqlite.IntegerColumn("id")
-		NameColumn        = sqlite.StringColumn("name")
-		DescriptionColumn = sqlite.StringColumn("description")
-		BuiltinColumn     = sqlite.StringColumn("builtin")
-		RequestableColumn = sqlite.BoolColumn("requestable")
-		SourceColumn      = sqlite.StringColumn("source")
-		CreatedAtColumn   = sqlite.TimestampColumn("created_at")
-		UpdatedAtColumn   = sqlite.TimestampColumn("updated_at")
-		allColumns        = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, SourceColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns    = sqlite.ColumnList{NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, SourceColumn, CreatedAtColumn, UpdatedAtColumn}
-		defaultColumns    = sqlite.ColumnList{RequestableColumn}
+		IDColumn                = sqlite.IntegerColumn("id")
+		NameColumn              = sqlite.StringColumn("name")
+		DescriptionColumn       = sqlite.StringColumn("description")
+		BuiltinColumn           = sqlite.StringColumn("builtin")
+		RequestableColumn       = sqlite.BoolColumn("requestable")
+		AutoApproveColumn       = sqlite.BoolColumn("auto_approve")
+		MaxRequestSecondsColumn = sqlite.IntegerColumn("max_request_seconds")
+		SourceColumn            = sqlite.StringColumn("source")
+		CreatedAtColumn         = sqlite.TimestampColumn("created_at")
+		UpdatedAtColumn         = sqlite.TimestampColumn("updated_at")
+		allColumns              = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, AutoApproveColumn, MaxRequestSecondsColumn, SourceColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns          = sqlite.ColumnList{NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, AutoApproveColumn, MaxRequestSecondsColumn, SourceColumn, CreatedAtColumn, UpdatedAtColumn}
+		defaultColumns          = sqlite.ColumnList{RequestableColumn, AutoApproveColumn, MaxRequestSecondsColumn}
 	)
 
 	return groupsTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:          IDColumn,
-		Name:        NameColumn,
-		Description: DescriptionColumn,
-		Builtin:     BuiltinColumn,
-		Requestable: RequestableColumn,
-		Source:      SourceColumn,
-		CreatedAt:   CreatedAtColumn,
-		UpdatedAt:   UpdatedAtColumn,
+		ID:                IDColumn,
+		Name:              NameColumn,
+		Description:       DescriptionColumn,
+		Builtin:           BuiltinColumn,
+		Requestable:       RequestableColumn,
+		AutoApprove:       AutoApproveColumn,
+		MaxRequestSeconds: MaxRequestSecondsColumn,
+		Source:            SourceColumn,
+		CreatedAt:         CreatedAtColumn,
+		UpdatedAt:         UpdatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

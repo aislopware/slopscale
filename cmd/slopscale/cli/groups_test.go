@@ -17,6 +17,7 @@ func groupFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("description", "d", "", "")
 	cmd.Flags().String("node", "", "")
 	cmd.Flags().StringP("user", "u", "", "")
+	groupRequestFlags(cmd)
 }
 
 func sampleGroup() clientv1.Group {
@@ -90,6 +91,10 @@ func TestGroupCommands(t *testing.T) {
 			src:   renameGroupCmd,
 			flags: map[string]string{"identifier": "1", "name": "core-devs", "description": "Core developers"},
 			routes: map[string]apiHandler{
+				"GET /api/v1/group/{id}": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, clientv1.GroupOutputBody{Group: group})
+				},
 				"PATCH /api/v1/group/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 					t.Helper()
 					assert.Equal(t, "1", r.PathValue("id"))
@@ -107,6 +112,62 @@ func TestGroupCommands(t *testing.T) {
 				},
 			},
 			want: "Group updated\n",
+		},
+		{
+			name:  "rename keeps the settings it was not given",
+			src:   renameGroupCmd,
+			flags: map[string]string{"identifier": "1", "name": "exit-node", "max-duration": "1h"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/group/{id}": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+
+					current := sampleGroup()
+					current.Requestable = true
+					current.AutoApprove = true
+					writeJSON(t, w, clientv1.GroupOutputBody{Group: current})
+				},
+				"PATCH /api/v1/group/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.UpdateGroupJSONRequestBody
+					decodeBody(t, r, &body)
+					require.NotNil(t, body.Description)
+					assert.Equal(t, "Engineering team", *body.Description, "the description stays")
+					require.NotNil(t, body.Requestable)
+					assert.True(t, *body.Requestable, "requestable stays")
+					require.NotNil(t, body.AutoApprove)
+					assert.True(t, *body.AutoApprove, "auto-approve stays")
+					require.NotNil(t, body.MaxRequestSeconds)
+					assert.Equal(t, int64(3600), *body.MaxRequestSeconds)
+
+					writeJSON(t, w, clientv1.GroupOutputBody{Group: sampleGroup()})
+				},
+			},
+			want: "Group updated\n",
+		},
+		{
+			name: "create sends the request settings",
+			src:  createGroupCmd,
+			flags: map[string]string{
+				"name": "exit-node", "requestable": "true", "auto-approve": "true", "max-duration": "1h",
+			},
+			routes: map[string]apiHandler{
+				"POST /api/v1/group": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.CreateGroupJSONRequestBody
+					decodeBody(t, r, &body)
+					require.NotNil(t, body.Requestable)
+					assert.True(t, *body.Requestable)
+					require.NotNil(t, body.AutoApprove)
+					assert.True(t, *body.AutoApprove)
+					require.NotNil(t, body.MaxRequestSeconds)
+					assert.Equal(t, int64(3600), *body.MaxRequestSeconds)
+
+					writeJSON(t, w, clientv1.GroupOutputBody{Group: sampleGroup()})
+				},
+			},
+			want: "Group created\n",
 		},
 		{
 			name:  "delete with --force skips the prompt",

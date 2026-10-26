@@ -243,6 +243,11 @@ CREATE TABLE groups(
   -- requestable lets members ask to join the group for a while; see
   -- access_requests.
   requestable numeric DEFAULT false,
+  -- auto_approve grants a request as soon as it is filed, with no
+  -- approver; max_request_seconds caps how long one request may ask
+  -- for, 0 for no cap of the group's own.
+  auto_approve numeric DEFAULT false,
+  max_request_seconds integer NOT NULL DEFAULT 0,
   -- source is "oidc" for a group mirrored from the identity provider's
   -- groups claim (oidc.groups.sync): its user members follow the claim
   -- on every login and cannot be edited by hand.

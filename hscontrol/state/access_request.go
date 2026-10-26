@@ -88,49 +88,23 @@ func (s *State) GetAccessRequest(id types.AccessRequestID) (types.AccessRequest,
 	return s.db.GetAccessRequest(id)
 }
 
+// AutoApprovedBy is what a request granted by its group's
+// [types.GroupRequests.AutoApprove] records as its approver.
+const AutoApprovedBy = "auto-approved"
+
 // CreateAccessRequest files a user's ask to join a group for a while.
-// The group must take requests and the machine, when named, must be the
-// user's.
-func (s *State) CreateAccessRequest(req types.AccessRequest) (types.AccessRequest, error) {
-	if req.UserID == 0 {
-		return types.AccessRequest{}, types.ErrAccessRequestNoUser
-	}
-
-	req.Reason = strings.TrimSpace(req.Reason)
-
-	err := types.ValidateAccessRequestText(req.Reason)
+// The group must take requests, the duration must fit its cap, and the
+// machine, when named, must be the user's. A group that approves by
+// itself grants the request at once, and the change says so.
+func (s *State) CreateAccessRequest(req types.AccessRequest) (types.AccessRequest, change.Change, error) {
+	group, err := s.checkAccessRequest(&req)
 	if err != nil {
-		return types.AccessRequest{}, err
-	}
-
-	err = types.ValidateAccessRequestDuration(req.Duration)
-	if err != nil {
-		return types.AccessRequest{}, err
-	}
-
-	group, ok := s.AccessModel().Group(req.GroupID)
-	if !ok {
-		return types.AccessRequest{}, types.ErrGroupNotFound
-	}
-
-	if !group.Requestable || group.IsBuiltin() {
-		return types.AccessRequest{}, types.ErrAccessRequestNotRequestable
-	}
-
-	if req.NodeID != nil {
-		node, ok := s.GetNodeByID(*req.NodeID)
-		if !ok {
-			return types.AccessRequest{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, *req.NodeID)
-		}
-
-		if node.IsTagged() || !node.UserID().Valid() || types.UserID(node.UserID().Get()) != req.UserID {
-			return types.AccessRequest{}, types.ErrAccessRequestNodeOwner
-		}
+		return types.AccessRequest{}, change.Change{}, err
 	}
 
 	created, err := s.db.CreateAccessRequest(req)
 	if err != nil {
-		return types.AccessRequest{}, err
+		return types.AccessRequest{}, change.Change{}, err
 	}
 
 	log.Info().
@@ -139,9 +113,86 @@ func (s *State) CreateAccessRequest(req types.AccessRequest) (types.AccessReques
 		Uint64("group.id", uint64(created.GroupID)).
 		Msg("Access request filed")
 
-	s.emitAccessRequest(types.EventAccessRequestCreated, created, "%s asked to join %s for %s.")
+	if !group.AutoApprove {
+		s.emitAccessRequest(types.EventAccessRequestCreated, created, "%s asked to join %s for %s.")
 
-	return created, nil
+		return created, change.Change{}, nil
+	}
+
+	// Nobody has to act on a request that is granted as it is filed, so
+	// only the approval is announced: the created event is what mails
+	// the approvers.
+	expiresAt := time.Now().Add(created.Duration).UTC()
+
+	decided, err := s.db.DecideAccessRequest(created.ID, hsdb.AccessRequestDecision{
+		Status:    types.AccessRequestApproved,
+		DecidedBy: AutoApprovedBy,
+		ExpiresAt: &expiresAt,
+	})
+	if err != nil {
+		return types.AccessRequest{}, change.Change{}, err
+	}
+
+	c, err := s.loadAccessModel()
+	if err != nil {
+		return types.AccessRequest{}, change.Change{}, err
+	}
+
+	log.Info().
+		Uint64("request.id", uint64(decided.ID)).
+		Time("expires.at", expiresAt).
+		Msg("Access request approved by its group")
+
+	s.emitAccessRequest(types.EventAccessRequestApproved, decided, "%s may join %s for %s.")
+
+	return decided, c, nil
+}
+
+// checkAccessRequest validates a request before it is filed and returns
+// the group it asks for.
+func (s *State) checkAccessRequest(req *types.AccessRequest) (types.AccessGroup, error) {
+	if req.UserID == 0 {
+		return types.AccessGroup{}, types.ErrAccessRequestNoUser
+	}
+
+	req.Reason = strings.TrimSpace(req.Reason)
+
+	err := types.ValidateAccessRequestText(req.Reason)
+	if err != nil {
+		return types.AccessGroup{}, err
+	}
+
+	err = types.ValidateAccessRequestDuration(req.Duration)
+	if err != nil {
+		return types.AccessGroup{}, err
+	}
+
+	group, ok := s.AccessModel().Group(req.GroupID)
+	if !ok {
+		return types.AccessGroup{}, types.ErrGroupNotFound
+	}
+
+	if !group.Requestable || group.IsBuiltin() {
+		return types.AccessGroup{}, types.ErrAccessRequestNotRequestable
+	}
+
+	err = group.CheckDuration(req.Duration)
+	if err != nil {
+		return types.AccessGroup{}, err
+	}
+
+	if req.NodeID != nil {
+		node, ok := s.GetNodeByID(*req.NodeID)
+		if !ok {
+			return types.AccessGroup{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, *req.NodeID)
+		}
+
+		if node.IsTagged() || !node.UserID().Valid() || types.UserID(node.UserID().Get()) != req.UserID {
+			return types.AccessGroup{}, types.ErrAccessRequestNodeOwner
+		}
+	}
+
+	return group, nil
 }
 
 // AccessDecision is what an approver says about a request.

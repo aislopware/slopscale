@@ -33,11 +33,13 @@ export const reader: Me = { ...admin, role: "auditor", permissions: { "devices:c
 export const approver: Me = { ...admin, permissions: { ...admin.permissions, policy_file: true } };
 
 export const ops: Group = {
+  autoApprove: false,
   builtin: "",
   createdAt: "2026-01-01T00:00:00Z",
   description: "",
   expiries: [],
   id: "3",
+  maxRequestSeconds: 0,
   name: "Ops",
   nodeIds: [],
   requestable: true,

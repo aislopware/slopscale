@@ -88,12 +88,14 @@ function node(id: string, owner: User, tags: string[] = []): Node {
 
 function group(id: string, overrides: Partial<Group> = {}): Group {
   return {
+    autoApprove: false,
     builtin: "",
     source: "",
     createdAt: stamp,
     description: "",
     expiries: [],
     id,
+    maxRequestSeconds: 0,
     name: `group-${id}`,
     nodeIds: [],
     requestable: false,
