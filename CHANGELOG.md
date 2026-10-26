@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.62.0](https://github.com/aislopware/slopscale/compare/v0.61.0...v0.62.0) (2026-10-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **policy/v2:** forward SSH ports only on rules that allow it
+
+### Fixes
+
+* **policy/v2:** forward SSH ports only on rules that allow it ([24db004](https://github.com/aislopware/slopscale/commit/24db004e719df83d20144314ec4e91e5c8cfa402))
+* **state:** let only signing nodes switch tailnet lock off ([24db004](https://github.com/aislopware/slopscale/commit/24db004e719df83d20144314ec4e91e5c8cfa402))
+* **state:** stop one network from evicting everyone's pending logins ([24db004](https://github.com/aislopware/slopscale/commit/24db004e719df83d20144314ec4e91e5c8cfa402))
+
 ## [0.61.0](https://github.com/aislopware/slopscale/compare/v0.60.1...v0.61.0) (2026-10-26)
 
 
