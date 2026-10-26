@@ -12,6 +12,7 @@ import { render } from "vitest-browser-react";
 
 import type { AccessRequestOptions } from "~/api/queries.ts";
 import { RequestAccessForm } from "~/components/access/request-access-page.tsx";
+import { toast } from "~/components/ui/toast.ts";
 
 // The typed client keeps the fetch it found when it was made, so the stand-in goes in before any
 // module loads; each test says how the server answers.
@@ -44,6 +45,7 @@ const options: AccessRequestOptions = {
   groups: [
     { id: "3", name: "Production", description: "Databases and the deploy hosts." },
     { id: "4", name: "Staging" },
+    { id: "5", name: "Exit node access", autoApprove: true, maxRequestSeconds: 3600 },
   ],
   nodes: [{ id: "9", name: "ada-laptop" }],
 };
@@ -62,7 +64,51 @@ function refuse(): Response {
   );
 }
 
-function app(answer: Answer = (): Response => Response.json({})): ReactElement {
+/** The server's answer for a request that waits for an approver. */
+function pending(): Response {
+  return Response.json({
+    request: {
+      createdAt: "2026-10-26T09:00:00Z",
+      decidedAt: null,
+      decidedBy: "",
+      durationSeconds: 14_400,
+      expiresAt: null,
+      groupId: "3",
+      id: "11",
+      note: "",
+      reason: "",
+      revokeNote: "",
+      revokedAt: null,
+      revokedBy: "",
+      status: "pending",
+      userId: "1",
+    },
+  });
+}
+
+/** The server's answer for a group that approves by itself: the grant, already in effect. */
+function grant(): Response {
+  return Response.json({
+    request: {
+      createdAt: "2026-10-26T09:00:00Z",
+      decidedAt: "2026-10-26T09:00:00Z",
+      decidedBy: "auto-approved",
+      durationSeconds: 3600,
+      expiresAt: "2026-10-26T10:00:00Z",
+      groupId: "4",
+      id: "12",
+      note: "",
+      reason: "",
+      revokeNote: "",
+      revokedAt: null,
+      revokedBy: "",
+      status: "approved",
+      userId: "1",
+    },
+  });
+}
+
+function app(answer: Answer = pending): ReactElement {
   server.requests = [];
   server.answer = answer;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -122,5 +168,48 @@ describe(RequestAccessForm, () => {
     await expect.element(screen.getByText("The request was not sent")).toBeVisible();
     await expect.element(screen.getByText(/you already have a pending request/v)).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Send request" })).toBeVisible();
+  });
+
+  it("says the access is granted now when the group approves by itself", async () => {
+    const success = vi.spyOn(toast, "success");
+    const screen = await render(app(grant));
+
+    await screen.getByRole("combobox", { name: "Group" }).click();
+    await screen.getByRole("option", { name: "Staging" }).click();
+    await screen.getByRole("radio", { name: "1 hour" }).click();
+    await screen.getByRole("button", { name: "Send request" }).click();
+
+    await expect.element(screen.getByText("My access")).toBeVisible();
+    expect(success).toHaveBeenCalledWith("Access granted", "You are in Staging now, for 1 hour.");
+    success.mockRestore();
+  });
+
+  it("offers only what a self-service group takes and says it grants at once", async () => {
+    const screen = await render(app(grant));
+
+    await screen.getByRole("radio", { name: "8 hours" }).click();
+    await expect.element(screen.getByText(/Granted immediately/v)).not.toBeInTheDocument();
+    await screen.getByRole("combobox", { name: "Group" }).click();
+    await screen.getByRole("option", { name: "Exit node access" }).click();
+
+    await expect.element(screen.getByRole("radio", { name: "1 hour" })).toBeChecked();
+    await expect.element(screen.getByRole("radio", { name: "30 minutes" })).toBeVisible();
+    await expect.element(screen.getByRole("radio", { name: "4 hours" })).not.toBeInTheDocument();
+    await expect.element(screen.getByText("Granted immediately, for up to 1 hour.")).toBeVisible();
+    await expect
+      .element(screen.getByText(/as soon as you send the request/v))
+      .toHaveTextContent(
+        "Every machine you own joins Exit node access for 1 hour as soon as you send the request.",
+      );
+    await screen.getByRole("button", { name: "Send request" }).click();
+
+    await expect.element(screen.getByText("My access")).toBeVisible();
+    expect(sent()).toStrictEqual([
+      {
+        method: "POST",
+        url: "/api/v1/access-request",
+        body: { groupId: "5", durationSeconds: 3600, reason: "" },
+      },
+    ]);
   });
 });

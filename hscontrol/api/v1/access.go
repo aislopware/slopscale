@@ -31,11 +31,14 @@ func init() {
 // every machine and lists none; the builtin "self" group is only a rule
 // destination and means the machines of the source's own user.
 type Group struct {
-	ID          string `format:"uint64"                                                 json:"id"`
+	ID          string `format:"uint64"                                                      json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Builtin     string `doc:"Empty for operator-made groups, else \"all\" or \"self\"." json:"builtin"`
-	Requestable bool   `doc:"Whether members may ask to join the group for a while."    json:"requestable"`
+	Builtin     string `doc:"Empty for operator-made groups, else \"all\" or \"self\"."      json:"builtin"`
+	Requestable bool   `doc:"Whether members may ask to join the group for a while."         json:"requestable"`
+	AutoApprove bool   `doc:"Whether a request is granted as it is filed, with no approver." json:"autoApprove"`
+	// MaxRequestSeconds caps how long one request may ask for.
+	MaxRequestSeconds int64 `doc:"Longest one request may ask for, in seconds; 0 for no cap." json:"maxRequestSeconds"`
 	// Source is "oidc" for a group mirrored from the identity provider's groups claim; its users
 	// follow the claim and cannot be edited.
 	Source  string   `doc:"Empty for operator-made groups, else \"oidc\"." json:"source"`
@@ -83,11 +86,13 @@ type AccessRule struct {
 // GroupRequestBody creates or updates a group. Members are replaced when
 // given and left alone when omitted.
 type GroupRequestBody struct {
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	Requestable bool      `doc:"Whether members may ask to join for a while." json:"requestable,omitempty"`
-	NodeIDs     *[]string `json:"nodeIds,omitempty"`
-	UserIDs     *[]string `json:"userIds,omitempty"`
+	Name              string    `json:"name"`
+	Description       string    `json:"description,omitempty"`
+	Requestable       bool      `doc:"Whether members may ask to join for a while." json:"requestable,omitempty"`
+	AutoApprove       bool      `doc:"Grant requests as filed; needs requestable."  json:"autoApprove,omitempty"`
+	MaxRequestSeconds int64     `doc:"Longest request in seconds; 0 for no cap."    json:"maxRequestSeconds,omitempty"`
+	NodeIDs           *[]string `json:"nodeIds,omitempty"`
+	UserIDs           *[]string `json:"userIds,omitempty"`
 }
 
 // GroupMemberRequestBody names a machine or user to add, for good or
@@ -183,19 +188,30 @@ type (
 	}
 )
 
+// requests is how the group takes access requests.
+func (b GroupRequestBody) requests() types.GroupRequests {
+	return types.GroupRequests{
+		Requestable: b.Requestable,
+		AutoApprove: b.AutoApprove,
+		MaxDuration: time.Duration(b.MaxRequestSeconds) * time.Second,
+	}
+}
+
 func groupFrom(g types.AccessGroup) Group {
 	out := Group{
-		ID:          formatID(uint64(g.ID)),
-		Name:        g.Name,
-		Description: g.Description,
-		Builtin:     g.Builtin,
-		Requestable: g.Requestable,
-		Source:      g.Source,
-		NodeIDs:     make([]string, 0, len(g.NodeIDs)),
-		UserIDs:     make([]string, 0, len(g.UserIDs)),
-		Expiries:    []GroupMemberExpiry{},
-		CreatedAt:   g.CreatedAt,
-		UpdatedAt:   g.UpdatedAt,
+		ID:                formatID(uint64(g.ID)),
+		Name:              g.Name,
+		Description:       g.Description,
+		Builtin:           g.Builtin,
+		Requestable:       g.Requestable,
+		AutoApprove:       g.AutoApprove,
+		MaxRequestSeconds: int64(g.MaxDuration / time.Second),
+		Source:            g.Source,
+		NodeIDs:           make([]string, 0, len(g.NodeIDs)),
+		UserIDs:           make([]string, 0, len(g.UserIDs)),
+		Expiries:          []GroupMemberExpiry{},
+		CreatedAt:         g.CreatedAt,
+		UpdatedAt:         g.UpdatedAt,
 	}
 
 	for _, id := range g.NodeIDs {
@@ -403,7 +419,7 @@ func registerGroups(api huma.API, b Backend) {
 	}, scope.PolicyFile), "group.create", "group", ""), func(
 		ctx context.Context, in *groupBodyInput,
 	) (*groupOutput, error) {
-		group, c, err := b.State.CreateGroup(in.Body.Name, in.Body.Description, in.Body.Requestable)
+		group, c, err := b.State.CreateGroup(in.Body.Name, in.Body.Description, in.Body.requests())
 		if err != nil {
 			return nil, mapError("creating group", err)
 		}
@@ -449,7 +465,7 @@ func registerGroups(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		group, c, err := b.State.UpdateGroup(id, in.Body.Name, in.Body.Description, in.Body.Requestable)
+		group, c, err := b.State.UpdateGroup(id, in.Body.Name, in.Body.Description, in.Body.requests())
 		if err != nil {
 			return nil, mapError("updating group", err)
 		}

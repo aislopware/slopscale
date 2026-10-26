@@ -59,11 +59,11 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	assert.Len(t, model.Groups, 2, "the builtin groups are created once")
 	assert.Len(t, model.Rules, 1, "the builtin rule is seeded once")
 
-	eng, err := db.CreateGroup("Engineering", "The engineers", false)
+	eng, err := db.CreateGroup("Engineering", "The engineers", types.GroupRequests{})
 	require.NoError(t, err)
 	assert.NotZero(t, eng.ID)
 
-	_, err = db.CreateGroup("Engineering", "", false)
+	_, err = db.CreateGroup("Engineering", "", types.GroupRequests{})
 	require.ErrorIs(t, err, types.ErrGroupNameTaken)
 
 	require.NoError(t, db.AddGroupNode(eng.ID, node.ID, nil))
@@ -75,7 +75,7 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	assert.Equal(t, []types.NodeID{node.ID}, got.NodeIDs)
 	assert.Equal(t, []types.UserID{types.UserID(alice.ID)}, got.UserIDs)
 
-	servers, err := db.CreateGroup("Servers", "", false)
+	servers, err := db.CreateGroup("Servers", "", types.GroupRequests{})
 	require.NoError(t, err)
 
 	rule, err := db.CreateAccessRule(types.AccessRule{

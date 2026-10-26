@@ -140,8 +140,24 @@ function StatusCell({ request }: { readonly request: RequestRow }): ReactElement
   );
 }
 
+/** What the server records as the decider of a request its group granted by itself. */
+const autoApprovedBy = "auto-approved";
+
+/** Who granted the request, in the words the row shows; nothing when nobody is recorded. */
+function approvalText(decidedBy: string): string {
+  if (decidedBy === autoApprovedBy) {
+    return "approved automatically";
+  }
+
+  return decidedBy === "" ? "" : `approved by ${decidedBy}`;
+}
+
 function Detail({ request }: { readonly request: RequestRow }): ReactElement | null {
-  const by = request.decidedBy === "" ? "" : ` by ${request.decidedBy}`;
+  const by =
+    request.decidedBy === "" || request.decidedBy === autoApprovedBy
+      ? ""
+      : ` by ${request.decidedBy}`;
+  const approved = approvalText(request.decidedBy);
 
   if (request.phase === "revoked") {
     const endedBy = request.revokedBy === "" ? "" : ` by ${request.revokedBy}`;
@@ -170,9 +186,9 @@ function Detail({ request }: { readonly request: RequestRow }): ReactElement | n
       <span className="truncate text-xs text-kumo-subtle">
         <span className="md:hidden">
           Ends <RelativeTime value={request.expiresAt} />
-          {by === "" ? "" : ", "}
+          {approved === "" ? "" : ", "}
         </span>
-        {by === "" ? null : `approved${by}`}
+        {approved === "" ? null : approved}
       </span>
     );
   }

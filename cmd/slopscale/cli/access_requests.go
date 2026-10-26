@@ -156,6 +156,11 @@ var createAccessRequestCmd = &cobra.Command{
 				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
 			}
 
+			if resp.JSON200.Request.Status == string(types.AccessRequestApproved) {
+				return printOutput(cmd, resp.JSON200.Request,
+					"Access granted until "+optionalTime(resp.JSON200.Request.ExpiresAt))
+			}
+
 			return printOutput(cmd, resp.JSON200.Request, "Access request filed")
 		},
 	),

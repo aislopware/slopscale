@@ -1,7 +1,9 @@
 package servertest_test
 
 import (
+	"fmt"
 	"net/http"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -442,4 +444,115 @@ func mustRuleID(t *testing.T, s string) types.AccessRuleID {
 	}
 
 	return types.AccessRuleID(id)
+}
+
+// TestSelfServiceExitNodeAccess proves a group that approves by itself:
+// an exit node network handed to it keeps the exit routes from everyone
+// else, a member who asks for no longer than the group's cap gets them at
+// once with no approver, a longer ask is refused, and the routes go when
+// the hour is up and come back with the next ask. The subtests build on
+// one another.
+//
+//nolint:tparallel // later steps depend on the state earlier ones leave behind
+func TestSelfServiceExitNodeAccess(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "exit-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+	bob := srv.CreateUser(t, "exit-bob")
+	bobKey := srv.CreateAPIKey(t, bob)
+
+	router := servertest.NewClient(t, srv, routerName, servertest.WithUser(owner))
+	laptop := servertest.NewClient(t, srv, "exit-laptop", servertest.WithUser(bob))
+	laptop.WaitForPeerCount(t, 1, networkWait)
+
+	exit4 := netip.MustParsePrefix("0.0.0.0/0")
+	advertise(t, router, routerName, exit4, netip.MustParsePrefix("::/0"))
+
+	routerID := findNodeID(t, srv, routerName)
+
+	var groupID string
+
+	t.Run("a group that approves by itself, capped at an hour", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/group",
+			map[string]any{"name": "Loose", "autoApprove": true})
+		assert.Equal(t, http.StatusBadRequest, status, "%v: auto-approve needs requestable", body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/group",
+			map[string]any{"name": "Short", "requestable": true, "maxRequestSeconds": 60})
+		assert.Equal(t, http.StatusBadRequest, status, "%v: a cap under five minutes", body)
+
+		groupID = createGroup(t, client, ownerKey, v1, map[string]any{
+			"name": "Exit node access", "requestable": true, "autoApprove": true, "maxRequestSeconds": 3600,
+		})
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/group/"+groupID, nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, true, field(t, body, "group", "autoApprove"))
+		assert.InDelta(t, 3600, field(t, body, "group", "maxRequestSeconds"), 0)
+	})
+
+	t.Run("an exit node network keeps the exit routes from non-members", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/network", map[string]any{
+			"name":          "Internet",
+			"prefixes":      []string{"0.0.0.0/0"},
+			"routerNodeIds": []string{routerID.String()},
+			"groupIds":      []string{groupID},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		laptop.WaitForCondition(t, "the router without exit routes", networkWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1 && !routerHasRoute(nm, exit4)
+		})
+	})
+
+	t.Run("an ask longer than the cap is refused", func(t *testing.T) {
+		status, body := apiCall(t, client, bobKey, http.MethodPost, v1+"/access-request", map[string]any{
+			"groupId": groupID, "nodeId": laptop.NodeIDString(), "durationSeconds": 7200,
+		})
+		assert.Equal(t, http.StatusBadRequest, status, body)
+		assert.Contains(t, fmt.Sprint(body["errors"]), "at most 1h0m0s", "the answer names the cap")
+	})
+
+	t.Run("an ask within the cap is granted at once", func(t *testing.T) {
+		status, body := apiCall(t, client, bobKey, http.MethodPost, v1+"/access-request", map[string]any{
+			"groupId": groupID, "nodeId": laptop.NodeIDString(), "durationSeconds": 3600, "reason": "deploy",
+		})
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, "approved", field(t, body, "request", "status"))
+		assert.Equal(t, "auto-approved", field(t, body, "request", "decidedBy"))
+		assert.NotNil(t, field(t, body, "request", "expiresAt"))
+
+		laptop.WaitForCondition(t, "the exit routes", networkWait, func(nm *netmap.NetworkMap) bool {
+			return routerHasRoute(nm, exit4)
+		})
+	})
+
+	t.Run("the exit routes go when the hour is up", func(t *testing.T) {
+		c, err := srv.State().ExpireAccess(time.Now(), time.Now().Add(2*time.Hour))
+		require.NoError(t, err)
+		require.False(t, c.IsEmpty(), "the policy changed")
+
+		srv.App.Change(c)
+
+		laptop.WaitForCondition(t, "no exit routes again", networkWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1 && !routerHasRoute(nm, exit4)
+		})
+	})
+
+	t.Run("the next ask brings them back", func(t *testing.T) {
+		status, body := apiCall(t, client, bobKey, http.MethodPost, v1+"/access-request", map[string]any{
+			"groupId": groupID, "nodeId": laptop.NodeIDString(), "durationSeconds": 1800,
+		})
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, "approved", field(t, body, "request", "status"))
+
+		laptop.WaitForCondition(t, "the exit routes back", networkWait, func(nm *netmap.NetworkMap) bool {
+			return routerHasRoute(nm, exit4)
+		})
+	})
 }

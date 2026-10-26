@@ -24,6 +24,8 @@ const groups: Group[] = [
     builtin: "",
     source: "",
     requestable: false,
+    autoApprove: false,
+    maxRequestSeconds: 0,
     expiries: [],
     nodeIds: [],
     userIds: ["1"],

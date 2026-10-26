@@ -60,15 +60,16 @@ const RuleBuiltinOwnMachines = "own-machines"
 // through their owner: every user-owned node of a user in UserIDs is a
 // member. Tagged nodes have no owner and join directly.
 type AccessGroup struct {
+	// GroupRequests says whether and how members may ask to join the
+	// group for a while; see [AccessRequest].
+	GroupRequests
+
 	ID          GroupID
 	Name        string
 	Description string
 	// Builtin is empty for groups an operator made and [GroupBuiltinAll]
 	// for the group that holds every node.
 	Builtin string
-	// Requestable lets members ask to join the group for a while; see
-	// [AccessRequest].
-	Requestable bool
 	// Source is [GroupSourceOIDC] for a group mirrored from the identity
 	// provider's groups claim: its user members follow the claim on every
 	// login and are not edited by hand. Empty for an operator-made group.

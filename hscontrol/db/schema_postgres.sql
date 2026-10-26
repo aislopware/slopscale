@@ -158,7 +158,9 @@ CREATE TABLE groups(
   requestable boolean DEFAULT false,
   created_at timestamptz,
   updated_at timestamptz,
-  source text
+  source text,
+  auto_approve boolean DEFAULT false,
+  max_request_seconds bigint NOT NULL DEFAULT 0
 );
 CREATE UNIQUE INDEX idx_groups_name ON groups(name);
 

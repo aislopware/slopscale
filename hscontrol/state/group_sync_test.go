@@ -20,7 +20,7 @@ func TestSyncUserGroups(t *testing.T) {
 	bob := createUserWithRole(t, s, "bob", "")
 	aliceID, bobID := types.UserID(alice.ID), types.UserID(bob.ID)
 
-	manual, _, err := s.CreateGroup("ops", "made by hand", false)
+	manual, _, err := s.CreateGroup("ops", "made by hand", types.GroupRequests{})
 	require.NoError(t, err)
 
 	c, err := s.SyncUserGroups(aliceID, []string{"eng", "ops", "sre"})
@@ -81,9 +81,9 @@ func TestSyncUserGroups(t *testing.T) {
 
 	// A synced group can be described and deleted like any other, but it
 	// keeps its name: the sync finds it by the claim's name.
-	_, _, err = s.UpdateGroup(sre.ID, "sre-team", "on call", true)
+	_, _, err = s.UpdateGroup(sre.ID, "sre-team", "on call", types.GroupRequests{Requestable: true})
 	require.ErrorIs(t, err, types.ErrGroupSyncedName)
-	_, _, err = s.UpdateGroup(sre.ID, "sre", "on call", true)
+	_, _, err = s.UpdateGroup(sre.ID, "sre", "on call", types.GroupRequests{Requestable: true})
 	require.NoError(t, err)
 	_, err = s.DeleteGroup(sre.ID)
 	require.NoError(t, err)

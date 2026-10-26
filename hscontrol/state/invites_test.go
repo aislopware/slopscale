@@ -18,7 +18,7 @@ func TestCreateUserInviteRules(t *testing.T) {
 
 	s := newRoleTestState(t)
 
-	group, _, err := s.CreateGroup("engineering", "", false)
+	group, _, err := s.CreateGroup("engineering", "", types.GroupRequests{})
 	require.NoError(t, err)
 
 	t.Run("an invitation cannot hand out ownership", func(t *testing.T) {
@@ -181,7 +181,7 @@ func TestAcceptUserInvite(t *testing.T) {
 	// by being first.
 	createUserWithRole(t, s, "owner", types.RoleOwner)
 
-	group, _, err := s.CreateGroup("engineering", "", false)
+	group, _, err := s.CreateGroup("engineering", "", types.GroupRequests{})
 	require.NoError(t, err)
 
 	invite, _, err := s.CreateUserInvite(nil, InviteSpec{
