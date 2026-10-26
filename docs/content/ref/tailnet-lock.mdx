@@ -46,7 +46,7 @@ signing nodes decide, and can prove nothing on its own.
    machine syncs. Removing a key re-signs the machines it had signed
    first.
 6. **Switching off** takes a disablement secret: `tailscale lock disable
-   <secret>` on a machine, or the console's _Switch off_ (and
+   <secret>` on a signing node, or the console's _Switch off_ (and
    `POST /api/v1/tailnet-lock/disable`) with the support secret. The
    server empties the log, keeps the secret so every machine that still
    has the lock on fetches it and verifies it against its own copy of the
@@ -73,6 +73,19 @@ by the signing keys, not by the server.
   not chain from a known state or is not signed by a trusted key is
   refused. A disablement secret is checked against the authority's
   disablement values.
+- Only a signing node may switch the lock off with
+  `tailscale lock disable`: a machine whose own lock key is one the
+  authority trusts and whose node key carries a valid signature. Any
+  other machine is refused with 403 and the lock stays on, even with the
+  right secret. The CLI hands the secret to `tailscaled` in the clear
+  over its local API, so someone with root on a machine can capture it
+  there; without this check, they could then switch the lock off from
+  any machine, a fresh one enrolled with a stolen auth key included, and
+  slip machines in unsigned. Run the disable on a signing node, or use
+  the console or the API, which do not depend on any machine and are
+  the way back when every signing node is lost. A refusal of a valid
+  secret is logged as a warning, since it means the secret left the
+  signing nodes.
 
 ## Status and switching off
 
@@ -89,7 +102,10 @@ answers 409 when none was recorded. Both are under the
 `feature_settings` scope (`feature_settings:read` to read), which the
 owner and admins hold. The console shows the same on the _Settings_
 page's _Tailnet_ tab, with _Switch off_ behind a confirmation. Switching
-the lock off is audited as `tailnet_lock.disable`.
+the lock off is audited as `tailnet_lock.disable`: from the console or
+the API with the credential as the actor, and from a machine, refused
+attempts included, with the machine as both actor and target, its lock
+key and, when refused, the reason.
 
 The v2 API has no counterpart, because Tailscale's API has none.
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/aislopware/slopscale/hscontrol/audit"
 	"github.com/aislopware/slopscale/hscontrol/state"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/wire"
@@ -57,25 +58,29 @@ func (ns *noiseServer) tkaRequest(
 	return node, true
 }
 
-// tkaError writes a tailnet lock failure with the status its cause
-// calls for.
-func tkaError(writer http.ResponseWriter, msg string, err error) {
-	code := http.StatusInternalServerError
-
+// tkaStatus is the status a tailnet lock failure calls for.
+func tkaStatus(err error) int {
 	switch {
 	case errors.Is(err, types.ErrTailnetLockEnabled), errors.Is(err, types.ErrTailnetLockDisabled),
 		errors.Is(err, types.ErrTailnetLockNoPendingInit):
-		code = http.StatusConflict
-	case errors.Is(err, types.ErrTailnetLockNotAdmin), errors.Is(err, types.ErrTailnetLockBadSecret):
-		code = http.StatusForbidden
+		return http.StatusConflict
+	case errors.Is(err, types.ErrTailnetLockNotAdmin), errors.Is(err, types.ErrTailnetLockBadSecret),
+		errors.Is(err, types.ErrTailnetLockNotSigner):
+		return http.StatusForbidden
 	case errors.Is(err, state.ErrTailnetLockInvalid), errors.Is(err, types.ErrTailnetLockMissingSignature),
 		errors.Is(err, types.ErrTailnetLockBadSignature):
-		code = http.StatusBadRequest
+		return http.StatusBadRequest
 	case errors.Is(err, state.ErrNodeNotFound):
-		code = http.StatusNotFound
+		return http.StatusNotFound
 	}
 
-	httpError(writer, NewHTTPError(code, msg+": "+err.Error(), err))
+	return http.StatusInternalServerError
+}
+
+// tkaError writes a tailnet lock failure with the status its cause
+// calls for.
+func tkaError(writer http.ResponseWriter, msg string, err error) {
+	httpError(writer, NewHTTPError(tkaStatus(err), msg+": "+err.Error(), err))
 }
 
 func tkaRespond(writer http.ResponseWriter, resp any) {
@@ -190,16 +195,20 @@ func (ns *noiseServer) TKASyncSendHandler(writer http.ResponseWriter, r *http.Re
 }
 
 // TKADisableHandler switches the lock off with a disablement secret
-// ([tailcfg.TKADisableRequest]), as `tailscale lock disable` does.
+// ([tailcfg.TKADisableRequest]), as `tailscale lock disable` does. Only a
+// signing node may (see [state.State.TailnetLockDisable]); every attempt
+// is audited with the node that made it.
 func (ns *noiseServer) TKADisableHandler(writer http.ResponseWriter, r *http.Request) {
 	var req tailcfg.TKADisableRequest
 
-	_, ok := ns.tkaRequest(writer, r, &req, func() key.NodePublic { return req.NodeKey })
+	node, ok := ns.tkaRequest(writer, r, &req, func() key.NodePublic { return req.NodeKey })
 	if !ok {
 		return
 	}
 
-	c, err := ns.slopscale.state.TailnetLockDisable(req.DisablementSecret)
+	c, err := ns.slopscale.state.TailnetLockDisable(node, req.DisablementSecret)
+	ns.auditTKADisable(node, r.RemoteAddr, err)
+
 	if err != nil {
 		tkaError(writer, "tailnet lock disable", err)
 
@@ -208,6 +217,41 @@ func (ns *noiseServer) TKADisableHandler(writer http.ResponseWriter, r *http.Req
 
 	ns.slopscale.Change(c)
 	tkaRespond(writer, &tailcfg.TKADisableResponse{})
+}
+
+// auditTKADisable records a node's attempt to switch the lock off, under
+// the action the API's disable records, with the node as the actor.
+func (ns *noiseServer) auditTKADisable(node types.NodeView, remoteAddr string, err error) {
+	detail := map[string]any{"via": "node"}
+
+	if !node.NLKey().IsZero() {
+		detail["nlKey"] = node.NLKey().CLIString()
+	}
+
+	outcome := http.StatusOK
+
+	if err != nil {
+		outcome = tkaStatus(err)
+		detail["error"] = err.Error()
+	}
+
+	event := &types.AuditEvent{
+		ActorKind:  types.ActorNode,
+		ActorName:  node.GivenName(),
+		Action:     "tailnet_lock.disable",
+		TargetKind: "node",
+		TargetID:   node.ID().String(),
+		TargetName: node.GivenName(),
+		Outcome:    outcome,
+		Detail:     detail,
+		RemoteAddr: remoteAddr,
+	}
+
+	if uid, ok := node.UserID().GetOk(); ok {
+		event.ActorUserID = types.UserID(uid)
+	}
+
+	audit.Record(ns.slopscale.state, event)
 }
 
 // TKASignHandler records a node key signature a signing node made

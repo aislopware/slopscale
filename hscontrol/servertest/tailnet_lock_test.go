@@ -26,10 +26,26 @@ import (
 func lockGenesis(t *testing.T, signer key.TLPrivate, secrets ...[]byte) tka.AUM {
 	t.Helper()
 
+	return lockGenesisTrusting(t, signer, nil, secrets...)
+}
+
+// lockGenesisTrusting is lockGenesis with more trusted keys besides the
+// signer's, such as a client's own lock key, which makes it a signing
+// node.
+func lockGenesisTrusting(t *testing.T, signer key.TLPrivate, trusted []key.TLPublic, secrets ...[]byte) tka.AUM {
+	t.Helper()
+
 	var entropy [16]byte
 
 	_, err := rand.Read(entropy[:])
 	require.NoError(t, err)
+
+	keys := make([]tka.Key, 0, 1+len(trusted))
+
+	keys = append(keys, tka.Key{Kind: tka.Key25519, Votes: 1, Public: signer.Public().Verifier()})
+	for _, pub := range trusted {
+		keys = append(keys, tka.Key{Kind: tka.Key25519, Votes: 1, Public: pub.Verifier()})
+	}
 
 	values := make([][]byte, 0, len(secrets))
 	for _, secret := range secrets {
@@ -37,7 +53,7 @@ func lockGenesis(t *testing.T, signer key.TLPrivate, secrets ...[]byte) tka.AUM 
 	}
 
 	_, genesis, err := tka.Create(tka.ChonkMem(), tka.State{
-		Keys:              []tka.Key{{Kind: tka.Key25519, Votes: 1, Public: signer.Public().Verifier()}},
+		Keys:              keys,
 		DisablementValues: values,
 		StateID1:          binary.LittleEndian.Uint64(entropy[:8]),
 		StateID2:          binary.LittleEndian.Uint64(entropy[8:]),
@@ -104,9 +120,10 @@ func peerSignature(nm *netmap.NetworkMap, name string) []byte {
 // which every node learns the head and its signature and peers carry
 // theirs; a node bootstraps from the genesis and syncs an added key; a
 // node that joins later is unsigned until a signing node signs it; a
-// node whose key expires re-signs its new key on its own; and the
-// operator switches the lock off with the support secret, which every
-// node then fetches. The subtests build on one another.
+// node whose key expires re-signs its new key on its own; nodes that are
+// not signing nodes are refused the node secret; and the operator
+// switches the lock off with the support secret, which every node then
+// fetches, audited. The subtests build on one another.
 //
 //nolint:tparallel // later steps depend on the state earlier ones leave behind
 func TestTailnetLock(t *testing.T) {
@@ -413,9 +430,39 @@ func TestTailnetLock(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusForbidden, status, "a wrong secret changes nothing: %s", body)
 
+		// No node's own lock key is trusted here, so none is a signing
+		// node and the right secret does not help them.
+		for _, node := range []*servertest.TestClient{alice, server} {
+			status, body = tkaDo(node, "disable", tailcfg.TKADisableRequest{
+				Version:           tailcfg.CurrentCapabilityVersion,
+				NodeKey:           node.NodePrivateKey().Public(),
+				DisablementSecret: nodeSecret,
+			})
+			assert.Equal(t, http.StatusForbidden, status, "only a signing node may disable: %s", body)
+		}
+
+		require.True(t, srv.State().TailnetLockEnabled(), "a refused disable leaves the lock on")
+
 		status, apiBody := apiCall(t, client, apiKey, http.MethodPost, api+"/disable", nil)
 		require.Equal(t, http.StatusOK, status, apiBody)
 		assert.False(t, boolField(t, apiBody, "enabled"))
+
+		events, err := srv.State().ListAuditEvents(types.AuditQuery{Action: "tailnet_lock.disable"})
+		require.NoError(t, err)
+
+		var viaAPI, refused int
+
+		for _, e := range events {
+			switch {
+			case e.ActorKind == types.ActorAPIKey && e.Outcome == http.StatusOK:
+				viaAPI++
+			case e.ActorKind == types.ActorNode && e.Outcome == http.StatusForbidden:
+				refused++
+			}
+		}
+
+		assert.Equal(t, 1, viaAPI, "the API's disable is audited: %+v", events)
+		assert.Equal(t, 3, refused, "every refused node disable is audited: %+v", events)
 
 		for _, node := range []*servertest.TestClient{alice, server, bob} {
 			node.WaitForCondition(t, "lock off", 10*time.Second, func(nm *netmap.NetworkMap) bool {
@@ -436,5 +483,168 @@ func TestTailnetLock(t *testing.T) {
 
 		status, apiBody = apiCall(t, client, apiKey, http.MethodPost, api+"/disable", nil)
 		assert.Equal(t, http.StatusConflict, status, "already off: %v", apiBody)
+	})
+}
+
+// TestTailnetLockDisableNeedsSigner pins the gate on the node path of
+// disabling the lock: `tailscale lock disable` sends the secret in the
+// clear through the client's local API, so a secret captured there must
+// not switch the lock off from just any node. A signed node whose lock
+// key is not trusted, and an unsigned node whose lock key is, are refused
+// with the right secret and leave the lock on; a signing node with a
+// wrong secret is refused; a signing node with the right one switches the
+// lock off. Every attempt is audited with the node that made it.
+//
+//nolint:tparallel // later steps depend on the state earlier ones leave behind
+func TestTailnetLockDisableNeedsSigner(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "alice")
+	alice := servertest.NewClient(t, srv, "laptop", servertest.WithUser(owner))
+	server := servertest.NewClient(t, srv, "srv", servertest.WithTags("tag:server"))
+	alice.WaitForPeerCount(t, 1, 10*time.Second)
+
+	tkaDo := func(node *servertest.TestClient, path string, body any) (int, []byte) {
+		return machineDo(t, srv, node, http.MethodGet, "tka/"+path, body)
+	}
+
+	nodeOf := func(c *servertest.TestClient) types.NodeView {
+		node, ok := srv.State().GetNodeByNodeKey(c.NodePrivateKey().Public())
+		require.True(t, ok)
+
+		return node
+	}
+
+	disable := func(c *servertest.TestClient, secret []byte) (int, []byte) {
+		return tkaDo(c, "disable", tailcfg.TKADisableRequest{
+			Version:           tailcfg.CurrentCapabilityVersion,
+			NodeKey:           c.NodePrivateKey().Public(),
+			DisablementSecret: secret,
+		})
+	}
+
+	disableEvents := func(node types.NodeView) []types.AuditEvent {
+		events, err := srv.State().ListAuditEvents(types.AuditQuery{
+			Action:     "tailnet_lock.disable",
+			TargetKind: "node",
+			TargetID:   node.ID().String(),
+		})
+		require.NoError(t, err)
+
+		return events
+	}
+
+	aliceLock := nodeOf(alice).NLKey()
+	require.False(t, aliceLock.IsZero(), "the client reports its lock key")
+
+	signer := key.NewTLPrivate()
+	nodeSecret := bytes.Repeat([]byte{1}, 32)
+	genesis := lockGenesisTrusting(t, signer, []key.TLPublic{aliceLock}, nodeSecret)
+
+	chonk := tka.ChonkMem()
+
+	authority, err := tka.Bootstrap(chonk, genesis)
+	require.NoError(t, err)
+
+	status, body := tkaDo(alice, "init/begin", tailcfg.TKAInitBeginRequest{
+		Version:    tailcfg.CurrentCapabilityVersion,
+		NodeKey:    alice.NodePrivateKey().Public(),
+		GenesisAUM: genesis.Serialize(),
+	})
+	require.Equal(t, http.StatusOK, status, string(body))
+
+	signatures := map[tailcfg.NodeID]tkatype.MarshaledSignature{}
+	for _, info := range decodeJSON[tailcfg.TKAInitBeginResponse](t, body).NeedSignatures {
+		signatures[info.NodeID] = signNodeKey(t, info, signer)
+	}
+
+	status, body = tkaDo(alice, "init/finish", tailcfg.TKAInitFinishRequest{
+		Version:    tailcfg.CurrentCapabilityVersion,
+		NodeKey:    alice.NodePrivateKey().Public(),
+		Signatures: signatures,
+	})
+	require.Equal(t, http.StatusOK, status, string(body))
+
+	// A node that joins later stays unsigned; its lock key is then made
+	// a trusted one, so it claims a trusted key without a signature.
+	bob := servertest.NewClient(t, srv, "phone", servertest.WithUser(owner))
+	bob.WaitForCondition(t, "lock on, unsigned", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.TKAEnabled && nm.SelfNode.Valid() && nm.SelfNode.KeySignature().Len() == 0
+	})
+
+	updater := authority.NewUpdater(signer)
+	require.NoError(t, updater.AddKey(tka.Key{Kind: tka.Key25519, Votes: 1, Public: nodeOf(bob).NLKey().Verifier()}))
+
+	aums, err := updater.Finalize(chonk)
+	require.NoError(t, err)
+	require.NoError(t, authority.Inform(chonk, aums))
+
+	missing := make([]tkatype.MarshaledAUM, 0, len(aums))
+	for i := range aums {
+		missing = append(missing, aums[i].Serialize())
+	}
+
+	status, body = tkaDo(alice, "sync/send", tailcfg.TKASyncSendRequest{
+		Version:     tailcfg.CurrentCapabilityVersion,
+		NodeKey:     alice.NodePrivateKey().Public(),
+		Head:        authority.Head().String(),
+		MissingAUMs: missing,
+	})
+	require.Equal(t, http.StatusOK, status, string(body))
+
+	t.Run("a node that is not a signing node is refused with the right secret", func(t *testing.T) {
+		// server is signed but its lock key is not trusted; bob claims a
+		// trusted lock key but is not signed.
+		for name, c := range map[string]*servertest.TestClient{"srv": server, "phone": bob} {
+			status, body := disable(c, nodeSecret)
+			assert.Equal(t, http.StatusForbidden, status, "%s may not disable: %s", name, body)
+			assert.Contains(t, string(body), "only a signing node may disable tailnet lock")
+
+			events := disableEvents(nodeOf(c))
+			require.Len(t, events, 1)
+			assert.Equal(t, types.ActorNode, events[0].ActorKind)
+			assert.Equal(t, http.StatusForbidden, events[0].Outcome)
+			assert.Equal(t, nodeOf(c).NLKey().CLIString(), events[0].Detail["nlKey"])
+			assert.Contains(t, events[0].Detail["error"], "only a signing node")
+		}
+
+		assert.True(t, srv.State().TailnetLockEnabled(), "the lock stays on")
+		assert.True(t, alice.Netmap().TKAEnabled)
+	})
+
+	t.Run("a signing node with a wrong secret is refused", func(t *testing.T) {
+		status, body := disable(alice, bytes.Repeat([]byte{9}, 32))
+		assert.Equal(t, http.StatusForbidden, status, string(body))
+		assert.Contains(t, string(body), "disablement secret does not verify")
+		assert.True(t, srv.State().TailnetLockEnabled(), "the lock stays on")
+	})
+
+	t.Run("a signing node switches the lock off", func(t *testing.T) {
+		status, body := disable(alice, nodeSecret)
+		require.Equal(t, http.StatusOK, status, string(body))
+
+		for _, c := range []*servertest.TestClient{alice, server, bob} {
+			c.WaitForCondition(t, "lock off", 10*time.Second, func(nm *netmap.NetworkMap) bool {
+				return !nm.TKAEnabled && nm.SelfNode.KeySignature().Len() == 0
+			})
+		}
+
+		events := disableEvents(nodeOf(alice))
+		require.Len(t, events, 2, "the wrong secret and the disable")
+
+		var ok *types.AuditEvent
+
+		for i := range events {
+			if events[i].Outcome == http.StatusOK {
+				ok = &events[i]
+			}
+		}
+
+		require.NotNil(t, ok, "the disable is audited: %+v", events)
+		assert.Equal(t, types.ActorNode, ok.ActorKind)
+		assert.Equal(t, "laptop", ok.ActorName)
+		assert.Equal(t, types.UserID(owner.ID), ok.ActorUserID)
+		assert.Equal(t, aliceLock.CLIString(), ok.Detail["nlKey"])
 	})
 }

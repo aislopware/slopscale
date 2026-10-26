@@ -2209,7 +2209,13 @@ func applyLockKeys(
 	nlKey key.TLPublic,
 	verified tkatype.MarshaledSignature,
 ) {
-	if !nlKey.IsZero() {
+	// A node that keeps its signature keeps the lock key it had. The
+	// client reports the key itself and nothing proves it holds the
+	// private half, so a new key on a node still signed for the same
+	// node key could only be a claim to a trusted key, which is what lets
+	// a node switch the lock off.
+	keepsSignature := len(verified) == 0 && node.NodeKey == newKey && len(node.KeySignature) > 0
+	if !nlKey.IsZero() && (node.NLKey.IsZero() || !keepsSignature) {
 		node.NLKey = nlKey
 	}
 
