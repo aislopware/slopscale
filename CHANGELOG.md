@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.61.0](https://github.com/aislopware/slopscale/compare/v0.60.1...v0.61.0) (2026-10-26)
+
+
+### Changes
+
+* let groups grant access requests by themselves, up to a time limit ([#74](https://github.com/aislopware/slopscale/issues/74)) ([e03adcb](https://github.com/aislopware/slopscale/commit/e03adcba1bb499b27d4dee730316039bdf5dd190))
+
 ## [0.60.1](https://github.com/aislopware/slopscale/compare/v0.60.0...v0.60.1) (2026-10-23)
 
 
