@@ -1730,7 +1730,9 @@ func TestSSHLocalpart(t *testing.T) {
 func TestSSHPortForwardingNeedsRuleOptIn(t *testing.T) {
 	IntegrationSkip(t)
 
-	versions := []string{"head", AllVersions[2]}
+	// Main and the newest stable release; older ones cannot forward Unix
+	// sockets at all.
+	versions := []string{"head", AllVersions[len(AllVersions)-1]}
 
 	spec := ScenarioSpec{
 		NodesPerUser: len(versions),
