@@ -41,7 +41,7 @@ export interface paths {
         put?: never;
         /**
          * Request access
-         * @description Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+         * @description Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
          */
         post: operations["createAccessRequest"];
         delete?: never;
@@ -2775,9 +2775,16 @@ export interface components {
             reason?: string;
         };
         AccessRequestOption: {
+            /** @description Whether the group grants requests as filed. */
+            autoApprove?: boolean;
             description?: string;
             /** Format: uint64 */
             id: string;
+            /**
+             * Format: int64
+             * @description Longest request in seconds; 0 for no cap.
+             */
+            maxRequestSeconds?: number;
             name: string;
         };
         AccessRevokeBody: {
@@ -3356,6 +3363,8 @@ export interface components {
             id?: string;
         };
         Group: {
+            /** @description Whether a request is granted as it is filed, with no approver. */
+            autoApprove: boolean;
             /** @description Empty for operator-made groups, else "all" or "self". */
             builtin: string;
             /** Format: date-time */
@@ -3364,6 +3373,11 @@ export interface components {
             expiries: components["schemas"]["GroupMemberExpiry"][];
             /** Format: uint64 */
             id: string;
+            /**
+             * Format: int64
+             * @description Longest one request may ask for, in seconds; 0 for no cap.
+             */
+            maxRequestSeconds: number;
             name: string;
             nodeIds: string[];
             /** @description Whether members may ask to join the group for a while. */
@@ -3397,7 +3411,14 @@ export interface components {
             group: components["schemas"]["Group"];
         };
         GroupRequestBody: {
+            /** @description Grant requests as filed; needs requestable. */
+            autoApprove?: boolean;
             description?: string;
+            /**
+             * Format: int64
+             * @description Longest request in seconds; 0 for no cap.
+             */
+            maxRequestSeconds?: number;
             name: string;
             nodeIds?: string[];
             /** @description Whether members may ask to join for a while. */

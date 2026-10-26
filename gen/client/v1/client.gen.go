@@ -577,9 +577,14 @@ type AccessRequestBody struct {
 
 // AccessRequestOption defines model for AccessRequestOption.
 type AccessRequestOption struct {
+	// AutoApprove Whether the group grants requests as filed.
+	AutoApprove *bool   `json:"autoApprove,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Id          string  `json:"id"`
-	Name        string  `json:"name"`
+
+	// MaxRequestSeconds Longest request in seconds; 0 for no cap.
+	MaxRequestSeconds *int64 `json:"maxRequestSeconds,omitempty"`
+	Name              string `json:"name"`
 }
 
 // AccessRevokeBody defines model for AccessRevokeBody.
@@ -1250,14 +1255,20 @@ type ExpirePreAuthKeyRequestBody struct {
 
 // Group defines model for Group.
 type Group struct {
+	// AutoApprove Whether a request is granted as it is filed, with no approver.
+	AutoApprove bool `json:"autoApprove"`
+
 	// Builtin Empty for operator-made groups, else "all" or "self".
 	Builtin     string              `json:"builtin"`
 	CreatedAt   time.Time           `json:"createdAt"`
 	Description string              `json:"description"`
 	Expiries    []GroupMemberExpiry `json:"expiries"`
 	Id          string              `json:"id"`
-	Name        string              `json:"name"`
-	NodeIds     []string            `json:"nodeIds"`
+
+	// MaxRequestSeconds Longest one request may ask for, in seconds; 0 for no cap.
+	MaxRequestSeconds int64    `json:"maxRequestSeconds"`
+	Name              string   `json:"name"`
+	NodeIds           []string `json:"nodeIds"`
 
 	// Requestable Whether members may ask to join the group for a while.
 	Requestable bool `json:"requestable"`
@@ -1290,9 +1301,14 @@ type GroupOutputBody struct {
 
 // GroupRequestBody defines model for GroupRequestBody.
 type GroupRequestBody struct {
-	Description *string   `json:"description,omitempty"`
-	Name        string    `json:"name"`
-	NodeIds     *[]string `json:"nodeIds,omitempty"`
+	// AutoApprove Grant requests as filed; needs requestable.
+	AutoApprove *bool   `json:"autoApprove,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// MaxRequestSeconds Longest request in seconds; 0 for no cap.
+	MaxRequestSeconds *int64    `json:"maxRequestSeconds,omitempty"`
+	Name              string    `json:"name"`
+	NodeIds           *[]string `json:"nodeIds,omitempty"`
 
 	// Requestable Whether members may ask to join for a while.
 	Requestable *bool     `json:"requestable,omitempty"`
@@ -3381,7 +3397,7 @@ type ClientInterface interface {
 
 	// CreateAccessRequestWithBody Request access
 	//
-	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3390,7 +3406,7 @@ type ClientInterface interface {
 
 	// CreateAccessRequest Request access
 	//
-	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5576,7 +5592,7 @@ func (c *Client) ListAccessRequests(ctx context.Context, params *ListAccessReque
 
 // CreateAccessRequestWithBody Request access
 //
-// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5595,7 +5611,7 @@ func (c *Client) CreateAccessRequestWithBody(ctx context.Context, contentType st
 
 // CreateAccessRequest Request access
 //
-// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17193,7 +17209,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateAccessRequestWithBodyWithResponse Request access
 	//
-	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -17202,7 +17218,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateAccessRequestWithResponse Request access
 	//
-	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27734,7 +27750,7 @@ func (c *ClientWithResponses) ListAccessRequestsWithResponse(ctx context.Context
 
 // CreateAccessRequestWithBodyWithResponse Request access
 //
-// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27749,7 +27765,7 @@ func (c *ClientWithResponses) CreateAccessRequestWithBodyWithResponse(ctx contex
 
 // CreateAccessRequestWithResponse Request access
 //
-// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user. A group that approves by itself grants the request at once.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
