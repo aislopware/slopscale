@@ -62,7 +62,6 @@ function GatewaysPage(): ReactElement {
     <>
       <PageHeader
         title="Gateways"
-        docs="ref/traffic"
         description="The tagged exit nodes, subnet routers and app connectors that report what passes through them."
         {...(data.reporters.length === 0 ? {} : { meta: <Tally reporters={data.reporters} /> })}
       />

@@ -246,22 +246,15 @@ function FactsGroup({
   id,
   title,
   description,
-  docs,
   items,
 }: {
   readonly id: string;
   readonly title: string;
   readonly description?: string;
-  readonly docs?: string;
   readonly items: readonly Definition[];
 }): ReactElement {
   return (
-    <SettingsGroup
-      id={id}
-      title={title}
-      {...(description === undefined ? {} : { description })}
-      {...(docs === undefined ? {} : { docs })}
-    >
+    <SettingsGroup id={id} title={title} {...(description === undefined ? {} : { description })}>
       <Card>
         <DefinitionList items={items} />
       </Card>
@@ -288,21 +281,18 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
       <FactsGroup
         id="network"
         title="Network"
-        docs="ref/configuration"
         description="Where clients reach the server and the addresses it hands out."
         items={networkItems(info)}
       />
       <FactsGroup
         id="policy"
         title="Policy and clients"
-        docs="ref/policy"
         description="Where the policy lives and how the server treats clients."
         items={policyItems(info)}
       />
       <FactsGroup
         id="relays"
         title="Relays"
-        docs="ref/derp"
         items={[
           {
             label: "DERP relays",

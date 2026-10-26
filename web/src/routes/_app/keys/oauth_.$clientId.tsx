@@ -34,7 +34,7 @@ function OAuthClientPage(): ReactElement {
   if (client === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="OAuth client not found" docs="ref/api" />
+        <PageHeader title="OAuth client not found" />
         <Section title="OAuth client" bodyClassName="p-0">
           <SectionEmpty
             title="This client does not exist"
@@ -57,7 +57,6 @@ function OAuthClientPage(): ReactElement {
       <PageHeader
         title={name}
         kicker={federated ? "Federated identity" : "OAuth client"}
-        docs="ref/api"
         description={
           federated
             ? "What a workload's OIDC token has to carry before the server trades it for an API token."

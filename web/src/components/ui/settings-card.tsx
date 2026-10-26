@@ -2,13 +2,12 @@ import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
 import { cardClass } from "~/components/ui/card.tsx";
-import { DocsBadge } from "~/components/ui/docs-badge.tsx";
 
 /**
- * The dashboard's settings card: one white card of rows, each a setting with its title, an optional
- * "View docs" pill, a subtle description and its control on the right (a Switch, or a secondary
- * button). `compact` is the denser card of a settings page (worker settings): 12px corners and 10px
- * rows with the label alone, for settings whose name says enough.
+ * The dashboard's settings card: one white card of rows, each a setting with its title, a subtle
+ * description and its control on the right (a Switch, or a secondary button). `compact` is the
+ * denser card of a settings page (worker settings): 12px corners and 10px rows with the label
+ * alone, for settings whose name says enough.
  */
 export function SettingsCard({
   children,
@@ -36,14 +35,11 @@ export function SettingsCard({
 /** One setting in a `SettingsCard`. */
 export function SettingsRow({
   title,
-  docs,
   description,
   control,
   children,
 }: {
   readonly title: ReactNode;
-  /** The documentation page that explains the setting, under `docs/content`: "ref/dns". */
-  readonly docs?: string;
   readonly description?: ReactNode;
   /** What changes the setting, on the right: a Switch, a Select, a secondary button. */
   readonly control?: ReactNode;
@@ -63,7 +59,6 @@ export function SettingsRow({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-h-lh flex-wrap items-center gap-2">
             <h3 className="font-medium text-kumo-default">{title}</h3>
-            {docs === undefined ? null : <DocsBadge path={docs} />}
           </div>
           {description === undefined ? null : (
             <div className="max-w-[750px] text-pretty text-kumo-subtle">{description}</div>

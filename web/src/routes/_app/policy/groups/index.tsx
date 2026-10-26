@@ -40,7 +40,6 @@ function GroupsPage(): ReactElement {
     <>
       <PageHeader
         title="Groups"
-        docs="ref/access-control"
         description="Named sets of users, machines and tags. Rules and networks refer to groups, so membership is the one place to change who is covered."
         meta={groups.length === 1 ? "1 group" : `${groups.length} groups`}
       />

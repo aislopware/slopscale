@@ -29,7 +29,6 @@ function NewGroupPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New group"
-        docs="ref/access-control"
         description="A set of machines: add users to include every machine they own, or add machines on their own."
       />
       <GroupEditor

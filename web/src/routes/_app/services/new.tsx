@@ -24,7 +24,6 @@ function NewServicePage(): ReactElement {
     <FormLayout width="narrow">
       <PageHeader
         title="New service"
-        docs="ref/services"
         description="A name of its own with a pair of tailnet addresses, hosted by the tagged machines you approve."
       />
       <ServiceEditor canEdit />

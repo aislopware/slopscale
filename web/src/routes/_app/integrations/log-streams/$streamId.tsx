@@ -32,7 +32,7 @@ function LogStreamPage(): ReactElement {
   if (stream === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="Log stream not found" docs="ref/log-streaming" />
+        <PageHeader title="Log stream not found" />
         <Section title="Log stream" bodyClassName="p-0">
           <SectionEmpty
             title="This log stream does not exist"
@@ -53,7 +53,6 @@ function LogStreamPage(): ReactElement {
       <PageHeader
         title={stream.name}
         kicker="Log stream"
-        docs="ref/log-streaming"
         meta={`${destinationLabel(stream.destination)} · ${countersLabel(stream)}`}
         actions={<SendTestEntryButton stream={stream} canEdit={canEdit} />}
       />

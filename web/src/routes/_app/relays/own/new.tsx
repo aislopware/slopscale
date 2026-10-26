@@ -32,7 +32,6 @@ function NewRegionPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New region"
-        docs="ref/derp"
         description="A region of relays you run yourself, merged into the map on top of the sources."
       />
       <RegionEditor derp={derp} canEdit={can(me, "feature_settings")} />

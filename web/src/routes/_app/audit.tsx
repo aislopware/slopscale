@@ -299,7 +299,6 @@ function AuditPage(): ReactElement {
     <>
       <PageHeader
         title="Audit log"
-        docs="ref/audit"
         description="Who changed what through the API and the console."
         actions={<ExportMenu filters={filtersOf(search)} />}
       />

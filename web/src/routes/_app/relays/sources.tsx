@@ -31,7 +31,6 @@ function SourcesPage(): ReactElement {
     <>
       <PageHeader
         title="Sources"
-        docs="ref/derp"
         description="The map URLs and files the map is built from, and how often they are fetched again."
         meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}

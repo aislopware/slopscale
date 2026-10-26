@@ -37,7 +37,7 @@ function RulePage(): ReactElement {
   if (rule === undefined || isBuiltinRule(rule)) {
     return (
       <FormLayout width="wide">
-        <PageHeader title={rule?.name ?? "Rule not found"} docs="ref/access-control" />
+        <PageHeader title={rule?.name ?? "Rule not found"} />
         <Section title="Rule" bodyClassName="p-0">
           <SectionEmpty
             title={
@@ -64,7 +64,6 @@ function RulePage(): ReactElement {
       <PageHeader
         title={rule.name}
         kicker="Rule"
-        docs="ref/access-control"
         {...(rule.description === "" ? {} : { description: rule.description })}
       />
       <RuleEditor

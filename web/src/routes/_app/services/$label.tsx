@@ -89,7 +89,6 @@ function ServiceHeader({
   return (
     <PageHeader
       title={serviceTitle(service)}
-      docs="ref/services"
       meta={
         <>
           <Badge tone={tone}>{label}</Badge>

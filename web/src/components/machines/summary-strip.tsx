@@ -7,7 +7,6 @@ import { plural } from "~/components/overview/plural.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
-import { DocsBadge } from "~/components/ui/docs-badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 import {
@@ -26,8 +25,7 @@ const iconSize = 16;
  * The strip across the top of a Zero Trust detail page ("Profile: Default · Enabled · 0 devices", a
  * Mesh node's "Mesh IP: – · Offline"): the machine's name, which is the page's title, its
  * connection badge, its tailnet address, whose it is, when it was last seen and what it does for
- * the tailnet, so the cards under it can each be about one thing. The docs pill sits at its far
- * end.
+ * the tailnet, so the cards under it can each be about one thing.
  */
 export function MachineSummary({ node }: { readonly node: Node }): ReactElement {
   const ipv4 = node.ipAddresses.find((address) => !address.includes(":"));
@@ -64,9 +62,6 @@ export function MachineSummary({ node }: { readonly node: Node }): ReactElement 
           <RelativeTime value={node.lastSeen} />
         </span>
       )}
-      <span className="ml-auto">
-        <DocsBadge path="ref/device-management" />
-      </span>
     </div>
   );
 }

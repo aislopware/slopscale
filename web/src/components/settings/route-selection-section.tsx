@@ -49,7 +49,6 @@ export function RouteSelectionSection({
     <SettingsGroup
       id="route-selection"
       title="Route selection"
-      docs="ref/console"
       description="Which machine each client uses when several serve the same subnet, app connector or service."
     >
       <SettingsCard>

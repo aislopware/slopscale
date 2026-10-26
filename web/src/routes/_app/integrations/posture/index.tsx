@@ -45,7 +45,6 @@ function PostureIntegrationsPage(): ReactElement {
     <>
       <PageHeader
         title="Device posture"
-        docs="ref/device-trust"
         description="Endpoint security and device management services that sync machine attributes by serial number."
         meta={meta}
       />

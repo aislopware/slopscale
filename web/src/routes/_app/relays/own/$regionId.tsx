@@ -47,7 +47,7 @@ function RegionPage(): ReactElement {
   if (region === undefined) {
     return (
       <FormLayout>
-        <PageHeader title={title} docs="ref/derp" />
+        <PageHeader title={title} />
         <Section title="Region" bodyClassName="p-0">
           <SectionEmpty
             title="This region does not exist"
@@ -72,7 +72,6 @@ function RegionPage(): ReactElement {
             ? `Region ${String(region.id)}`
             : `Region ${String(region.id)} · ${region.code}`
         }
-        docs="ref/derp"
       />
       <RegionEditor
         key={region.id}

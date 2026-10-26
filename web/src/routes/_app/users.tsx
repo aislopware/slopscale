@@ -120,7 +120,6 @@ function UsersPage(): ReactElement {
     <>
       <PageHeader
         title="Users"
-        docs="ref/roles"
         description="Everyone who signs in to the tailnet. A user's role bounds what they may change here; the policy decides what their machines reach."
         meta={describe(total, pending)}
       />

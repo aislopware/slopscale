@@ -73,7 +73,6 @@ export function ApprovalSection(props: {
     <SwitchSection
       id="approval"
       title="Approval"
-      docs="ref/approval"
       description="Who waits for an administrator before reaching the tailnet."
       rows={approvals}
       {...props}
@@ -89,7 +88,6 @@ export function DeviceTrustSection(props: {
     <SwitchSection
       id="device-trust"
       title="Device trust"
-      docs="ref/device-trust"
       description="What the server may learn about machines for posture checks."
       rows={trust}
       {...props}
@@ -100,7 +98,6 @@ export function DeviceTrustSection(props: {
 function SwitchSection({
   id,
   title,
-  docs,
   description,
   rows,
   settings,
@@ -108,7 +105,6 @@ function SwitchSection({
 }: {
   readonly id: string;
   readonly title: string;
-  readonly docs: string;
   readonly description?: string;
   readonly rows: readonly ApprovalSwitch[];
   readonly settings: Settings;
@@ -117,12 +113,7 @@ function SwitchSection({
   const update = useSettingsMutation();
 
   return (
-    <SettingsGroup
-      id={id}
-      title={title}
-      docs={docs}
-      {...(description === undefined ? {} : { description })}
-    >
+    <SettingsGroup id={id} title={title} {...(description === undefined ? {} : { description })}>
       <SettingsCard>
         {rows.map((row) => (
           <SettingsRow

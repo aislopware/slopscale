@@ -36,7 +36,6 @@ function NewWebhookPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New webhook"
-        docs="ref/webhooks"
         description="An endpoint the server posts events to as they happen. Generic endpoints get the signed JSON array, the rest get the message alone."
       />
       <WebhookEditor eventTypes={eventTypes} canEdit onCreated={setSecret} />
@@ -45,7 +44,6 @@ function NewWebhookPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="Webhook created"
-        docs="ref/webhooks"
         description="Copy the signing secret before you leave this page. It is not shown again."
       />
       <FormSection title="Signing secret">

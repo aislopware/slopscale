@@ -81,7 +81,6 @@ function SessionsPage(): ReactElement {
     <>
       <PageHeader
         title="SSH sessions"
-        docs="ref/ssh-recording"
         description={
           <>
             Terminal recordings of SSH sessions, one asciinema file each. Play a download with{" "}

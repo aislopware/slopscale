@@ -34,7 +34,6 @@ export function CreateOAuthClientPage({ me }: { readonly me: Me }): ReactElement
     <FormLayout>
       <PageHeader
         title="Create OAuth client"
-        docs="ref/api"
         description="The client exchanges its secret for short-lived v2 API tokens, limited to the scopes you pick."
       />
       <OAuthClientForm me={me} onCreated={setCreated} />
@@ -43,7 +42,6 @@ export function CreateOAuthClientPage({ me }: { readonly me: Me }): ReactElement
     <FormLayout>
       <PageHeader
         title="OAuth client created"
-        docs="ref/api"
         description="Copy the secret before you leave this page. It is not shown again."
       />
       <FormSection title="Client secret">

@@ -24,7 +24,6 @@ function NewLogStreamPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New log stream"
-        docs="ref/log-streaming"
         description="Ships every audit log entry to a SIEM or log store in batches, in the shape it expects."
       />
       <LogStreamEditor canEdit />

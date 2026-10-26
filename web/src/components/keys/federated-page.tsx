@@ -59,7 +59,6 @@ export function CreateFederatedIdentityPage({ me }: { readonly me: Me }): ReactE
     <FormLayout>
       <PageHeader
         title="Create federated identity"
-        docs="ref/api"
         description="A federated identity lets CI workflows and cloud workloads trade OIDC tokens for short-lived v2 API tokens."
       />
       {/* Keyed by the server URL: the audience defaults to it, and it may arrive after the page. */}
@@ -74,7 +73,6 @@ export function CreateFederatedIdentityPage({ me }: { readonly me: Me }): ReactE
     <FormLayout>
       <PageHeader
         title="Federated identity created"
-        docs="ref/api"
         description="No secret is stored. Workloads present an OIDC token from the issuer to trade for an API token."
       />
       <FormSection title="Identity" flush>

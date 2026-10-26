@@ -87,7 +87,6 @@ export function CreateApiKeyPage({ me }: { readonly me: Me }): ReactElement {
     <FormLayout>
       <PageHeader
         title="Create API key"
-        docs="ref/api"
         description="The key authenticates calls to the v1 API with its owner's permissions, or with the scopes you pick."
       />
       <ApiKeyForm me={me} onCreated={setCreated} />
@@ -96,7 +95,6 @@ export function CreateApiKeyPage({ me }: { readonly me: Me }): ReactElement {
     <FormLayout>
       <PageHeader
         title="API key created"
-        docs="ref/api"
         description="Copy the key before you leave this page. It is not shown again."
       />
       <FormSection title="Your key">

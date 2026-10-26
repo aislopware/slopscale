@@ -30,7 +30,6 @@ function ServerSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Server"
-        docs="ref/configuration"
         description="Build, addresses and config file values of this server, and its maintenance tasks."
       />
       <SettingsLayout parts={parts}>

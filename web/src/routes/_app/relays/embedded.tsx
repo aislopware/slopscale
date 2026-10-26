@@ -30,7 +30,6 @@ function EmbeddedPage(): ReactElement {
     <>
       <PageHeader
         title="Embedded relay"
-        docs="ref/derp"
         description="The relay built into this server, the region it joins and how it verifies clients."
         meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}

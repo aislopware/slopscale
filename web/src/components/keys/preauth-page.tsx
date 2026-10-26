@@ -66,7 +66,6 @@ export function CreatePreAuthKeyPage({ me }: { readonly me: Me }): ReactElement 
     <FormLayout>
       <PageHeader
         title="Create pre-auth key"
-        docs="ref/registration"
         description="A machine registers with the key instead of signing in, so it belongs to the user you pick, or to the tags you give it."
       />
       <PreAuthKeyForm me={me} onCreated={setCreated} />
@@ -75,7 +74,6 @@ export function CreatePreAuthKeyPage({ me }: { readonly me: Me }): ReactElement 
     <FormLayout>
       <PageHeader
         title="Pre-auth key created"
-        docs="ref/registration"
         description="Copy the key before you leave this page. It is not shown again."
       />
       <div className="flex flex-col gap-4">

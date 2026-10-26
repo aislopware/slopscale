@@ -44,7 +44,6 @@ function EditServicePage(): ReactElement {
       <PageHeader
         title={serviceTitle(service)}
         kicker="Edit service"
-        docs="ref/services"
         description="The name and the addresses stay as they are; everything else is what clients are told about the service."
         meta={<span className="font-mono">{service.name}</span>}
       />

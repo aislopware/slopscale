@@ -89,7 +89,6 @@ export function SSHRecordingSection({
     <SettingsGroup
       id="ssh-recording"
       title="SSH session recording"
-      docs="ref/ssh-recording"
       description="Where sessions admitted by SSH rules are recorded, unless a rule names its own recorder."
     >
       <SettingsCard>

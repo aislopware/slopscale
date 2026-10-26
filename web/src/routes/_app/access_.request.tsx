@@ -28,7 +28,6 @@ function RequestAccessPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="Request access"
-        docs="ref/temporary-access"
         description="Ask to join a group for a while. An approver decides, and the access ends on its own."
       />
       {reason === undefined ? (

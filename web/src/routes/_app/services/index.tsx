@@ -39,7 +39,6 @@ function ServicesPage(): ReactElement {
     <PageWithRail rail={<ServicesRail services={services} reachable={reachable} />}>
       <PageHeader
         title="Services"
-        docs="ref/services"
         description="Names with tailnet addresses of their own that tagged machines host, so a client reaches one by name however it moves."
         meta={reachable === 1 ? "1 service reachable" : `${reachable} services reachable`}
       />
