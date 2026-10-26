@@ -153,8 +153,12 @@ func TestSetGlobalExitNodeKeepsPriorityUnderConcurrentCalls(t *testing.T) {
 	assert.Equal(t, view.IsGlobalExitNode(), fromDB.GlobalExitNode, "store and database agree on the mark")
 	assert.Equal(t, view.ExitNodePriority(), fromDB.ExitNodePriority, "store and database agree on the priority")
 
+	// A keep applies to whatever the node has when it runs: 20 after the
+	// set, or 0 after the clear, which a later keep marks again without a
+	// priority. Never 10, which both of them replaced.
 	if view.IsGlobalExitNode() {
-		assert.Equal(t, 20, view.ExitNodePriority(), "a keep never resurrects the value an explicit set replaced")
+		assert.Contains(t, []int{0, 20}, view.ExitNodePriority(),
+			"a keep never resurrects the value an explicit set replaced")
 	} else {
 		assert.Equal(t, 0, view.ExitNodePriority(), "clearing resets the priority")
 	}
