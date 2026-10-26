@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.62.1](https://github.com/aislopware/slopscale/compare/v0.62.0...v0.62.1) (2026-10-26)
+
+
+### Fixes
+
+* **web:** drop the View docs pills that wrapped onto their own line ([#80](https://github.com/aislopware/slopscale/issues/80)) ([2df2a8f](https://github.com/aislopware/slopscale/commit/2df2a8f05437d7112d58cbffac720cfc556f7006))
+* **web:** show a machine's owner apart from its facts on the machine page ([#82](https://github.com/aislopware/slopscale/issues/82)) ([dda73fa](https://github.com/aislopware/slopscale/commit/dda73faeef8bc5c0967f9c61444c67c5c4e2d2c7))
+
 ## [0.62.0](https://github.com/aislopware/slopscale/compare/v0.61.0...v0.62.0) (2026-10-26)
 
 
