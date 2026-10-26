@@ -45,7 +45,7 @@ function PostureIntegrationPage(): ReactElement {
   if (integration === undefined || provider === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="Integration not found" docs="ref/device-trust" />
+        <PageHeader title="Integration not found" />
         <Section title="Posture integration" bodyClassName="p-0">
           <SectionEmpty
             title="This integration does not exist"
@@ -66,7 +66,6 @@ function PostureIntegrationPage(): ReactElement {
       <PageHeader
         title={integration.name}
         kicker="Posture integration"
-        docs="ref/device-trust"
         meta={`${providerLabel(providers, integration.provider)} · ${statusLabel(integrationStatus(integration))} · ${integration.lastMatched.toLocaleString()} machines matched`}
         actions={<SyncNowButton integration={integration} canEdit={canEdit} />}
       />

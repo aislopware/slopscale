@@ -31,7 +31,6 @@ function MapPage(): ReactElement {
     <>
       <PageHeader
         title="Map"
-        docs="ref/derp"
         description="The regions and relays that carry traffic between machines that cannot connect directly."
         meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}

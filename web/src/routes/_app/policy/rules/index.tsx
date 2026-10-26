@@ -39,7 +39,6 @@ function RulesPage(): ReactElement {
     <>
       <PageHeader
         title="Rules"
-        docs="ref/access-control"
         description="Each rule opens ports from a set of sources to a set of destinations. The policy file covers whatever the rules leave out."
         meta={enabled === 1 ? "1 rule enabled" : `${enabled} rules enabled`}
       />

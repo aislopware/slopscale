@@ -47,7 +47,6 @@ function TailnetSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Tailnet"
-        docs="ref/console"
         description="The tailnet's ID, who may join, what a machine must prove, how long a login lasts, which router each machine uses and whether SSH sessions are recorded."
       />
       <SettingsLayout parts={parts}>

@@ -105,7 +105,6 @@ export function WindowHeader({
   return (
     <PageHeader
       title={title}
-      docs="ref/traffic"
       {...(description === undefined ? {} : { description })}
       {...(actions === undefined ? {} : { actions })}
       meta={

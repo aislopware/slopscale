@@ -6,8 +6,6 @@ import { cn } from "@cloudflare/kumo/utils";
 import { useId } from "react";
 import type { ReactElement, ReactNode } from "react";
 
-import { DocsBadge } from "~/components/ui/docs-badge.tsx";
-
 /** A part of a settings page, as its table of contents lists it. */
 export interface SettingsPart {
   /** The id of the part's `SettingsGroup`, which the contents link to. */
@@ -77,23 +75,20 @@ export function SettingsLayout({
 
 /**
  * A titled block on a page, the way Zero Trust heads the parts of a page that are not cards of
- * their own: a 16px semibold heading with an optional "View docs" pill and a subtle sentence under
- * it, small controls on the right, then the block itself (a settings card, a table in its own
- * frame). The heading sits on the page, not on a band, so nothing wraps the block in a second
- * frame. With an id it is a place a link or a table of contents can jump to.
+ * their own: a 16px semibold heading with a subtle sentence under it, small controls on the right,
+ * then the block itself (a settings card, a table in its own frame). The heading sits on the page,
+ * not on a band, so nothing wraps the block in a second frame. With an id it is a place a link or a
+ * table of contents can jump to.
  */
 export function PageSection({
   id,
   title,
-  docs,
   description,
   actions,
   children,
 }: {
   readonly id?: string;
   readonly title: ReactNode;
-  /** The documentation page that explains the part, under `docs/content`. */
-  readonly docs?: string;
   readonly description?: ReactNode;
   /** Small controls on the heading's right, such as an "Add" button. */
   readonly actions?: ReactNode;
@@ -114,7 +109,6 @@ export function PageSection({
             <h2 id={headingId} className="text-lg font-semibold text-kumo-default">
               {title}
             </h2>
-            {docs === undefined ? null : <DocsBadge path={docs} />}
           </div>
           {description === undefined ? null : (
             <p className="max-w-[750px] text-pretty text-kumo-subtle">{description}</p>

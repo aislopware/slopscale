@@ -35,7 +35,7 @@ function NetworkPage(): ReactElement {
   if (network === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="Network not found" docs="ref/networks" />
+        <PageHeader title="Network not found" />
         <Section title="Network" bodyClassName="p-0">
           <SectionEmpty
             title="This network does not exist"
@@ -56,7 +56,6 @@ function NetworkPage(): ReactElement {
       <PageHeader
         title={network.name}
         kicker="Network"
-        docs="ref/networks"
         {...(network.description === "" ? {} : { description: network.description })}
       />
       <NetworkEditor

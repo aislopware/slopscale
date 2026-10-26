@@ -102,7 +102,6 @@ function OverviewPage(): ReactElement {
     <PageWithRail rail={<OverviewRail me={me} tiles={tiles} />}>
       <PageHeader
         title="Overview"
-        docs="ref/console"
         description="What waits for a decision, what is connected and where traffic goes."
         meta={<SignedIn me={me} />}
         actions={<QuickActions me={me} />}

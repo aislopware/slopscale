@@ -30,7 +30,6 @@ function NewPosturePage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New posture"
-        docs="ref/device-trust"
         description="Conditions a machine must meet before a rule that requires the posture applies to it."
       />
       <PostureEditor

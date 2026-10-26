@@ -13,7 +13,6 @@ export function TailnetIDSection({ tailnetId }: { readonly tailnetId: string }):
       <SettingsCard>
         <SettingsRow
           title="Tailnet ID"
-          docs="ref/api"
           description={
             <>
               {"Use the tailnet ID or "}

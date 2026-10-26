@@ -39,7 +39,6 @@ function AppsPage(): ReactElement {
     <>
       <PageHeader
         title="Apps"
-        docs="ref/apps"
         description="Domains reached through app connectors: the connectors resolve them, advertise a route for every address they learn and forward the traffic."
         meta={meta}
       />

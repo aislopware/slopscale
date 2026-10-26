@@ -16,7 +16,6 @@ function SignInsPage(): ReactElement {
     <>
       <PageHeader
         title="Sign-ins"
-        docs="ref/console"
         description="The credential this browser holds, and every console session on the server."
       />
       <div className="flex flex-col gap-6">

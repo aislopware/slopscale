@@ -105,7 +105,6 @@ export function PolicyFileTab({
     <>
       <PageHeader
         title="Policy file"
-        docs="ref/policy"
         description="Grants, tags, SSH rules and autogroups written by hand in HuJSON. Rules from the Rules page are added on top."
         meta={<DraftState dirty={draft.dirty} updatedAt={policy.updatedAt} />}
         actions={<Actions draft={draft} canEdit={canEdit} />}

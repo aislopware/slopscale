@@ -39,7 +39,6 @@ function NetworksPage(): ReactElement {
     <>
       <PageHeader
         title="Networks"
-        docs="ref/networks"
         description="Subnets and exit nodes reached through routing machines. A network hands its routes only to the groups you pick."
         meta={enabled === 1 ? "1 network enabled" : `${enabled} networks enabled`}
       />

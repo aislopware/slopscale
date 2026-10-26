@@ -103,7 +103,7 @@ function FirstRunPage({ me }: { readonly me: Me }): ReactElement {
 
   return (
     <PageWithRail rail={<UseCases />}>
-      <PageHeader title="Machines" docs="ref/device-management" description={machinesNote} />
+      <PageHeader title="Machines" description={machinesNote} />
       <MachinesFirstRun
         onAddMachine={
           can(me, "auth_keys")
@@ -170,7 +170,6 @@ function MachinesList(): ReactElement {
     <>
       <PageHeader
         title="Machines"
-        docs="ref/device-management"
         description={can(me, "devices:core:read") ? machinesNote : ownMachinesNote}
         meta={summary(machines)}
       />

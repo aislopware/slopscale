@@ -43,7 +43,6 @@ function RequestsPage(): ReactElement {
     <>
       <PageHeader
         title="Requests"
-        docs="ref/temporary-access"
         description="Requests to join a group for a set time. An approver decides here, and access ends when the time is up."
         meta={pending === 1 ? "1 waiting for a decision" : `${pending} waiting for a decision`}
       />

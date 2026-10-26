@@ -36,7 +36,6 @@ function PreferencesPage(): ReactElement {
       <PageHeader
         title={name}
         kicker="Preferences"
-        docs="ref/device-management"
         description="These go straight to the machine's own client, which applies them at once and may refuse one it does not allow. Only what you change is sent."
       />
       <MachinePreferences node={node} canEdit={can(me, "devices:core")} />

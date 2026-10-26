@@ -76,7 +76,6 @@ export function AddUserPage({ canEdit }: { readonly canEdit: boolean }): ReactEl
     <FormLayout>
       <PageHeader
         title="Add user"
-        docs="ref/roles"
         description="A local user that registers machines with a pre-auth key. Users from the identity provider appear on their own after their first sign-in."
       />
       <FormPage

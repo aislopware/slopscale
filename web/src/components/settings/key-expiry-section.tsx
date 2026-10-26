@@ -50,12 +50,7 @@ export function KeyExpirySection({
       : "Off. A login lasts as long as the client asks for, 180 days by default.";
 
   return (
-    <SettingsGroup
-      id="key-expiry"
-      title="Key expiry"
-      docs="ref/console"
-      description="How long a login stays valid."
-    >
+    <SettingsGroup id="key-expiry" title="Key expiry" description="How long a login stays valid.">
       <SettingsCard>
         <SettingsRow
           title="Maximum"

@@ -42,7 +42,7 @@ function WebhookPage(): ReactElement {
   if (webhook === undefined) {
     return (
       <FormLayout>
-        <PageHeader title={title} docs="ref/webhooks" />
+        <PageHeader title={title} />
         <Section title="Webhook" bodyClassName="p-0">
           <SectionEmpty
             title="This webhook does not exist"
@@ -63,7 +63,6 @@ function WebhookPage(): ReactElement {
       <PageHeader
         title={title}
         kicker="Webhook"
-        docs="ref/webhooks"
         meta={providerLabel(webhook.providerType)}
         actions={<WebhookPageActions webhook={webhook} canEdit={canEdit} />}
       />

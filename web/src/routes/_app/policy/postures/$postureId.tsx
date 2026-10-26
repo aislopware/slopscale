@@ -42,7 +42,7 @@ function PosturePage(): ReactElement {
   if (posture === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="Posture not found" docs="ref/device-trust" />
+        <PageHeader title="Posture not found" />
         <Section title="Posture" bodyClassName="p-0">
           <SectionEmpty
             title="This posture does not exist"
@@ -63,7 +63,6 @@ function PosturePage(): ReactElement {
       <PageHeader
         title={posture.name}
         kicker="Posture"
-        docs="ref/device-trust"
         {...(posture.description === "" ? {} : { description: posture.description })}
         meta={countRules(rulesUsingPosture(rules, posture).length)}
       />

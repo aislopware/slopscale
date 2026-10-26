@@ -30,7 +30,6 @@ function OwnRelaysPage(): ReactElement {
     <>
       <PageHeader
         title="Your relays"
-        docs="ref/derp"
         description="Regions you add by hand, for relays you run yourself. They are merged into the map on top of the sources."
         meta={<DerpSourceNote derp={derp} />}
         actions={<DerpSourceActions derp={derp} canEdit={canEdit} mutations={mutations} />}

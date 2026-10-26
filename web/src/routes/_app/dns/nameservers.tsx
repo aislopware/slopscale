@@ -29,7 +29,6 @@ function NameserversPage(): ReactElement {
     <>
       <PageHeader
         title="Nameservers"
-        docs="ref/dns"
         description="The resolvers every machine uses, MagicDNS, and the search domains that complete short names."
         meta={<DnsSourceNote dns={dns.data} />}
         actions={<DnsSourceActions dns={dns.data} canEdit={canEdit} mutations={mutations} />}

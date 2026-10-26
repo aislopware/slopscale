@@ -29,7 +29,7 @@ function AppPage(): ReactElement {
   if (app === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="App not found" docs="ref/apps" />
+        <PageHeader title="App not found" />
         <Section title="App" bodyClassName="p-0">
           <SectionEmpty
             title="This app does not exist"
@@ -50,7 +50,6 @@ function AppPage(): ReactElement {
       <PageHeader
         title={app.name}
         kicker="App"
-        docs="ref/apps"
         {...(app.description === "" ? {} : { description: app.description })}
       />
       <AppEditor key={app.id} app={app} me={me} canEdit={can(me, "policy_file")} />

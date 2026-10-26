@@ -53,7 +53,7 @@ export function InvitePage({ me }: { readonly me: Me }): ReactElement {
   if (result === null) {
     return (
       <FormLayout>
-        <PageHeader title="Invite a user" docs="ref/roles" description={pageDescription} />
+        <PageHeader title="Invite a user" description={pageDescription} />
         <InviteForm me={me} onCreated={setResult} />
       </FormLayout>
     );
@@ -63,7 +63,6 @@ export function InvitePage({ me }: { readonly me: Me }): ReactElement {
     <FormLayout>
       <PageHeader
         title={result.emailSent ? "Invitation sent" : "Invitation created"}
-        docs="ref/roles"
         description="Copy the link before you leave this page. It is not shown again; re-send the invitation for a fresh one."
       />
       <FormSection title="Invitation link">

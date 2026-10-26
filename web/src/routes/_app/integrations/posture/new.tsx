@@ -48,7 +48,6 @@ function NewPostureIntegrationPage(): ReactElement {
       <FormLayout>
         <PageHeader
           title="New posture integration"
-          docs="ref/device-trust"
           description="Pick the endpoint security or device management service to connect. Its attributes sync to machines by serial number, ready for postures to check."
         />
         <FormSection title="Select a provider">
@@ -62,7 +61,6 @@ function NewPostureIntegrationPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title={`Connect ${provider.label}`}
-        docs="ref/device-trust"
         description={`Syncs ${provider.label} attributes to machines by serial number, ready for postures to check.`}
       />
       <PostureIntegrationEditor key={provider.provider} provider={provider} canEdit />

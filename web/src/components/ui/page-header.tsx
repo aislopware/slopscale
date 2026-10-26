@@ -1,20 +1,17 @@
 import type { ReactElement, ReactNode } from "react";
 
-import { DocsBadge } from "~/components/ui/docs-badge.tsx";
 import { FullBleed } from "~/components/ui/page.tsx";
 
 /**
  * The title block of every page, in the Cloudflare dashboard's current style: a 20px semibold title
- * with a "View docs" pill beside it, an optional 12px kicker above it, a subtle description kept to
- * 750px, an optional meta line of small facts, and the page's actions on the right (h-9, secondary
- * before primary). Under it a rule runs the full width of the page, edge to edge. It renders two
- * blocks of the page grid, the header and the rule, so it goes straight in the route's fragment
- * rather than inside a wrapper.
+ * with an optional 12px kicker above it, a subtle description kept to 750px, an optional meta line
+ * of small facts, and the page's actions on the right (h-9, secondary before primary). Under it a
+ * rule runs the full width of the page, edge to edge. It renders two blocks of the page grid, the
+ * header and the rule, so it goes straight in the route's fragment rather than inside a wrapper.
  */
 export function PageHeader({
   title,
   kicker,
-  docs,
   description,
   meta,
   actions,
@@ -22,8 +19,6 @@ export function PageHeader({
   readonly title: ReactNode;
   /** A 12px word above the title naming the part of a thing this page is: "Overview". */
   readonly kicker?: ReactNode;
-  /** The documentation page that explains this one, under `docs/content`: "ref/dns". */
-  readonly docs?: string;
   readonly description?: ReactNode;
   /** Small muted facts under the description, e.g. "3 machines · 2 connected". */
   readonly meta?: ReactNode;
@@ -39,7 +34,6 @@ export function PageHeader({
               <h1 className="truncate text-[20px] leading-[25px] font-semibold text-kumo-default">
                 {title}
               </h1>
-              {docs === undefined ? null : <DocsBadge path={docs} />}
             </div>
           </div>
           {description === undefined ? null : (

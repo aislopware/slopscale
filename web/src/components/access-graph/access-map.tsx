@@ -246,16 +246,19 @@ function Readout({ map, at }: { readonly map: AccessMap; readonly at: MatrixPos 
   const cell = row?.cells[at.col];
 
   return (
-    <p aria-live="polite" className="flex min-h-lh flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <p aria-live="polite" className="flex min-h-lh items-baseline gap-x-4">
       {row === undefined || cell === undefined ? null : (
         <>
-          <ClassName group={row.src} />
-          <span aria-hidden className="text-kumo-subtle">
-            →
+          {/* The pair wraps on its own, so the summary stays on the first line at the right. */}
+          <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <ClassName group={row.src} />
+            <span aria-hidden className="text-kumo-subtle">
+              →
+            </span>
+            <span className="sr-only">reaches</span>
+            <ClassName group={cell.dst} />
           </span>
-          <span className="sr-only">reaches</span>
-          <ClassName group={cell.dst} />
-          <span className="ml-auto text-kumo-strong">{cellSummary(cell)}</span>
+          <span className="max-w-1/2 text-right text-kumo-strong">{cellSummary(cell)}</span>
         </>
       )}
     </p>

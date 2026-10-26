@@ -31,7 +31,6 @@ function NewAppPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New app"
-        docs="ref/apps"
         description="Domains reached through app connectors: the connectors resolve them and route every address they learn."
       />
       <AppEditor me={me} canEdit />

@@ -32,7 +32,6 @@ function NewRulePage(): ReactElement {
     <FormLayout width="wide">
       <PageHeader
         title="New rule"
-        docs="ref/access-control"
         description="Pick who opens the connection, what it may reach and what their machine must meet."
       />
       <RuleEditor

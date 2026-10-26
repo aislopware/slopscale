@@ -45,7 +45,7 @@ function DnsRulePage(): ReactElement {
   if (rule === undefined) {
     return (
       <FormLayout>
-        <PageHeader title="DNS rule not found" docs="ref/dns" />
+        <PageHeader title="DNS rule not found" />
         <Section title="DNS rule" bodyClassName="p-0">
           <SectionEmpty
             title="This DNS rule does not exist"
@@ -66,7 +66,6 @@ function DnsRulePage(): ReactElement {
       <PageHeader
         title={rule.name}
         kicker="DNS rule"
-        docs="ref/dns"
         {...(rule.description === "" ? {} : { description: rule.description })}
       />
       <DnsRuleEditor

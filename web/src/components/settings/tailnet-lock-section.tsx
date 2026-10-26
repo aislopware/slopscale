@@ -144,7 +144,6 @@ export function TailnetLockSection({
       <SettingsGroup
         id="tailnet-lock"
         title="Tailnet lock"
-        docs="ref/tailnet-lock"
         description={
           <>
             Nodes sign each other&apos;s keys so a compromised control server cannot add a machine.

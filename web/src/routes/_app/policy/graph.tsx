@@ -65,7 +65,6 @@ function GraphPage(): ReactElement {
     <>
       <PageHeader
         title="Graph"
-        docs="ref/access-control"
         description="Who reaches what, read off the rules the server hands each machine rather than off the policy file."
         meta={countMachines(graph.nodes.length)}
         actions={

@@ -35,7 +35,6 @@ function NewDnsRulePage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New DNS rule"
-        docs="ref/dns"
         description="Split DNS that only the machines in the groups you pick receive."
       />
       <DnsRuleEditor groups={groups.data?.groups ?? []} canEdit={can(me, "dns")} />

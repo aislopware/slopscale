@@ -38,7 +38,7 @@ function GroupPage(): ReactElement {
   if (group === undefined || isBuiltin(group)) {
     return (
       <FormLayout>
-        <PageHeader title={group?.name ?? "Group not found"} docs="ref/access-control" />
+        <PageHeader title={group?.name ?? "Group not found"} />
         <Section title="Group" bodyClassName="p-0">
           <SectionEmpty
             title={
@@ -67,7 +67,6 @@ function GroupPage(): ReactElement {
       <PageHeader
         title={group.name}
         kicker={isSynced(group) ? "Group · synced from the identity provider" : "Group"}
-        docs="ref/access-control"
         {...(group.description === "" ? {} : { description: group.description })}
         meta={used === 0 ? "No rule names it" : `Named by ${plural(used, "rule")}`}
       />

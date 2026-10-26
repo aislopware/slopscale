@@ -69,7 +69,6 @@ function MyAccessPage(): ReactElement {
     <>
       <PageHeader
         title="My access"
-        docs="ref/temporary-access"
         description="Ask to join a group for a set time. An approver decides, and access ends when the time is up."
         meta={active === 0 ? undefined : `${active} active ${active === 1 ? "grant" : "grants"}`}
         actions={

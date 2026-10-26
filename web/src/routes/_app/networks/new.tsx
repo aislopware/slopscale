@@ -32,7 +32,6 @@ function NewNetworkPage(): ReactElement {
     <FormLayout>
       <PageHeader
         title="New network"
-        docs="ref/networks"
         description="Prefixes reached through routing machines, approved on the routers and handed only to the groups you pick."
       />
       <NetworkEditor
