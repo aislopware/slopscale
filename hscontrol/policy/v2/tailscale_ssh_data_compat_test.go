@@ -174,6 +174,14 @@ func TestSSHDataCompat(t *testing.T) {
 				tf.Input.FullPolicy,
 			)
 
+			// The hosted control plane allows port forwarding on every
+			// accept rule; slopscale only on rules that ask for it. Ask
+			// on every rule so the captures compare as they were taken.
+			for i := range pol.SSHs {
+				pol.SSHs[i].AllowLocalPortForwarding = true
+				pol.SSHs[i].AllowRemotePortForwarding = true
+			}
+
 			for nodeName, capture := range tf.Captures {
 				t.Run(nodeName, func(t *testing.T) {
 					node := findNodeByGivenName(nodes, nodeName)

@@ -42,4 +42,17 @@ describe(lintPolicy, () => {
       "A service can only be a destination",
     ]);
   });
+
+  it("takes the SSH port forwarding switches as booleans only", () => {
+    expect(
+      messages(`{
+        "ssh": [
+          {
+            "action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self"], "users": ["root"],
+            "allowLocalPortForwarding": true, "allowRemotePortForwarding": "yes",
+          },
+        ],
+      }`),
+    ).toStrictEqual(["allowRemotePortForwarding is true or false"]);
+  });
 });

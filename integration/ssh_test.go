@@ -1719,3 +1719,151 @@ func TestSSHLocalpart(t *testing.T) {
 		})
 	}
 }
+
+// TestSSHPortForwardingNeedsRuleOptIn pins that a Tailscale SSH session
+// forwards nothing unless its rule sets allowLocalPortForwarding. Released
+// clients up to at least 1.104 dial a forwarded Unix socket as root (the
+// Tailworm report, finding 1), so the switch is the only thing standing
+// between an SSH login and every root-only socket on the machine. It runs
+// on Tailscale's main branch and on the newest stable release, and logs
+// what a forward to a root-only socket gets on each.
+func TestSSHPortForwardingNeedsRuleOptIn(t *testing.T) {
+	IntegrationSkip(t)
+
+	versions := []string{"head", AllVersions[2]}
+
+	spec := ScenarioSpec{
+		NodesPerUser: len(versions),
+		Users:        []string{"user1", "user2", "user3"},
+		Versions:     versions,
+	}
+	scenario, err := NewScenario(spec)
+	require.NoError(t, err)
+
+	defer scenario.ShutdownAssertNoPanics(t)
+
+	sshRule := func(src string, forward bool) policyv2.SSH {
+		return policyv2.SSH{
+			Action:                   "accept",
+			Sources:                  policyv2.SSHSrcAliases{usernamep(src)},
+			Destinations:             policyv2.SSHDstAliases{new(policyv2.AutoGroupMember)},
+			Users:                    []policyv2.SSHUser{policyv2.SSHUser("ssh-it-user")},
+			AllowLocalPortForwarding: forward,
+		}
+	}
+
+	err = scenario.CreateSlopscaleEnv(
+		[]tsic.Option{
+			tsic.WithSSH(),
+			tsic.WithNetfilter("off"),
+			tsic.WithPackages("openssh", "socat"),
+			tsic.WithExtraCommands("adduser ssh-it-user"),
+			tsic.WithDockerWorkdir("/"),
+		},
+		hsic.WithACLPolicy(&policyv2.Policy{
+			ACLs: []policyv2.ACL{{
+				Action:       "accept",
+				Protocol:     "tcp",
+				Sources:      []policyv2.Alias{wildcard()},
+				Destinations: []policyv2.AliasWithPorts{aliasWithPorts(wildcard(), tailcfg.PortRangeAny)},
+			}},
+			SSHs: []policyv2.SSH{
+				// user2's rule does not ask for forwarding, user3's does.
+				sshRule("user2@", false),
+				sshRule("user3@", true),
+			},
+		}),
+		hsic.WithTestName("ssh-forwarding"),
+	)
+	require.NoError(t, err)
+
+	err = scenario.WaitForTailscaleSync()
+	requireNoErrSync(t, err)
+
+	for _, version := range versions {
+		target := userClientAt(t, scenario, "user1", version)
+		plain := userClientAt(t, scenario, "user2", version)
+		forwarder := userClientAt(t, scenario, "user3", version)
+
+		// A socket the login may open, and one only root may open; both
+		// answer with the id of the process behind them.
+		_, _, err = target.Execute([]string{
+			"sh", "-c",
+			"nohup socat UNIX-LISTEN:/tmp/user.sock,user=ssh-it-user,mode=600,fork EXEC:id " +
+				">/dev/null 2>&1 & " +
+				"nohup socat UNIX-LISTEN:/tmp/rootonly.sock,mode=600,fork EXEC:id >/dev/null 2>&1 &",
+		})
+		require.NoError(t, err)
+
+		assert.EventuallyWithT(t, func(ct *assert.CollectT) {
+			direct, _, execErr := target.Execute([]string{
+				"su", "ssh-it-user", "-s", "/bin/sh", "-c", "socat -T2 - UNIX-CONNECT:/tmp/user.sock",
+			})
+			assert.NoError(ct, execErr)
+			assert.Contains(ct, direct, "uid=0(root)")
+		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll)
+
+		// The login itself cannot open the root-only one.
+		direct, _, _ := target.Execute([]string{
+			"su", "ssh-it-user", "-s", "/bin/sh", "-c", "socat -T2 - UNIX-CONNECT:/tmp/rootonly.sock",
+		})
+		require.NotContains(t, direct, "uid=", "ssh-it-user must not reach the root-only socket directly")
+
+		targetFQDN, err := target.FQDN()
+		require.NoError(t, err)
+
+		forward := func(client TailscaleClient, socket string) (string, string, error) {
+			return client.Execute([]string{
+				"sh", "-c",
+				// ssh runs in the background with its own descriptors,
+				// so the exec returns once it is killed.
+				"rm -f /tmp/relay.sock; " +
+					"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -N " +
+					"-L /tmp/relay.sock:" + socket + " ssh-it-user@" + targetFQDN +
+					" </dev/null >/dev/null 2>/tmp/ssh.err & pid=$!; " +
+					"for i in 1 2 3 4 5 6 7 8 9 10; do [ -S /tmp/relay.sock ] && break; sleep 0.5; done; " +
+					"sleep 1; socat -T3 - UNIX-CONNECT:/tmp/relay.sock </dev/null; " +
+					"kill $pid; wait $pid; cat /tmp/ssh.err >&2; true",
+			})
+		}
+
+		// The rule that asks forwards.
+		assert.EventuallyWithT(t, func(ct *assert.CollectT) {
+			forwarded, stderr, fwdErr := forward(forwarder, "/tmp/user.sock")
+			assert.NoError(ct, fwdErr, stderr)
+			assert.Contains(ct, forwarded, "uid=0(root)", "%s: %s", version, stderr)
+		}, integrationutil.ScaledTimeout(30*time.Second), integrationutil.SlowPoll)
+
+		// The same command under the rule that does not ask reaches nothing.
+		forwarded, stderr, err := forward(plain, "/tmp/user.sock")
+		require.NoError(t, err, stderr)
+		assert.NotContains(t, forwarded, "uid=",
+			"%s: a rule without allowLocalPortForwarding must not forward:\n%s", version, stderr)
+		assert.Contains(t, stderr, "open failed", "%s: the client must refuse the channel", version)
+
+		// What the opted-in rule gets from a root-only socket depends on
+		// the client: released ones dial it as root.
+		rootOnly, stderr, err := forward(forwarder, "/tmp/rootonly.sock")
+		require.NoError(t, err, stderr)
+		t.Logf("%s (%s): forward to a root-only socket answered %q, ssh said %q",
+			version, forwarder.Version(), strings.TrimSpace(rootOnly), strings.TrimSpace(stderr))
+	}
+}
+
+// userClientAt returns the user's client running the given version.
+func userClientAt(t *testing.T, scenario *Scenario, user, version string) TailscaleClient {
+	t.Helper()
+
+	clients, err := scenario.ListTailscaleClients(user)
+	requireNoErrListClients(t, err)
+
+	for _, client := range clients {
+		if client.Version() == version {
+			return client
+		}
+	}
+
+	require.Failf(t, "client missing", "%s has no %s client", user, version)
+
+	return nil
+}

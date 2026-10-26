@@ -34,14 +34,14 @@ type PolicyManager interface {
 	// dst as localUser from the current policy, avoiding trust of
 	// client-provided URL params.
 	SSHCheckParams(srcNodeID, dstNodeID types.NodeID, localUser string) (time.Duration, bool)
-	// SSHRecordingFor returns the recorders and failure action for the
-	// check-mode session from src to dst as localUser; nil when none
-	// records.
-	SSHRecordingFor(
+	// SSHCheckAccept returns the action a check-mode session from src to
+	// dst as localUser gets once the check passes: the rule's forwarding
+	// and recorders, Accept left for the caller.
+	SSHCheckAccept(
 		baseURL string,
 		srcNodeID, dstNodeID types.NodeID,
 		localUser string,
-	) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction)
+	) tailcfg.SSHAction
 	// SetSSHRecording replaces the tailnet's default session recording.
 	SetSSHRecording(recording policyv2.SSHRecording) (bool, error)
 	SetPolicy(pol []byte) (bool, error)

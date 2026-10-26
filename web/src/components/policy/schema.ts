@@ -111,6 +111,16 @@ export const sshKeys: readonly KeyInfo[] = [
     doc: "Refuse the session when no recorder is reachable rather than letting it go unrecorded.",
     shape: "bool",
   },
+  {
+    name: "allowLocalPortForwarding",
+    doc: "Let sessions forward local ports and sockets (ssh -L, -D). Off by default: forwards run as root on the machine.",
+    shape: "bool",
+  },
+  {
+    name: "allowRemotePortForwarding",
+    doc: "Let sessions forward remote ports and sockets (ssh -R). Off by default: forwards run as root on the machine.",
+    shape: "bool",
+  },
 ];
 
 export const nodeAttrKeys: readonly KeyInfo[] = [

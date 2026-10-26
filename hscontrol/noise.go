@@ -684,17 +684,9 @@ func (ns *noiseServer) sshAction(
 	srcNodeID, dstNodeID types.NodeID,
 	localUser, authIDStr string,
 ) (*tailcfg.SSHAction, error) {
-	action := tailcfg.SSHAction{
-		AllowAgentForwarding:      true,
-		AllowLocalPortForwarding:  true,
-		AllowRemotePortForwarding: true,
-	}
-
 	// The final action replaces the rule's, so it carries the
-	// recorders the rule would have.
-	action.Recorders, action.OnRecordingFailure = ns.slopscale.state.SSHRecordingFor(
-		srcNodeID, dstNodeID, localUser,
-	)
+	// forwarding and recorders the rule would have.
+	action := ns.slopscale.state.SSHCheckAccept(srcNodeID, dstNodeID, localUser)
 
 	// Look up check params from the server's own policy rather than
 	// trusting URL parameters, which the client could tamper with.

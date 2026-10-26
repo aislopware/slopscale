@@ -80,14 +80,14 @@ func (s *State) SetSSHRecording(recorders []string, enforce bool) (change.Change
 	return change.PolicyChange(), nil
 }
 
-// SSHRecordingFor returns the recorders and failure action a check-mode
-// session from src to dst as localUser records with; see
-// [policyv2.PolicyManager.SSHRecordingFor].
-func (s *State) SSHRecordingFor(
+// SSHCheckAccept returns the action a check-mode session from src to dst
+// as localUser gets once the check passes; see
+// [policyv2.PolicyManager.SSHCheckAccept].
+func (s *State) SSHCheckAccept(
 	srcNodeID, dstNodeID types.NodeID,
 	localUser string,
-) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction) {
-	return s.polMan.SSHRecordingFor(s.cfg.ServerURL, srcNodeID, dstNodeID, localUser)
+) tailcfg.SSHAction {
+	return s.polMan.SSHCheckAccept(s.cfg.ServerURL, srcNodeID, dstNodeID, localUser)
 }
 
 // NodeByIP finds the node that holds a tailnet address; the recorder
