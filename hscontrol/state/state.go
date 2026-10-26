@@ -233,6 +233,9 @@ type State struct {
 	// time out have their auth verdict resolved with ErrRegistrationExpired
 	// via the eviction callback so any waiting goroutines wake.
 	authCache *expirable.LRU[types.AuthID, *types.AuthRequest]
+	// regSources counts the unauthenticated entries in authCache per source
+	// network; see [State.SetPendingRegistration].
+	regSources *registrationSources
 
 	// pings tracks pending ping requests and their response channels.
 	pings *pingTracker
@@ -311,9 +314,21 @@ func NewState(cfg *types.Config) (*State, error) {
 		cacheMaxEntries = cfg.Tuning.RegisterCacheMaxEntries
 	}
 
+	maxPerSource := defaultRegisterCacheMaxPerSource
+	if cfg.Tuning.RegisterCacheMaxPerSource > 0 {
+		maxPerSource = cfg.Tuning.RegisterCacheMaxPerSource
+	}
+
+	regSources := newRegistrationSources(maxPerSource)
+
+	// The callback runs for every way an entry leaves the cache: Remove,
+	// TTL expiry and LRU eviction (golang-lru v2.0.7), so the per-source
+	// count is released exactly once per entry. It runs under the cache's
+	// lock and must not call back into the cache.
 	authCache := expirable.NewLRU[types.AuthID, *types.AuthRequest](
 		cacheMaxEntries,
-		func(_ types.AuthID, rn *types.AuthRequest) {
+		func(id types.AuthID, rn *types.AuthRequest) {
+			regSources.release(id)
 			rn.FinishAuth(types.AuthVerdict{Err: ErrRegistrationExpired})
 		},
 		cacheExpiration,
@@ -369,13 +384,14 @@ func NewState(cfg *types.Config) (*State, error) {
 	s := &State{
 		cfg: cfg,
 
-		db:        db,
-		ipAlloc:   ipAlloc,
-		polMan:    polMan,
-		authCache: authCache,
-		nodeStore: nodeStore,
-		pings:     newPingTracker(),
-		c2n:       newC2NTracker(),
+		db:         db,
+		ipAlloc:    ipAlloc,
+		polMan:     polMan,
+		authCache:  authCache,
+		regSources: regSources,
+		nodeStore:  nodeStore,
+		pings:      newPingTracker(),
+		c2n:        newC2NTracker(),
 
 		sshCheckAuth:  make(map[sshCheckPair]time.Time),
 		registerLocks: xsync.NewMap[key.MachinePublic, *sync.Mutex](),
@@ -2103,9 +2119,31 @@ func (s *State) GetAuthCacheEntry(id types.AuthID) (*types.AuthRequest, bool) {
 	return s.authCache.Get(id)
 }
 
-// SetAuthCacheEntry stores a pending auth request in the cache.
+// SetAuthCacheEntry stores a pending auth request in the cache without a
+// per-source limit, for callers that have already authenticated the request
+// (the API, SSH check holds). Unauthenticated registrations go through
+// [State.SetPendingRegistration].
 func (s *State) SetAuthCacheEntry(id types.AuthID, entry *types.AuthRequest) {
 	s.authCache.Add(id, entry)
+}
+
+// SetPendingRegistration stores an unauthenticated registration in the auth
+// cache, counted against the network it came from (the address for IPv4,
+// its /64 for IPv6). Once that network holds tuning.register_cache_max_per_source
+// entries it returns [ErrTooManyPendingRegistrations] and stores nothing, so
+// a flood from one network refuses itself instead of evicting other
+// clients' pending logins. An invalid source is not counted.
+func (s *State) SetPendingRegistration(id types.AuthID, entry *types.AuthRequest, source netip.Addr) error {
+	if source.IsValid() {
+		err := s.regSources.reserve(id, sourceNetwork(source))
+		if err != nil {
+			return err
+		}
+	}
+
+	s.authCache.Add(id, entry)
+
+	return nil
 }
 
 // DeleteAuthCacheEntryForTest drops a pending auth request from the cache,

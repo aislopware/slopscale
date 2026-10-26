@@ -5,16 +5,50 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/db"
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )
+
+// registrationRefusedSampler lets one refused-registration warning per
+// minute through, so a flood refuses itself without flooding the log.
+var registrationRefusedSampler = &zerolog.BurstSampler{Burst: 1, Period: time.Minute}
+
+// registrationSourceKey is the context key for the address a register
+// request came from; see [withRegistrationSource].
+type registrationSourceKey struct{}
+
+// withRegistrationSource returns ctx carrying the client address of a
+// register request, from the Noise request's RemoteAddr: the outer
+// /ts2021 request's address, which the trusted_proxies middleware has
+// already resolved, pinned across the hijack. It is the only address a
+// registration handler can trust; headers on the inner request are the
+// client's own. An unparseable address leaves ctx without a source.
+func withRegistrationSource(ctx context.Context, remoteAddr string) context.Context {
+	addr, ok := parsePeerAddr(remoteAddr)
+	if !ok {
+		return ctx
+	}
+
+	return context.WithValue(ctx, registrationSourceKey{}, addr)
+}
+
+// registrationSource returns the address [withRegistrationSource] stored,
+// or the zero [netip.Addr], which [state.State.SetPendingRegistration]
+// does not count.
+func registrationSource(ctx context.Context) netip.Addr {
+	addr, _ := ctx.Value(registrationSourceKey{}).(netip.Addr)
+
+	return addr
+}
 
 type AuthProvider interface {
 	RegisterHandler(w http.ResponseWriter, r *http.Request)
@@ -107,7 +141,7 @@ func (h *Slopscale) handleRegister(
 		return resp, nil
 	}
 
-	resp, err := h.handleRegisterInteractive(req, machineKey)
+	resp, err := h.handleRegisterInteractive(req, machineKey, registrationSource(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("handling register interactive: %w", err)
 	}
@@ -387,7 +421,7 @@ func (h *Slopscale) waitForFollowup(
 		if verdict.Accept() {
 			if !verdict.Node.Valid() {
 				// registration is expired in the cache, instruct the client to try a new registration
-				return h.reqToNewRegisterResponse(req, machineKey)
+				return h.reqToNewRegisterResponse(req, machineKey, registrationSource(ctx))
 			}
 
 			// The followup poll is only authenticated by the auth ID in the
@@ -417,7 +451,7 @@ func (h *Slopscale) waitForFollowup(
 	}
 
 	// if the follow-up registration isn't found anymore, instruct the client to try a new registration
-	return h.reqToNewRegisterResponse(req, machineKey)
+	return h.reqToNewRegisterResponse(req, machineKey, registrationSource(ctx))
 }
 
 // reqToNewRegisterResponse refreshes the registration flow by creating a new
@@ -426,6 +460,7 @@ func (h *Slopscale) waitForFollowup(
 func (h *Slopscale) reqToNewRegisterResponse(
 	req tailcfg.RegisterRequest,
 	machineKey key.MachinePublic,
+	source netip.Addr,
 ) (*tailcfg.RegisterResponse, error) {
 	newAuthID, err := types.NewAuthID()
 	if err != nil {
@@ -436,8 +471,12 @@ func (h *Slopscale) reqToNewRegisterResponse(
 		registrationDataFromRequest(req, machineKey),
 	)
 
+	err = h.setPendingRegistration(newAuthID, authRegReq, machineKey, source)
+	if err != nil {
+		return nil, err
+	}
+
 	log.Info().Msgf("new followup node registration using auth id: %s", newAuthID)
-	h.state.SetAuthCacheEntry(newAuthID, authRegReq)
 
 	return &tailcfg.RegisterResponse{
 		AuthURL: h.authProvider.RegisterURL(newAuthID),
@@ -546,6 +585,7 @@ func (h *Slopscale) handleRegisterWithAuthKey(
 func (h *Slopscale) handleRegisterInteractive(
 	req tailcfg.RegisterRequest,
 	machineKey key.MachinePublic,
+	source netip.Addr,
 ) (*tailcfg.RegisterResponse, error) {
 	authID, err := types.NewAuthID()
 	if err != nil {
@@ -568,11 +608,44 @@ func (h *Slopscale) handleRegisterInteractive(
 		registrationDataFromRequest(req, machineKey),
 	)
 
-	h.state.SetAuthCacheEntry(authID, authRegReq)
+	err = h.setPendingRegistration(authID, authRegReq, machineKey, source)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Info().Msgf("starting node registration using auth id: %s", authID)
 
 	return &tailcfg.RegisterResponse{
 		AuthURL: h.authProvider.RegisterURL(authID),
 	}, nil
+}
+
+// setPendingRegistration parks an unauthenticated interactive registration
+// in the auth cache, or refuses it with 429 when its source network already
+// holds its share of the cache; see [state.State.SetPendingRegistration].
+func (h *Slopscale) setPendingRegistration(
+	authID types.AuthID,
+	authRegReq *types.AuthRequest,
+	machineKey key.MachinePublic,
+	source netip.Addr,
+) error {
+	err := h.state.SetPendingRegistration(authID, authRegReq, source)
+	if err == nil {
+		return nil
+	}
+
+	logger := log.Sample(registrationRefusedSampler)
+	logger.Warn().
+		Err(err).
+		Stringer("source", source).
+		Str("machine.key", machineKey.ShortString()).
+		Msg("refusing interactive registration: its network has too many pending registrations " +
+			"(tuning.register_cache_max_per_source); further refusals are logged at most once a minute")
+
+	return NewHTTPError(
+		http.StatusTooManyRequests,
+		"too many pending registrations from your network; "+
+			"complete an earlier login or wait for it to expire, then try again",
+		err,
+	)
 }

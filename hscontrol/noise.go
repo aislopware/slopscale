@@ -71,6 +71,13 @@ const (
 	// No legitimate Noise request ([tailcfg.MapRequest], [tailcfg.RegisterRequest], etc.) comes close
 	// to this limit; typical payloads are a few KB.
 	noiseBodyLimit int64 = 1048576 // 1 MiB
+
+	// registerBodyLimit bounds a [tailcfg.RegisterRequest] tighter than
+	// other Noise requests. Any machine key may register, and a pending
+	// interactive registration keeps the request's Hostinfo in the auth
+	// cache, so at the general limit a full cache of strangers' requests
+	// would hold a gigabyte or more. A real request is a few KB.
+	registerBodyLimit int64 = 128 << 10 // 128 KiB
 )
 
 type noiseServer struct {
@@ -587,6 +594,8 @@ func (ns *noiseServer) RegistrationHandler(
 
 	var registerRequest tailcfg.RegisterRequest
 
+	req.Body = http.MaxBytesReader(writer, req.Body, registerBodyLimit)
+
 	err := wire.UnmarshalRead(req.Body, &registerRequest)
 	if err != nil {
 		httpError(writer, NewHTTPError(http.StatusBadRequest, "malformed register request", err))
@@ -601,7 +610,9 @@ func (ns *noiseServer) RegistrationHandler(
 		return
 	}
 
-	registerResponse, err := ns.slopscale.handleRegister(req.Context(), registerRequest, ns.machineKey)
+	registerResponse, err := ns.slopscale.handleRegister(
+		withRegistrationSource(req.Context(), req.RemoteAddr), registerRequest, ns.machineKey,
+	)
 	if err != nil {
 		if httpErr, ok := errors.AsType[HTTPError](err); ok {
 			registerResponse = &tailcfg.RegisterResponse{Error: httpErr.Msg}

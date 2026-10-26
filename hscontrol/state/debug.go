@@ -187,6 +187,10 @@ func (s *State) DebugRegistrationCache() map[string]any {
 		"max_entries": defaultRegisterCacheMaxEntries,
 		"current_len": s.authCache.Len(),
 		"status":      "active",
+		// Unauthenticated registrations per source network, against
+		// the per-source limit; see [State.SetPendingRegistration].
+		"max_per_source":    s.regSources.limit,
+		"pending_by_source": s.regSources.snapshot(),
 	}
 }
 
