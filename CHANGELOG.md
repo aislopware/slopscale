@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [0.63.0](https://github.com/aislopware/slopscale/compare/v0.62.0...v0.63.0) (2026-11-06)
+
+
+### Changes
+
+* roll out the latest Tailscale release to every machine that allows auto-update ([#84](https://github.com/aislopware/slopscale/issues/84)) ([f4ad734](https://github.com/aislopware/slopscale/commit/f4ad734ad892a871ea62c1ffd0c42b57ef1dc4d9))
+
+
+### Fixes
+
+* **mapper:** answer extra records on every client without overriding local DNS ([#83](https://github.com/aislopware/slopscale/issues/83)) ([336e093](https://github.com/aislopware/slopscale/commit/336e0933f84d2569b7f46c26fb44f221181dedd6))
+* **web:** drop the View docs pills that wrapped onto their own line ([#80](https://github.com/aislopware/slopscale/issues/80)) ([2df2a8f](https://github.com/aislopware/slopscale/commit/2df2a8f05437d7112d58cbffac720cfc556f7006))
+* **web:** show a machine's owner apart from its facts on the machine page ([#82](https://github.com/aislopware/slopscale/issues/82)) ([dda73fa](https://github.com/aislopware/slopscale/commit/dda73faeef8bc5c0967f9c61444c67c5c4e2d2c7))
+
 ## [0.62.0](https://github.com/aislopware/slopscale/compare/v0.61.0...v0.62.0) (2026-10-26)
 
 
