@@ -462,14 +462,18 @@ policy:
 # Tell clients whether a newer Tailscale client exists, the way the hosted
 # control plane does: the server reads the latest stable release from
 # https://pkgs.tailscale.com once a day and each client behind it shows
-# the "update available" health warning (and updates itself when its
-# auto-update is on). The Server page of the console shows the release.
+# the "update available" health warning. The Server page of the console
+# shows the release.
 # client_updates:
 #   # Set to false on a server without internet access, or to keep the
 #   # clients quiet.
 #   check: true
 #   # How often to look; at least 1h.
 #   interval: 24h
+#   # Ask each connected client that allows remote updates
+#   # (tailscale set --auto-update) and runs an older release to update,
+#   # one every two minutes. A running client never updates by itself.
+#   apply: true
 
 ## Control dial plan
 #

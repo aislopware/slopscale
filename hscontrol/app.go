@@ -86,6 +86,10 @@ type Slopscale struct {
 	// recorder node feeds it when cfg.SSHRecording.Enabled.
 	recorder *recorder.Recorder
 
+	// clientUpdatesAsked is when the client update rollout last asked
+	// each node, and for which release; only its goroutine touches it.
+	clientUpdatesAsked map[types.NodeID]clientUpdateAttempt
+
 	// challenges publishes ACME challenge records for machines' HTTPS
 	// certificates and removes them after use; nil when cfg.HTTPSCerts
 	// is off.
@@ -593,6 +597,10 @@ func (h *Slopscale) Serve() error {
 
 	if h.cfg.ClientUpdates.Check {
 		errorGroup.Go(func() error { return h.runClientVersionCheck(ctx) })
+	}
+
+	if h.cfg.ClientUpdates.Check && h.cfg.ClientUpdates.Apply {
+		errorGroup.Go(func() error { return h.runClientUpdateRollout(ctx) })
 	}
 
 	// Handle common process-killing signals so we can gracefully shut down:

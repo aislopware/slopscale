@@ -77,9 +77,11 @@ machine it runs on:
 - `branding`, the name and logo the server puts on itself; the logo is a file, read once at startup. See
   [Branding](/ref/branding).
 - `client_updates`: the server reads the latest stable Tailscale release from pkgs.tailscale.com once a day and
-  tells each client whether it runs it, so an older client shows Tailscale's own _update available_ warning and,
-  with auto-update on, updates itself. `check: false` turns the lookup off on a server without internet access;
-  `interval` is how often to look, at least one hour. See [Device management](/ref/device-management#client-update-notices).
+  tells each client whether it runs it, so an older client shows Tailscale's own _update available_ warning, and
+  then asks each connected client that allows remote updates to install it, one every two minutes. `check: false`
+  turns the lookup off on a server without internet access; `interval` is how often to look, at least one hour;
+  `apply: false` keeps the lookup and stops the rollout. See
+  [Device management](/ref/device-management#automatic-client-updates).
 - `control_dial_plan`: addresses clients try for the server before resolving its name, in order of preference.
   Clients keep the plan between runs, so they reach the server through a DNS outage and fall back to the name when
   none of the addresses answers. Leave it empty to rely on DNS.
