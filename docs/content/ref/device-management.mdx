@@ -53,13 +53,35 @@ reports each machine on its own.
 Separately from a push, the server tells every client whether a newer
 Tailscale exists, the way the hosted control plane does: it reads the
 latest stable release from pkgs.tailscale.com once a day, and a client
-behind it shows Tailscale's own _update available_ health warning and,
-with auto-update on, updates itself. The node object carries
+behind it shows Tailscale's own _update available_ health warning. The node object carries
 `clientVersion` and `updateAvailable`, the server info
 `latestClientVersion`, and the console shows the version on the machine
 page with an _Update available_ status and the latest release on the
 _Server_ page. `client_updates` in the [configuration file](/ref/configuration#settings-that-live-only-in-the-file)
 turns the lookup off or changes how often it runs.
+
+### Automatic client updates
+
+A connected client never updates on its own, even with auto-update on: its
+own check runs only while it is logged out or stopped, and otherwise it
+waits for the control server to ask, as the hosted control plane does. So
+the server rolls the latest release out itself. Every two minutes it asks
+one connected machine that allows remote updates and runs an older release
+to update, lowest ID first, so the gateways of a tailnet never restart
+together. A machine that refuses, because it is serving SSH sessions or
+cannot update itself, or that is still behind afterwards, is asked again
+six hours later or as soon as a newer release is out. Each request is
+logged as `client update started` or `client update refused`.
+
+Which machines take part is up to their owners: a machine allows it with
+`tailscale set --auto-update` (on the Mac and Windows, _Automatically
+install updates_ in the app's settings). New machines start with
+`auto_update.enabled` as their default, and a machine keeps the first
+default it sees, so turning the setting on later does not reach machines
+that already joined with it off. The App Store and Play Store builds are
+updated by their stores and never allow it. `client_updates.apply: false`
+stops the rollout; it needs the release lookup, so `check: false` stops it
+too.
 
 ## Health and diagnostics
 

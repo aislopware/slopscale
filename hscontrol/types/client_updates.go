@@ -23,10 +23,17 @@ var ErrClientUpdatesIntervalTooShort = errors.New("client_updates.interval must 
 
 // ClientUpdatesConfig is whether and how often the server looks up the
 // latest stable Tailscale client release at pkgs.tailscale.com, to tell
-// each client whether it runs it ([tailcfg.MapResponse.ClientVersion]).
+// each client whether it runs it ([tailcfg.MapResponse.ClientVersion]),
+// and whether it then asks the clients that allow it to update.
 type ClientUpdatesConfig struct {
 	Check    bool
 	Interval time.Duration
+	// Apply has the server ask each connected client that allows remote
+	// updates and runs an older release to update itself, one at a time.
+	// A running client never updates on its own: its periodic check runs
+	// only while it is logged out or stopped, and otherwise it waits for
+	// the control server to ask. Needs Check, for the latest release.
+	Apply bool
 }
 
 // Validate checks the interval.
@@ -74,6 +81,7 @@ func clientUpdatesConfig() (ClientUpdatesConfig, error) {
 	cfg := ClientUpdatesConfig{
 		Check:    conf.GetBool("client_updates.check"),
 		Interval: conf.GetDuration("client_updates.interval"),
+		Apply:    conf.GetBool("client_updates.apply"),
 	}
 
 	err := cfg.Validate()

@@ -967,6 +967,7 @@ func setNodeServiceDefaults() {
 	conf.SetDefault("traffic.asn_cache_path", "/var/lib/slopscale/ip2asn-combined.tsv.gz")
 	conf.SetDefault("client_updates.check", true)
 	conf.SetDefault("client_updates.interval", DefaultClientUpdatesInterval)
+	conf.SetDefault("client_updates.apply", true)
 	conf.SetDefault("egress.deny_private_targets", false)
 	conf.SetDefault("egress.allow_loopback_targets", false)
 	conf.SetDefault("debug.node_api_enabled", false)
