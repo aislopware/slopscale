@@ -23,9 +23,15 @@ func TestNextClientUpdate(t *testing.T) {
 		return (&types.Node{
 			ID:       id,
 			IsOnline: isOnline,
-			Hostinfo: &tailcfg.Hostinfo{IPNVersion: version, AllowsUpdate: allows},
+			Hostinfo: &tailcfg.Hostinfo{OS: "linux", IPNVersion: version, AllowsUpdate: allows},
 		}).View()
 	}
+
+	mac := (&types.Node{
+		ID:       1,
+		IsOnline: &online,
+		Hostinfo: &tailcfg.Hostinfo{OS: "macOS", IPNVersion: "1.102.4-t1", AllowsUpdate: true},
+	}).View()
 
 	nodes := views.SliceOf([]types.NodeView{
 		node(9, "1.102.4-t1", true, &online),
@@ -34,6 +40,7 @@ func TestNextClientUpdate(t *testing.T) {
 		node(5, "1.102.4-t1", true, &offline), // not connected
 		node(7, "1.98.4-t1", true, &online),
 		(&types.Node{ID: 2, IsOnline: &online}).View(), // no Hostinfo yet
+		mac, // updates itself through Sparkle
 	})
 
 	now := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)

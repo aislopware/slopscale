@@ -87,7 +87,10 @@ func (h *Slopscale) rollOutClientUpdate(ctx context.Context, now time.Time) {
 
 // nextClientUpdate returns the node with the lowest ID that is due an
 // update: connected, allowing remote updates, behind latest, and not
-// asked for this release within [clientUpdateRetry].
+// asked for this release within [clientUpdateRetry]. Macs are left out:
+// with auto-update on, the standalone app installs updates through
+// Sparkle on its own schedule and answers a remote request "not
+// supported", and the App Store updates the other build.
 func nextClientUpdate(
 	nodes views.Slice[types.NodeView], latest string, asked map[types.NodeID]clientUpdateAttempt, now time.Time,
 ) (types.NodeView, bool) {
@@ -96,7 +99,7 @@ func nextClientUpdate(
 	for _, node := range nodes.All() {
 		hi := node.Hostinfo()
 		if !node.IsOnline().Valid() || !node.IsOnline().Get() || !hi.Valid() || !hi.AllowsUpdate() ||
-			!clientversion.Outdated(hi.IPNVersion(), latest) {
+			hi.OS() == "macOS" || !clientversion.Outdated(hi.IPNVersion(), latest) {
 			continue
 		}
 

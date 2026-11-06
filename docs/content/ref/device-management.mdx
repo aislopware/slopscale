@@ -75,7 +75,9 @@ logged as `client update started` or `client update refused`.
 
 Which machines take part is up to their owners: a machine allows it with
 `tailscale set --auto-update` (on the Mac and Windows, _Automatically
-install updates_ in the app's settings). New machines start with
+install updates_ in the app's settings). The rollout leaves Macs out: with
+auto-update on, the standalone Mac app installs updates through Sparkle on
+its own and refuses a request from the server. New machines start with
 `auto_update.enabled` as their default, and a machine keeps the first
 default it sees, so turning the setting on later does not reach machines
 that already joined with it off. The App Store and Play Store builds are
