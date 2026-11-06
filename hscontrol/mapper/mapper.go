@@ -157,6 +157,8 @@ func generateDNSConfig(
 		dnsConfig.Routes[domain] = append(dnsConfig.Routes[domain], rs...)
 	}
 
+	routeExtraRecords(dnsConfig, cfg.BaseDomain)
+
 	profile := nextDNSProfileFromCapMap(capMap)
 	if profile != "" {
 		applyNextDNSProfile(dnsConfig.Resolvers, profile)
@@ -179,6 +181,56 @@ func generateDNSConfig(
 	}
 
 	return dnsConfig
+}
+
+// routeExtraRecords gives every extra record that no route covers an
+// empty route of its own, the client's "answer this name yourself". The
+// route is what puts the name in the operating system's match domains,
+// so its queries reach the client's resolver and get the record. Without
+// it, a record outside the base domain is answered only while
+// override_local_dns sends every query there, and even then macOS races
+// the local resolver. Clients from Tailscale 1.104.0 add these routes
+// themselves (coverExtraRecords in ipn/ipnlocal); this does the same for
+// older ones. A route that covers the name, including MagicDNS's base
+// domain, wins, as it does on the client. An empty route survives an exit
+// node, where a route with resolvers not kept for exit nodes is dropped.
+func routeExtraRecords(dnsConfig *tailcfg.DNSConfig, baseDomain string) {
+	base := strings.ToLower(strings.TrimSuffix(baseDomain, "."))
+
+	for _, rec := range dnsConfig.ExtraRecords {
+		name := strings.ToLower(strings.TrimSuffix(rec.Name, "."))
+		if name == "" || routeCovers(dnsConfig.Routes, name) {
+			continue
+		}
+
+		if dnsConfig.Proxied && base != "" && (name == base || strings.HasSuffix(name, "."+base)) {
+			continue
+		}
+
+		if dnsConfig.Routes == nil {
+			dnsConfig.Routes = make(map[string][]*dnstype.Resolver)
+		}
+
+		// Empty, not nil: Clone drops map entries whose value is nil
+		// (see addMagicDNSRoutes in types/config.go).
+		dnsConfig.Routes[name] = []*dnstype.Resolver{}
+	}
+}
+
+// routeCovers reports whether a route is the name or a domain above it.
+func routeCovers(routes map[string][]*dnstype.Resolver, name string) bool {
+	for {
+		if _, ok := routes[name]; ok {
+			return true
+		}
+
+		_, parent, found := strings.Cut(name, ".")
+		if !found {
+			return false
+		}
+
+		name = parent
+	}
 }
 
 // nextDNSProfileFromCapMap returns the policy-selected

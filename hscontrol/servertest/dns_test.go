@@ -351,3 +351,35 @@ func TestDNSEditsWithFileOwnedRecords(t *testing.T) {
 	assert.Equal(t, []any{"lab.example"}, field(t, body, "effective", "searchDomains"))
 	assert.Len(t, field(t, body, "effective", "extraRecords"), 1, "the file's records survive the edits")
 }
+
+// TestExtraRecordRoutesWithoutOverride proves a tailnet that leaves the
+// clients' own DNS in place still answers its extra records: each record
+// outside the base domain reaches the client with an empty route, which
+// makes the client's resolver answer it, while a record under the base
+// domain is left to MagicDNS.
+func TestExtraRecordRoutesWithoutOverride(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithDNS(types.DNSConfig{
+		MagicDNS:    true,
+		BaseDomain:  "ts.example",
+		Nameservers: types.Nameservers{Split: map[string][]string{"lab.example": {"10.0.0.3"}}},
+		ExtraRecords: []tailcfg.DNSRecord{
+			{Name: "wiki.corp.example", Type: "A", Value: "100.64.0.28"},
+			{Name: "git.lab.example", Type: "A", Value: "100.64.0.29"},
+			{Name: "grafana.ts.example", Type: "A", Value: "100.64.0.30"},
+		},
+	}))
+	node := servertest.NewClient(t, srv, "dns-records")
+
+	node.WaitForCondition(t, "netmap with the extra records", dnsWait, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid() && len(nm.DNS.ExtraRecords) == 3
+	})
+
+	nm := node.Netmap()
+	assert.Empty(t, nm.DNS.Resolvers, "the clients keep their own DNS")
+	require.Contains(t, nm.DNS.Routes, "wiki.corp.example")
+	assert.Empty(t, nm.DNS.Routes["wiki.corp.example"], "the client answers the record itself")
+	assert.NotContains(t, nm.DNS.Routes, "git.lab.example", "the split DNS route covers it")
+	assert.NotContains(t, nm.DNS.Routes, "grafana.ts.example", "MagicDNS covers the base domain")
+}
