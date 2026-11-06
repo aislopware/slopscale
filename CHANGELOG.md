@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.63.1](https://github.com/aislopware/slopscale/compare/v0.63.0...v0.63.1) (2026-11-06)
+
+
+### Fixes
+
+* stop asking Macs to update every six hours when Sparkle already updates them ([#85](https://github.com/aislopware/slopscale/issues/85)) ([369394a](https://github.com/aislopware/slopscale/commit/369394ab4203c6205320a2503f1521f52c75a565))
+
 ## [0.63.0](https://github.com/aislopware/slopscale/compare/v0.62.0...v0.63.0) (2026-11-06)
 
 
